@@ -289,11 +289,55 @@ int main() {
     }
 
     /* Test memmove (overlap handling) */
-    /* Note: Since we link with kernel/string.c, we are testing our implementation
-       if the linker picks it up. If not, we test libc's.
-       To be sure, let's trust that memset16 is unique.
-       Testing memmove/memcpy here might be ambiguous due to libc conflict.
-    */
+    {
+        char buffer[20];
+
+        /* Initialize buffer: "0123456789" */
+        strcpy(buffer, "0123456789");
+
+        /* Overlap: dest > src (shift right, requires backward copy) */
+        /* src = buffer ("01234..."), dest = buffer + 1 ("12345...") */
+        /* Move "01234" to index 1 -> overwrites "12345" */
+        /* If forward copy: buf[1]='0', buf[2]='0' (was '1' but now '0')... WRONG */
+        /* If backward copy: buf[5]='4', buf[4]='3', ... buf[1]='0'. CORRECT */
+        memmove(buffer + 1, buffer, 5);
+        /* Expected: "0012346789" */
+        /* buffer[0] is untouched ('0') */
+        /* buffer[1..5] becomes "01234" */
+        /* buffer[6..9] remains "6789" */
+        assert(memcmp(buffer, "0012346789", 10) == 0);
+
+        printf("memmove backward copy (dest > src) passed\n");
+
+        /* Reset */
+        strcpy(buffer, "0123456789");
+
+        /* Overlap: dest < src (shift left, forward copy is safe) */
+        /* src = buffer + 1 ("12345..."), dest = buffer ("01234...") */
+        /* Move "12345" to index 0 -> overwrites "01234" */
+        memmove(buffer, buffer + 1, 5);
+        /* Expected: "1234556789" */
+        /* buffer[0..4] becomes "12345" */
+        /* buffer[5..9] remains "56789" */
+        assert(memcmp(buffer, "1234556789", 10) == 0);
+
+        printf("memmove forward copy (dest < src) passed\n");
+
+        /* No overlap */
+        strcpy(buffer, "0123456789");
+        memmove(buffer + 5, buffer, 5);
+        /* Expected: "0123401234" */
+        assert(memcmp(buffer, "0123401234", 10) == 0);
+
+        printf("memmove no overlap passed\n");
+
+        /* Self assignment */
+        strcpy(buffer, "0123456789");
+        memmove(buffer, buffer, 10);
+        assert(memcmp(buffer, "0123456789", 10) == 0);
+
+        printf("memmove self assignment passed\n");
+    }
 
     printf("All tests passed!\n");
     return 0;
