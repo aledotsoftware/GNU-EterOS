@@ -55,7 +55,7 @@ static void kernel_halt(void);
  * Invocada por el bootloader desde Long Mode (64-bit).
  * Inicializa los subsistemas principales y entra en el loop del kernel.
  */
-void kmain(void) {
+void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 1. Inicializar el terminal VGA ---- */
     terminal_initialize();
 

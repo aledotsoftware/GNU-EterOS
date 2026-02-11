@@ -207,14 +207,34 @@ static void irq_default(struct interrupt_frame *frame) {
 }
 
 void idt_init(void) {
-    /* DEBUG PRINTS REMOVED (Clean version) */
-    
+    /* Limpiar toda la tabla */
     memset(idt, 0, sizeof(idt));
-    
-    // ... exception handlers ...
-    // (use previous idt_init logic until loop)
+
+    /* --- Instalar handlers de excepciones --- */
+    idt_set_gate(0,  (void*)isr_0,  IDT_GATE_INTERRUPT);
+    idt_set_gate(1,  (void*)isr_1,  IDT_GATE_INTERRUPT);
+    idt_set_gate(2,  (void*)isr_2,  IDT_GATE_INTERRUPT);
+    idt_set_gate(3,  (void*)isr_3,  IDT_GATE_INTERRUPT);
+    idt_set_gate(4,  (void*)isr_4,  IDT_GATE_INTERRUPT);
+    idt_set_gate(5,  (void*)isr_5,  IDT_GATE_INTERRUPT);
+    idt_set_gate(6,  (void*)isr_6,  IDT_GATE_INTERRUPT);
+    idt_set_gate(7,  (void*)isr_7,  IDT_GATE_INTERRUPT);
+    idt_set_gate(8,  (void*)isr_8,  IDT_GATE_INTERRUPT);
+    idt_set_gate(9,  (void*)isr_9,  IDT_GATE_INTERRUPT);
+    idt_set_gate(10, (void*)isr_10, IDT_GATE_INTERRUPT);
+    idt_set_gate(11, (void*)isr_11, IDT_GATE_INTERRUPT);
+    idt_set_gate(12, (void*)isr_12, IDT_GATE_INTERRUPT);
+    idt_set_gate(13, (void*)isr_13, IDT_GATE_INTERRUPT);
+    idt_set_gate(14, (void*)isr_14, IDT_GATE_INTERRUPT);
+    idt_set_gate(16, (void*)isr_16, IDT_GATE_INTERRUPT);
+    idt_set_gate(17, (void*)isr_17, IDT_GATE_INTERRUPT);
+    idt_set_gate(18, (void*)isr_18, IDT_GATE_INTERRUPT);
+    idt_set_gate(19, (void*)isr_19, IDT_GATE_INTERRUPT);
+    idt_set_gate(20, (void*)isr_20, IDT_GATE_INTERRUPT);
+    idt_set_gate(21, (void*)isr_21, IDT_GATE_INTERRUPT);
 
     /* --- Instalar handlers de IRQs (32-47) --- */
+    /* Usamos isr_stub_timer (assembly) -> irq_timer_handler (C) */
     idt_set_gate(IRQ_BASE + 0,  (void*)isr_stub_timer,    IDT_GATE_INTERRUPT);
     idt_set_gate(IRQ_BASE + 1,  (void*)isr_stub_keyboard, IDT_GATE_INTERRUPT);
     idt_set_gate(IRQ_BASE + 4,  (void*)irq_serial,        IDT_GATE_INTERRUPT);

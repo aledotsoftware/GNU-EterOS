@@ -61,10 +61,11 @@ isr_stub_timer:
     ; ABI Setup
     cld                         ; Clear Direction Flag (System V ABI)
     
-    call irq_timer_handler      ; Llamar lógica en C
+    ; call irq_timer_handler      ; Llamar lógica en C
     
-    ; Enviar EOI manual (PIC1_COMMAND 0x20, PIC_EOI 0x20) - YA NO ES NECESARIO SI C LO HACE
-    ; (irq_timer_handler hace pic_eoi)
+    ; Enviar EOI manual (PIC1_COMMAND 0x20, PIC_EOI 0x20)
+    mov al, 0x20
+    out 0x20, al
     
     POP_ALL
     iretq
