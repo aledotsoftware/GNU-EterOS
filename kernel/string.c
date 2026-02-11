@@ -12,9 +12,8 @@
 /* ========================================================================= */
 
 void* memcpy(void* dest, const void* src, size_t n) {
+#ifdef __x86_64__
     void* original_dest = dest;
-    
-    /* Copiar bloques de 8 bytes (64 bits) usando rep movsq */
     size_t qwords = n / 8;
     size_t remainder = n % 8;
 
@@ -25,24 +24,28 @@ void* memcpy(void* dest, const void* src, size_t n) {
         : "memory"
     );
 
-    /* Copiar los bytes restantes */
     __asm__ volatile (
         "rep movsb"
         : "+D"(dest), "+S"(src), "+c"(remainder)
         :
         : "memory"
     );
-    
     return original_dest;
+#else
+    uint8_t* d = (uint8_t*)dest;
+    const uint8_t* s = (const uint8_t*)src;
+    while (n--) *d++ = *s++;
+    return dest;
+#endif
 }
 
 void* memset(void* dest, int c, size_t n) {
+#ifdef __x86_64__
     void* original_dest = dest;
     uint64_t val = (uint8_t)c;
     uint64_t pattern = val | (val << 8) | (val << 16) | (val << 24) |
                        (val << 32) | (val << 40) | (val << 48) | (val << 56);
     
-    /* Copiar bloques de 8 bytes (64 bits) usando rep stosq */
     size_t qwords = n / 8;
     size_t remainder = n % 8;
 
@@ -53,28 +56,35 @@ void* memset(void* dest, int c, size_t n) {
         : "memory"
     );
 
-    /* Copiar los bytes restantes */
     __asm__ volatile (
         "rep stosb"
         : "+D"(dest), "+c"(remainder)
         : "a"(val)
         : "memory"
     );
-    
     return original_dest;
+#else
+    uint8_t* d = (uint8_t*)dest;
+    while (n--) *d++ = (uint8_t)c;
+    return dest;
+#endif
 }
 
 void* memset16(void* dest, uint16_t c, size_t n) {
+#ifdef __x86_64__
     void* original_dest = dest;
-
     __asm__ volatile (
         "cld; rep stosw"
         : "+D"(dest), "+c"(n)
         : "a"(c)
         : "memory"
     );
-
     return original_dest;
+#else
+    uint16_t* d = (uint16_t*)dest;
+    while (n--) *d++ = c;
+    return dest;
+#endif
 }
 
 void* memmove(void* dest, const void* src, size_t n) {
@@ -83,27 +93,33 @@ void* memmove(void* dest, const void* src, size_t n) {
     
     if (d == s || n == 0) return dest;
 
+#ifdef __x86_64__
     if (d < s) {
-        /* Copiar hacia adelante */
         __asm__ volatile (
             "cld; rep movsb"
             : "+S"(s), "+D"(d), "+c"(n)
-            :
-            : "memory"
+            : : "memory"
         );
     } else {
-        /* Copiar hacia atrás para manejar solapamiento */
         s += n - 1;
         d += n - 1;
         __asm__ volatile (
             "std; rep movsb; cld"
             : "+S"(s), "+D"(d), "+c"(n)
-            :
-            : "memory"
+            : : "memory"
         );
     }
-    
     return dest;
+#else
+    if (d < s) {
+        while (n--) *d++ = *s++;
+    } else {
+        d += n;
+        s += n;
+        while (n--) *--d = *--s;
+    }
+    return dest;
+#endif
 }
 
 int memcmp(const void* s1, const void* s2, size_t n) {

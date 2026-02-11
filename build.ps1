@@ -23,7 +23,10 @@
 
 param(
     [ValidateSet("all", "boot", "kernel", "image", "vdi", "vbox", "run", "debug", "clean", "info")]
-    [string]$Target = "all"
+    [string]$Target = "all",
+
+    [ValidateSet("x86_64", "i386")]
+    [string]$Arch = "x86_64"
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,6 +63,12 @@ $crossSearchPaths = @(
     "C:\cross\bin"
 )
 
+$cross32SearchPaths = @(
+    "C:\i686-elf-tools\bin",
+    "$env:LOCALAPPDATA\i686-elf-tools\bin",
+    "C:\cross32\bin"
+)
+
 $qemuSearchPaths = @(
     "C:\Program Files\qemu",
     "C:\Program Files (x86)\qemu",
@@ -67,10 +76,7 @@ $qemuSearchPaths = @(
 )
 
 $AS = Find-Tool "nasm"                $nasmSearchPaths
-$CC = Find-Tool "x86_64-elf-gcc"      $crossSearchPaths
-$LD = Find-Tool "x86_64-elf-ld"       $crossSearchPaths
-$OBJCOPY = Find-Tool "x86_64-elf-objcopy"  $crossSearchPaths
-$QEMU = Find-Tool "qemu-system-x86_64"  $qemuSearchPaths
+$QEMU = Find-Tool "qemu-system-$Arch"  $qemuSearchPaths
 
 # VBoxManage (opcional — para generar VDI)
 $vboxSearchPaths = @(
@@ -80,13 +86,49 @@ $vboxSearchPaths = @(
 )
 $VBOXMANAGE = Find-Tool "VBoxManage" $vboxSearchPaths
 
+if ($Arch -eq "x86_64") {
+    $CC = Find-Tool "x86_64-elf-gcc" $crossSearchPaths
+    $LD = Find-Tool "x86_64-elf-ld" $crossSearchPaths
+    $OBJCOPY = Find-Tool "x86_64-elf-objcopy" $crossSearchPaths
+    $BOOT_DIR = "boot\x86_64"
+    $CARCHFLAGS = @("-m64", "-mcmodel=large", "-mno-red-zone", "-mno-sse", "-mno-sse2", "-mno-mmx", "-D__x86_64__")
+    $LDFLAGS_ARCH = @("-m", "elf_x86_64")
+    $VBOX_OSTYPE = "Other_64"
+}
+else {
+    # Para i386 usamos el compilador de 32 bits si existe, o el de 64 bits con flag -m32
+    $CC = Find-Tool "i686-elf-gcc" $cross32SearchPaths
+    if (!$CC) { 
+        $CC = Find-Tool "x86_64-elf-gcc" $crossSearchPaths 
+        $CARCHFLAGS = @("-m32", "-mno-sse", "-mno-sse2", "-mno-mmx")
+    }
+    else {
+        $CARCHFLAGS = @("-mno-sse", "-mno-sse2", "-mno-mmx")
+    }
+
+    $LD = Find-Tool "i686-elf-ld" $cross32SearchPaths
+    if (!$LD) {
+        $LD = Find-Tool "x86_64-elf-ld" $crossSearchPaths
+        $LDFLAGS_ARCH = @("-m", "elf_i386")
+    }
+    else {
+        $LDFLAGS_ARCH = @()
+    }
+    
+    $OBJCOPY = Find-Tool "i686-elf-objcopy" $cross32SearchPaths
+    if (!$OBJCOPY) { $OBJCOPY = Find-Tool "x86_64-elf-objcopy" $crossSearchPaths }
+
+    $BOOT_DIR = "boot\i386"
+    $VBOX_OSTYPE = "Other"
+}
+
 # Verificar herramientas críticas
 $missing = @()
 if (!$AS) { $missing += "nasm" }
-if (!$CC) { $missing += "x86_64-elf-gcc" }
-if (!$LD) { $missing += "x86_64-elf-ld" }
-if (!$OBJCOPY) { $missing += "x86_64-elf-objcopy" }
-if (!$QEMU) { $missing += "qemu-system-x86_64" }
+if (!$CC) { $missing += "$Arch-elf-gcc" }
+if (!$LD) { $missing += "$Arch-elf-ld" }
+if (!$OBJCOPY) { $missing += "$Arch-elf-objcopy" }
+if (!$QEMU) { $missing += "qemu-system-$Arch" }
 
 if ($missing.Count -gt 0 -and $Target -notin @("clean", "info")) {
     Write-Host "  [ERROR] Herramientas no encontradas:" -ForegroundColor Red
@@ -102,10 +144,11 @@ if ($missing.Count -gt 0 -and $Target -notin @("clean", "info")) {
     exit 1
 }
 
-$BOOT_DIR = "boot\x86_64"
 $KERNEL_DIR = "kernel"
 $INCLUDE_DIR = "include"
-$BUILD_DIR = "build"
+$BUILD_DIR = "build\$Arch"
+
+if (!(Test-Path $BUILD_DIR)) { New-Item -ItemType Directory -Force -Path $BUILD_DIR | Out-Null }
 
 $BOOT_SRC = "$BOOT_DIR\boot.asm"
 $BOOT_BIN = "$BUILD_DIR\boot.bin"
@@ -121,15 +164,13 @@ $CFLAGS = @(
     "-nostdlib",
     "-nostdinc",
     "-mno-red-zone",
-    "-mno-sse",
-    "-mno-sse2",
-    "-mno-mmx",
     "-Wall",
     "-Wextra",
     "-O2",
     "-I$INCLUDE_DIR"
-)
+) + $CARCHFLAGS
 
+# Archivos fuente comunes
 $KERNEL_SRCS = @(
     "$KERNEL_DIR\main.c",
     "$KERNEL_DIR\string.c",
@@ -137,12 +178,22 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\drivers\video\vga.c",
     "$KERNEL_DIR\drivers\serial\serial.c",
     "$KERNEL_DIR\drivers\input\keyboard.c",
-    "$KERNEL_DIR\arch\x86_64\idt.c",
-    "$KERNEL_DIR\arch\x86_64\pic.c",
     "$KERNEL_DIR\drivers\timer\pit.c",
+    "$KERNEL_DIR\drivers\pci\pci.c",
+    "$KERNEL_DIR\libgcc.c",
     "$KERNEL_DIR\apps\santitravel.c",
     "$KERNEL_DIR\apps\sysmon.c"
 )
+
+# Archivos específicos de arquitectura
+if ($Arch -eq "x86_64") {
+    $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\idt.c"
+    $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\pic.c"
+}
+else {
+    $KERNEL_SRCS += "$KERNEL_DIR\arch\i386\idt.c"
+    $KERNEL_SRCS += "$KERNEL_DIR\arch\i386\pic.c"
+}
 
 # ---- Funciones auxiliares ----
 
@@ -169,8 +220,9 @@ function Initialize-BuildDirs {
         "$BUILD_DIR\$KERNEL_DIR\drivers\video",
         "$BUILD_DIR\$KERNEL_DIR\drivers\serial",
         "$BUILD_DIR\$KERNEL_DIR\drivers\input",
-        "$BUILD_DIR\$KERNEL_DIR\arch\x86_64",
+        "$BUILD_DIR\$KERNEL_DIR\arch\$Arch",
         "$BUILD_DIR\$KERNEL_DIR\drivers\timer",
+        "$BUILD_DIR\$KERNEL_DIR\drivers\pci",
         "$BUILD_DIR\$KERNEL_DIR\apps"
     )
     foreach ($d in $dirs) {
@@ -205,7 +257,7 @@ function Invoke-KernelBuild {
     }
 
     Write-Step "LD" "Enlazando kernel..."
-    & $LD -T "$BOOT_DIR\linker.ld" -nostdlib -o $KERNEL_ELF @objFiles
+    & $LD @LDFLAGS_ARCH -T "$BOOT_DIR\linker.ld" -nostdlib -o $KERNEL_ELF $objFiles
     if ($LASTEXITCODE -ne 0) {
         Write-Step "ERR" "Fallo al enlazar el kernel"
         exit 1
@@ -284,7 +336,7 @@ function Invoke-VBoxRun {
         return
     }
 
-    $vmName = "eterOS"
+    $vmName = "eterOS_$Arch"
     $vdiPath = (Join-Path (Get-Location) $OS_VDI).Replace('/', '\')
 
     # Verificar si la VM ya existe
@@ -316,7 +368,7 @@ function Invoke-VBoxRun {
         $ErrorActionPreference = "Stop"
     }
     else {
-        Write-Step "VBOX" "Creando VM '$vmName'..."
+        Write-Step "VBOX" "Creando VM '$vmName' ($Arch)..."
 
         # Generar VDI
         Invoke-VdiBuild
@@ -331,18 +383,20 @@ function Invoke-VBoxRun {
         }
 
         # Crear VM
-        & $VBOXMANAGE createvm --name $vmName --ostype Other_64 --register 2>&1 | Out-Null
+        & $VBOXMANAGE createvm --name $vmName --ostype $VBOX_OSTYPE --register 2>&1 | Out-Null
 
-        # Configurar: BIOS (NO EFI), 128MB RAM, 1 CPU, Long Mode ON
+        # Configurar
+        $longMode = if ($Arch -eq "x86_64") { "on" } else { "off" }
+        
         & $VBOXMANAGE modifyvm $vmName `
             --memory 128 `
             --cpus 1 `
             --firmware bios `
-            --long-mode on `
+            --long-mode $longMode `
             --graphicscontroller VBoxVGA `
             --audio-driver none `
             --uart1 0x3F8 4 `
-            --uartmode1 file "$((Get-Location).Path)\build\serial.log" 2>&1 | Out-Null
+            --uartmode1 file "$((Get-Location).Path)\build\$Arch\serial.log" 2>&1 | Out-Null
 
         # Crear controladora SATA
         & $VBOXMANAGE storagectl $vmName --name "SATA" --add sata --controller IntelAhci --portcount 1 2>&1 | Out-Null
@@ -363,13 +417,13 @@ function Invoke-VBoxRun {
     $ErrorActionPreference = "Continue"
     & $VBOXMANAGE startvm $vmName --type gui 2>&1 | Out-Null
     $ErrorActionPreference = "Stop"
-    Write-Step "OK" "VM iniciada. Serial log: build\serial.log"
+    Write-Step "OK" "VM iniciada. Serial log: build\$Arch\serial.log"
 }
 
 function Invoke-QemuRun {
     param([bool]$DebugMode = $false)
 
-    Write-Step "QEMU" "Iniciando eterOS..."
+    Write-Step "QEMU" "Iniciando eterOS ($Arch)..."
 
     $qemuArgs = @(
         "-drive", "format=raw,file=$OS_IMAGE,if=floppy",

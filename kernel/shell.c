@@ -21,6 +21,7 @@
 #include "../include/santitravel.h"
 #include "../include/sysmon.h"
 #include "../include/idt.h"
+#include "../include/pci.h"
 
 /* ========================================================================= */
 /* Constantes del sistema                                                    */
@@ -54,6 +55,7 @@ static void cmd_about(const char* args);
 static void cmd_reboot(const char* args);
 static void cmd_halt(const char* args);
 static void cmd_mem(const char* args);
+static void cmd_lspci(const char* args);
 
 /* ========================================================================= */
 /* Tabla de comandos (extensible — solo agregar entradas)                    */
@@ -66,6 +68,7 @@ static const shell_command_t commands[] = {
     { "echo",     "Repite el texto ingresado",                   cmd_echo    },
     { "about",    "Acerca de eterOS",                            cmd_about   },
     { "mem",      "Informacion basica de memoria",               cmd_mem     },
+    { "lspci",    "Lista dispositivos PCI",                      cmd_lspci   },
     { "reboot",   "Reinicia el sistema",                         cmd_reboot  },
     { "halt",     "Detiene la CPU",                              cmd_halt    },
 };
@@ -271,6 +274,11 @@ static void cmd_halt(const char* args) {
     serial_write_string("[eterOS] Halt solicitado.\n");
     __asm__ volatile ("cli");
     for (;;) { __asm__ volatile ("hlt"); }
+}
+
+static void cmd_lspci(const char* args) {
+    (void)args;
+    pci_scan_bus();
 }
 
 /* ========================================================================= */
