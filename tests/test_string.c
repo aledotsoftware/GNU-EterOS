@@ -220,6 +220,27 @@ int main() {
         printf("strlcpy tests passed\n");
     }
 
+    /* Test strlcpy null termination guarantee */
+    {
+        char buffer[10];
+        size_t len;
+
+        /* Initialize with pattern */
+        memset(buffer, 'A', sizeof(buffer));
+
+        /* Truncated copy */
+        len = strlcpy(buffer, "1234567890", 5);
+        assert(len == 10);
+        assert(buffer[0] == '1');
+        assert(buffer[1] == '2');
+        assert(buffer[2] == '3');
+        assert(buffer[3] == '4');
+        assert(buffer[4] == '\0'); /* Null terminator */
+        assert(buffer[5] == 'A'); /* Should be untouched */
+
+        printf("strlcpy null termination guarantee passed\n");
+    }
+
     /* Test memset16 */
     {
         uint16_t buffer[16];
