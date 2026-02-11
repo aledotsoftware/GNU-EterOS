@@ -25,6 +25,11 @@ void* memcpy(void* dest, const void* src, size_t n);
 void* memset(void* dest, int c, size_t n);
 
 /**
+ * Establece n palabras de 16 bits de dest al valor c.
+ */
+void* memset16(void* dest, uint16_t c, size_t n);
+
+/**
  * Mueve n bytes de src a dest (soporta solapamiento).
  */
 void* memmove(void* dest, const void* src, size_t n);

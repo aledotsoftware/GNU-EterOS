@@ -6,8 +6,9 @@
  * Soporta scroll automático, cursor hardware, y colores.
  */
 
-#include "../include/vga.h"
-#include "../include/io.h"
+#include <vga.h>
+#include <io.h>
+#include <string.h>
 
 /* ========================================================================= */
 /* Estado interno del terminal                                               */
@@ -55,9 +56,7 @@ void terminal_initialize(void) {
     terminal_buffer = (uint16_t*)VGA_BUFFER_ADDR;
 
     /* Limpiar toda la pantalla */
-    for (size_t i = 0; i < VGA_SIZE; i++) {
-        terminal_buffer[i] = vga_entry(' ', terminal_color);
-    }
+    memset16(terminal_buffer, vga_entry(' ', terminal_color), VGA_SIZE);
 
     terminal_enable_cursor();
     terminal_update_cursor();
@@ -69,14 +68,11 @@ void terminal_set_color(uint8_t color) {
 
 void terminal_scroll(void) {
     /* Mover todas las líneas una posición hacia arriba */
-    for (size_t i = 0; i < (VGA_HEIGHT - 1) * VGA_WIDTH; i++) {
-        terminal_buffer[i] = terminal_buffer[i + VGA_WIDTH];
-    }
+    memmove(terminal_buffer, terminal_buffer + VGA_WIDTH, (VGA_HEIGHT - 1) * VGA_WIDTH * sizeof(uint16_t));
 
     /* Limpiar la última línea */
-    for (size_t i = (VGA_HEIGHT - 1) * VGA_WIDTH; i < VGA_SIZE; i++) {
-        terminal_buffer[i] = vga_entry(' ', terminal_color);
-    }
+    const size_t last_line_offset = (VGA_HEIGHT - 1) * VGA_WIDTH;
+    memset16(terminal_buffer + last_line_offset, vga_entry(' ', terminal_color), VGA_WIDTH);
 
     terminal_row = VGA_HEIGHT - 1;
 }
@@ -148,9 +144,7 @@ void terminal_write_colored(const char* str, vga_color_t fg, vga_color_t bg) {
 }
 
 void terminal_clear(void) {
-    for (size_t i = 0; i < VGA_SIZE; i++) {
-        terminal_buffer[i] = vga_entry(' ', terminal_color);
-    }
+    memset16(terminal_buffer, vga_entry(' ', terminal_color), VGA_SIZE);
     terminal_row = 0;
     terminal_col = 0;
     terminal_update_cursor();

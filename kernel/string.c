@@ -12,8 +12,7 @@
 /* ========================================================================= */
 
 void* memcpy(void* dest, const void* src, size_t n) {
-    uint8_t* d = (uint8_t*)dest;
-    const uint8_t* s = (const uint8_t*)src;
+    void* original_dest = dest;
     
     /* Copiar bloques de 8 bytes (64 bits) usando rep movsq */
     size_t qwords = n / 8;
@@ -34,35 +33,59 @@ void* memcpy(void* dest, const void* src, size_t n) {
         : "memory"
     );
     
-    return dest;
+    return original_dest;
 }
 
 void* memset(void* dest, int c, size_t n) {
-    uint8_t* d = (uint8_t*)dest;
+    void* original_dest = dest;
     
-    while (n--) {
-        *d++ = (uint8_t)c;
-    }
+    __asm__ volatile (
+        "cld; rep stosb"
+        : "+D"(dest), "+c"(n)
+        : "a"(c)
+        : "memory"
+    );
     
-    return dest;
+    return original_dest;
+}
+
+void* memset16(void* dest, uint16_t c, size_t n) {
+    void* original_dest = dest;
+
+    __asm__ volatile (
+        "cld; rep stosw"
+        : "+D"(dest), "+c"(n)
+        : "a"(c)
+        : "memory"
+    );
+
+    return original_dest;
 }
 
 void* memmove(void* dest, const void* src, size_t n) {
     uint8_t* d = (uint8_t*)dest;
     const uint8_t* s = (const uint8_t*)src;
     
+    if (d == s || n == 0) return dest;
+
     if (d < s) {
         /* Copiar hacia adelante */
-        while (n--) {
-            *d++ = *s++;
-        }
-    } else if (d > s) {
+        __asm__ volatile (
+            "cld; rep movsb"
+            : "+S"(s), "+D"(d), "+c"(n)
+            :
+            : "memory"
+        );
+    } else {
         /* Copiar hacia atrás para manejar solapamiento */
-        d += n;
-        s += n;
-        while (n--) {
-            *--d = *--s;
-        }
+        s += n - 1;
+        d += n - 1;
+        __asm__ volatile (
+            "std; rep movsb; cld"
+            : "+S"(s), "+D"(d), "+c"(n)
+            :
+            : "memory"
+        );
     }
     
     return dest;
