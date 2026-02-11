@@ -14,9 +14,21 @@
 void* memcpy(void* dest, const void* src, size_t n) {
     void* original_dest = dest;
     
-    __asm__ volatile (
-        "cld; rep movsb"
-        : "+S"(src), "+D"(dest), "+c"(n)
+    /* Copiar bloques de 8 bytes (64 bits) usando rep movsq */
+    size_t qwords = n / 8;
+    size_t remainder = n % 8;
+
+    asm volatile (
+        "rep movsq"
+        : "+D"(d), "+S"(s), "+c"(qwords)
+        :
+        : "memory"
+    );
+
+    /* Copiar los bytes restantes */
+    asm volatile (
+        "rep movsb"
+        : "+D"(d), "+S"(s), "+c"(remainder)
         :
         : "memory"
     );
@@ -97,6 +109,14 @@ int memcmp(const void* s1, const void* s2, size_t n) {
 /* ========================================================================= */
 /* Funciones de Cadena                                                       */
 /* ========================================================================= */
+
+/**
+ * NOTA DE SEGURIDAD:
+ * La función estándar `strcpy` ha sido eliminada intencionalmente de este
+ * codebase debido a su vulnerabilidad inherente a desbordamientos de búfer.
+ * Se debe utilizar `strlcpy` en su lugar, la cual garantiza la terminación
+ * nula y respeta el tamaño del búfer de destino.
+ */
 
 size_t strlen(const char* str) {
     size_t len = 0;
@@ -192,6 +212,7 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
 }
 
 void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
+    /* Verify buffer size to prevent overflow */
     if (buffer_size == 0) return;
 
     if (buffer_size == 1) {
