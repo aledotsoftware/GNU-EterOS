@@ -13,6 +13,8 @@
 
 void* memcpy(void* dest, const void* src, size_t n) {
     void* original_dest = dest;
+    void* d = dest;
+    const void* s = src;
     
     /* Copiar bloques de 8 bytes (64 bits) usando rep movsq */
     size_t qwords = n / 8;
