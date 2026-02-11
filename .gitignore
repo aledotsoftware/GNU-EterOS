@@ -1,18 +1,25 @@
-# éterOS - Build artifacts
-build/
-*.o
-*.bin
-*.elf
-*.img
-*.iso
+# éterOS - Git Ignore
 
-# Editor files
+# Los binarios de build SI se versionan para que Jules los pueda pushear
+# y el usuario los descargue directamente.
+# Solo ignoramos archivos temporales de compilación.
+
+# Archivos objeto intermedios
+*.o
+*.elf
+*.d
+
+# Archivos temporales del sistema
 *.swp
 *.swo
 *~
-.vscode/
-.idea/
-
-# OS files
 .DS_Store
 Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs temporales
+build/serial_output.log

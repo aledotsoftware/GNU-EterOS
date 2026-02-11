@@ -67,7 +67,12 @@ OS_IMAGE    = $(BUILD_DIR)/eteros.img
 # Targets
 # =============================================================================
 
-.PHONY: all boot kernel image run debug clean dirs info
+.PHONY: all boot kernel image run run-nographic debug clean dirs info
+
+# NOTA WINDOWS:
+# Si estás en Windows, tienes dos opciones:
+#   1. WSL2 (recomendado): cd /mnt/p/EterOS && make run
+#   2. PowerShell nativo:  .\build.ps1 -Target run
 
 all: dirs image
 	@echo ""
@@ -130,6 +135,16 @@ run: all
 	$(QEMU) -drive format=raw,file=$(OS_IMAGE),if=floppy \
 	        -serial stdio                                 \
 	        -m 128M                                       \
+	        -no-reboot                                    \
+	        -no-shutdown
+
+# ---- Ejecutar sin ventana gráfica (ideal para WSL sin X11) ----
+run-nographic: all
+	@echo "[QEMU] Iniciando eterOS (modo texto)..."
+	$(QEMU) -drive format=raw,file=$(OS_IMAGE),if=floppy \
+	        -serial mon:stdio                             \
+	        -m 128M                                       \
+	        -nographic                                    \
 	        -no-reboot                                    \
 	        -no-shutdown
 

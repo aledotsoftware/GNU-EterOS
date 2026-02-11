@@ -1,0 +1,129 @@
+name: "éterOS Build & Release"
+
+# Se ejecuta en cada push a main o en PRs
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: "Compilar éterOS"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout código"
+        uses: actions/checkout@v4
+
+      - name: "Instalar toolchain"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm qemu-system-x86 xorriso mtools
+
+      - name: "Instalar cross-compiler"
+        run: |
+          # En Ubuntu x86_64, gcc nativo sirve como cross-compiler
+          # Crear wrappers para compatibilidad con el Makefile
+          sudo ln -sf /usr/bin/gcc /usr/local/bin/x86_64-elf-gcc
+          sudo ln -sf /usr/bin/ld /usr/local/bin/x86_64-elf-ld
+          sudo ln -sf /usr/bin/objcopy /usr/local/bin/x86_64-elf-objcopy
+          
+          # Verificar herramientas
+          echo "=== Toolchain ==="
+          nasm --version
+          x86_64-elf-gcc --version | head -1
+          qemu-system-x86_64 --version | head -1
+
+      - name: "Compilar bootloader"
+        run: make boot
+
+      - name: "Compilar kernel"
+        run: make kernel
+
+      - name: "Generar imagen de disco (.img)"
+        run: make image
+
+      - name: "Generar imagen ISO (.iso)"
+        run: |
+          # Crear ISO booteable (si grub está disponible)
+          if command -v grub-mkrescue &> /dev/null; then
+            chmod +x scripts/create_iso.sh
+            ./scripts/create_iso.sh
+          else
+            echo "grub-mkrescue no disponible, solo se genera .img"
+          fi
+
+      - name: "Verificar artefactos"
+        run: |
+          echo "=== Artefactos generados ==="
+          ls -lh build/
+          echo ""
+          echo "Tamaño total del sistema:"
+          du -sh build/
+
+      - name: "Test rápido en QEMU (boot check)"
+        run: |
+          # Ejecutar QEMU por 3 segundos para verificar que arranca
+          timeout 3 qemu-system-x86_64 \
+            -drive format=raw,file=build/eteros.img,if=floppy \
+            -serial file:build/serial_output.log \
+            -display none \
+            -m 128M \
+            -no-reboot \
+            -no-shutdown || true
+          
+          echo "=== Serial Output ==="
+          cat build/serial_output.log 2>/dev/null || echo "(sin salida serial)"
+
+      - name: "Subir artefactos de build"
+        uses: actions/upload-artifact@v4
+        with:
+          name: eteros-build
+          path: |
+            build/eteros.img
+            build/eteros.iso
+            build/serial_output.log
+          retention-days: 30
+
+  # ---- Release automático cuando se pushea un tag v* ----
+  release:
+    name: "Publicar Release"
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: "Descargar artefactos"
+        uses: actions/download-artifact@v4
+        with:
+          name: eteros-build
+          path: artifacts/
+
+      - name: "Crear Release en GitHub"
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "éterOS ${{ github.ref_name }}"
+          body: |
+            ## éterOS ${{ github.ref_name }}
+            
+            ### 📥 Descargas
+            - **eteros.img** - Imagen de disco (para QEMU o hardware real)
+            - **eteros.iso** - Imagen ISO booteable (para VirtualBox o grabar en USB)
+            
+            ### 🚀 Ejecución rápida
+            ```bash
+            # Con QEMU
+            qemu-system-x86_64 -drive format=raw,file=eteros.img,if=floppy -serial stdio -m 128M
+            ```
+            
+            ### 📋 Cambios
+            Ver commits incluidos en este release.
+          files: |
+            artifacts/eteros.img
+            artifacts/eteros.iso
+          fail_on_missing_files: false
