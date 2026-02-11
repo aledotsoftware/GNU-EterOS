@@ -10,6 +10,8 @@
 
 #include "types.h"
 
+#ifndef __ETEROS_HOST_TEST__
+
 /* ========================================================================= */
 /* Escritura en puerto                                                       */
 /* ========================================================================= */
@@ -76,5 +78,20 @@ static inline uint32_t inl(uint16_t port) {
 static inline void io_wait(void) {
     outb(0x80, 0);
 }
+
+#else
+
+/* Mock function declarations for host testing */
+void outb(uint16_t port, uint8_t value);
+void outw(uint16_t port, uint16_t value);
+void outl(uint16_t port, uint32_t value);
+
+uint8_t inb(uint16_t port);
+uint16_t inw(uint16_t port);
+uint32_t inl(uint16_t port);
+
+void io_wait(void);
+
+#endif /* !__ETEROS_HOST_TEST__ */
 
 #endif /* ETEROS_IO_H */

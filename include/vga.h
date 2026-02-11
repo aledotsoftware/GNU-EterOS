@@ -13,7 +13,9 @@
 /* ========================================================================= */
 /* Constantes VGA                                                            */
 /* ========================================================================= */
+#ifndef VGA_BUFFER_ADDR
 #define VGA_BUFFER_ADDR     0xB8000
+#endif
 #define VGA_WIDTH           80
 #define VGA_HEIGHT          25
 #define VGA_SIZE            (VGA_WIDTH * VGA_HEIGHT)
