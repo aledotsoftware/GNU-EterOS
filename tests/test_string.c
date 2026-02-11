@@ -148,6 +148,43 @@ int main() {
         assert(dest[0] == 'x');
     }
 
+    /* Test strlcpy */
+    {
+        char buffer[32];
+        size_t len;
+
+        /* Normal copy */
+        len = strlcpy(buffer, "Hello", sizeof(buffer));
+        assert(len == 5);
+        assert(strcmp(buffer, "Hello") == 0);
+
+        /* Truncation */
+        len = strlcpy(buffer, "Hello World", 6);
+        assert(len == 11); /* Returns src length */
+        assert(strcmp(buffer, "Hello") == 0); /* buffer holds "Hello\0" */
+
+        /* Empty source */
+        len = strlcpy(buffer, "", sizeof(buffer));
+        assert(len == 0);
+        assert(strcmp(buffer, "") == 0);
+
+        /* Size 0 */
+        buffer[0] = 'X';
+        len = strlcpy(buffer, "Test", 0);
+        assert(len == 4);
+        assert(buffer[0] == 'X'); /* Should not modify buffer */
+
+        /* Size 1 */
+        buffer[0] = 'X';
+        buffer[1] = 'Y';
+        len = strlcpy(buffer, "Test", 1);
+        assert(len == 4);
+        assert(buffer[0] == '\0'); /* Should be empty string */
+        assert(buffer[1] == 'Y'); /* Should not touch beyond size */
+
+        printf("strlcpy tests passed\n");
+    }
+
     printf("All tests passed!\n");
     return 0;
 }

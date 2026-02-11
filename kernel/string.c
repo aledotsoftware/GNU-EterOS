@@ -87,6 +87,14 @@ int memcmp(const void* s1, const void* s2, size_t n) {
 /* Funciones de Cadena                                                       */
 /* ========================================================================= */
 
+/**
+ * NOTA DE SEGURIDAD:
+ * La función estándar `strcpy` ha sido eliminada intencionalmente de este
+ * codebase debido a su vulnerabilidad inherente a desbordamientos de búfer.
+ * Se debe utilizar `strlcpy` en su lugar, la cual garantiza la terminación
+ * nula y respeta el tamaño del búfer de destino.
+ */
+
 size_t strlen(const char* str) {
     size_t len = 0;
     while (str[len]) {
