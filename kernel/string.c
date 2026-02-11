@@ -166,6 +166,7 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
 }
 
 void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
+    /* Verify buffer size to prevent overflow */
     if (buffer_size == 0) return;
 
     if (buffer_size == 1) {

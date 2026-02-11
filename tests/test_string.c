@@ -46,6 +46,36 @@ int main() {
         /* Should contain "0x00" */
         printf("Small buffer utoa_hex: %s\n", small_buf);
         assert(strcmp(small_buf, "0x00") == 0);
+
+        /* Test boundary conditions */
+        char temp[20];
+
+        /* Size 1 */
+        temp[0] = 'a';
+        utoa_hex_s(0xDEADBEEF, temp, 1);
+        assert(temp[0] == '\0');
+
+        /* Size 2 */
+        utoa_hex_s(0xDEADBEEF, temp, 2);
+        assert(strcmp(temp, "0") == 0);
+
+        /* Size 3 */
+        utoa_hex_s(0xDEADBEEF, temp, 3);
+        assert(strcmp(temp, "0x") == 0);
+
+        /* Size 18 (0x + 15 digits + null) - truncates last digit */
+        char buf18[18];
+        utoa_hex_s(0xDEADBEEF, buf18, 18);
+        assert(strlen(buf18) == 17);
+        assert(strncmp(buf18, "0x00000000DEADBEE", 17) == 0);
+
+        /* Size 19 (full) */
+        char buf19[19];
+        utoa_hex_s(0xDEADBEEF, buf19, 19);
+        assert(strlen(buf19) == 18);
+        assert(strcmp(buf19, "0x00000000DEADBEEF") == 0);
+
+        printf("Boundary tests passed for utoa_hex_s\n");
     }
 
     /* Test memcpy */
