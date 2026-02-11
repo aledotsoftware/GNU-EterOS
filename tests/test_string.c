@@ -220,6 +220,46 @@ int main() {
         printf("strlcpy tests passed\n");
     }
 
+    /* Test strcmp */
+    {
+        /* Equal strings */
+        assert(strcmp("abc", "abc") == 0);
+        assert(strcmp("", "") == 0);
+        assert(strcmp("Hello World", "Hello World") == 0);
+
+        /* Different content same length */
+        /* 'c' (99) < 'd' (100) -> negative */
+        assert(strcmp("abc", "abd") < 0);
+        /* 'd' (100) > 'c' (99) -> positive */
+        assert(strcmp("abd", "abc") > 0);
+
+        /* Different length */
+        /* "abc" is prefix of "abcd", so compare '\0' with 'd' -> 0 - 100 -> negative */
+        assert(strcmp("abc", "abcd") < 0);
+        /* "abcd" has prefix "abc", so compare 'd' with '\0' -> 100 - 0 -> positive */
+        assert(strcmp("abcd", "abc") > 0);
+
+        /* Empty vs non-empty */
+        assert(strcmp("", "a") < 0);
+        assert(strcmp("a", "") > 0);
+
+        /* Case sensitivity */
+        /* 'A' (65) < 'a' (97) -> negative */
+        assert(strcmp("A", "a") < 0);
+        assert(strcmp("a", "A") > 0);
+        assert(strcmp("Hello", "hello") < 0);
+
+        /* Extended ASCII / unsigned char check */
+        /* \xff (255) vs \x01 (1). If char is signed, \xff is -1.
+           If char is unsigned (as per standard strcmp), 255 > 1.
+           The implementation casts to unsigned char*, so it should be positive. */
+        char s1[] = { (char)0xff, 0 };
+        char s2[] = { 0x01, 0 };
+        assert(strcmp(s1, s2) > 0);
+
+        printf("strcmp tests passed\n");
+    }
+
     /* Test memset16 */
     {
         uint16_t buffer[16];
