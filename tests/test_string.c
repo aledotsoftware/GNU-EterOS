@@ -79,6 +79,23 @@ int main() {
         printf("Boundary tests passed for utoa_hex_s\n");
     }
 
+    /* Test utoa_hex */
+    {
+        char buffer[32];
+        utoa_hex(0xDEADBEEF, buffer);
+        /* Should be "0x00000000DEADBEEF" (18 chars) */
+        printf("utoa_hex: %s\n", buffer);
+        assert(strcmp(buffer, "0x00000000DEADBEEF") == 0);
+
+        utoa_hex(0, buffer);
+        assert(strcmp(buffer, "0x0000000000000000") == 0);
+
+        utoa_hex(0xFFFFFFFFFFFFFFFF, buffer);
+        assert(strcmp(buffer, "0xFFFFFFFFFFFFFFFF") == 0);
+
+        printf("utoa_hex tests passed\n");
+    }
+
     /* Test memcpy */
     {
         char src[] = "Hello World";
@@ -147,6 +164,23 @@ int main() {
         memset(dest, 'x', sizeof(dest));
         memcpy(dest, src, 0);
         assert(dest[0] == 'x');
+    }
+
+    /* Test strlen */
+    {
+        /* Test normal string */
+        assert(strlen("Hello World") == 11);
+
+        /* Test empty string */
+        assert(strlen("") == 0);
+
+        /* Test single character */
+        assert(strlen("A") == 1);
+
+        /* Test string with spaces */
+        assert(strlen("   ") == 3);
+
+        printf("strlen tests passed\n");
     }
 
     /* Test strlcpy */

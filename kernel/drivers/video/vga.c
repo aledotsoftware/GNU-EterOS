@@ -77,7 +77,7 @@ void terminal_scroll(void) {
     terminal_row = VGA_HEIGHT - 1;
 }
 
-void terminal_putchar(char c) {
+static void _terminal_putchar(char c) {
     switch (c) {
         case '\n':
             /* Nueva línea */
@@ -126,14 +126,18 @@ void terminal_putchar(char c) {
     if (terminal_row >= VGA_HEIGHT) {
         terminal_scroll();
     }
+}
 
+void terminal_putchar(char c) {
+    _terminal_putchar(c);
     terminal_update_cursor();
 }
 
 void terminal_write_string(const char* str) {
     while (*str) {
-        terminal_putchar(*str++);
+        _terminal_putchar(*str++);
     }
+    terminal_update_cursor();
 }
 
 void terminal_write_colored(const char* str, vga_color_t fg, vga_color_t bg) {
