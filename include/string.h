@@ -45,9 +45,20 @@ int memcmp(const void* s1, const void* s2, size_t n);
 size_t strlen(const char* str);
 
 /**
- * Copia una cadena de src a dest.
+ * Copia hasta n caracteres de src a dest.
  */
-char* strcpy(char* dest, const char* src);
+char* strncpy(char* dest, const char* src, size_t n);
+
+/**
+ * Copia una cadena de src a dest.
+ * @deprecated Esta función es insegura. Use strlcpy en su lugar.
+ */
+char* strcpy(char* dest, const char* src) __attribute__((deprecated("Use strlcpy o strncpy en su lugar")));
+
+/**
+ * Copia una cadena a un buffer de tamaño limitado, asegurando terminación null.
+ */
+size_t strlcpy(char* dest, const char* src, size_t size);
 
 /**
  * Compara dos cadenas.
