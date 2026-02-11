@@ -192,13 +192,15 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
         return;
     }
 
+    uint64_t uvalue;
+
     /* Manejar números negativos solo en base 10 */
     if (value < 0 && base == 10) {
         is_negative = 1;
-        value = -value;
+        uvalue = (uint64_t)0 - (uint64_t)value;
+    } else {
+        uvalue = (uint64_t)value;
     }
-
-    uint64_t uvalue = (uint64_t)value;
     
     while (uvalue != 0) {
         int remainder = (int)(uvalue % base);

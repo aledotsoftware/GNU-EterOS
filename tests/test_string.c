@@ -33,6 +33,42 @@ int main() {
         assert(strcmp(small_buf, "123") == 0);
     }
 
+    /* Test itoa_s with edge cases */
+    {
+        char buffer[65];
+
+        /* INT64_MIN */
+        itoa_s(INT64_MIN, buffer, sizeof(buffer), 10);
+        printf("INT64_MIN: %s\n", buffer);
+        /* Check against expected string */
+        /* INT64_MIN = -9223372036854775808 */
+        assert(strcmp(buffer, "-9223372036854775808") == 0);
+
+        /* INT64_MAX */
+        itoa_s(INT64_MAX, buffer, sizeof(buffer), 10);
+        printf("INT64_MAX: %s\n", buffer);
+        assert(strcmp(buffer, "9223372036854775807") == 0);
+
+        /* Base 16 (negative number) - should be treated as unsigned */
+        itoa_s(-1, buffer, sizeof(buffer), 16);
+        printf("-1 in base 16: %s\n", buffer);
+        assert(strcmp(buffer, "FFFFFFFFFFFFFFFF") == 0);
+
+        /* Base 2 */
+        itoa_s(5, buffer, sizeof(buffer), 2);
+        printf("5 in base 2: %s\n", buffer);
+        assert(strcmp(buffer, "101") == 0);
+
+        /* Truncation with negative number */
+        char small_buf[5]; /* Size 5 -> 4 chars + null */
+        itoa_s(-12345, small_buf, sizeof(small_buf), 10);
+        printf("Small buffer negative: %s\n", small_buf);
+        /* -12345 (6 chars) -> truncation to 4 chars -> "-123" */
+        assert(strcmp(small_buf, "-123") == 0);
+
+        printf("Advanced itoa_s tests passed\n");
+    }
+
     /* Test utoa_hex_s */
     {
         char buffer[32];
