@@ -149,6 +149,23 @@ int main() {
         assert(dest[0] == 'x');
     }
 
+    /* Test strlen */
+    {
+        /* Test normal string */
+        assert(strlen("Hello World") == 11);
+
+        /* Test empty string */
+        assert(strlen("") == 0);
+
+        /* Test single character */
+        assert(strlen("A") == 1);
+
+        /* Test string with spaces */
+        assert(strlen("   ") == 3);
+
+        printf("strlen tests passed\n");
+    }
+
     /* Test strlcpy */
     {
         char buffer[32];
