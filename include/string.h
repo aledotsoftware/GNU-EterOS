@@ -10,6 +10,17 @@
 
 #include "types.h"
 
+#ifdef __ETEROS_HOST_TEST__
+#define memcpy eteros_memcpy
+#define memset eteros_memset
+#define memmove eteros_memmove
+#define memcmp eteros_memcmp
+#define strlen eteros_strlen
+#define strncpy eteros_strncpy
+#define strlcpy eteros_strlcpy
+#define strcmp eteros_strcmp
+#endif
+
 /* ========================================================================= */
 /* Funciones de Memoria                                                      */
 /* ========================================================================= */

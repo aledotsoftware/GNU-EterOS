@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+/* Capture standard library functions before they are renamed */
+static void* (*std_memset)(void*, int, size_t) = memset;
+
 /* Define host test mode */
 #ifndef __ETEROS_HOST_TEST__
 #define __ETEROS_HOST_TEST__
@@ -96,6 +99,45 @@ int main() {
         printf("utoa_hex tests passed\n");
     }
 
+    /* Test memset */
+    {
+        uint8_t buffer[32];
+        void* ret;
+
+        /* Initialize with garbage or known pattern using standard memset */
+        std_memset(buffer, 0x55, sizeof(buffer));
+
+        /* Test 1: Fill with 0xAA */
+        ret = memset(buffer, 0xAA, 32);
+        assert(ret == buffer);
+        for(int i=0; i<32; i++) {
+            assert(buffer[i] == 0xAA);
+        }
+
+        /* Test 2: Fill partial */
+        std_memset(buffer, 0x55, sizeof(buffer));
+        memset(buffer, 0xBB, 16);
+        for(int i=0; i<16; i++) assert(buffer[i] == 0xBB);
+        for(int i=16; i<32; i++) assert(buffer[i] == 0x55); /* Remaining should be unchanged */
+
+        /* Test 3: Size 0 */
+        buffer[0] = 0xCC;
+        memset(buffer, 0xDD, 0);
+        assert(buffer[0] == 0xCC);
+
+        /* Test 4: Value truncation */
+        memset(buffer, 0x1234, 32);
+        for(int i=0; i<32; i++) assert(buffer[i] == 0x34);
+
+        /* Test 5: Unaligned size */
+        std_memset(buffer, 0x55, sizeof(buffer));
+        memset(buffer, 0xEE, 7);
+        for(int i=0; i<7; i++) assert(buffer[i] == 0xEE);
+        assert(buffer[7] == 0x55);
+
+        printf("memset tests passed\n");
+    }
+
     /* Test memcpy */
     {
         char src[] = "Hello World";
@@ -137,31 +179,31 @@ int main() {
         char dest[20];
 
         /* Test normal copy */
-        memset(dest, 0, sizeof(dest));
+        std_memset(dest, 0, sizeof(dest));
         memcpy(dest, src, strlen(src) + 1);
         assert(strcmp(dest, "Hello World") == 0);
 
         /* Test small copy (less than 8 bytes) */
-        memset(dest, 0, sizeof(dest));
+        std_memset(dest, 0, sizeof(dest));
         memcpy(dest, src, 5);
         dest[5] = '\0';
         assert(strcmp(dest, "Hello") == 0);
 
         /* Test 8 bytes exactly */
-        memset(dest, 0, sizeof(dest));
+        std_memset(dest, 0, sizeof(dest));
         memcpy(dest, src, 8);
         dest[8] = '\0';
         assert(strcmp(dest, "Hello Wo") == 0);
 
         /* Test 9 bytes */
-        memset(dest, 0, sizeof(dest));
+        std_memset(dest, 0, sizeof(dest));
         memcpy(dest, src, 9);
         dest[9] = '\0';
         assert(strcmp(dest, "Hello Wor") == 0);
 
         /* Test aligned/unaligned (if we could control alignment, but here just generic) */
         /* Test 0 bytes */
-        memset(dest, 'x', sizeof(dest));
+        std_memset(dest, 'x', sizeof(dest));
         memcpy(dest, src, 0);
         assert(dest[0] == 'x');
     }
