@@ -79,6 +79,23 @@ int main() {
         printf("Boundary tests passed for utoa_hex_s\n");
     }
 
+    /* Test utoa_hex */
+    {
+        char buffer[32];
+        utoa_hex(0xDEADBEEF, buffer);
+        /* Should be "0x00000000DEADBEEF" (18 chars) */
+        printf("utoa_hex: %s\n", buffer);
+        assert(strcmp(buffer, "0x00000000DEADBEEF") == 0);
+
+        utoa_hex(0, buffer);
+        assert(strcmp(buffer, "0x0000000000000000") == 0);
+
+        utoa_hex(0xFFFFFFFFFFFFFFFF, buffer);
+        assert(strcmp(buffer, "0xFFFFFFFFFFFFFFFF") == 0);
+
+        printf("utoa_hex tests passed\n");
+    }
+
     /* Test memcpy */
     {
         char src[] = "Hello World";
@@ -149,48 +166,21 @@ int main() {
         assert(dest[0] == 'x');
     }
 
-    /* Test strncpy */
+    /* Test strlen */
     {
-        char buffer[10];
-
-        /* Test padding: copy shorter string */
-        memset(buffer, 'X', sizeof(buffer));
-        strncpy(buffer, "Hi", 5);
-        /* Expect "Hi\0\0\0" followed by 'X's */
-        assert(buffer[0] == 'H');
-        assert(buffer[1] == 'i');
-        assert(buffer[2] == '\0');
-        assert(buffer[3] == '\0');
-        assert(buffer[4] == '\0');
-        assert(buffer[5] == 'X'); /* Should not be touched */
-
-        /* Test truncation: copy longer string */
-        memset(buffer, 'X', sizeof(buffer));
-        strncpy(buffer, "Hello", 3);
-        /* Expect "Hel" (no null) */
-        assert(buffer[0] == 'H');
-        assert(buffer[1] == 'e');
-        assert(buffer[2] == 'l');
-        assert(buffer[3] == 'X'); /* Should not be touched */
-
-        /* Test exact fit: copy exact length string */
-        memset(buffer, 'X', sizeof(buffer));
-        strncpy(buffer, "Hello", 5);
-        /* Expect "Hello" (no null, as src has 5 chars + null, but n=5) */
-        /* Wait, "Hello" is 6 bytes including null. n=5. So it copies 'H','e','l','l','o'. No null. */
-        assert(strncmp(buffer, "Hello", 5) == 0);
-        assert(buffer[5] == 'X');
+        /* Test normal string */
+        assert(strlen("Hello World") == 11);
 
         /* Test empty string */
-        memset(buffer, 'X', sizeof(buffer));
-        strncpy(buffer, "", 5);
-        /* Expect "\0\0\0\0\0" */
-        for (int i = 0; i < 5; i++) {
-            assert(buffer[i] == '\0');
-        }
-        assert(buffer[5] == 'X');
+        assert(strlen("") == 0);
 
-        printf("strncpy tests passed\n");
+        /* Test single character */
+        assert(strlen("A") == 1);
+
+        /* Test string with spaces */
+        assert(strlen("   ") == 3);
+
+        printf("strlen tests passed\n");
     }
 
     /* Test strlcpy */

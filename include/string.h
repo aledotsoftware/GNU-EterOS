@@ -73,6 +73,11 @@ int strcmp(const char* s1, const char* s2);
 void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base);
 
 /**
+ * Convierte un entero sin signo a su representación en cadena hexadecimal (sin comprobación de límites).
+ */
+void utoa_hex(uint64_t value, char* buffer);
+
+/**
  * Convierte un entero sin signo a su representación en cadena hexadecimal.
  *
  * @param buffer_size Tamaño del buffer de destino.
