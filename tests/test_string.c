@@ -46,6 +46,41 @@ int main() {
         assert(strcmp(small_buf, "0x00") == 0);
     }
 
+    /* Test memcpy */
+    {
+        char src[] = "Hello World";
+        char dest[20];
+
+        /* Test normal copy */
+        memset(dest, 0, sizeof(dest));
+        memcpy(dest, src, strlen(src) + 1);
+        assert(strcmp(dest, "Hello World") == 0);
+
+        /* Test small copy (less than 8 bytes) */
+        memset(dest, 0, sizeof(dest));
+        memcpy(dest, src, 5);
+        dest[5] = '\0';
+        assert(strcmp(dest, "Hello") == 0);
+
+        /* Test 8 bytes exactly */
+        memset(dest, 0, sizeof(dest));
+        memcpy(dest, src, 8);
+        dest[8] = '\0';
+        assert(strcmp(dest, "Hello Wo") == 0);
+
+        /* Test 9 bytes */
+        memset(dest, 0, sizeof(dest));
+        memcpy(dest, src, 9);
+        dest[9] = '\0';
+        assert(strcmp(dest, "Hello Wor") == 0);
+
+        /* Test aligned/unaligned (if we could control alignment, but here just generic) */
+        /* Test 0 bytes */
+        memset(dest, 'x', sizeof(dest));
+        memcpy(dest, src, 0);
+        assert(dest[0] == 'x');
+    }
+
     printf("All tests passed!\n");
     return 0;
 }
