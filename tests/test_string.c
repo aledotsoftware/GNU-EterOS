@@ -4,7 +4,9 @@
 #include <stdlib.h>
 
 /* Define host test mode */
+#ifndef __ETEROS_HOST_TEST__
 #define __ETEROS_HOST_TEST__
+#endif
 #include "../include/string.h"
 
 int main() {
@@ -44,6 +46,41 @@ int main() {
         /* Should contain "0x00" */
         printf("Small buffer utoa_hex: %s\n", small_buf);
         assert(strcmp(small_buf, "0x00") == 0);
+    }
+
+    /* Test memcpy */
+    {
+        char src[] = "Hello World";
+        char dest[32];
+        void* ret;
+
+        /* Test basic copy */
+        /* Use standard memset to clear buffer initially to be safe,
+           or just loop to clear it manually if we don't trust memset yet */
+        for(size_t i=0; i<sizeof(dest); i++) dest[i] = 0;
+
+        ret = memcpy(dest, src, strlen(src) + 1);
+        assert(ret == dest);
+        assert(strcmp(dest, src) == 0);
+
+        /* Test partial copy */
+        for(size_t i=0; i<sizeof(dest); i++) dest[i] = 0;
+        ret = memcpy(dest, src, 5);
+        assert(ret == dest);
+        /* Check first 5 chars match */
+        for(int i=0; i<5; i++) {
+            assert(dest[i] == src[i]);
+        }
+        /* Check 6th char is still 0 */
+        assert(dest[5] == 0);
+
+        /* Test zero length copy */
+        for(size_t i=0; i<sizeof(dest); i++) dest[i] = 'X';
+        ret = memcpy(dest, src, 0);
+        assert(ret == dest);
+        assert(dest[0] == 'X');
+
+        printf("memcpy tests passed\n");
     }
 
     printf("All tests passed!\n");
