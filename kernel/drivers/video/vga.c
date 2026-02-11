@@ -67,11 +67,11 @@ void terminal_set_color(uint8_t color) {
 }
 
 void terminal_scroll(void) {
-    /* Mover todas las líneas una posición hacia arriba */
-    memmove(terminal_buffer, terminal_buffer + VGA_WIDTH, (VGA_HEIGHT - 1) * VGA_WIDTH * sizeof(uint16_t));
+    /* Move all lines one position up */
+    memmove(terminal_buffer, terminal_buffer + VGA_WIDTH, (VGA_SIZE - VGA_WIDTH) * sizeof(uint16_t));
 
-    /* Limpiar la última línea */
-    const size_t last_line_offset = (VGA_HEIGHT - 1) * VGA_WIDTH;
+    /* Clear the last line */
+    const size_t last_line_offset = VGA_SIZE - VGA_WIDTH;
     memset16(terminal_buffer + last_line_offset, vga_entry(' ', terminal_color), VGA_WIDTH);
 
     terminal_row = VGA_HEIGHT - 1;
