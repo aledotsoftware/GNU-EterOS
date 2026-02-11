@@ -46,4 +46,10 @@ char serial_read(void);
  */
 int serial_received(void);
 
+/**
+ * Manejador de interrupciones del puerto serie.
+ * Debe ser llamado desde el ISR correspondiente.
+ */
+void serial_irq_handler(void);
+
 #endif /* ETEROS_SERIAL_H */
