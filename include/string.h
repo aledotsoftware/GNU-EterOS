@@ -50,12 +50,6 @@ size_t strlen(const char* str);
 char* strncpy(char* dest, const char* src, size_t n);
 
 /**
- * Copia una cadena de src a dest.
- * @deprecated Esta función es insegura. Use strlcpy en su lugar.
- */
-char* strcpy(char* dest, const char* src) __attribute__((deprecated("Use strlcpy o strncpy en su lugar")));
-
-/**
  * Copia una cadena a un buffer de tamaño limitado, asegurando terminación null.
  */
 size_t strlcpy(char* dest, const char* src, size_t size);
@@ -75,7 +69,9 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base);
 
 /**
  * Convierte un entero sin signo a su representación en cadena hexadecimal.
+ *
+ * @param buffer_size Tamaño del buffer de destino.
  */
-void utoa_hex(uint64_t value, char* buffer);
+void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size);
 
 #endif /* ETEROS_STRING_H */

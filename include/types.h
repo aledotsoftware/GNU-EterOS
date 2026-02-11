@@ -8,6 +8,13 @@
 #ifndef ETEROS_TYPES_H
 #define ETEROS_TYPES_H
 
+#ifdef __ETEROS_HOST_TEST__
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <sys/types.h>
+#else
+
 /* ========================================================================= */
 /* Tipos enteros con tamaño fijo                                             */
 /* ========================================================================= */
@@ -49,5 +56,7 @@ typedef int64_t             intptr_t;
 /* Constante NULL                                                            */
 /* ========================================================================= */
 #define NULL ((void*)0)
+
+#endif /* !__ETEROS_HOST_TEST__ */
 
 #endif /* ETEROS_TYPES_H */

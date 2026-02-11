@@ -102,12 +102,6 @@ size_t strlcpy(char* dest, const char* src, size_t size) {
     return strlen(src);
 }
 
-char* strcpy(char* dest, const char* src) {
-    char* d = dest;
-    while ((*d++ = *src++));
-    return dest;
-}
-
 int strcmp(const char* s1, const char* s2) {
     while (*s1 && (*s1 == *s2)) {
         s1++;
@@ -171,15 +165,29 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
     buffer[j] = '\0';
 }
 
-void utoa_hex(uint64_t value, char* buffer) {
+void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
+    if (buffer_size == 0) return;
+
+    if (buffer_size == 1) {
+        buffer[0] = '\0';
+        return;
+    }
+
     const char hex_chars[] = "0123456789ABCDEF";
+    size_t i = 0;
     
-    buffer[0] = '0';
-    buffer[1] = 'x';
+    /* Escribir prefijo "0x" */
+    if (i < buffer_size - 1) buffer[i++] = '0';
+    if (i < buffer_size - 1) buffer[i++] = 'x';
     
-    for (int i = 15; i >= 0; i--) {
-        buffer[2 + (15 - i)] = hex_chars[(value >> (i * 4)) & 0xF];
+    /* Escribir 16 dígitos hexadecimales */
+    for (int shift = 60; shift >= 0; shift -= 4) {
+        if (i < buffer_size - 1) {
+            buffer[i++] = hex_chars[(value >> shift) & 0xF];
+        } else {
+            break;
+        }
     }
     
-    buffer[18] = '\0';
+    buffer[i] = '\0';
 }
