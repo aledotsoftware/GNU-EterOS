@@ -18,6 +18,9 @@ void* memcpy(void* dest, const void* src, size_t n) {
     size_t qwords = n / 8;
     size_t remainder = n % 8;
 
+    void* d = dest;
+    const void* s = src;
+
     asm volatile (
         "rep movsq"
         : "+D"(d), "+S"(s), "+c"(qwords)

@@ -149,6 +149,50 @@ int main() {
         assert(dest[0] == 'x');
     }
 
+    /* Test strncpy */
+    {
+        char buffer[10];
+
+        /* Test padding: copy shorter string */
+        memset(buffer, 'X', sizeof(buffer));
+        strncpy(buffer, "Hi", 5);
+        /* Expect "Hi\0\0\0" followed by 'X's */
+        assert(buffer[0] == 'H');
+        assert(buffer[1] == 'i');
+        assert(buffer[2] == '\0');
+        assert(buffer[3] == '\0');
+        assert(buffer[4] == '\0');
+        assert(buffer[5] == 'X'); /* Should not be touched */
+
+        /* Test truncation: copy longer string */
+        memset(buffer, 'X', sizeof(buffer));
+        strncpy(buffer, "Hello", 3);
+        /* Expect "Hel" (no null) */
+        assert(buffer[0] == 'H');
+        assert(buffer[1] == 'e');
+        assert(buffer[2] == 'l');
+        assert(buffer[3] == 'X'); /* Should not be touched */
+
+        /* Test exact fit: copy exact length string */
+        memset(buffer, 'X', sizeof(buffer));
+        strncpy(buffer, "Hello", 5);
+        /* Expect "Hello" (no null, as src has 5 chars + null, but n=5) */
+        /* Wait, "Hello" is 6 bytes including null. n=5. So it copies 'H','e','l','l','o'. No null. */
+        assert(strncmp(buffer, "Hello", 5) == 0);
+        assert(buffer[5] == 'X');
+
+        /* Test empty string */
+        memset(buffer, 'X', sizeof(buffer));
+        strncpy(buffer, "", 5);
+        /* Expect "\0\0\0\0\0" */
+        for (int i = 0; i < 5; i++) {
+            assert(buffer[i] == '\0');
+        }
+        assert(buffer[5] == 'X');
+
+        printf("strncpy tests passed\n");
+    }
+
     /* Test strlcpy */
     {
         char buffer[32];
