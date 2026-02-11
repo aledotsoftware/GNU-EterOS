@@ -135,7 +135,7 @@ static void kernel_print_banner(void) {
     /* Versión y codename */
     terminal_write_string("    Version ");
     
-    char version_str[4];
+    char version_str[32];
     itoa_s(ETEROS_VERSION_MAJOR, version_str, sizeof(version_str), 10);
     terminal_write_colored(version_str, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     terminal_write_string(".");
