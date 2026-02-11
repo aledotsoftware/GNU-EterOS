@@ -20,6 +20,7 @@
 #include "../include/io.h"
 #include "../include/santitravel.h"
 #include "../include/sysmon.h"
+#include "../include/idt.h"
 
 /* ========================================================================= */
 /* Constantes del sistema                                                    */
@@ -253,10 +254,7 @@ static void cmd_reboot(const char* args) {
     serial_write_string("[eterOS] Reboot solicitado.\n");
 
     /* Triple fault: cargar IDT vacía y disparar interrupción */
-    struct {
-        uint16_t limit;
-        uint64_t base;
-    } __attribute__((packed)) null_idt = { 0, 0 };
+    struct idt_ptr null_idt = { 0, 0 };
 
     __asm__ volatile ("lidt %0" : : "m"(null_idt));
     __asm__ volatile ("int $0x03");
