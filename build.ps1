@@ -136,7 +136,9 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\drivers\input\keyboard.c",
     "$KERNEL_DIR\arch\x86_64\idt.c",
     "$KERNEL_DIR\arch\x86_64\pic.c",
-    "$KERNEL_DIR\apps\santitravel.c"
+    "$KERNEL_DIR\drivers\timer\pit.c",
+    "$KERNEL_DIR\apps\santitravel.c",
+    "$KERNEL_DIR\apps\sysmon.c"
 )
 
 # ---- Funciones auxiliares ----
@@ -165,6 +167,7 @@ function Initialize-BuildDirs {
         "$BUILD_DIR\$KERNEL_DIR\drivers\serial",
         "$BUILD_DIR\$KERNEL_DIR\drivers\input",
         "$BUILD_DIR\$KERNEL_DIR\arch\x86_64",
+        "$BUILD_DIR\$KERNEL_DIR\drivers\timer",
         "$BUILD_DIR\$KERNEL_DIR\apps"
     )
     foreach ($d in $dirs) {

@@ -26,6 +26,7 @@
 #include "../include/pic.h"
 #include "../include/keyboard.h"
 #include "../include/shell.h"
+#include "../include/timer.h"
 
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */
@@ -85,7 +86,13 @@ void kmain(void) {
     keyboard_init();
     pic_unmask_irq(1);   /* Habilitar IRQ1 (teclado) */
 
-    /* ---- 7. Habilitar interrupciones ---- */
+    /* ---- 7. Inicializar el Timer (PIT) ---- */
+    terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("Timer PIT (~100 Hz)\n");
+    timer_init();
+    pic_unmask_irq(0);   /* Habilitar IRQ0 (timer) */
+
+    /* ---- 8. Habilitar interrupciones ---- */
     terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     terminal_write_string("Interrupciones habilitadas (STI)\n");
     __asm__ volatile ("sti");

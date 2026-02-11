@@ -19,6 +19,7 @@
 #include "../../../include/serial.h"
 #include "../../../include/io.h"
 #include "../../../include/string.h"
+#include "../../../include/timer.h"
 
 /* ========================================================================= */
 /* Tabla IDT (256 entradas × 16 bytes = 4 KB)                               */
@@ -157,6 +158,7 @@ EXCEPTION_HANDLER_ERR(21)
 __attribute__((interrupt))
 static void irq_timer(struct interrupt_frame *frame) {
     (void)frame;
+    timer_tick();
     pic_send_eoi(0);
 }
 

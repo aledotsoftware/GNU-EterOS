@@ -19,6 +19,7 @@
 #include "../include/serial.h"
 #include "../include/io.h"
 #include "../include/santitravel.h"
+#include "../include/sysmon.h"
 
 /* ========================================================================= */
 /* Constantes del sistema                                                    */
@@ -83,7 +84,8 @@ typedef struct {
 } app_entry_t;
 
 static const app_entry_t apps[] = {
-    { "santitravel", "Aventuras con Santi", "1.0", santitravel_run },
+    { "santitravel", "Aventuras con Santi",     "1.1", santitravel_run },
+    { "etermon",     "Monitor del Sistema",     "1.0", sysmon_run      },
 };
 
 #define NUM_APPS  (sizeof(apps) / sizeof(apps[0]))
