@@ -194,7 +194,10 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
 
     uint64_t uvalue;
 
-    /* Manejar números negativos solo en base 10 */
+    /* Manejar números negativos solo en base 10.
+       Se utiliza aritmética sin signo para manejar INT64_MIN correctamente.
+       La negación directa (-value) causaría desbordamiento si value es INT64_MIN.
+       Al castear a uint64_t primero, la operación es segura y bien definida. */
     if (value < 0 && base == 10) {
         is_negative = 1;
         uvalue = (uint64_t)0 - (uint64_t)value;
