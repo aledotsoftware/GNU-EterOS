@@ -226,4 +226,4 @@ Ver [`JULES.md`](JULES.md) para instrucciones detalladas del agente.
 
 ## 📜 Licencia
 
-Proyecto de desarrollo de sistemas operativos — Nueva Era.
+© 2026 **Tudex Networks**. Todos los derechos reservados.

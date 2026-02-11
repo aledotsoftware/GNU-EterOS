@@ -28,12 +28,71 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ---- Configuración ----
-$AS = "nasm"
-$CC = "x86_64-elf-gcc"
-$LD = "x86_64-elf-ld"
-$OBJCOPY = "x86_64-elf-objcopy"
-$QEMU = "qemu-system-x86_64"
+# ---- Auto-detección de herramientas ----
+# Busca herramientas en PATH y en rutas de instalación comunes
+function Find-Tool {
+    param([string]$Name, [string[]]$SearchPaths)
+
+    # Primero intentar en PATH
+    $found = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($found) { return $found.Source }
+
+    # Buscar en rutas comunes
+    foreach ($p in $SearchPaths) {
+        $full = Join-Path $p $Name
+        if (Test-Path $full) { return $full }
+        if (Test-Path "$full.exe") { return "$full.exe" }
+    }
+
+    return $null
+}
+
+$nasmSearchPaths = @(
+    "$env:LOCALAPPDATA\bin\NASM",
+    "C:\Program Files\NASM",
+    "C:\Program Files (x86)\NASM",
+    "C:\nasm"
+)
+
+$crossSearchPaths = @(
+    "C:\x86_64-elf-tools\bin",
+    "$env:LOCALAPPDATA\x86_64-elf-tools\bin",
+    "C:\cross\bin"
+)
+
+$qemuSearchPaths = @(
+    "C:\Program Files\qemu",
+    "C:\Program Files (x86)\qemu",
+    "$env:LOCALAPPDATA\Programs\qemu"
+)
+
+$AS = Find-Tool "nasm"                $nasmSearchPaths
+$CC = Find-Tool "x86_64-elf-gcc"      $crossSearchPaths
+$LD = Find-Tool "x86_64-elf-ld"       $crossSearchPaths
+$OBJCOPY = Find-Tool "x86_64-elf-objcopy"  $crossSearchPaths
+$QEMU = Find-Tool "qemu-system-x86_64"  $qemuSearchPaths
+
+# Verificar herramientas críticas
+$missing = @()
+if (!$AS) { $missing += "nasm" }
+if (!$CC) { $missing += "x86_64-elf-gcc" }
+if (!$LD) { $missing += "x86_64-elf-ld" }
+if (!$OBJCOPY) { $missing += "x86_64-elf-objcopy" }
+if (!$QEMU) { $missing += "qemu-system-x86_64" }
+
+if ($missing.Count -gt 0 -and $Target -notin @("clean", "info")) {
+    Write-Host "  [ERROR] Herramientas no encontradas:" -ForegroundColor Red
+    foreach ($m in $missing) {
+        Write-Host "    - $m" -ForegroundColor Red
+    }
+    Write-Host ""
+    Write-Host "  Instalar con:" -ForegroundColor Yellow
+    Write-Host "    winget install NASM.NASM" -ForegroundColor Gray
+    Write-Host "    winget install SoftwareFreedomConservancy.QEMU" -ForegroundColor Gray
+    Write-Host "    Cross-compiler: https://github.com/lordmilko/i686-elf-tools/releases" -ForegroundColor Gray
+    Write-Host ""
+    exit 1
+}
 
 $BOOT_DIR = "boot\x86_64"
 $KERNEL_DIR = "kernel"

@@ -32,10 +32,18 @@ typedef int64_t             intptr_t;
 /* ========================================================================= */
 /* Tipo booleano                                                             */
 /* ========================================================================= */
-typedef enum {
-    false = 0,
-    true  = 1
-} bool;
+/* GCC 15+ / C23: bool, true, false son keywords nativas.                    */
+/* Para versiones anteriores, definimos manualmente.                          */
+#if !defined(__bool_true_false_are_defined) && !defined(bool)
+#  if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
+     /* C23: ya están definidos por el compilador */
+#  else
+     typedef _Bool bool;
+#    define true  1
+#    define false 0
+#  endif
+#  define __bool_true_false_are_defined 1
+#endif
 
 /* ========================================================================= */
 /* Constante NULL                                                            */

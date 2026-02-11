@@ -1,6 +1,7 @@
 /**
  * =============================================================================
  * éterOS - Kernel Main
+ * Copyright (c) 2026 Tudex Networks. All rights reserved.
  * =============================================================================
  * 
  * Punto de entrada principal del kernel de éterOS.
@@ -61,6 +62,7 @@ void kmain(void) {
     if (serial_status == 0) {
         serial_write_string("[eterOS] Puerto serie COM1 inicializado.\n");
         serial_write_string("[eterOS] Kernel cargado en modo de 64 bits.\n");
+        serial_write_string("[eterOS] (c) 2026 Tudex Networks\n");
     }
 
     /* ---- Información del sistema ---- */
@@ -146,6 +148,12 @@ static void kernel_print_banner(void) {
     terminal_write_string(" (\"");
     terminal_write_colored(ETEROS_CODENAME, VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
     terminal_write_string("\")\n");
+
+    /* Copyright */
+    terminal_write_string("    ");
+    terminal_write_colored("(c) 2026 Tudex Networks",
+                          VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+    terminal_write_string("\n");
     
     terminal_write_colored(
         "  ========================================\n",
