@@ -98,14 +98,20 @@ int strcmp(const char* s1, const char* s2) {
 /* Funciones de Conversión                                                   */
 /* ========================================================================= */
 
-void itoa(int64_t value, char* buffer, int base) {
+void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
+    if (buffer_size == 0) return;
+
     char temp[65];
     int i = 0;
     int is_negative = 0;
 
     if (value == 0) {
-        buffer[0] = '0';
-        buffer[1] = '\0';
+        if (buffer_size > 1) {
+            buffer[0] = '0';
+            buffer[1] = '\0';
+        } else {
+            buffer[0] = '\0';
+        }
         return;
     }
 
@@ -128,10 +134,17 @@ void itoa(int64_t value, char* buffer, int base) {
         temp[i++] = '-';
     }
 
-    /* Invertir la cadena */
+    /* Invertir la cadena y copiar con límite */
     int j = 0;
-    while (i > 0) {
+    size_t chars_to_copy = (size_t)i;
+
+    if (chars_to_copy >= buffer_size) {
+        chars_to_copy = buffer_size - 1;
+    }
+
+    while (chars_to_copy > 0) {
         buffer[j++] = temp[--i];
+        chars_to_copy--;
     }
     buffer[j] = '\0';
 }
