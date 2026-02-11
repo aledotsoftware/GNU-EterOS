@@ -174,6 +174,16 @@ static void irq_keyboard(struct interrupt_frame *frame) {
 }
 
 /**
+ * IRQ4 - Puerto Serie COM1/COM3.
+ */
+__attribute__((interrupt))
+static void irq_serial(struct interrupt_frame *frame) {
+    (void)frame;
+    serial_irq_handler();
+    pic_send_eoi(4);
+}
+
+/**
  * Handler por defecto para IRQs no manejadas.
  */
 __attribute__((interrupt))
@@ -218,9 +228,11 @@ void idt_init(void) {
     /* --- Instalar handlers de IRQs (32-47) --- */
     idt_set_gate(IRQ_BASE + 0,  (void*)irq_timer,    IDT_GATE_INTERRUPT);
     idt_set_gate(IRQ_BASE + 1,  (void*)irq_keyboard, IDT_GATE_INTERRUPT);
+    idt_set_gate(IRQ_BASE + 4,  (void*)irq_serial,   IDT_GATE_INTERRUPT);
 
     /* IRQs restantes: handler por defecto */
     for (int i = 2; i < 16; i++) {
+        if (i == 4) continue;
         idt_set_gate(IRQ_BASE + i, (void*)irq_default, IDT_GATE_INTERRUPT);
     }
 
