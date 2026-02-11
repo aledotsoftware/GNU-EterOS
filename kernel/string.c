@@ -216,7 +216,7 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
        Al castear a uint64_t primero, la operación es segura y bien definida. */
     if (value < 0 && base == 10) {
         is_negative = 1;
-        uvalue = (uint64_t)0 - (uint64_t)value;
+        uvalue = -(uint64_t)value;
     } else {
         uvalue = (uint64_t)value;
     }

@@ -52,6 +52,11 @@ int main() {
         printf("INT64_MAX: %s\n", buffer);
         assert(strcmp(buffer, "9223372036854775807") == 0);
 
+        /* Base 16 (INT64_MIN) - should be treated as unsigned */
+        itoa_s(INT64_MIN, buffer, sizeof(buffer), 16);
+        printf("INT64_MIN in base 16: %s\n", buffer);
+        assert(strcmp(buffer, "8000000000000000") == 0);
+
         /* Base 16 (negative number) - should be treated as unsigned */
         itoa_s(-1, buffer, sizeof(buffer), 16);
         printf("-1 in base 16: %s\n", buffer);
@@ -61,6 +66,16 @@ int main() {
         itoa_s(5, buffer, sizeof(buffer), 2);
         printf("5 in base 2: %s\n", buffer);
         assert(strcmp(buffer, "101") == 0);
+
+        /* Base 2 (INT64_MIN) */
+        itoa_s(INT64_MIN, buffer, sizeof(buffer), 2);
+        printf("INT64_MIN in base 2: %s\n", buffer);
+        /* 1 followed by 63 zeros */
+        assert(buffer[0] == '1');
+        for (int i = 1; i < 64; i++) {
+            assert(buffer[i] == '0');
+        }
+        assert(buffer[64] == '\0');
 
         /* Truncation with negative number */
         char small_buf[5]; /* Size 5 -> 4 chars + null */
