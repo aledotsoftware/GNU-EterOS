@@ -22,6 +22,10 @@
 #include "../include/string.h"
 #include "../include/serial.h"
 #include "../include/io.h"
+#include "../include/idt.h"
+#include "../include/pic.h"
+#include "../include/keyboard.h"
+#include "../include/shell.h"
 
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */
@@ -49,13 +53,13 @@ static void kernel_halt(void);
  * Inicializa los subsistemas principales y entra en el loop del kernel.
  */
 void kmain(void) {
-    /* ---- Inicializar el terminal VGA ---- */
+    /* ---- 1. Inicializar el terminal VGA ---- */
     terminal_initialize();
 
-    /* ---- Inicializar el puerto serie para depuración ---- */
+    /* ---- 2. Inicializar el puerto serie para depuración ---- */
     int serial_status = serial_init();
 
-    /* ---- Mostrar banner de éterOS ---- */
+    /* ---- 3. Mostrar banner de éterOS ---- */
     kernel_print_banner();
 
     /* ---- Log de depuración por serial ---- */
@@ -65,36 +69,37 @@ void kmain(void) {
         serial_write_string("[eterOS] (c) 2026 Tudex Networks\n");
     }
 
-    /* ---- Información del sistema ---- */
+    /* ---- 4. Inicializar el PIC (remapear IRQs) ---- */
+    terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("PIC remapeado (IRQ 32-47)\n");
+    pic_init();
+
+    /* ---- 5. Inicializar la IDT ---- */
+    terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("IDT cargada (256 vectores)\n");
+    idt_init();
+
+    /* ---- 6. Inicializar el teclado PS/2 ---- */
+    terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("Teclado PS/2 (IRQ1)\n");
+    keyboard_init();
+    pic_unmask_irq(1);   /* Habilitar IRQ1 (teclado) */
+
+    /* ---- 7. Habilitar interrupciones ---- */
+    terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("Interrupciones habilitadas (STI)\n");
+    __asm__ volatile ("sti");
+
+    serial_write_string("[eterOS] Todos los subsistemas inicializados.\n");
+    serial_write_string("[eterOS] Lanzando shell interactivo.\n");
+
+    /* ---- 8. Información del sistema ---- */
     kernel_print_sysinfo();
 
-    /* ---- Mensaje de estado ---- */
-    terminal_write_string("\n");
-    terminal_write_colored("  Sistema inicializado correctamente.\n",
-                          VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-    terminal_write_string("\n");
+    /* ---- 9. Lanzar shell interactivo ---- */
+    shell_run();  /* Nunca retorna */
 
-    /* ---- Próximos pasos (indicador visual) ---- */
-    terminal_write_colored("  Proximos pasos:\n",
-                          VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
-    terminal_write_string("    ");
-    terminal_write_colored("[ ]", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-    terminal_write_string(" Implementar GDT de 64 bits completa\n");
-    terminal_write_string("    ");
-    terminal_write_colored("[ ]", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-    terminal_write_string(" Implementar gestor de memoria fisica\n");
-    terminal_write_string("    ");
-    terminal_write_colored("[ ]", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-    terminal_write_string(" Implementar IDT e interrupciones\n");
-    terminal_write_string("    ");
-    terminal_write_colored("[ ]", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-    terminal_write_string(" Soporte para teclado PS/2\n");
-
-    terminal_write_string("\n");
-    terminal_write_colored("  > ", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    terminal_write_string("Kernel en espera. CPU detenida (HLT).\n");
-
-    /* ---- Detener la CPU ---- */
+    /* Si por alguna razón retorna, halt */
     kernel_halt();
 }
 

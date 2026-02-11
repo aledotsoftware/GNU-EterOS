@@ -121,8 +121,12 @@ $CFLAGS = @(
 $KERNEL_SRCS = @(
     "$KERNEL_DIR\main.c",
     "$KERNEL_DIR\string.c",
+    "$KERNEL_DIR\shell.c",
     "$KERNEL_DIR\drivers\video\vga.c",
-    "$KERNEL_DIR\drivers\serial\serial.c"
+    "$KERNEL_DIR\drivers\serial\serial.c",
+    "$KERNEL_DIR\drivers\input\keyboard.c",
+    "$KERNEL_DIR\arch\x86_64\idt.c",
+    "$KERNEL_DIR\arch\x86_64\pic.c"
 )
 
 # ---- Funciones auxiliares ----
@@ -148,7 +152,9 @@ function Initialize-BuildDirs {
         $BUILD_DIR,
         "$BUILD_DIR\$KERNEL_DIR",
         "$BUILD_DIR\$KERNEL_DIR\drivers\video",
-        "$BUILD_DIR\$KERNEL_DIR\drivers\serial"
+        "$BUILD_DIR\$KERNEL_DIR\drivers\serial",
+        "$BUILD_DIR\$KERNEL_DIR\drivers\input",
+        "$BUILD_DIR\$KERNEL_DIR\arch\x86_64"
     )
     foreach ($d in $dirs) {
         if (!(Test-Path $d)) {

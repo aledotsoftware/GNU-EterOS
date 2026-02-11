@@ -51,8 +51,12 @@ BOOT_SRC    = $(BOOT_DIR)/boot.asm
 
 KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/string.c             \
+              $(KERNEL_DIR)/shell.c              \
               $(KERNEL_DIR)/drivers/video/vga.c  \
-              $(KERNEL_DIR)/drivers/serial/serial.c
+              $(KERNEL_DIR)/drivers/serial/serial.c \
+              $(KERNEL_DIR)/drivers/input/keyboard.c \
+              $(KERNEL_DIR)/arch/x86_64/idt.c    \
+              $(KERNEL_DIR)/arch/x86_64/pic.c
 
 # ---- Archivos objeto ----
 KERNEL_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_SRCS))
@@ -89,6 +93,8 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/video
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/serial
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/input
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64
 
 # ---- Bootloader (binario plano, incluye Stage 1 + Stage 2) ----
 boot: dirs $(BOOT_BIN)
