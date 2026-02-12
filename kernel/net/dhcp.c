@@ -8,6 +8,7 @@
 #include "../../include/string.h"
 #include "../../include/vga.h"
 #include "../../include/mm.h"
+#include "../../include/timer.h"
 
 /* Network Constants */
 #define ETHERNET_TYPE_IP 0x0800
@@ -152,9 +153,10 @@ void dhcp_discover(void) {
     char numbuf[16];
     
     uint8_t rx_buffer[1514];
-    int attempts = 50000; /* Polling loop count */
+    uint64_t start_ticks = timer_get_ticks();
+    uint64_t timeout_ticks = 3 * TIMER_HZ; /* 3 seconds */
     
-    while(attempts--) {
+    while(timer_get_ticks() - start_ticks < timeout_ticks) {
         int len = e1000_receive(rx_buffer, sizeof(rx_buffer));
         if (len > 0) {
             /* Check if it's IP/UDP */
@@ -188,8 +190,8 @@ void dhcp_discover(void) {
             }
         }
         
-        /* Small delay loop */
-        for(volatile int k=0; k<1000; k++);
+        /* Yield CPU until next interrupt (timer or packet) */
+        __asm__ volatile("hlt");
     }
     
     terminal_write_colored("[DHCP] Timeout. Sin respuesta.\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
