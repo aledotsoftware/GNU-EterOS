@@ -79,6 +79,15 @@ static inline void io_wait(void) {
     outb(0x80, 0);
 }
 
+/**
+ * Lee el Time Stamp Counter (TSC).
+ */
+static inline uint64_t rdtsc(void) {
+    uint32_t low, high;
+    __asm__ volatile ("rdtsc" : "=a"(low), "=d"(high));
+    return ((uint64_t)high << 32) | low;
+}
+
 #else
 
 /* Mock function declarations for host testing */

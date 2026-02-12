@@ -8,6 +8,8 @@
 #include "../../include/string.h"
 #include "../../include/vga.h"
 #include "../../include/mm.h"
+#include "../../include/io.h"
+#include "../../include/timer.h"
 
 /* Network Constants */
 #define ETHERNET_TYPE_IP 0x0800
@@ -69,6 +71,23 @@ struct dhcp_packet {
 } __attribute__((packed));
 
 /* Checksum Helper */
+/* PRNG: Xorshift32 */
+static uint32_t xorshift_state = 0xACE1; /* Initial seed */
+
+static uint32_t rand32(void) {
+    uint32_t x = xorshift_state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    xorshift_state = x;
+    return x;
+}
+
+static void srand(uint32_t seed) {
+    if (seed == 0) seed = 12345; /* Seed cannot be zero */
+    xorshift_state = seed;
+}
+
 static uint16_t ip_checksum(void* vdata, size_t length) {
     char* data = (char*)vdata;
     uint32_t acc = 0;
@@ -97,7 +116,9 @@ void dhcp_discover(void) {
     struct udp_header* udp = (struct udp_header*)(buffer + sizeof(struct ethernet_header) + sizeof(struct ip_header));
     struct dhcp_packet* dhcp = (struct dhcp_packet*)(buffer + sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct udp_header));
     
-    uint32_t xid = 0x12345678; /* Static XID */
+    /* Seed PRNG with TSC and current ticks for better entropy */
+    srand((uint32_t)rdtsc() ^ (uint32_t)timer_get_ticks());
+    uint32_t xid = rand32();
     
     /* 1. Build DHCP Payload */
     dhcp->op = 1;       /* Boot Request */
