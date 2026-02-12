@@ -43,4 +43,10 @@ uint32_t timer_get_uptime_seconds(void);
  */
 uint32_t timer_get_uptime_minutes(void);
 
+/**
+ * Bloquea la ejecución durante el tiempo indicado en milisegundos.
+ * Implementado mediante espera activa eficiente (hlt).
+ */
+void timer_wait(uint32_t ms);
+
 #endif /* ETEROS_TIMER_H */
