@@ -25,10 +25,6 @@ static void pic_io_wait(void) {
 /* ========================================================================= */
 
 void pic_init(void) {
-    /* Guardar las máscaras actuales */
-    uint8_t mask1 = inb(PIC1_DATA);
-    uint8_t mask2 = inb(PIC2_DATA);
-
     /* ICW1: Iniciar secuencia de inicialización (modo cascada + ICW4 needed) */
     outb(PIC1_COMMAND, 0x11);
     pic_io_wait();
@@ -54,8 +50,6 @@ void pic_init(void) {
     pic_io_wait();
 
     /* Restaurar máscaras (enmascarar todo por defecto) */
-    (void)mask1;
-    (void)mask2;
     outb(PIC1_DATA, 0xFF);     /* Enmascarar todas las IRQs del master */
     outb(PIC2_DATA, 0xFF);     /* Enmascarar todas las IRQs del slave  */
 }
