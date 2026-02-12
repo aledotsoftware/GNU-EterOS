@@ -43,13 +43,6 @@ static size_t memory_total = HEAP_SIZE;
 /* Helpers Internos                                                          */
 /* ========================================================================= */
 
-static void logging(const char* msg) {
-    /* Descomentar para debug detallado */
-    // serial_write_string("[MM] ");
-    // serial_write_string(msg);
-    // serial_write_string("\n");
-}
-
 /* Alinea un tamaño al múltiplo de HEAP_ALIGNMENT */
 static size_t align(size_t n) {
     return (n + HEAP_ALIGNMENT - 1) & ~(HEAP_ALIGNMENT - 1);
@@ -113,9 +106,6 @@ void* kmalloc(size_t size) {
             
             curr->is_free = 0;
             memory_used += curr->size + sizeof(block_header_t);
-            
-            /* Debug log */
-            // logging("Allocated block");
             
             /* Retornar puntero a los datos (justo después del header) */
             return (void*)((uintptr_t)curr + sizeof(block_header_t));
