@@ -6,6 +6,8 @@
 
 /* Capture standard library functions before they are renamed */
 static void* (*std_memset)(void*, int, size_t) = memset;
+static int (*std_memcmp)(const void*, const void*, size_t) = memcmp;
+static int (*std_strcmp)(const char*, const char*) = strcmp;
 
 /* Define host test mode */
 #ifndef __ETEROS_HOST_TEST__
@@ -378,6 +380,110 @@ int main() {
         assert(memcmp(buffer, "0123456789", 10) == 0);
 
         printf("memmove self assignment passed\n");
+    }
+
+    /* Test memcmp */
+    {
+        char b1[20];
+        char b2[20];
+
+        /* Test 1: Equality */
+        std_memset(b1, 0xAB, 20);
+        std_memset(b2, 0xAB, 20);
+        assert(memcmp(b1, b2, 20) == 0);
+        assert(memcmp(b1, b2, 0) == 0); /* Size 0 */
+
+        /* Test 2: Inequality */
+        b2[10] = 0xAC; /* b2 > b1 */
+        /* b1[10] = 0xAB, b2[10] = 0xAC */
+        /* memcmp returns b1 - b2 -> negative */
+        assert(memcmp(b1, b2, 20) < 0);
+
+        b2[10] = 0xAA; /* b2 < b1 */
+        /* b1[10] = 0xAB, b2[10] = 0xAA */
+        /* memcmp returns b1 - b2 -> positive */
+        assert(memcmp(b1, b2, 20) > 0);
+
+        /* Test 3: Difference at start */
+        b1[0] = 'A';
+        b2[0] = 'B';
+        assert(memcmp(b1, b2, 20) < 0);
+
+        /* Test 4: Difference at end */
+        std_memset(b1, 0, 20);
+        std_memset(b2, 0, 20);
+        b1[19] = 1;
+        assert(memcmp(b1, b2, 20) > 0);
+
+        /* Test 5: Verify against standard memcmp */
+        /* Randomize buffers */
+        for(int i=0; i<20; i++) {
+            b1[i] = (char)(i * 3);
+            b2[i] = (char)(i * 3);
+        }
+        b2[10] = 50; /* Introduce difference */
+
+        int res_std = std_memcmp(b1, b2, 20);
+        int res_eteros = memcmp(b1, b2, 20);
+
+        /* Check sign consistency */
+        if (res_std < 0) assert(res_eteros < 0);
+        else if (res_std > 0) assert(res_eteros > 0);
+        else assert(res_eteros == 0);
+
+        /* Test 6: Unsigned comparison */
+        /* char is usually signed, but memcmp treats as unsigned char */
+        unsigned char u1[] = { 0xFF };
+        unsigned char u2[] = { 0x00 };
+        /* 0xFF (255) > 0x00 (0) */
+        /* If treated as signed char: -1 < 0 -> WRONG */
+        assert(memcmp(u1, u2, 1) > 0);
+
+        printf("memcmp tests passed\n");
+    }
+
+    /* Test strcmp */
+    {
+        /* Test 1: Equality */
+        assert(strcmp("Hello", "Hello") == 0);
+        assert(strcmp("", "") == 0);
+
+        /* Test 2: Inequality */
+        assert(strcmp("Hello", "World") < 0); /* 'H' < 'W' */
+        assert(strcmp("World", "Hello") > 0);
+
+        /* Test 3: Prefix */
+        assert(strcmp("Hello", "Hello World") < 0); /* '\0' < ' ' */
+        assert(strcmp("Hello World", "Hello") > 0);
+
+        /* Test 4: Empty strings */
+        assert(strcmp("", "A") < 0);
+        assert(strcmp("A", "") > 0);
+
+        /* Test 5: Case sensitivity */
+        assert(strcmp("A", "a") < 0); /* 65 < 97 */
+
+        /* Test 6: Verify against standard strcmp */
+        const char* s1 = "TestString1";
+        const char* s2 = "TestString2";
+        int res_std = std_strcmp(s1, s2);
+        int res_eteros = strcmp(s1, s2);
+
+        if (res_std < 0) assert(res_eteros < 0);
+        else if (res_std > 0) assert(res_eteros > 0);
+        else assert(res_eteros == 0);
+
+        /* Test 7: Extended ASCII / Signedness */
+        /* strcmp should treat chars as unsigned char */
+        char u1[] = { (char)0xFF, '\0' }; /* 255 */
+        char u2[] = { 0x01, '\0' };       /* 1 */
+
+        /* If char is signed, 0xFF is -1. -1 < 1. */
+        /* If unsigned comparison, 255 > 1. */
+        /* Standard strcmp uses unsigned char comparison. */
+        assert(strcmp(u1, u2) > 0);
+
+        printf("strcmp tests passed\n");
     }
 
     printf("All tests passed!\n");
