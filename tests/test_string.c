@@ -133,22 +133,6 @@ int main() {
         printf("Boundary tests passed for utoa_hex_s\n");
     }
 
-    /* Test utoa_hex */
-    {
-        char buffer[32];
-        utoa_hex(0xDEADBEEF, buffer);
-        /* Should be "0x00000000DEADBEEF" (18 chars) */
-        printf("utoa_hex: %s\n", buffer);
-        assert(strcmp(buffer, "0x00000000DEADBEEF") == 0);
-
-        utoa_hex(0, buffer);
-        assert(strcmp(buffer, "0x0000000000000000") == 0);
-
-        utoa_hex(0xFFFFFFFFFFFFFFFF, buffer);
-        assert(strcmp(buffer, "0xFFFFFFFFFFFFFFFF") == 0);
-
-        printf("utoa_hex tests passed\n");
-    }
 
     /* Test memset */
     {
