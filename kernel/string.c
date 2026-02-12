@@ -247,19 +247,6 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
     buffer[j] = '\0';
 }
 
-void utoa_hex(uint64_t value, char* buffer) {
-    const char hex_chars[] = "0123456789ABCDEF";
-
-    buffer[0] = '0';
-    buffer[1] = 'x';
-
-    for (int i = 15; i >= 0; i--) {
-        buffer[2 + (15 - i)] = hex_chars[(value >> (i * 4)) & 0xF];
-    }
-
-    buffer[18] = '\0';
-}
-
 void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
     /* Verify buffer size to prevent overflow */
     if (buffer_size == 0) return;
