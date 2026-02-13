@@ -247,68 +247,50 @@ static void show_menu(void) {
 }
 
 /* ========================================================================= */
-/* Pantalla: Lugares visitados                                               */
+/* Pantalla: Listado de destinos (Genérica)                                  */
 /* ========================================================================= */
 
-static void show_visited(void) {
-    draw_header("Lugares Conocidos");
+static void show_destinations_list(bool show_visited) {
+    const char* header = show_visited ? "Lugares Conocidos" : "Lugares por Conocer";
+    draw_header(header);
     terminal_write_string("\n");
 
     uint32_t n = 0;
+
+    /* Configuración visual según el modo */
+    vga_color_t main_color = show_visited ? VGA_COLOR_LIGHT_GREEN : VGA_COLOR_LIGHT_MAGENTA;
+    const char* bullet     = show_visited ? "   * " : "   o ";
+    vga_color_t city_color = show_visited ? VGA_COLOR_WHITE : VGA_COLOR_LIGHT_GREY;
+    vga_color_t country_color = show_visited ? VGA_COLOR_LIGHT_GREY : VGA_COLOR_DARK_GREY;
+
     for (size_t i = 0; i < NUM_DESTINATIONS; i++) {
-        if (!destinations[i].visited) continue;
+        bool is_visited = (destinations[i].visited != 0);
+        if (is_visited != show_visited) continue;
+
         n++;
 
-        terminal_write_colored("   * ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+        terminal_write_colored(bullet, main_color, VGA_COLOR_BLACK);
         terminal_write_colored("[", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
         terminal_write_colored(destinations[i].code, VGA_COLOR_CYAN, VGA_COLOR_BLACK);
         terminal_write_colored("] ", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-        terminal_write_colored(destinations[i].city, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+
+        terminal_write_colored(destinations[i].city, city_color, VGA_COLOR_BLACK);
+
         terminal_write_colored(", ", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-        terminal_write_colored(destinations[i].country, VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+        terminal_write_colored(destinations[i].country, country_color, VGA_COLOR_BLACK);
         terminal_write_string("\n");
     }
 
     char buf[8];
     terminal_write_string("\n");
-    terminal_write_colored("  Total: ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+
+    const char* label  = show_visited ? "  Total: " : "  Faltan: ";
+    const char* suffix = show_visited ? " destinos visitados\n" : " destinos por descubrir!\n";
+
+    terminal_write_colored(label, main_color, VGA_COLOR_BLACK);
     itoa_s(n, buf, sizeof(buf), 10);
     terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-    terminal_write_colored(" destinos visitados\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-
-    draw_footer("Presiona cualquier tecla para volver al menu...");
-    keyboard_getchar();
-}
-
-/* ========================================================================= */
-/* Pantalla: Lugares por visitar                                             */
-/* ========================================================================= */
-
-static void show_pending(void) {
-    draw_header("Lugares por Conocer");
-    terminal_write_string("\n");
-
-    uint32_t n = 0;
-    for (size_t i = 0; i < NUM_DESTINATIONS; i++) {
-        if (destinations[i].visited) continue;
-        n++;
-
-        terminal_write_colored("   o ", VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
-        terminal_write_colored("[", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-        terminal_write_colored(destinations[i].code, VGA_COLOR_CYAN, VGA_COLOR_BLACK);
-        terminal_write_colored("] ", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-        terminal_write_string(destinations[i].city);
-        terminal_write_colored(", ", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-        terminal_write_colored(destinations[i].country, VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
-        terminal_write_string("\n");
-    }
-
-    char buf[8];
-    terminal_write_string("\n");
-    terminal_write_colored("  Faltan: ", VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
-    itoa_s(n, buf, sizeof(buf), 10);
-    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-    terminal_write_colored(" destinos por descubrir!\n", VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+    terminal_write_colored(suffix, main_color, VGA_COLOR_BLACK);
 
     draw_footer("Presiona cualquier tecla para volver al menu...");
     keyboard_getchar();
@@ -330,10 +312,10 @@ void santitravel_run(void) {
 
         switch (c) {
             case '1':
-                show_visited();
+                show_destinations_list(true);
                 break;
             case '2':
-                show_pending();
+                show_destinations_list(false);
                 break;
             case '0':
             case 27:   /* ESC */
