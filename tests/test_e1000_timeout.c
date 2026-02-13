@@ -47,7 +47,7 @@ uint32_t inl(uint16_t port) { (void)port; return 0; }
 void io_wait(void) {}
 
 /* Memory */
-void mm_init(void) {}
+void mm_init(boot_info_t* boot_info) { (void)boot_info; }
 void* kmalloc(size_t size) { return calloc(1, size); }
 void* kcalloc(size_t num, size_t size) { return calloc(num, size); }
 void kfree(void* ptr) { free(ptr); }
@@ -79,7 +79,7 @@ void pci_write_dword(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, ui
 }
 
 /* VGA */
-void terminal_initialize(void) {}
+void terminal_initialize(boot_info_t* boot_info) { (void)boot_info; }
 void terminal_write_string(const char* data) { printf("%s", data); }
 void terminal_write_colored(const char* data, vga_color_t text_color, vga_color_t back_color) {
     (void)text_color; (void)back_color;
