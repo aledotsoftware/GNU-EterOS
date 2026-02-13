@@ -158,7 +158,7 @@ Dirección       | Contenido
 
 ### Fase 3: Kernel Moderno y Multitarea
 - [x] **Heap Manager:** `kmalloc()`, `kfree()`, `kcalloc()` para el kernel (completado en Fase 1)
-- [ ] **Scheduler Round-Robin:** Multitarea preemptiva
+- [x] **Scheduler Round-Robin:** Multitarea preemptiva (comandos `ps`, `kill`, `demo`)
 - [ ] **VFS (Virtual File System):** Abstracción de sistemas de archivos
 - [ ] **Initrd:** Sistema de archivos en RAM (sin drivers de disco complejos)
 

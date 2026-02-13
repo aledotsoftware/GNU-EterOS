@@ -138,7 +138,12 @@ void serial_putchar(char c) {
     uint16_t next_head = (tx_head + 1) % SERIAL_BUFFER_SIZE;
 
     /* Si el buffer está lleno, esperar a que el ISR libere espacio */
+    /* Timeout de seguridad para evitar congelamiento si la IRQ falla */
+    volatile uint32_t timeout = 10000000;
     while (next_head == tx_tail) {
+        if (--timeout == 0) {
+            return; /* Descartar carácter si hay timeout (evita hang) */
+        }
         __asm__ volatile("pause");
     }
 
@@ -146,11 +151,14 @@ void serial_putchar(char c) {
     tx_buffer[tx_head] = c;
     tx_head = next_head;
 
-    /* Habilitar interrupción TX para asegurar transmisión */
+    /* Habilitar interrupción TX para asegurar transmisión.
+       Protegemos el acceso a IER con CLI/STI para evitar condiciones de carrera. */
+    __asm__ volatile("cli");
     uint8_t ier = inb(COM1_PORT + UART_INT_ENABLE);
     if (!(ier & IER_TX_EMPTY)) {
         outb(COM1_PORT + UART_INT_ENABLE, ier | IER_TX_EMPTY);
     }
+    __asm__ volatile("sti");
 }
 
 void serial_write_string(const char* str) {

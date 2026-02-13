@@ -1,0 +1,50 @@
+; =============================================================================
+; éterOS - Context Switch (x86_64)
+; =============================================================================
+; Realiza el cambio de contexto entre dos tareas.
+; Guarda los registros callee-saved y RSP de la tarea actual.
+; Restaura los registros callee-saved y RSP de la nueva tarea.
+;
+; Los registros caller-saved (RAX, RCX, RDX, RSI, RDI, R8-R11) ya fueron
+; guardados por el llamador (convención System V AMD64 ABI), o por el
+; ISR stub si venimos de una interrupción.
+; =============================================================================
+
+[bits 64]
+
+global context_switch
+
+section .text
+
+; -----------------------------------------------------------------------------
+; context_switch(uint64_t* old_rsp, uint64_t new_rsp)
+;   RDI = puntero donde guardar el RSP actual (de la tarea saliente)
+;   RSI = RSP de la tarea entrante (a restaurar)
+; -----------------------------------------------------------------------------
+context_switch:
+    ; Guardar registros callee-saved en el stack actual
+    push rbp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+
+    ; Guardar el RSP actual en *old_rsp
+    mov [rdi], rsp
+
+    ; Cargar el RSP de la nueva tarea
+    mov rsp, rsi
+
+    ; Restaurar registros callee-saved del stack de la nueva tarea
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+
+    ; RET salta a la dirección de retorno que está en el stack de la nueva tarea.
+    ; Si la tarea ya corría antes, vuelve a schedule() -> timer ISR -> iretq.
+    ; Si es la primera vez, salta a task_entry_wrapper().
+    ret

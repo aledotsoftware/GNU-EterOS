@@ -187,7 +187,8 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\mm\vmm.c",
     "$KERNEL_DIR\libgcc.c",
     "$KERNEL_DIR\apps\santitravel.c",
-    "$KERNEL_DIR\apps\sysmon.c"
+    "$KERNEL_DIR\apps\sysmon.c",
+    "$KERNEL_DIR\task.c"
 )
 
 # Archivos específicos de arquitectura

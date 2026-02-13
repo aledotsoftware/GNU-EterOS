@@ -20,6 +20,7 @@
 #include "../../../include/io.h"
 #include "../../../include/string.h"
 #include "../../../include/timer.h"
+#include "../../../include/task.h"
 
 /* ========================================================================= */
 /* Tabla IDT (256 entradas × 16 bytes = 4 KB)                               */
@@ -217,6 +218,7 @@ extern void isr_stub_keyboard(void);
 void irq_timer_handler(void) {
     timer_tick();
     pic_send_eoi(0);
+    schedule(); /* Habilitar scheduler */
 }
 
 /**

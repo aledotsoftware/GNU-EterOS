@@ -32,6 +32,7 @@
 #include "../include/mm.h"
 #include "../include/net/e1000.h"
 #include "../include/gdt.h"
+#include "../include/task.h"
 
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */
@@ -102,7 +103,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     terminal_write_string("PIC remapeado (IRQ 32-47)\n");
     pic_init();
-    pic_unmask_irq(4);   /* Habilitar IRQ4 (Serial COM1) */
+    /* pic_unmask_irq(4); */ /* Habilitar IRQ4 (Serial COM1) - DESHABILITADO DEBUG */
 
     /* ---- 5. Inicializar la IDT ---- */
     terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
@@ -132,8 +133,17 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 8. Información del sistema ---- */
     kernel_print_sysinfo();
 
+    /* ---- 8.5. Inicializar Scheduler ---- */
+    /* ---- 8.5. Inicializar Scheduler ---- */
+    terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("Scheduler Round-Robin\n");
+    scheduler_init();
+
+    terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("Lanzando shell...\n");
+
     /* ---- 9. Lanzar shell interactivo ---- */
-    shell_run();  /* Nunca retorna */
+    shell_run();  /* Nunca retorna (tarea 0 del kernel) */
 
     /* Si por alguna razón retorna, halt */
     kernel_halt();

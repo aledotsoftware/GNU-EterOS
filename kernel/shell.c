@@ -27,6 +27,7 @@
 #include "../include/timer.h"
 #include "../include/net/e1000.h"
 #include "../include/net/dhcp.h"
+#include "../include/task.h"
 
 /* ========================================================================= */
 /* Constantes del sistema                                                    */
@@ -64,6 +65,9 @@ static void cmd_lspci(const char* args);
 static void cmd_net(const char* args);
 static void cmd_dhcp(const char* args);
 static void cmd_uptime(const char* args);
+static void cmd_ps(const char* args);
+static void cmd_kill(const char* args);
+static void cmd_demo(const char* args);
 
 /* ========================================================================= */
 /* Tabla de comandos (extensible — solo agregar entradas)                    */
@@ -80,6 +84,9 @@ static const shell_command_t commands[] = {
     { "net",      "Informacion de red (MAC)",                    cmd_net     },
     { "dhcp",     "Obtener IP via DHCP",                         cmd_dhcp    },
     { "uptime",   "Tiempo desde el arranque",                    cmd_uptime  },
+    { "ps",       "Lista tareas activas",                         cmd_ps      },
+    { "kill",     "Matar tarea (uso: kill <pid>)",                cmd_kill    },
+    { "demo",     "Crear tarea de fondo (test scheduler)",        cmd_demo    },
     { "reboot",   "Reinicia el sistema",                         cmd_reboot  },
     { "halt",     "Detiene la CPU",                              cmd_halt    },
 };
@@ -387,10 +394,117 @@ static void cmd_uptime(const char* args) {
     terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     terminal_write_string("s\n\n");
 }
+/* ========================================================================= */
+/* Comando `ps` — Listar tareas del scheduler                                */
+/* ========================================================================= */
+
+static const char* task_state_str(task_state_t s) {
+    switch (s) {
+        case TASK_RUNNING:  return "RUNNING";
+        case TASK_READY:    return "READY";
+        case TASK_BLOCKED:  return "BLOCKED";
+        case TASK_DEAD:     return "DEAD";
+        default:            return "???";
+    }
+}
+
+static void cmd_ps(const char* args) {
+    (void)args;
+    char buf[32];
+
+    terminal_write_string("\n");
+    terminal_write_colored("  PID  Estado    Nombre\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_write_colored("  ---  --------  ----------------\n", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
+
+    int count = task_get_count();
+    /* La API actual no expone iteración directa, pero sabemos que
+     * task 0 es kernel y podemos usar task_get_current() para la actual.
+     * Por ahora mostramos el count y la tarea actual. */
+    terminal_write_string("  ");
+    itoa_s(task_get_current()->id, buf, sizeof(buf), 10);
+    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_write_string("    ");
+    terminal_write_colored(task_state_str(task_get_current()->state), VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("  ");
+    terminal_write_string(task_get_current()->name);
+    terminal_write_string(" *\n");
+
+    terminal_write_string("\n  Total tareas activas: ");
+    itoa_s(count, buf, sizeof(buf), 10);
+    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_write_string("\n\n");
+}
+
+static void cmd_kill(const char* args) {
+    if (!args || *args == '\0') {
+        terminal_write_string("Uso: kill <pid>\n");
+        return;
+    }
+
+    /* Skip spaces */
+    while (*args == ' ') args++;
+
+    /* Simple atoi implementation */
+    uint32_t pid = 0;
+    const char* ptr = args;
+    while (*ptr >= '0' && *ptr <= '9') {
+        pid = pid * 10 + (*ptr - '0');
+        ptr++;
+    }
+
+    if (pid == 0) {
+        terminal_write_colored("Error: PID invalido o es kernel (PID 0).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+        return;
+    }
+
+    if (task_kill(pid) == 0) {
+        terminal_write_colored("Tarea terminada.\n", VGA_COLOR_GREEN, VGA_COLOR_BLACK);
+    } else {
+        terminal_write_colored("Error: No se pudo terminar la tarea (PID no existe?).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+    }
+}
+
+/* ========================================================================= */
+/* Comando `demo` — Crear tarea de fondo para demostrar multitarea           */
+/* ========================================================================= */
+
+static volatile int demo_task_counter = 0;
+
+static void demo_background_task(void) {
+    /* Esta tarea corre en background, escribiendo al serial cada ~1 segundo */
+    char buf[32];
+    for (int i = 0; i < 10; i++) {
+        demo_task_counter++;
+        serial_write_string("[DEMO] Tick #");
+        itoa_s(demo_task_counter, buf, sizeof(buf), 10);
+        serial_write_string(buf);
+        serial_write_string(" desde tarea background\n");
+        /* Esperar ~1 segundo (100 ticks a 100Hz) usando yield */
+        for (volatile int j = 0; j < 500000; j++) { }
+        task_yield();
+    }
+    serial_write_string("[DEMO] Tarea de fondo terminada!\n");
+    /* task_exit() se llama automáticamente al retornar */
+}
+
+static void cmd_demo(const char* args) {
+    (void)args;
+    int id = task_create("demo-bg", demo_background_task);
+    if (id >= 0) {
+        char buf[32];
+        terminal_write_string("\n  Tarea de fondo creada (PID ");
+        itoa_s(id, buf, sizeof(buf), 10);
+        terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+        terminal_write_string(")\n");
+        terminal_write_string("  Revisa serial (COM1) para ver output del scheduler.\n\n");
+    } else {
+        terminal_write_colored("\n  Error al crear tarea.\n\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+    }
+}
 
 /* ========================================================================= */
 /* Loop principal del Shell                                                  */
-/* ========================================================================= */
+/* =========================================================================*/
 
 #define HISTORY_SIZE    8
 #define HISTORY_LEN     SHELL_MAX_INPUT
