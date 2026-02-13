@@ -22,13 +22,24 @@ static bool     use_framebuffer = false;
 static uint32_t fb_fg = 0xFFFFFFFF; // Blanco por defecto
 static uint32_t fb_bg = 0xFF000000; // Negro por defecto
 
+/*
+ * Hardware Scrolling State
+ * VGA Text Mode memory is 32KB (0x8000 bytes) at 0xB8000.
+ * Screen is 80x25 characters (4000 bytes).
+ * We can store multiple screens in video memory and change the Start Address.
+ */
+#define VGA_MEMORY_SIZE     0x8000
+#define VGA_MEMORY_CHARS    (VGA_MEMORY_SIZE / 2)
+static uint16_t vga_buffer_offset = 0; // Offset in characters/words from 0xB8000
+
 /* ========================================================================= */
 /* Funciones VGA Legacy (Privadas)                                           */
 /* ========================================================================= */
 
 static void vga_update_cursor(void) {
     if (use_framebuffer) return; 
-    uint16_t pos = (uint16_t)(terminal_row * VGA_WIDTH + terminal_col);
+    /* Cursor position is relative to start of video memory */
+    uint16_t pos = (uint16_t)(vga_buffer_offset + terminal_row * VGA_WIDTH + terminal_col);
     outb(0x3D4, 0x0F);
     outb(0x3D5, (uint8_t)(pos & 0xFF));
     outb(0x3D4, 0x0E);
@@ -42,11 +53,35 @@ static void vga_enable_cursor(void) {
     outb(0x3D5, (inb(0x3D5) & 0xE0) | 15);
 }
 
+static void vga_set_start_address(uint16_t offset) {
+    outb(0x3D4, 0x0C);
+    outb(0x3D5, (offset >> 8) & 0xFF);
+    outb(0x3D4, 0x0D);
+    outb(0x3D5, offset & 0xFF);
+}
+
 static void vga_scroll(void) {
-    /* Move all lines one position up */
-    memmove((void*)terminal_buffer, (const void*)(terminal_buffer + VGA_WIDTH), (VGA_SIZE - VGA_WIDTH) * sizeof(uint16_t));
-    /* Clear the last line */
-    const size_t last_line_offset = VGA_SIZE - VGA_WIDTH;
+    /* Check if next screen fits in VRAM */
+    if (vga_buffer_offset + VGA_SIZE + VGA_WIDTH > VGA_MEMORY_CHARS) {
+        /* Wrap around: Copy current visible screen (lines 1..24) to offset 0 */
+        /* lines 1..24 of current screen become lines 0..23 of new screen at offset 0 */
+        volatile uint16_t* vram_base = (volatile uint16_t*)VGA_BUFFER_ADDR;
+        memmove((void*)vram_base, (const void*)(terminal_buffer + VGA_WIDTH), (VGA_SIZE - VGA_WIDTH) * sizeof(uint16_t));
+
+        vga_buffer_offset = 0;
+        terminal_buffer = vram_base;
+    } else {
+        /* Hardware scroll: Advance buffer offset by one line */
+        vga_buffer_offset += VGA_WIDTH;
+        terminal_buffer += VGA_WIDTH;
+    }
+
+    /* Update Hardware Start Address */
+    vga_set_start_address(vga_buffer_offset);
+
+    /* Clear the new last line (visible at the bottom) */
+    /* terminal_buffer points to top-left of visible screen, so last line is at offset (VGA_HEIGHT - 1) * VGA_WIDTH */
+    const size_t last_line_offset = (VGA_HEIGHT - 1) * VGA_WIDTH;
     memset16((uint16_t*)(terminal_buffer + last_line_offset), vga_entry(' ', terminal_color), VGA_WIDTH);
 }
 
@@ -81,6 +116,10 @@ void terminal_initialize(boot_info_t* info) {
         framebuffer_clear(fb_bg);
     } else {
         /* Limpiar toda la pantalla VGA */
+        vga_buffer_offset = 0;
+        vga_set_start_address(0);
+        terminal_buffer = (volatile uint16_t*)VGA_BUFFER_ADDR;
+
         memset16((uint16_t*)terminal_buffer, vga_entry(' ', terminal_color), VGA_SIZE);
         vga_enable_cursor();
         vga_update_cursor();
@@ -185,6 +224,10 @@ void terminal_clear(void) {
     if (use_framebuffer) {
         framebuffer_clear(fb_bg);
     } else {
+        vga_buffer_offset = 0;
+        vga_set_start_address(0);
+        terminal_buffer = (volatile uint16_t*)VGA_BUFFER_ADDR;
+
         memset16((uint16_t*)terminal_buffer, vga_entry(' ', terminal_color), VGA_SIZE);
     }
     terminal_row = 0;
