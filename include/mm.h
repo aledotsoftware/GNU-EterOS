@@ -9,6 +9,7 @@
 #define ETEROS_MM_H
 
 #include "types.h"
+#include "boot.h"
 
 /* ========================================================================= */
 /* API de Memoria Dinámica                                                   */
@@ -17,8 +18,11 @@
 /**
  * Inicializa el sistema de gestión de memoria.
  * Debe ser llamado al inicio del kernel.
+ *
+ * @param boot_info Puntero a la estructura de información del bootloader
+ *                  (necesario para leer el mapa de memoria).
  */
-void mm_init(void);
+void mm_init(boot_info_t* boot_info);
 
 /**
  * Asigna un bloque de memoria de al menos 'size' bytes.

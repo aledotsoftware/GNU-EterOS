@@ -74,7 +74,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 2.5. Inicializar Memory Managers ---- */
     pmm_init(); /* Físico */
     vmm_init(); /* Virtual (Paginación) */
-    mm_init();  /* Heap simple (4MB, identity-mapped) */
+    mm_init(boot_info);  /* Heap simple (Dinámico) */
     
     /* ---- 2.6. Inicializar Red ---- */
     terminal_write_string("\n");
@@ -231,7 +231,7 @@ static void kernel_print_sysinfo(void) {
     terminal_write_string("Serial: COM1 @ 38400 baud\n");
 
     terminal_write_colored("  [INFO] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-    terminal_write_string("Paginacion: Identity mapped (4 MB)\n");
+    terminal_write_string("Paginacion: Identity mapped (0-4GB)\n");
 }
 
 /**
