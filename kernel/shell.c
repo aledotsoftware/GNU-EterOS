@@ -557,16 +557,12 @@ void shell_run(void) {
             terminal_write_string("\n");
             input[pos] = '\0';
 
-            if (pos > 0) {
-                history_add(input);
-                history_idx = history_count;
+                if (pos > 0) {
+                    history_add(input);
+                    history_idx = history_count;
 
-                serial_write_string("[shell] > ");
-                serial_write_string(input);
-                serial_write_string("\n");
-
-                bool found = false;
-                for (size_t i = 0; i < NUM_COMMANDS; i++) {
+                    bool found = false;
+                    for (size_t i = 0; i < NUM_COMMANDS; i++) {
                     const char* args = match_command(input, commands[i].name);
                     if (args) {
                         commands[i].handler(args);

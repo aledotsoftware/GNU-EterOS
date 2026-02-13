@@ -121,11 +121,14 @@ void serial_irq_handler(void) {
 
     /* Verificar si el transmisor está vacío (TX) */
     if (inb(COM1_PORT + UART_LINE_STATUS) & LSR_TX_EMPTY) {
-        if (tx_head != tx_tail) {
-            /* Enviar siguiente byte del buffer */
+        /* Llenar el FIFO de hardware (hasta 16 bytes) */
+        int burst = 16;
+        while (burst-- > 0 && tx_head != tx_tail) {
             outb(COM1_PORT + UART_DATA, tx_buffer[tx_tail]);
             tx_tail = (tx_tail + 1) % SERIAL_BUFFER_SIZE;
-        } else {
+        }
+
+        if (tx_head == tx_tail) {
             /* Buffer vacío, deshabilitar interrupción TX para evitar bucle */
             uint8_t ier = inb(COM1_PORT + UART_INT_ENABLE);
             /* Mantener RX habilitado */
@@ -139,7 +142,7 @@ void serial_putchar(char c) {
 
     /* Si el buffer está lleno, esperar a que el ISR libere espacio */
     /* Timeout de seguridad para evitar congelamiento si la IRQ falla */
-    volatile uint32_t timeout = 10000000;
+    volatile uint32_t timeout = 10000;
     while (next_head == tx_tail) {
         if (--timeout == 0) {
             return; /* Descartar carácter si hay timeout (evita hang) */

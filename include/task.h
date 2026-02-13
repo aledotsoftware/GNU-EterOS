@@ -15,7 +15,7 @@
 /* ========================================================================= */
 /* Configuración                                                             */
 /* ========================================================================= */
-#define MAX_TASKS       16
+#define MAX_TASKS       32
 #define TASK_STACK_SIZE  4096   /* 4 KB por tarea */
 #define SCHEDULER_HZ     10    /* Switch cada 10 ticks (100ms a 100Hz PIT) */
 

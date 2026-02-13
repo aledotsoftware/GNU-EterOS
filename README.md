@@ -146,6 +146,7 @@ Dirección       | Contenido
 
 ### Fase 2: Drivers y E/S Esencial (En progreso)
 - [x] **Teclado PS/2 Mejorado:** Scancodes Set 1 + Extended (0xE0), flechas, Home/End/Delete/PgUp/PgDown
+- [x] **Optimizaciones de Rendimiento:** VGA Scroll (64-bit mov), Serial DMA-like Burst, Shell no-bloqueante
 - [x] **Shell con Historial:** Flecha ⬆️/⬇️ para navegar comandos anteriores (8 entradas)
 - [x] **Temporizador PIT:** 100 Hz, API de `uptime`, `timer_wait()` para delays
 - [x] **Comando `uptime`:** Muestra horas/minutos/segundos desde boot

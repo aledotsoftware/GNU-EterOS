@@ -95,9 +95,18 @@ void* memmove(void* dest, const void* src, size_t n) {
 
 #ifdef __x86_64__
     if (d < s) {
+        size_t qwords = n / 8;
+        size_t remainder = n % 8;
+
         __asm__ volatile (
-            "cld; rep movsb"
-            : "+S"(s), "+D"(d), "+c"(n)
+            "cld; rep movsq"
+            : "+S"(s), "+D"(d), "+c"(qwords)
+            : : "memory"
+        );
+
+        __asm__ volatile (
+            "rep movsb"
+            : "+S"(s), "+D"(d), "+c"(remainder)
             : : "memory"
         );
     } else {

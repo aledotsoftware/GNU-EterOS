@@ -103,7 +103,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     terminal_write_string("PIC remapeado (IRQ 32-47)\n");
     pic_init();
-    /* pic_unmask_irq(4); */ /* Habilitar IRQ4 (Serial COM1) - DESHABILITADO DEBUG */
+    pic_unmask_irq(4);   /* Habilitar IRQ4 (Serial COM1) */
 
     /* ---- 5. Inicializar la IDT ---- */
     terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
