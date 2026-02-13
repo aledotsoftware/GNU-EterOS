@@ -137,7 +137,29 @@ void serial_irq_handler(void) {
     }
 }
 
+static void serial_write_polled(char c) {
+    /* Wait for Transmitter Holding Register Empty (THRE) */
+    while (!(inb(COM1_PORT + UART_LINE_STATUS) & LSR_TX_EMPTY));
+    outb(COM1_PORT + UART_DATA, c);
+}
+
+static void serial_flush_polled(void) {
+    /* Drain the software circular buffer */
+    while (tx_tail != tx_head) {
+        serial_write_polled(tx_buffer[tx_tail]);
+        tx_tail = (tx_tail + 1) % SERIAL_BUFFER_SIZE;
+    }
+}
+
 void serial_putchar(char c) {
+    /* Check if we are in an interrupt-disabled context (e.g., panic or critical section) */
+    if (!interrupts_enabled()) {
+        /* Polled Mode: Ensure previous data is sent, then send new char directly */
+        serial_flush_polled();
+        serial_write_polled(c);
+        return;
+    }
+
     uint16_t next_head = (tx_head + 1) % SERIAL_BUFFER_SIZE;
 
     /* Si el buffer está lleno, esperar a que el ISR libere espacio */
@@ -150,18 +172,21 @@ void serial_putchar(char c) {
         __asm__ volatile("pause");
     }
 
+    /* Save interrupt state and disable them to protect buffer access */
+    uint64_t flags = irq_save();
+
     /* Agregar al buffer */
     tx_buffer[tx_head] = c;
     tx_head = next_head;
 
-    /* Habilitar interrupción TX para asegurar transmisión.
-       Protegemos el acceso a IER con CLI/STI para evitar condiciones de carrera. */
-    __asm__ volatile("cli");
+    /* Habilitar interrupción TX para asegurar transmisión. */
     uint8_t ier = inb(COM1_PORT + UART_INT_ENABLE);
     if (!(ier & IER_TX_EMPTY)) {
         outb(COM1_PORT + UART_INT_ENABLE, ier | IER_TX_EMPTY);
     }
-    __asm__ volatile("sti");
+
+    /* Restore interrupt state (re-enables interrupts if they were enabled) */
+    irq_restore(flags);
 }
 
 void serial_write_string(const char* str) {

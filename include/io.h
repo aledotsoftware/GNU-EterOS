@@ -86,6 +86,38 @@ static inline void cpu_halt(void) {
     __asm__ volatile ("hlt");
 }
 
+/* ========================================================================= */
+/* Control de Interrupciones                                                 */
+/* ========================================================================= */
+
+/**
+ * Verifica si las interrupciones están habilitadas (Flag IF).
+ */
+static inline int interrupts_enabled(void) {
+    uint64_t flags;
+    __asm__ volatile ("pushfq; popq %0" : "=r"(flags));
+    return (flags & 0x200) != 0;
+}
+
+/**
+ * Guarda el estado de las interrupciones y las deshabilita.
+ * Retorna los flags para ser restaurados luego.
+ */
+static inline uint64_t irq_save(void) {
+    uint64_t flags;
+    __asm__ volatile ("pushfq; popq %0; cli" : "=r"(flags) : : "memory");
+    return flags;
+}
+
+/**
+ * Restaura el estado de las interrupciones.
+ */
+static inline void irq_restore(uint64_t flags) {
+    if (flags & 0x200) {
+        __asm__ volatile ("sti");
+    }
+}
+
 #else
 
 /* Mock function declarations for host testing */
@@ -99,6 +131,10 @@ uint32_t inl(uint16_t port);
 
 void io_wait(void);
 void cpu_halt(void);
+
+int interrupts_enabled(void);
+uint64_t irq_save(void);
+void irq_restore(uint64_t flags);
 
 #endif /* !__ETEROS_HOST_TEST__ */
 
