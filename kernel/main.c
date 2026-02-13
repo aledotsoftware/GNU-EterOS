@@ -66,9 +66,18 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     mm_init();
     
     /* ---- 2.6. Inicializar Red ---- */
-    /* Intentar inicializar E1000 si está presente */
     terminal_write_string("\n");
-    e1000_init(NULL);
+    terminal_write_colored("  [NET]  ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("Escaneando dispositivos de red...\n");
+
+    /* Attempt to init E1000 */
+    if (e1000_init(NULL) == 0) {
+        // Success
+    } else {
+        terminal_write_colored("  [NET]  ", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+        terminal_write_string("Info: No se detecto tarjeta Intel E1000.\n");
+        terminal_write_string("         (El sistema continuara sin red)\n");
+    }
 
     /* ---- 3. Mostrar banner de éterOS ---- */
     kernel_print_banner();

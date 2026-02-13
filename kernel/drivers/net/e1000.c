@@ -127,7 +127,7 @@ int e1000_init(pci_device_t* pci_dev_ptr) {
         if (pci_find_device(E1000_VENDOR_ID, E1000_DEVICE_ID, &dev)) {
             pci_dev = &dev;
         } else {
-            serial_write_string("[E1000] Dispositivo no encontrado.\n");
+            /* Silent return during probe - allows scanning for other cards */
             return -1;
         }
     }

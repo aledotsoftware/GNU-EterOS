@@ -146,7 +146,10 @@ void dhcp_discover(void) {
     uint16_t total_len = sizeof(struct ethernet_header) + sizeof(struct ip_header) + udp_len;
     
     terminal_write_colored("[DHCP] Enviando Discover...\n", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
-    e1000_send_packet(buffer, total_len);
+    if (e1000_send_packet(buffer, total_len) < 0) {
+        terminal_write_colored("[DHCP] Error: No se pudo enviar el paquete (Driver inactivo o error HW).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+        return;
+    }
     
     /* 6. Wait for response (Polling with simple loop timer) */
     /* Wait approx 3 seconds. */

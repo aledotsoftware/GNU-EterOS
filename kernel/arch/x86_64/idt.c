@@ -24,7 +24,9 @@
 /* ========================================================================= */
 /* Tabla IDT (256 entradas × 16 bytes = 4 KB)                               */
 /* ========================================================================= */
-static struct idt_entry idt[IDT_ENTRIES];
+_Static_assert(sizeof(struct idt_entry) == 16, "IDT Entry size must be 16 bytes");
+
+static struct idt_entry idt[IDT_ENTRIES] __attribute__((aligned(16)));
 static struct idt_ptr   idtr;
 
 /* ========================================================================= */
@@ -78,7 +80,7 @@ static const char* exception_names[] = {
 /**
  * Handler genérico de excepción: muestra el error y detiene la CPU.
  */
-static void handle_exception(uint8_t vector) {
+static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint64_t error_code) {
     terminal_write_colored("\n  [PANIC] ", VGA_COLOR_RED, VGA_COLOR_BLACK);
 
     if (vector < NUM_EXCEPTION_NAMES) {
@@ -88,15 +90,38 @@ static void handle_exception(uint8_t vector) {
     }
 
     terminal_write_string(" (INT ");
-    char buf[8];
+    char buf[32];
     itoa_s(vector, buf, sizeof(buf), 10);
     terminal_write_string(buf);
     terminal_write_string(")\n");
+    
+    /* Print detailed info */
+    terminal_write_string("    RIP: 0x");
+    utoa_hex_s(frame->rip, buf, sizeof(buf));
+    terminal_write_string(buf);
+    
+    terminal_write_string("  CS: 0x");
+    utoa_hex_s(frame->cs, buf, sizeof(buf));
+    terminal_write_string(buf);
+    
+    terminal_write_string("  RFLAGS: 0x");
+    utoa_hex_s(frame->rflags, buf, sizeof(buf));
+    terminal_write_string(buf);
+    
+    terminal_write_string("\n    Error Code: 0x");
+    utoa_hex_s(error_code, buf, sizeof(buf));
+    terminal_write_string(buf);
+    terminal_write_string("\n");
 
     terminal_write_colored("  Sistema detenido.\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
-
-    serial_write_string("[PANIC] Exception: ");
-    serial_write_string(vector < NUM_EXCEPTION_NAMES ? exception_names[vector] : "Unknown");
+    
+    /* Also print to serial */
+    serial_write_string("[PANIC] Exception INT ");
+    itoa_s(vector, buf, sizeof(buf), 10);
+    serial_write_string(buf);
+    serial_write_string("\n");
+    serial_write_string("RIP: "); utoa_hex_s(frame->rip, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" Error: "); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
     serial_write_string("\n");
 
     /* Halt forever */
@@ -111,16 +136,13 @@ static void handle_exception(uint8_t vector) {
 #define EXCEPTION_HANDLER(num) \
     __attribute__((interrupt)) \
     static void isr_##num(struct interrupt_frame *frame) { \
-        (void)frame; \
-        handle_exception(num); \
+        handle_exception(num, frame, 0); \
     }
 
 #define EXCEPTION_HANDLER_ERR(num) \
     __attribute__((interrupt)) \
     static void isr_##num(struct interrupt_frame *frame, uint64_t error_code) { \
-        (void)frame; \
-        (void)error_code; \
-        handle_exception(num); \
+        handle_exception(num, frame, error_code); \
     }
 
 /* Excepciones sin error code */
@@ -236,6 +258,21 @@ void idt_init(void) {
     /* --- Instalar handlers de IRQs (32-47) --- */
     /* Usamos isr_stub_timer (assembly) -> irq_timer_handler (C) */
     idt_set_gate(IRQ_BASE + 0,  (void*)isr_stub_timer,    IDT_GATE_INTERRUPT);
+    
+    /* Debug: Full Hex Dump of Timer Entry (Vector 32) */
+    serial_write_string("[DEBUG] IDT[32] Raw Bytes:\n");
+    uint8_t* ptr = (uint8_t*)&idt[IRQ_BASE + 0];
+    char hexbuf[4];
+    for (int k = 0; k < 16; k++) {
+        const char hex[] = "0123456789ABCDEF";
+        hexbuf[0] = hex[(ptr[k] >> 4) & 0xF];
+        hexbuf[1] = hex[ptr[k] & 0xF];
+        hexbuf[2] = ' ';
+        hexbuf[3] = 0;
+        serial_write_string(hexbuf);
+    }
+    serial_write_string("\n");
+
     idt_set_gate(IRQ_BASE + 1,  (void*)isr_stub_keyboard, IDT_GATE_INTERRUPT);
     idt_set_gate(IRQ_BASE + 4,  (void*)irq_serial,        IDT_GATE_INTERRUPT);
 

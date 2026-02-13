@@ -16,7 +16,7 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 
 | Objetivo | Meta |
 |---|---|
-| **Tamaño total** | < 10 MB (kernel + drivers + apps + assets) |
+| **Tamaño total** | < 10 MB (Core). *Nota: Capas de compatibilidad y Assets gráficos aumentarán este tamaño.* |
 | **Arquitecturas** | x86_64, aarch64, ARM Cortex-M, RISC-V, Xtensa, AVR |
 | **Portabilidad** | HAL universal con tiers Micro / Core / Full |
 | **Compatibilidad** | Capa POSIX para ejecutar software como Apache |
@@ -24,11 +24,11 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 
 ### 💻 Dónde corre éterOS
 
-| Tier | Edición | Dispositivos | Arquitecturas |
-|---|---|---|---|
-| **Tier 1** | éterOS-Micro | Aire acondicionado, microondas, sensores IoT, drones | ARM Cortex-M, AVR, RISC-V32, Xtensa |
-| **Tier 2** | éterOS-Core | Tablets, phones, Raspberry Pi, satélites, robots | aarch64, RISC-V64 |
-| **Tier 3** | éterOS-Full | PCs, servidores, data centers, estaciones de trabajo | x86_64 |
+| Tier | Edición | Dispositivos | Arquitecturas | Memoria / Protección |
+|---|---|---|---|---|
+| **Tier 1** | éterOS-Micro | Aire acondicionado, sensores IoT, drones | ARM Cortex-M, AVR, RISC-V32, Xtensa | **No MMU** / MPU (Static) |
+| **Tier 2** | éterOS-Core | Tablets, phones, RPi, satélites | aarch64, RISC-V64 | **MMU** / Paging (4-Level) |
+| **Tier 3** | éterOS-Full | PCs, servidores, data centers | x86_64 | **MMU** / Ring 0-3 Protection |
 
 ## 📂 Estructura del Proyecto
 
@@ -36,7 +36,7 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 éterOS/
 ├── boot/                       # El despertar del metal (Bootloader)
 │   └── x86_64/
-│       ├── boot.asm            # Bootloader de dos etapas (Stage 1 + Stage 2)
+│       ├── boot.asm            # MBR Legacy (BIOS) - *UEFI Loader en roadmap*
 │       └── linker.ld           # Script de enlace para el kernel
 ├── kernel/                     # Ether-Core: El corazón del sistema
 │   ├── main.c                  # Punto de entrada (kmain)
@@ -79,9 +79,9 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 
 El arranque de éterOS configura directamente un entorno de **64 bits puro**:
 
-- **Stage 1 (MBR):** Habilita A20, carga Stage 2 + Kernel desde disco
-- **Stage 2:** Configura GDT, paginación de 4 niveles (PML4 → PDPT → PD), activa EFER.LME
-- **Identity Mapping:** 8 MB de huge pages (2 MB cada una) para acceso directo al hardware
+- **Legacy Boot (BIOS):** MBR carga Stage 2, que configura GDT y Paginación.
+- **Modern Boot (UEFI):** *[En desarrollo]* Carga directa de binario PE/COFF.
+- **Identity Mapping:** 8 MB de huge pages (2 MB cada una) para acceso directo al hardware (Lower Half por simplicidad inicial, migración a Upper Half en roadmap).
 
 ### 2. AetherGraphics (Video)
 
@@ -156,7 +156,37 @@ Dirección       | Contenido
 - [ ] **Double Buffering:** Renderizado sin parpadeo
 - [ ] **Event Loop:** Sistema de mensajes (mouse, teclado → ventanas)
 - [ ] **Gestor de Ventanas (Compositor):** Superposición de ventanas con foco
-- [ ] **Primera App:** Calculadora o Monitor de Sistema con GUI nativa
+- [ ] **Primera App:** Calculadora o Monitor de Sistema con GUI nativa y soporte touch nativo
+
+### Fase 5.5: Subsistema de Compatibilidad Linux (Aether-Linux-Subsystem)
+*Objetivo: Ejecutar binarios ELF de Linux sin máquinas virtuales.*
+- [ ] **Traducción de Syscalls:** Mapeo de syscalls de Linux (ABI) a nativas de éterOS.
+- [ ] **VFS Layer:** Implementación de `/proc`, `/sys`.
+- [ ] **Linux Driver Wrapper:** Capa de pegamento (Glue Logic) para reutilizar drivers de red/wifi.
+
+### Fase 5.6: Subsistema de Compatibilidad Android (Aether-Droid)
+- [ ] **Binder IPC:** Implementación del mecanismo de comunicación entre procesos de Android.
+- [ ] **Dalvik/ART Shim:** Capa para ejecutar el runtime de Android sobre éterOS.
+- [ ] **HAL Wrapper:** Adaptador para drivers de hardware específicos de Android (libhardware).
+
+### Fase 5.7: Subsistema de Compatibilidad Windows (Aether-Win32)
+*Similar a WINE, pero a nivel de kernel.*
+- [ ] **PE Loader:** Cargador de ejecutables `.exe` y librerías `.dll`.
+- [ ] **Win32 API Bridge:** Reimplementación de `kernel32.dll`, `user32.dll` en userland.
+- [ ] **NT Syscall Translation:** Traducción de llamadas nativas NT a éterOS.
+
+### Fase 5.8: Subsistema de Compatibilidad macOS/iOS (Aether-Darwin)
+*Inspirado en el proyecto Darling.*
+- [ ] **Mach-O Loader:** Cargador de binarios de macOS.
+- [ ] **Objective-C Runtime:** Soporte para librerías base de Apple.
+- [ ] **Cocoa Bridge:** Mapeo de primitivas gráficas de Quartz a AetherGraphics.
+
+### Fase 5.10: Subsistema de Compatibilidad Web (Aether-Web)
+- [ ] **Chromium Embedded:** Port nativo del motor Blink.
+- [ ] **PWA Runtime:** Ejecución de aplicaciones web como nativas (.crx, .wbn).
+
+
+
 
 ### Meta Final: Software Real
 - [ ] **Apache HTTP Server:** Compilado estáticamente contra musl + lwIP, corriendo sobre éterOS
