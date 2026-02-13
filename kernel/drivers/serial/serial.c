@@ -8,6 +8,7 @@
 
 #include "../include/serial.h"
 #include "../include/io.h"
+#include <task.h>
 
 /* ========================================================================= */
 /* Registros del UART 16550 (offsets desde la base del puerto)               */
@@ -164,11 +165,12 @@ void serial_putchar(char c) {
 
     /* Si el buffer está lleno, esperar a que el ISR libere espacio */
     /* Timeout de seguridad para evitar congelamiento si la IRQ falla */
-    volatile uint32_t timeout = 10000;
+    volatile uint32_t timeout = 20000;
     while (next_head == tx_tail) {
         if (--timeout == 0) {
             return; /* Descartar carácter si hay timeout (evita hang) */
         }
+        task_yield();
         __asm__ volatile("pause");
     }
 
