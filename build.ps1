@@ -192,6 +192,7 @@ $KERNEL_SRCS = @(
 if ($Arch -eq "x86_64") {
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\idt.c"
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\pic.c"
+    $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\gdt.c"
 }
 else {
     $KERNEL_SRCS += "$KERNEL_DIR\arch\i386\idt.c"
@@ -251,16 +252,19 @@ function Invoke-KernelBuild {
     $objFiles = @()
 
     # Compilar ASM stubs si existen
-    $asmSrc = "$KERNEL_DIR\arch\$Arch\interrupts.asm"
-    if (Test-Path $asmSrc) {
-        $asmObj = "$BUILD_DIR\$($asmSrc -replace '\.asm$', '.o')"
+    # Compilar TODOS los archivos ASM en arch/$Arch
+    $asmFiles = Get-ChildItem "$KERNEL_DIR\arch\$Arch" -Filter "*.asm"
+    
+    foreach ($asmFile in $asmFiles) {
+        $asmSrc = $asmFile.FullName
+        $asmObj = "$BUILD_DIR\$KERNEL_DIR\arch\$Arch\$($asmFile.Name -replace '\.asm$', '.o')"
         $objFiles += $asmObj
 
-        Write-Step "ASM" $asmSrc
+        Write-Step "ASM" $asmFile.Name
         $asmFormat = if ($Arch -eq "x86_64") { "elf64" } else { "elf32" }
         & $AS -f $asmFormat $asmSrc -o $asmObj
         if ($LASTEXITCODE -ne 0) {
-            Write-Step "ERR" "Fallo al ensamblar stubs"
+            Write-Step "ERR" "Fallo al ensamblar $($asmFile.Name)"
             exit 1
         }
     }

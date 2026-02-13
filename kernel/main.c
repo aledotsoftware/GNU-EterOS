@@ -29,6 +29,7 @@
 #include "../include/timer.h"
 #include "../include/mm.h"
 #include "../include/net/e1000.h"
+#include "../include/gdt.h"
 
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */
@@ -89,7 +90,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         serial_write_string("[eterOS] (c) 2026 Tudex Networks\n");
     }
 
-    /* ---- 4. Inicializar el PIC (remapear IRQs) ---- */
+    /* ---- 4. Inicializar GDT y TSS ---- */
+    /* Importante hacerlo antes de la IDT/Interrupts */
+    gdt_init();
+
+    /* ---- 4.1 Inicializar el PIC (remapear IRQs) ---- */
     terminal_write_colored("  [INIT] ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     terminal_write_string("PIC remapeado (IRQ 32-47)\n");
     pic_init();

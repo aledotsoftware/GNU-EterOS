@@ -39,13 +39,44 @@ static struct idt_ptr   idtr;
 static void idt_set_gate(uint8_t vector, void* handler, uint8_t type_attr) {
     uint64_t addr = (uint64_t)handler;
 
-    idt[vector].offset_low  = (uint16_t)(addr & 0xFFFF);
-    idt[vector].selector    = KERNEL_CS;
-    idt[vector].ist         = 0;
-    idt[vector].type_attr   = type_attr;
-    idt[vector].offset_mid  = (uint16_t)((addr >> 16) & 0xFFFF);
-    idt[vector].offset_high = (uint32_t)((addr >> 32) & 0xFFFFFFFF);
-    idt[vector].reserved    = 0;
+    /* Access as raw bytes to guarantee layout and debug */
+    uint8_t* p = (uint8_t*)&idt[vector];
+
+    /* Offset Low (0-15) */
+    p[0] = (addr) & 0xFF;
+    p[1] = (addr >> 8) & 0xFF;
+
+    /* Selector (16-31) = KERNEL_CS (0x08) */
+    p[2] = 0x08;
+    p[3] = 0x00;
+
+    /* IST (32-39) = 0 */
+    p[4] = 0x00;
+
+    /* Type/Attr (40-47) */
+    p[5] = type_attr;
+
+    /* Offset Mid (48-63) */
+    p[6] = (addr >> 16) & 0xFF;
+    p[7] = (addr >> 24) & 0xFF;
+
+    /* Offset High (64-95) */
+    p[8] = (addr >> 32) & 0xFF;
+    p[9] = (addr >> 40) & 0xFF;
+    p[10] = (addr >> 48) & 0xFF;
+    p[11] = (addr >> 56) & 0xFF;
+
+    /* Reserved (96-127) */
+    *(uint32_t*)&p[12] = 0;
+    
+    /* Debug specific vector to see what we are writing */
+    if (vector == 32) {
+        char buf[32];
+        terminal_write_string("[DEBUG] Setting IDT[32] to type: 0x");
+        utoa_hex_s(type_attr, buf, sizeof(buf));
+        terminal_write_string(buf);
+        terminal_write_string("\n");
+    }
 }
 
 /* ========================================================================= */
@@ -260,7 +291,8 @@ void idt_init(void) {
     idt_set_gate(IRQ_BASE + 0,  (void*)isr_stub_timer,    IDT_GATE_INTERRUPT);
     
     /* Debug: Full Hex Dump of Timer Entry (Vector 32) */
-    serial_write_string("[DEBUG] IDT[32] Raw Bytes:\n");
+    /* Debug: Full Hex Dump of Timer Entry (Vector 32) */
+    terminal_write_string("[DEBUG] IDT[32] Raw: ");
     uint8_t* ptr = (uint8_t*)&idt[IRQ_BASE + 0];
     char hexbuf[4];
     for (int k = 0; k < 16; k++) {
@@ -269,9 +301,15 @@ void idt_init(void) {
         hexbuf[1] = hex[ptr[k] & 0xF];
         hexbuf[2] = ' ';
         hexbuf[3] = 0;
-        serial_write_string(hexbuf);
+        terminal_write_string(hexbuf);
     }
-    serial_write_string("\n");
+    terminal_write_string("\n");
+    
+    char size_buf[16];
+    itoa_s(sizeof(struct idt_entry), size_buf, sizeof(size_buf), 10);
+    terminal_write_string("[DEBUG] sizeof(idt_entry) = ");
+    terminal_write_string(size_buf);
+    terminal_write_string("\n");
 
     idt_set_gate(IRQ_BASE + 1,  (void*)isr_stub_keyboard, IDT_GATE_INTERRUPT);
     idt_set_gate(IRQ_BASE + 4,  (void*)irq_serial,        IDT_GATE_INTERRUPT);
