@@ -60,6 +60,7 @@ void ui_draw_char(const rect_t* clip, int32_t x, int32_t y, char c, uint32_t fg,
 }
 
 void ui_draw_string(const rect_t* clip, int32_t x, int32_t y, const char* text, uint32_t fg, uint32_t bg) {
+    if (!text) return;
     int32_t cur_x = x;
     while (*text) {
         ui_draw_char(clip, cur_x, y, *text, fg, bg);

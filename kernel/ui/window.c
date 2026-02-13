@@ -85,14 +85,35 @@ void wm_print_at(window_t* win, int32_t x, int32_t y, const char* text) {
 void wm_fill_rect(window_t* win, rect_t rect, uint32_t color) {
     if (!win->active) return;
     
-     /* Offset por barra de título (20px) */
+    /* Offset por barra de título (20px) */
     int32_t abs_x = win->bounds.x + rect.x;
     int32_t abs_y = win->bounds.y + 20 + rect.y;
 
-    /* Clipping muy básico */
-    if (abs_x < win->bounds.x) abs_x = win->bounds.x;
-    if (abs_y < win->bounds.y + 20) abs_y = win->bounds.y + 20;
+    /* Límites del área de contenido */
+    int32_t min_x = win->bounds.x;
+    int32_t min_y = win->bounds.y + 20;
+    int32_t max_x = win->bounds.x + win->bounds.w;
+    int32_t max_y = win->bounds.y + win->bounds.h;
+
+    /* Clipping Rectangle Intersection */
+    if (abs_x < min_x) {
+        rect.w -= (min_x - abs_x);
+        abs_x = min_x;
+    }
+    if (abs_y < min_y) {
+        rect.h -= (min_y - abs_y);
+        abs_y = min_y;
+    }
+
+    if (abs_x + rect.w > max_x) {
+        rect.w = max_x - abs_x;
+    }
+    if (abs_y + rect.h > max_y) {
+        rect.h = max_y - abs_y;
+    }
+
+    /* Si no queda nada, salir */
+    if (rect.w <= 0 || rect.h <= 0) return;
     
-    /* Implementar clipping real sería mejor, pero por ahora... */
     framebuffer_rect((uint32_t)abs_x, (uint32_t)abs_y, (uint32_t)rect.w, (uint32_t)rect.h, color);
 }

@@ -100,13 +100,21 @@ void gui_demo_run(void) {
     while (keyboard_has_input()) keyboard_getchar();
 
     /* Mensaje (temporalmente sobre la UI) */
-    wm_print_at(win_status, 10, 80, "Press ENTER to exit");
+    wm_print_at(win_status, 10, 80, "Demo running... (Wait 2s)");
+    
+    /* Forzar espera de 2 segundos para asegurar que se vea algo */
+    /* (Evita que teclas "residuales" cierren la ventana inmediatamente) */
+    for(volatile int i=0; i<200000000; i++);
+
+    wm_print_at(win_status, 10, 80, "Press ENTER to exit      ");
+
+    /* Flush de nuevo por si acaso */
+    while (keyboard_has_input()) keyboard_getchar();
 
     /* Loop de espera principal */
     while (gui_running) {
         if (keyboard_has_input()) {
-            /* Salir con cualquier tecla (ENTER = 10, ESC = 27) */
-            /* Simplificamos para asegurar que funcione la salida */
+            /* Salir con cualquier tecla */
             char c = keyboard_getchar();
             gui_running = false;
         }

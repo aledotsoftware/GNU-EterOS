@@ -545,6 +545,16 @@ long_mode_start:
     ; Configurar stack de 64 bits
     mov rsp, 0x90000
 
+    ; ---- Habilitar SSE (Requerido por GCC en x86_64) ----
+    mov rax, cr0
+    and ax, 0xFFFB          ; Clear EM (bit 2)
+    or ax, 0x0002           ; Set MP (bit 1)
+    mov cr0, rax
+
+    mov rax, cr4
+    or ax, 0x0600           ; Set OSFXSR (bit 9) and OSXMMEXCPT (bit 10)
+    mov cr4, rax
+
     ; Indicador visual en VGA: "64" en verde brillante
     mov word [0xB8004], 0x2F36          ; '6'
     mov word [0xB8006], 0x2F34          ; '4'
