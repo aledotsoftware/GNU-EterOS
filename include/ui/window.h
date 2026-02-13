@@ -24,5 +24,7 @@ void wm_draw_window(window_t* win);
 /* Helpers de dibujo contextual */
 void wm_print_at(window_t* win, int32_t x, int32_t y, const char* text);
 void wm_fill_rect(window_t* win, rect_t rect, uint32_t color);
+void wm_move_window(window_t* win, int32_t dx, int32_t dy);
+void wm_redraw_desktop(void);
 
 #endif

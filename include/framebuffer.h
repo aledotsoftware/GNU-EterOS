@@ -13,6 +13,9 @@ void framebuffer_clear(uint32_t color);
 /* Dibuja un pixel */
 void framebuffer_putpixel(uint32_t x, uint32_t y, uint32_t color);
 
+void framebuffer_flush(void);
+void framebuffer_enable_double_buffer(void);
+
 /* Dibuja un rectángulo */
 void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color);
 

@@ -38,6 +38,11 @@ window_t* wm_create_window(int32_t x, int32_t y, int32_t w, int32_t h, const cha
 void wm_draw_window(window_t* win) {
     if (!win->active) return;
     
+    /* 0. Sombra (Offset +4, +4) */
+    framebuffer_rect((uint32_t)win->bounds.x + 4, (uint32_t)win->bounds.y + 4,
+                     (uint32_t)win->bounds.w, (uint32_t)win->bounds.h,
+                     0x000000); /* Black shadow */
+
     /* 1. Fondo */
     /* rect local -> global */
     framebuffer_rect((uint32_t)win->bounds.x, (uint32_t)win->bounds.y,
@@ -116,4 +121,34 @@ void wm_fill_rect(window_t* win, rect_t rect, uint32_t color) {
     if (rect.w <= 0 || rect.h <= 0) return;
     
     framebuffer_rect((uint32_t)abs_x, (uint32_t)abs_y, (uint32_t)rect.w, (uint32_t)rect.h, color);
+}
+
+void wm_move_window(window_t* win, int32_t dx, int32_t dy) {
+    if (!win->active) return;
+    win->bounds.x += dx;
+    win->bounds.y += dy;
+    
+    /* Full Redraw (Expensive but safe for now) */
+    wm_redraw_desktop();
+}
+
+void wm_redraw_desktop(void) {
+    /* 1. Fondo "Desktop" (Dark Teal) */
+    framebuffer_clear(0x002040);
+    
+    /* 2. Grid Effect */
+    /* Draw horizontal lines */
+    for (uint32_t y = 0; y < 768; y += 40) {
+        framebuffer_rect(0, y, 1024, 1, 0x003050);
+    }
+    /* Draw vertical lines */
+    for (uint32_t x = 0; x < 1024; x += 40) {
+        framebuffer_rect(x, 0, 1, 768, 0x003050);
+    }
+
+    /* 3. Redraw all windows */
+    wm_draw_all();
+    
+    /* 4. Flush backbuffer to screen */
+    framebuffer_flush();
 }
