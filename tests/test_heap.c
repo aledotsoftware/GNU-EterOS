@@ -66,7 +66,27 @@ void reset_heap() {
     // Initialize first block
     heap_start->size = memory_total - sizeof(block_header_t);
     heap_start->is_free = 1;
+    heap_start->magic = HEAP_MAGIC;
     heap_start->next = NULL;
+}
+
+void test_kmalloc_overflow() {
+    printf("Running test_kmalloc_overflow... ");
+    reset_heap();
+
+    /* Try to allocate SIZE_MAX (or close to it) */
+    void* p = kmalloc(SIZE_MAX);
+    assert(p == NULL);
+
+    /* Test slightly less than SIZE_MAX to catch off-by-one in align */
+    void* p2 = kmalloc(SIZE_MAX - 7);
+    assert(p2 == NULL);
+
+    /* Test allocation larger than total memory */
+    void* p3 = kmalloc(memory_total + 1);
+    assert(p3 == NULL);
+
+    printf("PASSED\n");
 }
 
 void test_kmalloc_basic() {
@@ -221,6 +241,7 @@ int main() {
     test_out_of_memory();
     test_double_free();
     test_kcalloc();
+    test_kmalloc_overflow();
 
     printf("\nAll heap tests passed!\n");
     return 0;
