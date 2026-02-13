@@ -10,64 +10,7 @@
 #include "../../include/mm.h"
 #include "../../include/timer.h"
 
-/* Network Constants */
-#define ETHERNET_TYPE_IP 0x0800
-#define IP_PROTO_UDP 17
-#define DHCP_MAGIC 0x63825363
-
-/* Byte Order Utils (x86 is Little Endian) */
-static inline uint16_t htons(uint16_t v) { return (v << 8) | (v >> 8); }
-static inline uint32_t htonl(uint32_t v) { 
-    return ((v & 0xFF) << 24) | ((v & 0xFF00) << 8) | ((v & 0xFF0000) >> 8) | ((v >> 24) & 0xFF); 
-}
-#define ntohs htons
-#define ntohl htonl
-
-/* Structures */
-struct ethernet_header {
-    uint8_t dest[6];
-    uint8_t src[6];
-    uint16_t type;
-} __attribute__((packed));
-
-struct ip_header {
-    uint8_t  ver_ihl;   /* Version (4) + IHL (4) */
-    uint8_t  tos;
-    uint16_t len;
-    uint16_t id;
-    uint16_t frag_offset;
-    uint8_t  ttl;
-    uint8_t  proto;
-    uint16_t checksum;
-    uint32_t src;
-    uint32_t dest;
-} __attribute__((packed));
-
-struct udp_header {
-    uint16_t src_port;
-    uint16_t dest_port;
-    uint16_t len;
-    uint16_t checksum;
-} __attribute__((packed));
-
-struct dhcp_packet {
-    uint8_t  op;        /* 1: request, 2: reply */
-    uint8_t  htype;     /* 1: ethernet */
-    uint8_t  hlen;      /* 6 */
-    uint8_t  hops;
-    uint32_t xid;
-    uint16_t secs;
-    uint16_t flags;
-    uint32_t ciaddr;
-    uint32_t yiaddr;
-    uint32_t siaddr;
-    uint32_t giaddr;
-    uint8_t  chaddr[16];
-    uint8_t  sname[64];
-    uint8_t  file[128];
-    uint32_t magic;
-    uint8_t  options[308]; /* Minimum size */
-} __attribute__((packed));
+/* Constants and structs are now in include/net/dhcp.h and include/net/defs.h */
 
 /* Checksum Helper */
 static uint16_t ip_checksum(void* vdata, size_t length) {
@@ -162,34 +105,21 @@ void dhcp_discover(void) {
     while(timer_get_ticks() - start_ticks < timeout_ticks) {
         int len = e1000_receive(rx_buffer, sizeof(rx_buffer));
         if (len > 0) {
-            /* Check if it's IP/UDP */
-            struct ethernet_header* r_eth = (struct ethernet_header*)rx_buffer;
-            if (r_eth->type == htons(ETHERNET_TYPE_IP)) {
-                struct ip_header* r_ip = (struct ip_header*)(rx_buffer + sizeof(struct ethernet_header));
-                if (r_ip->proto == IP_PROTO_UDP) {
-                    struct udp_header* r_udp = (struct udp_header*)((uint8_t*)r_ip + (r_ip->ver_ihl & 0xF)*4);
-                    
-                    /* Check Port 68 */
-                    if (r_udp->dest_port == htons(68)) {
-                         struct dhcp_packet* r_dhcp = (struct dhcp_packet*)((uint8_t*)r_udp + sizeof(struct udp_header));
-                         
-                         if (r_dhcp->xid == htonl(xid) && r_dhcp->op == 2 /* Reply */) {
-                             terminal_write_colored("[DHCP] Oferta Recibida!\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-                             
-                             /* Print Offered IP (yiaddr) */
-                             uint8_t* ip = (uint8_t*)&r_dhcp->yiaddr;
-                             
-                             terminal_write_string("  IP Address: ");
-                             itoa_s(ip[0], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
-                             itoa_s(ip[1], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
-                             itoa_s(ip[2], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
-                             itoa_s(ip[3], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf);
-                             terminal_write_string("\n");
-                             
-                             return;
-                         }
-                    }
-                }
+            const struct dhcp_packet* r_dhcp = NULL;
+            if (dhcp_parse_offer(rx_buffer, len, xid, &r_dhcp) == 0) {
+                 terminal_write_colored("[DHCP] Oferta Recibida!\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+
+                 /* Print Offered IP (yiaddr) */
+                 const uint8_t* ip = (const uint8_t*)&r_dhcp->yiaddr;
+
+                 terminal_write_string("  IP Address: ");
+                 itoa_s(ip[0], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
+                 itoa_s(ip[1], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
+                 itoa_s(ip[2], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
+                 itoa_s(ip[3], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf);
+                 terminal_write_string("\n");
+
+                 return;
             }
         }
         

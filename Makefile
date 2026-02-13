@@ -66,6 +66,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/apps/sysmon.c          \
               $(KERNEL_DIR)/drivers/net/e1000.c    \
               $(KERNEL_DIR)/net/dhcp.c             \
+              $(KERNEL_DIR)/net/dhcp_parser.c      \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/mm/heap.c
 
