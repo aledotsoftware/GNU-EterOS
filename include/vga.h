@@ -43,6 +43,9 @@ typedef enum {
     VGA_COLOR_WHITE         = 15,
 } vga_color_t;
 
+typedef void (*terminal_hook_t)(char c);
+void terminal_set_hook(terminal_hook_t hook);
+
 /* ========================================================================= */
 /* Funciones inline para construir entradas VGA                              */
 /* ========================================================================= */

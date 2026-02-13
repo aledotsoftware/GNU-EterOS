@@ -19,4 +19,10 @@
  */
 void shell_run(void);
 
+/**
+ * Ejecuta un comando individual.
+ * Retorna 0 si éxito, -1 si error/no encontrado.
+ */
+int shell_exec(char* cmdbuf);
+
 #endif /* ETEROS_SHELL_H */

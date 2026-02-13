@@ -542,6 +542,9 @@ void shell_run(void) {
     char input[SHELL_MAX_INPUT];
     size_t pos = 0;
 
+    /* Redirigir output a serial también (para modo sin gráficos) */
+    terminal_set_hook(serial_putchar);
+
     terminal_write_string("\n");
     terminal_write_colored("  Terminal interactiva lista. ",
                           VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
@@ -552,7 +555,25 @@ void shell_run(void) {
     shell_print_prompt();
 
     for (;;) {
-        char c = keyboard_getchar();
+        char c = 0;
+
+        /* Esperar input de Teclado O Serial */
+        while (1) {
+            if (keyboard_has_input()) {
+                c = keyboard_getchar();
+                break;
+            }
+            if (serial_received()) {
+                c = serial_read();
+                /* Mapear Enter de Serial (\r) a \n */
+                if (c == '\r') c = '\n';
+                /* Mapear Backspace de Serial (DEL=127) a \b */
+                if (c == 127) c = '\b';
+                break;
+            }
+            /* Dormir hasta la próxima interrupción */
+            __asm__ volatile("hlt"); 
+        }
 
         if (c == '\n') {
             /* ---- Enter: procesar comando ---- */

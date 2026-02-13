@@ -31,6 +31,11 @@ static uint32_t fb_bg = 0xFF000000; // Negro por defecto
 #define VGA_MEMORY_SIZE     0x8000
 #define VGA_MEMORY_CHARS    (VGA_MEMORY_SIZE / 2)
 static uint16_t vga_buffer_offset = 0; // Offset in characters/words from 0xB8000
+static terminal_hook_t active_hook = (void*)0;
+
+void terminal_set_hook(terminal_hook_t hook) {
+    active_hook = hook;
+}
 
 /* ========================================================================= */
 /* Funciones VGA Legacy (Privadas)                                           */
@@ -152,6 +157,13 @@ void terminal_scroll(void) {
 }
 
 static void _terminal_putchar(char c) {
+    if (active_hook) {
+        active_hook(c);
+        /* Si hay hook activo, podríamos evitar escribir en pantalla VGA/FB para evitar "doble print" en la ventanita */
+        /* O podemos dejar que pinte en fondo */
+        // return;  <-- Si queremos silenciar el fondo
+    }
+
     size_t width = use_framebuffer ? (1024/8) : VGA_WIDTH;
     size_t height = use_framebuffer ? (768/16) : VGA_HEIGHT;
 

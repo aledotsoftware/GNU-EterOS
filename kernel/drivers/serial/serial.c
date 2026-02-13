@@ -79,6 +79,8 @@ int serial_init(void) {
 
     /* Verificar que recibimos el mismo byte */
     if (inb(port + UART_DATA) != 0xAE) {
+        /* Asegurar que el loopback se deshabilita incluso si falla el test */
+        outb(port + UART_MODEM_CTRL, 0x0F);
         return -1;  /* Puerto serie defectuoso */
     }
 

@@ -22,7 +22,7 @@
 # =============================================================================
 
 param(
-    [ValidateSet("all", "boot", "kernel", "image", "vdi", "vbox", "run", "debug", "clean", "info")]
+    [ValidateSet("all", "boot", "kernel", "image", "vdi", "vbox", "run", "run-nographic", "debug", "clean", "info")]
     [string]$Target = "all",
 
     [ValidateSet("x86_64", "i386")]
@@ -464,17 +464,25 @@ function Invoke-VBoxRun {
 }
 
 function Invoke-QemuRun {
-    param([bool]$DebugMode = $false)
+    param([bool]$DebugMode = $false, [bool]$NoGraphic = $false)
 
     Write-Step "QEMU" "Iniciando eterOS ($Arch)..."
 
     $qemuArgs = @(
         "-drive", "format=raw,file=$OS_IMAGE,if=floppy",
-        "-serial", "stdio",
         "-m", "128M",
         "-no-reboot",
         "-no-shutdown"
     )
+
+    if ($NoGraphic) {
+        $qemuArgs += "-nographic"
+        # -nographic redirects serial 0 to stdio automatically so no need for -serial stdio
+    }
+    else {
+        # Regular mode with GUI -> use serial stdio
+        $qemuArgs += "-serial", "stdio"
+    }
 
     if ($DebugMode) {
         $qemuArgs += @("-s", "-S")
@@ -575,6 +583,13 @@ switch ($Target) {
         Invoke-KernelBuild
         Invoke-ImageBuild
         Invoke-QemuRun
+    }
+    "run-nographic" {
+        Initialize-BuildDirs
+        Invoke-BootBuild
+        Invoke-KernelBuild
+        Invoke-ImageBuild
+        Invoke-QemuRun -NoGraphic $true
     }
     "debug" {
         Initialize-BuildDirs
