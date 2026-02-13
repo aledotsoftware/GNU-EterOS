@@ -58,6 +58,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/video/vga.c  \
               $(KERNEL_DIR)/drivers/serial/serial.c \
               $(KERNEL_DIR)/drivers/input/keyboard.c \
+              $(KERNEL_DIR)/arch/x86_64/hal_impl.c \
               $(KERNEL_DIR)/arch/x86_64/idt.c    \
               $(KERNEL_DIR)/arch/x86_64/pic.c     \
               $(KERNEL_DIR)/drivers/timer/pit.c    \
