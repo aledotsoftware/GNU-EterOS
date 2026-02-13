@@ -21,6 +21,8 @@ SECTIONS
     /* El kernel comienza en 0x10000 */
     . = 0x10000;
 
+    _kernel_start = .;
+
     /* Sección de texto (código ejecutable) */
     .text BLOCK(4K) : ALIGN(4K)
     {

@@ -22,6 +22,7 @@
 #include "../include/string.h"
 #include "../include/timer.h"
 #include "../include/io.h"
+#include "../include/vmm.h"
 
 /* ========================================================================= */
 /* CPUID helpers                                                             */
@@ -131,6 +132,13 @@ static cpu_features_t get_cpu_features(void) {
 /* ========================================================================= */
 /* Helpers de pantalla                                                       */
 /* ========================================================================= */
+
+static void format_hex(uint64_t val, char* buf, size_t size) {
+    if (size < 3) return;
+    buf[0] = '0';
+    buf[1] = 'x';
+    itoa_s(val, buf + 2, size - 2, 16);
+}
 
 static void draw_separator(void) {
     terminal_write_colored(
@@ -326,11 +334,44 @@ static void show_memory_map(void) {
     terminal_write_colored("  0x07E00 - 0x09DFF", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     terminal_write_string("   8 KB      Stage 2 Bootloader\n");
 
-    terminal_write_colored("  0x10000 - 0x1FFFF", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
-    terminal_write_string("   64 KB     Ether-Core (Kernel)\n");
+    /* ---- Kernel (Dynamic) ---- */
+    extern char _kernel_start[];
+    extern char _kernel_end[];
+    uint64_t k_start = (uint64_t)_kernel_start;
+    uint64_t k_end   = (uint64_t)_kernel_end;
+    uint64_t k_size  = k_end - k_start;
+    char s_buf[20], e_buf[20], sz_buf[16];
 
-    terminal_write_colored("  0x70000 - 0x72FFF", VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
-    terminal_write_string("   12 KB     Page Tables (PML4/PDPT/PD)\n");
+    format_hex(k_start, s_buf, sizeof(s_buf));
+    format_hex(k_end, e_buf, sizeof(e_buf));
+
+    terminal_write_colored("  ", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    terminal_write_colored(s_buf, VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    terminal_write_colored(" - ", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    terminal_write_colored(e_buf, VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+
+    terminal_write_string("   ");
+    itoa_s(k_size / 1024, sz_buf, sizeof(sz_buf), 10);
+    terminal_write_string(sz_buf);
+    terminal_write_string(" KB     Ether-Core (Kernel)\n");
+
+    /* ---- Page Tables (Dynamic) ---- */
+    uint64_t pt_start = BOOT_PML4_ADDR;
+    uint64_t pt_size  = BOOT_PAGE_TABLE_SIZE;
+    uint64_t pt_end   = pt_start + pt_size - 1;
+
+    format_hex(pt_start, s_buf, sizeof(s_buf));
+    format_hex(pt_end, e_buf, sizeof(e_buf));
+
+    terminal_write_colored("  ", VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+    terminal_write_colored(s_buf, VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+    terminal_write_colored(" - ", VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+    terminal_write_colored(e_buf, VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+
+    terminal_write_string("   ");
+    itoa_s(pt_size / 1024, sz_buf, sizeof(sz_buf), 10);
+    terminal_write_string(sz_buf);
+    terminal_write_string(" KB     Page Tables (PML4/PDPT/PD)\n");
 
     terminal_write_colored("  0x80000 - 0x8FFFF", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     terminal_write_string("   64 KB     Kernel Stack\n");
