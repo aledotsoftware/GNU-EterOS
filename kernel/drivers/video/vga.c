@@ -16,7 +16,7 @@
 static size_t   terminal_row;
 static size_t   terminal_col;
 static uint8_t  terminal_color;
-static uint16_t* terminal_buffer;
+static volatile uint16_t* terminal_buffer;
 
 /* ========================================================================= */
 /* Funciones de cursor hardware VGA                                          */
@@ -53,10 +53,10 @@ void terminal_initialize(void) {
     terminal_row    = 0;
     terminal_col    = 0;
     terminal_color  = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-    terminal_buffer = (uint16_t*)VGA_BUFFER_ADDR;
+    terminal_buffer = (volatile uint16_t*)VGA_BUFFER_ADDR;
 
     /* Limpiar toda la pantalla */
-    memset16(terminal_buffer, vga_entry(' ', terminal_color), VGA_SIZE);
+    memset16((uint16_t*)terminal_buffer, vga_entry(' ', terminal_color), VGA_SIZE);
 
     terminal_enable_cursor();
     terminal_update_cursor();
@@ -68,11 +68,11 @@ void terminal_set_color(uint8_t color) {
 
 void terminal_scroll(void) {
     /* Move all lines one position up */
-    memmove(terminal_buffer, terminal_buffer + VGA_WIDTH, (VGA_SIZE - VGA_WIDTH) * sizeof(uint16_t));
+    memmove((void*)terminal_buffer, (const void*)(terminal_buffer + VGA_WIDTH), (VGA_SIZE - VGA_WIDTH) * sizeof(uint16_t));
 
     /* Clear the last line */
     const size_t last_line_offset = VGA_SIZE - VGA_WIDTH;
-    memset16(terminal_buffer + last_line_offset, vga_entry(' ', terminal_color), VGA_WIDTH);
+    memset16((uint16_t*)(terminal_buffer + last_line_offset), vga_entry(' ', terminal_color), VGA_WIDTH);
 
     terminal_row = VGA_HEIGHT - 1;
 }
@@ -148,7 +148,7 @@ void terminal_write_colored(const char* str, vga_color_t fg, vga_color_t bg) {
 }
 
 void terminal_clear(void) {
-    memset16(terminal_buffer, vga_entry(' ', terminal_color), VGA_SIZE);
+    memset16((uint16_t*)terminal_buffer, vga_entry(' ', terminal_color), VGA_SIZE);
     terminal_row = 0;
     terminal_col = 0;
     terminal_update_cursor();
