@@ -1,82 +1,137 @@
 # =============================================================================
 # éterOS - Makefile
 # =============================================================================
-# Sistema de construcción para éterOS (x86_64)
+# Sistema de construcción para éterOS
+# Soporta: x86_64 (Default) y aarch64 (Raspberry Pi 4)
 #
-# Targets principales:
-#   make all      - Construir todo el sistema
-#   make boot     - Compilar el bootloader (Stage 1 + Stage 2)
-#   make kernel   - Compilar el kernel
-#   make image    - Generar la imagen de disco
-#   make run      - Ejecutar en QEMU
-#   make debug    - Ejecutar en QEMU con depuración GDB
-#   make clean    - Limpiar archivos generados
+# Uso:
+#   make                (Construye x86_64)
+#   make ARCH=aarch64   (Construye AArch64)
 # =============================================================================
 
-# ---- Toolchain (Cross-Compiler) ----
-# Si usas x86_64-linux-gnu-gcc, cambia estas variables:
-AS      = nasm
-CC      = x86_64-elf-gcc
-LD      = x86_64-elf-ld
-OBJCOPY = x86_64-elf-objcopy
-
-# ---- Emulador ----
-QEMU    = qemu-system-x86_64
+ARCH ?= x86_64
 
 # ---- Directorios ----
-BOOT_DIR    = boot/x86_64
+BUILD_DIR   = build
 KERNEL_DIR  = kernel
 INCLUDE_DIR = include
-BUILD_DIR   = build
 
-# ---- Flags de compilación ----
-ASFLAGS = -f elf64
+# ---- Configuración por Arquitectura ----
 
-CFLAGS  = -ffreestanding       \
-          -fno-exceptions      \
-          -fno-stack-protector \
-          -nostdlib             \
-          -nostdinc             \
-          -mno-red-zone        \
-          -mno-sse             \
-          -mno-sse2            \
-          -mno-mmx             \
-          -Wall                \
-          -Wextra              \
-          -O2                  \
-          -I$(INCLUDE_DIR)
+ifeq ($(ARCH), x86_64)
+    # Toolchain
+    AS      = nasm
+    CC      = x86_64-elf-gcc
+    LD      = x86_64-elf-ld
+    OBJCOPY = x86_64-elf-objcopy
+    QEMU    = qemu-system-x86_64
 
-LDFLAGS = -T $(BOOT_DIR)/linker.ld \
-          -nostdlib
+    # Flags
+    ASFLAGS = -f elf64
+    CFLAGS  = -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc \
+              -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -O2 \
+              -I$(INCLUDE_DIR) -DARCH_X86_64
 
-# ---- Archivos fuente ----
-BOOT_SRC    = $(BOOT_DIR)/boot.asm
+    LDFLAGS = -T boot/x86_64/linker.ld -nostdlib
 
-KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
-              $(KERNEL_DIR)/string.c             \
-              $(KERNEL_DIR)/shell.c              \
-              $(KERNEL_DIR)/drivers/video/vga.c  \
-              $(KERNEL_DIR)/drivers/serial/serial.c \
-              $(KERNEL_DIR)/drivers/input/keyboard.c \
-              $(KERNEL_DIR)/arch/x86_64/idt.c    \
-              $(KERNEL_DIR)/arch/x86_64/pic.c     \
-              $(KERNEL_DIR)/drivers/timer/pit.c    \
-              $(KERNEL_DIR)/mm/heap.c             \
-              $(KERNEL_DIR)/apps/santitravel.c     \
-              $(KERNEL_DIR)/apps/sysmon.c          \
-              $(KERNEL_DIR)/drivers/net/e1000.c    \
-              $(KERNEL_DIR)/net/dhcp.c             \
-              $(KERNEL_DIR)/drivers/pci/pci.c      \
-              $(KERNEL_DIR)/mm/heap.c
+    # Archivos Fuente (x86_64)
+    BOOT_SRC        = boot/x86_64/boot.asm
+    BOOT_BIN        = $(BUILD_DIR)/boot.bin
 
-# ---- Archivos objeto ----
-KERNEL_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_SRCS))
+    KERNEL_SRCS     = $(KERNEL_DIR)/main.c \
+                      $(KERNEL_DIR)/string.c \
+                      $(KERNEL_DIR)/shell.c \
+                      $(KERNEL_DIR)/drivers/video/vga.c \
+                      $(KERNEL_DIR)/drivers/serial/serial.c \
+                      $(KERNEL_DIR)/drivers/input/keyboard.c \
+                      $(KERNEL_DIR)/arch/x86_64/idt.c \
+                      $(KERNEL_DIR)/arch/x86_64/pic.c \
+                      $(KERNEL_DIR)/drivers/timer/pit.c \
+                      $(KERNEL_DIR)/mm/heap.c \
+                      $(KERNEL_DIR)/apps/santitravel.c \
+                      $(KERNEL_DIR)/apps/sysmon.c \
+                      $(KERNEL_DIR)/drivers/net/e1000.c \
+                      $(KERNEL_DIR)/net/dhcp.c \
+                      $(KERNEL_DIR)/drivers/pci/pci.c \
+                      $(KERNEL_DIR)/mm/pmm.c \
+                      $(KERNEL_DIR)/arch/x86_64/hal_impl.c \
+                      $(KERNEL_DIR)/task.c \
+                      $(KERNEL_DIR)/apps/gui_demo.c \
+                      $(KERNEL_DIR)/drivers/video/framebuffer.c \
+                      $(KERNEL_DIR)/arch/x86_64/gdt.c \
+                      $(KERNEL_DIR)/mm/vmm.c \
+                      $(KERNEL_DIR)/drivers/video/font.c \
+                      $(KERNEL_DIR)/ui/window.c \
+                      $(KERNEL_DIR)/ui/primitives.c
 
-# ---- Archivos de salida ----
-BOOT_BIN    = $(BUILD_DIR)/boot.bin
-KERNEL_ELF  = $(BUILD_DIR)/kernel.elf
-KERNEL_BIN  = $(BUILD_DIR)/kernel.bin
-OS_IMAGE    = $(BUILD_DIR)/eteros.img
+    KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/interrupts.asm \
+                      $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
+                      $(KERNEL_DIR)/arch/x86_64/context_switch.asm
+
+    # Output Names
+    KERNEL_ELF      = $(BUILD_DIR)/kernel.elf
+    KERNEL_BIN      = $(BUILD_DIR)/kernel.bin
+    OS_IMAGE        = $(BUILD_DIR)/eteros.img
+
+    # Boot Rule
+    BOOT_RULE       = $(AS) -f bin $< -o $@
+
+else ifeq ($(ARCH), aarch64)
+    # Toolchain
+    AS      = aarch64-linux-gnu-as
+    CC      = aarch64-linux-gnu-gcc
+    LD      = aarch64-linux-gnu-ld
+    OBJCOPY = aarch64-linux-gnu-objcopy
+    QEMU    = qemu-system-aarch64
+
+    # Flags
+    ASFLAGS = -mcpu=cortex-a72
+    CFLAGS  = -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc \
+              -Wall -Wextra -O2 -mcpu=cortex-a72 \
+              -I$(INCLUDE_DIR) -DARCH_AARCH64
+
+    LDFLAGS = -T kernel/arch/aarch64/linker.ld -nostdlib
+
+    # Archivos Fuente (AArch64)
+    # Note: No VGA, No PS/2 Keyboard, No PCI/E1000 (yet)
+    KERNEL_SRCS     = $(KERNEL_DIR)/main.c \
+                      $(KERNEL_DIR)/string.c \
+                      $(KERNEL_DIR)/shell.c \
+                      $(KERNEL_DIR)/mm/heap.c \
+                      $(KERNEL_DIR)/apps/santitravel.c \
+                      $(KERNEL_DIR)/mm/pmm.c \
+                      $(KERNEL_DIR)/arch/aarch64/hal_impl.c \
+                      $(KERNEL_DIR)/task.c \
+                      $(KERNEL_DIR)/drivers/video/font.c \
+                      $(KERNEL_DIR)/drivers/video/framebuffer.c \
+                      $(KERNEL_DIR)/ui/window.c \
+                      $(KERNEL_DIR)/ui/primitives.c \
+                      $(KERNEL_DIR)/apps/gui_demo.c \
+                      $(KERNEL_DIR)/arch/aarch64/stubs.c
+
+    KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/aarch64/boot.S \
+                      $(KERNEL_DIR)/arch/aarch64/context_switch.S \
+                      $(KERNEL_DIR)/arch/aarch64/vectors.S
+
+    # Output Names
+    KERNEL_ELF      = $(BUILD_DIR)/kernel8.elf
+    KERNEL_BIN      = $(BUILD_DIR)/kernel8.img
+    OS_IMAGE        = $(BUILD_DIR)/eteros_rpi4.img
+
+    # Boot Rule (Not used for AArch64 usually, kernel8.img is loaded directly)
+    BOOT_BIN        =
+
+endif
+
+# ---- Objetos ----
+KERNEL_OBJS     = $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_SRCS))
+
+# ASM objects extension handling
+ifeq ($(ARCH), x86_64)
+    KERNEL_ASM_OBJS = $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRCS))
+else
+    KERNEL_ASM_OBJS = $(patsubst %.S,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRCS))
+endif
 
 # =============================================================================
 # Targets
@@ -84,21 +139,9 @@ OS_IMAGE    = $(BUILD_DIR)/eteros.img
 
 .PHONY: all boot kernel image run run-nographic debug clean dirs info
 
-# NOTA WINDOWS:
-# Si estás en Windows, tienes dos opciones:
-#   1. WSL2 (recomendado): cd /mnt/p/EterOS && make run
-#   2. PowerShell nativo:  .\build.ps1 -Target run
-
 all: dirs image
-	@echo ""
-	@echo "================================================"
-	@echo "  eterOS construido exitosamente!"
-	@echo "  Imagen: $(OS_IMAGE)"
-	@echo "  Ejecutar: make run"
-	@echo "================================================"
-	@echo ""
+	@echo "Build complete for $(ARCH)"
 
-# ---- Crear directorios de build ----
 dirs:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)
@@ -106,103 +149,61 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/serial
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/input
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/aarch64
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/timer
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/mm
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/apps
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/net
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/pci
-	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/mm
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/ui
 
-# ---- Bootloader (binario plano, incluye Stage 1 + Stage 2) ----
 boot: dirs $(BOOT_BIN)
 
+# Only for x86_64
 $(BOOT_BIN): $(BOOT_SRC)
+ifeq ($(ARCH), x86_64)
 	@echo "[ASM]  $<"
-	$(AS) -f bin $< -o $@
+	$(BOOT_RULE)
+endif
 
-# ---- Kernel ----
 kernel: dirs $(KERNEL_BIN)
 
-# Compilar archivos .c a .o
+# Compile C
 $(BUILD_DIR)/%.o: %.c
 	@echo "[CC]   $<"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Enlazar objetos en un ELF, luego extraer binario plano
-$(KERNEL_BIN): $(KERNEL_OBJS)
-	@echo "[LD]   Enlazando kernel..."
-	$(LD) $(LDFLAGS) -o $(KERNEL_ELF) $(KERNEL_OBJS)
-	@echo "[BIN]  Extrayendo binario del kernel..."
+# Compile ASM (x86 .asm)
+$(BUILD_DIR)/%.o: %.asm
+	@echo "[ASM]  $<"
+	@mkdir -p $(dir $@)
+	$(AS) $(ASFLAGS) $< -o $@
+
+# Compile ASM (AArch64 .S)
+$(BUILD_DIR)/%.o: %.S
+	@echo "[ASM]  $<"
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(KERNEL_BIN): $(KERNEL_OBJS) $(KERNEL_ASM_OBJS)
+	@echo "[LD]   Enlazando kernel ($(ARCH))..."
+	$(LD) $(LDFLAGS) -o $(KERNEL_ELF) $(KERNEL_OBJS) $(KERNEL_ASM_OBJS)
+	@echo "[BIN]  Extrayendo binario..."
 	$(OBJCOPY) -O binary $(KERNEL_ELF) $(KERNEL_BIN)
-	@echo "[INFO] Tamaño del kernel: $$(wc -c < $(KERNEL_BIN)) bytes"
 
-# ---- Imagen de disco ----
-# Layout del disco:
-#   Sector 0          : Stage 1 (MBR)
-#   Sectores 1-8      : Stage 2
-#   Sectores 9+       : Kernel
 image: boot kernel
-	@echo "[IMG]  Generando imagen de disco..."
-	@# Crear imagen vacía de 1.44 MB (formato floppy)
+ifeq ($(ARCH), x86_64)
+	@echo "[IMG]  Generando imagen de disco x86_64..."
 	dd if=/dev/zero of=$(OS_IMAGE) bs=512 count=2880 2>/dev/null
-	@# Escribir bootloader completo (Stage 1 + Stage 2)
 	dd if=$(BOOT_BIN) of=$(OS_IMAGE) bs=512 conv=notrunc 2>/dev/null
-	@# Escribir kernel después del bootloader
-	@# Stage 1 = 1 sector, Stage 2 = 8 sectores, kernel va en sector 9
 	dd if=$(KERNEL_BIN) of=$(OS_IMAGE) bs=512 seek=9 conv=notrunc 2>/dev/null
-	@echo "[IMG]  Imagen generada: $(OS_IMAGE) ($$(wc -c < $(OS_IMAGE)) bytes)"
+else
+	@echo "[IMG]  Generando imagen RPi4..."
+	# Just copy kernel8.img
+	cp $(KERNEL_BIN) $(OS_IMAGE)
+endif
 
-# ---- Ejecutar en QEMU ----
-run: all
-	@echo "[QEMU] Iniciando eterOS..."
-	$(QEMU) -drive format=raw,file=$(OS_IMAGE),if=floppy \
-	        -serial stdio                                 \
-	        -m 128M                                       \
-	        -no-reboot                                    \
-	        -no-shutdown
-
-# ---- Ejecutar sin ventana gráfica (ideal para WSL sin X11) ----
-run-nographic: all
-	@echo "[QEMU] Iniciando eterOS (modo texto)..."
-	$(QEMU) -drive format=raw,file=$(OS_IMAGE),if=floppy \
-	        -serial mon:stdio                             \
-	        -m 128M                                       \
-	        -nographic                                    \
-	        -no-reboot                                    \
-	        -no-shutdown
-
-# ---- Depuración con GDB ----
-debug: all
-	@echo "[QEMU] Iniciando eterOS en modo depuracion..."
-	@echo "       Conectar con: gdb -ex 'target remote localhost:1234'"
-	$(QEMU) -drive format=raw,file=$(OS_IMAGE),if=floppy \
-	        -serial stdio                                 \
-	        -m 128M                                       \
-	        -no-reboot                                    \
-	        -no-shutdown                                  \
-	        -s -S
-
-# ---- Limpiar ----
 clean:
-	@echo "[CLEAN] Limpiando archivos generados..."
 	rm -rf $(BUILD_DIR)
-	@echo "[CLEAN] Limpieza completada."
 
-# ---- Información del build system ----
-info:
-	@echo ""
-	@echo "=== eterOS Build System ==="
-	@echo "Assembler:    $(AS)"
-	@echo "Compiler:     $(CC)"
-	@echo "Linker:       $(LD)"
-	@echo "Emulator:     $(QEMU)"
-	@echo ""
-	@echo "Boot source:  $(BOOT_SRC)"
-	@echo "Kernel srcs:  $(KERNEL_SRCS)"
-	@echo ""
-	@echo "Boot binary:  $(BOOT_BIN)"
-	@echo "Kernel ELF:   $(KERNEL_ELF)"
-	@echo "Kernel BIN:   $(KERNEL_BIN)"
-	@echo "Disk image:   $(OS_IMAGE)"
-	@echo ""

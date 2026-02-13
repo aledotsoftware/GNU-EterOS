@@ -18,6 +18,7 @@
 #include "../include/serial.h"
 #include "../include/vga.h"
 #include "../include/timer.h"
+#include "../include/hal.h"
 
 /* ========================================================================= */
 /* Estado Global del Scheduler                                               */
@@ -47,13 +48,21 @@ typedef void (*task_func_t)(void);
 static void task_entry_wrapper(void) {
     /* Habilitar interrupciones (estamos en una tarea nueva, el context_switch
        no las habilita automáticamente como haría iretq) */
-    __asm__ volatile("sti");
+    hal_interrupts_enable();
 
+    task_func_t entry;
+
+#ifdef ARCH_X86_64
     /* Obtener el entry point de la tarea actual.
      * Lo guardamos en R15 del stack inicial de la tarea.
      * R15 fue restaurado por context_switch. */
-    task_func_t entry;
     __asm__ volatile("mov %%r15, %0" : "=r"(entry));
+#elif defined(ARCH_AARCH64)
+    /* En AArch64 usamos X19 (callee-saved) para pasar el entry point */
+    __asm__ volatile("mov %0, x19" : "=r"(entry));
+#else
+    entry = NULL;
+#endif
 
     /* Ejecutar la función de la tarea */
     if (entry) {
@@ -117,20 +126,10 @@ int task_create(const char* name, void (*entry)(void)) {
 
     /*
      * Preparar el stack para que context_switch pueda "entrar" por primera vez.
-     * 
-     * Cuando context_switch cargue este RSP, hará:
-     *   pop r15  (→ entry function pointer, usado por task_entry_wrapper)
-     *   pop r14  (→ 0)
-     *   pop r13  (→ 0)
-     *   pop r12  (→ 0)
-     *   pop rbx  (→ 0)
-     *   pop rbp  (→ 0)
-     *   ret      (→ task_entry_wrapper)
-     *
-     * Luego task_entry_wrapper lee R15 para obtener el entry point.
      */
     uint64_t* sp = (uint64_t*)(stack + TASK_STACK_SIZE);
 
+#ifdef ARCH_X86_64
     /* ret address → task_entry_wrapper */
     *(--sp) = (uint64_t)task_entry_wrapper;
 
@@ -141,6 +140,29 @@ int task_create(const char* name, void (*entry)(void)) {
     *(--sp) = 0;                     /* r13 */
     *(--sp) = 0;                     /* r14 */
     *(--sp) = (uint64_t)entry;       /* r15 = entry point (leído por wrapper) */
+#elif defined(ARCH_AARCH64)
+    /* AArch64: Restauramos D8-D15, luego X19-X30. X30 es LR. */
+    /* context_switch.S: ldp x29, x30, [sp], #16 (Last pop) */
+
+    /* Push X29, X30 (LR) */
+    *(--sp) = (uint64_t)task_entry_wrapper; // X30 (LR)
+    *(--sp) = 0; // X29 (FP)
+
+    /* Push X27, X28 ... X19, X20 */
+    *(--sp) = 0; // X28
+    *(--sp) = 0; // X27
+    *(--sp) = 0; // X26
+    *(--sp) = 0; // X25
+    *(--sp) = 0; // X24
+    *(--sp) = 0; // X23
+    *(--sp) = 0; // X22
+    *(--sp) = 0; // X21
+    *(--sp) = 0; // X20
+    *(--sp) = (uint64_t)entry; // X19 (entry point)
+
+    /* Push D8-D15 (8 regs = 64 bytes) */
+    for (int i = 0; i < 8; i++) *(--sp) = 0;
+#endif
 
     tasks[slot].rsp = (uint64_t)sp;
 
@@ -234,7 +256,7 @@ void task_sleep(uint64_t ms) {
        volveremos aquí inmediatamente pero seguiremos en estado SLEEPING.
        Debemos esperar (wait for interrupt) hasta que el timer nos despierte. */
     while (current->state == TASK_SLEEPING) {
-        __asm__ volatile("hlt");
+        hal_cpu_halt();
     }
 
     /* Restaurar estado a RUNNING si nos despertamos */
@@ -270,7 +292,7 @@ void task_exit(void) {
     schedule();
 
     /* Si llegamos aquí, no había otra tarea (no debería pasar) */
-    for (;;) { __asm__ volatile("hlt"); }
+    for (;;) { hal_cpu_halt(); }
 }
 
 task_t* task_get_current(void) {

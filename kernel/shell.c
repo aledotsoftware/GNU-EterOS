@@ -18,6 +18,7 @@
 #include "../include/string.h"
 #include "../include/serial.h"
 #include "../include/io.h"
+#include "../include/hal.h"
 #include "../include/santitravel.h"
 #include "../include/sysmon.h"
 #include "../include/idt.h"
@@ -350,24 +351,16 @@ static void cmd_reboot(const char* args) {
     terminal_write_colored("  Reiniciando...\n", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
     serial_write_string("[eterOS] Reboot solicitado.\n");
 
-    /* Triple fault: cargar IDT vacía y disparar interrupción */
-    struct idt_ptr null_idt = { 0, 0 };
-
-    __asm__ volatile ("lidt %0" : : "m"(null_idt));
-    __asm__ volatile ("int $0x03");
-
-    /* Si por alguna razón no funciona, usar reset vía 8042 */
-    outb(0x64, 0xFE);
-
-    for (;;) { __asm__ volatile ("hlt"); }
+    hal_cpu_reset();
 }
 
 static void cmd_halt(const char* args) {
     (void)args;
     terminal_write_colored("  CPU detenida (HLT).\n", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
     serial_write_string("[eterOS] Halt solicitado.\n");
-    __asm__ volatile ("cli");
-    for (;;) { __asm__ volatile ("hlt"); }
+
+    hal_interrupts_disable();
+    for (;;) { hal_cpu_halt(); }
 }
 
 static void cmd_lspci(const char* args) {

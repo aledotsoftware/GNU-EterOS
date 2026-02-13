@@ -46,7 +46,7 @@ typedef signed long long    int64_t;
 #define UINT32_MAX 4294967295U
 #define UINT64_MAX 18446744073709551615ULL
 
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__aarch64__)
 #define SIZE_MAX UINT64_MAX
 #else
 #define SIZE_MAX UINT32_MAX
@@ -55,7 +55,7 @@ typedef signed long long    int64_t;
 /* ========================================================================= */
 /* Tipos de tamaño de plataforma                                             */
 /* ========================================================================= */
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__aarch64__)
 typedef uint64_t            size_t;
 typedef int64_t             ssize_t;
 typedef uint64_t            uintptr_t;
