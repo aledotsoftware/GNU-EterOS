@@ -14,22 +14,12 @@
  * =============================================================================
  */
 
-#include "../include/santitravel.h"
-#include "../include/vga.h"
-#include "../include/keyboard.h"
-#include "../include/string.h"
-#include "../include/io.h"
-
-/* ========================================================================= */
-/* Delay calibrado por I/O port (port 0x80 ~ 1µs por read)                  */
-/* ========================================================================= */
-static void delay_ms(uint32_t ms) {
-    for (uint32_t i = 0; i < ms; i++) {
-        for (uint32_t j = 0; j < 800; j++) {
-            inb(0x80);
-        }
-    }
-}
+#include "../../include/santitravel.h"
+#include "../../include/vga.h"
+#include "../../include/keyboard.h"
+#include "../../include/string.h"
+#include "../../include/io.h"
+#include "../../include/timer.h"
 
 /* ========================================================================= */
 /* Datos de destinos                                                         */
@@ -121,7 +111,7 @@ static void anim_frame(const char* line1, const char* line2,
     terminal_write_colored(line3, VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
     terminal_write_colored(line4, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     terminal_write_colored(line5, VGA_COLOR_CYAN, VGA_COLOR_BLACK);
-    delay_ms(wait);
+    timer_wait(wait);
 }
 
 static void run_animation(void) {
@@ -154,7 +144,7 @@ static void run_animation(void) {
     terminal_write_colored("                  |    |\n", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
     terminal_write_string("\n");
     terminal_write_colored("   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n", VGA_COLOR_BLUE, VGA_COLOR_BLACK);
-    delay_ms(400);
+    timer_wait(400);
 
     /* Frame 4: En el aire */
     terminal_initialize();
@@ -169,7 +159,7 @@ static void run_animation(void) {
     terminal_write_colored("      .         *              .       *\n", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
     terminal_write_string("\n\n\n\n\n\n");
     terminal_write_colored("   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n", VGA_COLOR_BLUE, VGA_COLOR_BLACK);
-    delay_ms(600);
+    timer_wait(600);
 
     /* Frame 5: Volando alto */
     terminal_initialize();
@@ -181,7 +171,7 @@ static void run_animation(void) {
     terminal_write_colored("      .         *              .       *\n", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
     terminal_write_string("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     terminal_write_colored("   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n", VGA_COLOR_BLUE, VGA_COLOR_BLACK);
-    delay_ms(800);
+    timer_wait(800);
 }
 
 /* ========================================================================= */
