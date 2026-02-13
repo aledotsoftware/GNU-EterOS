@@ -79,6 +79,13 @@ static inline void io_wait(void) {
     outb(0x80, 0);
 }
 
+/**
+ * Detiene la CPU hasta la próxima interrupción.
+ */
+static inline void cpu_halt(void) {
+    __asm__ volatile ("hlt");
+}
+
 #else
 
 /* Mock function declarations for host testing */
@@ -91,6 +98,7 @@ uint16_t inw(uint16_t port);
 uint32_t inl(uint16_t port);
 
 void io_wait(void);
+void cpu_halt(void);
 
 #endif /* !__ETEROS_HOST_TEST__ */
 

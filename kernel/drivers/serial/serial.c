@@ -34,9 +34,15 @@
 /* ========================================================================= */
 #define SERIAL_BUFFER_SIZE 1024
 
+/* TX Buffer */
 static uint8_t tx_buffer[SERIAL_BUFFER_SIZE];
 static volatile uint16_t tx_head = 0;
 static volatile uint16_t tx_tail = 0;
+
+/* RX Buffer */
+static uint8_t rx_buffer[SERIAL_BUFFER_SIZE];
+static volatile uint16_t rx_head = 0;
+static volatile uint16_t rx_tail = 0;
 
 /* ========================================================================= */
 /* Implementación                                                            */
@@ -79,8 +85,7 @@ int serial_init(void) {
     outb(port + UART_MODEM_CTRL, 0x0F);
 
     /* Habilitar interrupciones de RX inicialmente (TX se habilita bajo demanda) */
-    // Nota: Por ahora solo RX si fuera necesario, pero la lógica de TX lo habilita.
-    // outb(port + UART_INT_ENABLE, IER_RX_AVAIL);
+    outb(port + UART_INT_ENABLE, IER_RX_AVAIL);
 
     return 0;
 }
@@ -92,9 +97,29 @@ static int serial_is_transmit_empty(void) {
 void serial_irq_handler(void) {
     /* Leer registro de identificación de interrupción */
     uint8_t iir = inb(COM1_PORT + UART_IIR);
-    if (iir & 1) return; /* No hay interrupción pendiente */
 
-    /* Verificar si el transmisor está vacío */
+    /* Nota: bit 0 de IIR es "Interrupt Pending" (0 = pendiente, 1 = no pendiente) */
+    /* Pero en modo FIFO, los bits pueden variar. Comprobamos estado de línea también. */
+    if (iir & 1) {
+        /* Aunque IIR diga que no hay interrupción, a veces es mejor verificar LSR por seguridad
+           en entornos con IRQs compartidas o condiciones de carrera,
+           pero aquí confiamos en IIR o verificamos LSR abajo. */
+        // return;
+        /* Comentado porque a veces LSR tiene datos y IIR no se actualizó todavía o viceversa */
+    }
+
+    /* Verificar si hay datos recibidos (RX) */
+    if (inb(COM1_PORT + UART_LINE_STATUS) & LSR_DATA_READY) {
+        char c = inb(COM1_PORT + UART_DATA);
+        uint16_t next_head = (rx_head + 1) % SERIAL_BUFFER_SIZE;
+        if (next_head != rx_tail) {
+            rx_buffer[rx_head] = c;
+            rx_head = next_head;
+        }
+        /* Si está lleno, descartamos el carácter (drop) */
+    }
+
+    /* Verificar si el transmisor está vacío (TX) */
     if (inb(COM1_PORT + UART_LINE_STATUS) & LSR_TX_EMPTY) {
         if (tx_head != tx_tail) {
             /* Enviar siguiente byte del buffer */
@@ -103,6 +128,7 @@ void serial_irq_handler(void) {
         } else {
             /* Buffer vacío, deshabilitar interrupción TX para evitar bucle */
             uint8_t ier = inb(COM1_PORT + UART_INT_ENABLE);
+            /* Mantener RX habilitado */
             outb(COM1_PORT + UART_INT_ENABLE, ier & ~IER_TX_EMPTY);
         }
     }
@@ -137,10 +163,15 @@ void serial_write_string(const char* str) {
 }
 
 int serial_received(void) {
-    return inb(COM1_PORT + UART_LINE_STATUS) & LSR_DATA_READY;
+    return rx_head != rx_tail;
 }
 
 char serial_read(void) {
-    while (!serial_received());
-    return (char)inb(COM1_PORT + UART_DATA);
+    while (!serial_received()) {
+        cpu_halt(); /* Esperar interrupción (ahorro de energía) */
+    }
+
+    char c = rx_buffer[rx_tail];
+    rx_tail = (rx_tail + 1) % SERIAL_BUFFER_SIZE;
+    return c;
 }
