@@ -6,9 +6,11 @@
 
 global isr_stub_timer
 global isr_stub_keyboard
+global isr_stub_serial
 
 extern irq_timer_handler    ; Renombraremos las funciones en C para evitar conflictos
 extern irq_keyboard_handler
+extern irq_serial_handler
 
 section .text
 
@@ -78,5 +80,15 @@ isr_stub_keyboard:
     PUSH_ALL
     cld
     call irq_keyboard_handler
+    POP_ALL
+    iretq
+
+; -----------------------------------------------------------------------------
+; ISR Serial (IRQ4)
+; -----------------------------------------------------------------------------
+isr_stub_serial:
+    PUSH_ALL
+    cld
+    call irq_serial_handler
     POP_ALL
     iretq

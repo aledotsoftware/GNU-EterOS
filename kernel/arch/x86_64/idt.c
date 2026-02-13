@@ -206,6 +206,7 @@ EXCEPTION_HANDLER_ERR(21)
 /* ========================================================================= */
 extern void isr_stub_timer(void);
 extern void isr_stub_keyboard(void);
+extern void isr_stub_serial(void);
 
 /* ========================================================================= */
 /* IRQ Handlers (Funciones C llamadas por los Stubs ASM)                     */
@@ -232,11 +233,10 @@ void irq_keyboard_handler(void) {
 }
 
 /**
- * IRQ4 - Puerto Serie COM1/COM3. (Sigue usando atributo interrupt por ahora)
+ * IRQ4 - Puerto Serie COM1/COM3.
+ * Llamada desde isr_stub_serial (assembly).
  */
-__attribute__((interrupt))
-static void irq_serial(struct interrupt_frame *frame) {
-    (void)frame;
+void irq_serial_handler(void) {
     serial_irq_handler();
     pic_send_eoi(4);
 }
@@ -284,7 +284,7 @@ void idt_init(void) {
     idt_set_gate(IRQ_BASE + 0,  (void*)isr_stub_timer,    IDT_GATE_INTERRUPT);
     
     idt_set_gate(IRQ_BASE + 1,  (void*)isr_stub_keyboard, IDT_GATE_INTERRUPT);
-    idt_set_gate(IRQ_BASE + 4,  (void*)irq_serial,        IDT_GATE_INTERRUPT);
+    idt_set_gate(IRQ_BASE + 4,  (void*)isr_stub_serial,   IDT_GATE_INTERRUPT);
 
     /* IRQs restantes: handler por defecto */
     for (int i = 2; i < 16; i++) {
