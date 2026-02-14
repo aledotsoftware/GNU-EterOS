@@ -106,8 +106,6 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/apps/santitravel.c     \
               $(KERNEL_DIR)/apps/sysmon.c          \
               $(KERNEL_DIR)/drivers/net/e1000.c    \
-              $(KERNEL_DIR)/net/dhcp.c             \
-              $(KERNEL_DIR)/net/dhcp_parser.c      \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/fs/initrd.c            \
               $(KERNEL_DIR)/fs/vfs.c               \
@@ -116,13 +114,16 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/ui/primitives.c        \
               $(KERNEL_DIR)/ui/window.c            \
               $(KERNEL_DIR)/ui/image.c             \
+              $(KERNEL_DIR)/ui/upng.c              \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
               $(KERNEL_DIR)/mm/pmm.c               \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
               $(KERNEL_DIR)/arch/x86_64/gdt.c \
-              $(KERNEL_DIR)/arch/x86_64/syscall.c
+              $(KERNEL_DIR)/arch/x86_64/syscall.c \
+              $(KERNEL_DIR)/apps/wget.c \
+              $(LWIP_SRCS)
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
@@ -195,7 +196,7 @@ boot: dirs $(BOOT_BIN)
 $(BOOT_BIN): $(BOOT_SRC)
 ifeq ($(ARCH), x86_64)
 	@echo "[ASM]  $<"
-	nasm -f bin $< -o $@
+	$(AS) -f bin $< -o $@
 else
 	@echo "[SKIP] Bootloader no necesario para $(ARCH) (o no implementado)"
 endif
@@ -211,7 +212,7 @@ $(BUILD_DIR)/%.o: %.c
 # Compilar archivos .asm a .o (Kernel)
 $(BUILD_DIR)/%.o: %.asm
 	@echo "[ASM]  $<"
-	nasm -f elf64 $< -o $@
+	$(AS) -f elf64 $< -o $@
 
 # Enlazar objetos en un ELF, luego extraer binario plano
 $(KERNEL_BIN): $(KERNEL_OBJS)
