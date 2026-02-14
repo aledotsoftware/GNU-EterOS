@@ -62,11 +62,13 @@ typedef uint64_t            size_t;
 typedef int64_t             ssize_t;
 typedef uint64_t            uintptr_t;
 typedef int64_t             intptr_t;
+typedef int64_t             time_t;     /* Y2K38 Proof: 64-bit time */
 #else
 typedef uint32_t            size_t;
 typedef int32_t             ssize_t;
 typedef uint32_t            uintptr_t;
 typedef int32_t             intptr_t;
+typedef int64_t             time_t;     /* Even in 32-bit mode, we use 64-bit time! */
 #endif
 
 /* ========================================================================= */

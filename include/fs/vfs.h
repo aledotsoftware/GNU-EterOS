@@ -29,6 +29,9 @@ typedef struct fs_node {
     uint32_t inode;       /* This is device-specific - provides a way for a filesystem to identify files */
     uint32_t length;      /* Size of the file, in bytes */
     uint32_t impl;        /* An implementation-defined number */
+    time_t   atime;       /* Access time */
+    time_t   mtime;       /* Modification time */
+    time_t   ctime;       /* Creation time */
     read_type_t read;
     write_type_t write;
     open_type_t open;

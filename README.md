@@ -142,8 +142,14 @@ El arranque de éterOS configura directamente un entorno de **64 bits puro**:
 Diseñado para portabilidad. Toda la lógica del kernel es agnóstica al hardware; Ether-Core habla con la HAL, facilitando expansión futura a RISC-V o ARM.
 
 ### 4. Serial Debug (COM1)
-
+  
 UART 16550 a 38400 baud para depuración. Compatible con `qemu -serial stdio`.
+
+### 5. Gestión del Tiempo (Y2K38 Ready)
+éterOS está diseñado para trascender los límites del software tradicional. Hemos implementado un sistema de tiempo de **64 bits** desde el núcleo:
+- **`time_t` de 64 bits**: Garantiza que el sistema funcionará sin desbordamientos hasta el año 292.000 millones.
+- **VFS Compliant**: Todos los nodos del sistema de archivos (`fs_node_t`) y las estructuras de estado (`stat`) utilizan marcas de tiempo de 8 bytes.
+- **Arquitectura Futura**: Incluso en futuras versiones de 32 bits, éterOS mantendrá el estándar de 64 bits para el tiempo, evitando el colapso del 19 de enero de 2038.
 
 ## 📋 Layout de Memoria
 
