@@ -25,7 +25,7 @@ param(
     [ValidateSet("all", "boot", "kernel", "image", "vdi", "vbox", "run", "run-nographic", "debug", "clean", "info")]
     [string]$Target = "all",
 
-    [ValidateSet("x86_64", "i386")]
+    [ValidateSet("x86_64", "i386", "aarch64")]
     [string]$Arch = "x86_64"
 )
 
@@ -75,6 +75,13 @@ $qemuSearchPaths = @(
     "$env:LOCALAPPDATA\Programs\qemu"
 )
 
+$aarch64SearchPaths = @(
+    "C:\aarch64-elf-tools\bin",
+    "$env:LOCALAPPDATA\aarch64-elf-tools\bin",
+    "C:\cross-aarch64\bin",
+    "C:\msys64\opt\aarch64-elf\bin"
+)
+
 $AS = Find-Tool "nasm"                $nasmSearchPaths
 $QEMU = Find-Tool "qemu-system-$Arch"  $qemuSearchPaths
 
@@ -94,6 +101,16 @@ if ($Arch -eq "x86_64") {
     $CARCHFLAGS = @("-m64", "-mcmodel=large", "-mno-red-zone", "-mno-sse", "-mno-sse2", "-mno-mmx", "-D__x86_64__", "-DARCH_X86_64")
     $LDFLAGS_ARCH = @("-m", "elf_x86_64")
     $VBOX_OSTYPE = "Other_64"
+}
+elseif ($Arch -eq "aarch64") {
+    $CC = Find-Tool "aarch64-elf-gcc" $aarch64SearchPaths
+    $LD = Find-Tool "aarch64-elf-ld" $aarch64SearchPaths
+    $OBJCOPY = Find-Tool "aarch64-elf-objcopy" $aarch64SearchPaths
+    # For ARM, we use the GCC preprocessor/assembler instead of NASM
+    $BOOT_DIR = "boot\aarch64"
+    $CARCHFLAGS = @("-march=armv8-a", "-ffreestanding", "-nostdlib", "-D__aarch64__", "-DARCH_AARCH64")
+    $LDFLAGS_ARCH = @("-m", "aarch64elf")
+    $VBOX_OSTYPE = "Oracle_Arm64" 
 }
 else {
     # Para i386 usamos el compilador de 32 bits si existe, o el de 64 bits con flag -m32
@@ -197,7 +214,8 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\apps\sysmon.c",
     "$KERNEL_DIR\apps\gui_demo.c",
     "$KERNEL_DIR\task.c",
-    "$KERNEL_DIR\fs\initrd.c"
+    "$KERNEL_DIR\fs\initrd.c",
+    "$KERNEL_DIR\ui\image.c"
 )
 
 # Archivos específicos de arquitectura
@@ -206,6 +224,9 @@ if ($Arch -eq "x86_64") {
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\pic.c"
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\gdt.c"
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\hal_impl.c"
+}
+elseif ($Arch -eq "aarch64") {
+    $KERNEL_SRCS += "$KERNEL_DIR\arch\aarch64\hal_impl.c"
 }
 else {
     $KERNEL_SRCS += "$KERNEL_DIR\arch\i386\idt.c"
@@ -257,7 +278,15 @@ function Initialize-BuildDirs {
 
 function Invoke-BootBuild {
     Write-Step "ASM" $BOOT_SRC
-    & $AS -f bin $BOOT_SRC -o $BOOT_BIN
+    if ($Arch -eq "aarch64") {
+        # Para ARM usamos GCC/AS para generar un binario crudo o similar
+        # Por ahora generamos un objeto para enlazarlo con el kernel
+        & $CC $CFLAGS -c $BOOT_SRC -o "$BUILD_DIR\boot.o"
+    }
+    else {
+        & $AS -f bin $BOOT_SRC -o $BOOT_BIN
+    }
+
     if ($LASTEXITCODE -ne 0) {
         Write-Step "ERR" "Fallo al ensamblar el bootloader"
         exit 1
@@ -268,17 +297,24 @@ function Invoke-KernelBuild {
     $objFiles = @()
 
     # Compilar ASM stubs si existen
-    # Compilar TODOS los archivos ASM en arch/$Arch
-    $asmFiles = Get-ChildItem "$KERNEL_DIR\arch\$Arch" -Filter "*.asm"
+    # Compilar TODOS los archivos ASM/S en arch/$Arch
+    $asmFiles = Get-ChildItem "$KERNEL_DIR\arch\$Arch" -Include @("*.asm", "*.S") -Recurse
     
     foreach ($asmFile in $asmFiles) {
         $asmSrc = $asmFile.FullName
-        $asmObj = "$BUILD_DIR\$KERNEL_DIR\arch\$Arch\$($asmFile.Name -replace '\.asm$', '.o')"
+        $asmObj = "$BUILD_DIR\$KERNEL_DIR\arch\$Arch\$($asmFile.Name -replace '\.asm$', '.o' -replace '\.S$', '.o')"
         $objFiles += $asmObj
 
         Write-Step "ASM" $asmFile.Name
-        $asmFormat = if ($Arch -eq "x86_64") { "elf64" } else { "elf32" }
-        & $AS -f $asmFormat $asmSrc -o $asmObj
+        if ($Arch -eq "aarch64") {
+            # Use GCC as assembler for ARM (.S files)
+            & $CC $CFLAGS -c $asmSrc -o $asmObj
+        }
+        else {
+            $asmFormat = if ($Arch -eq "x86_64") { "elf64" } else { "elf32" }
+            & $AS -f $asmFormat $asmSrc -o $asmObj
+        }
+        
         if ($LASTEXITCODE -ne 0) {
             Write-Step "ERR" "Fallo al ensamblar $($asmFile.Name)"
             exit 1
@@ -315,6 +351,27 @@ function Invoke-KernelBuild {
     Write-Step "OK" "Kernel: $size bytes"
 }
 
+function Invoke-InitrdBuild {
+    $initrdBin = "$BUILD_DIR\initrd.bin"
+    $initrdSrc = "initrd_root"
+    
+    if (!(Test-Path $initrdSrc)) {
+        New-Item -ItemType Directory -Path $initrdSrc -Force | Out-Null
+    }
+
+    Write-Step "BIN" "Generando Initrd.bin..."
+    & python tools/gen_logo.py
+    & python tools/mkinitrd.py $initrdSrc $initrdBin
+    if ($LASTEXITCODE -ne 0) {
+        Write-Step "ERR" "Fallo al generar Initrd (Asegurate de tener Python instalado)"
+        # No salimos con error fatal porque el sistema puede bootear sin initrd
+    }
+    else {
+        $size = (Get-Item $initrdBin).Length
+        Write-Step "OK" "Initrd: $size bytes"
+    }
+}
+
 function Invoke-ImageBuild {
     Write-Step "IMG" "Generando imagen de disco..."
 
@@ -335,6 +392,21 @@ function Invoke-ImageBuild {
     $kernelData = [System.IO.File]::ReadAllBytes($kernelPath)
     $kernelOffset = 17 * 512
     [System.Array]::Copy($kernelData, 0, $imageData, $kernelOffset, $kernelData.Length)
+
+    # Leer el Initrd y copiarlo después del kernel
+    # El bootloader espera el initrd en el sector después del kernel (Sector 1 + 16 + 256 = 273)
+    $initrdPath = "$BUILD_DIR\initrd.bin"
+    if (Test-Path $initrdPath) {
+        $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
+        $initrdOffset = (1 + 16 + 256) * 512
+        if ($initrdOffset + $initrdData.Length -le $imageSize) {
+            [System.Array]::Copy($initrdData, 0, $imageData, $initrdOffset, $initrdData.Length)
+            Write-Step "OK" "Initrd inyectado en la imagen."
+        }
+        else {
+            Write-Step "ERR" "Initrd demasiado grande para el floppy de 1.44MB!"
+        }
+    }
 
     # Escribir imagen final
     [System.IO.File]::WriteAllBytes($imagePath, $imageData)
@@ -556,6 +628,7 @@ switch ($Target) {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-InitrdBuild
         Invoke-ImageBuild
         Invoke-VdiBuild
         Write-Host ""

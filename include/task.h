@@ -117,6 +117,12 @@ int task_get_max(void);
  */
 int task_kill(uint32_t pid);
 
+/**
+ * Busca una tarea por su ID único.
+ * @return Puntero a la tarea o NULL si no existe.
+ */
+task_t* task_get_by_id(uint32_t id);
+
 /* ========================================================================= */
 /* Context Switch (definido en context_switch.asm)                           */
 /* ========================================================================= */

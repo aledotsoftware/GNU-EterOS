@@ -177,6 +177,8 @@ Dirección       | Contenido
 - [ ] **Integración lwIP:** Stack TCP/IP ligero para networking completo
 - [ ] **Soporte FAT32:** Lectura básica de archivos
 
+sistema de actualizaciones?
+
 ### Fase 4: Espacio de Usuario (Userland)
 - [ ] **Context Switching:** Transición Ring 0 → Ring 3
 - [ ] **Syscalls (SYSCALL/SYSRET):** Instrucciones nativas x86_64 (no `int 0x80`)

@@ -11,7 +11,6 @@ typedef struct {
 
 /* Global state */
 static uint8_t* initrd_start = NULL;
-static uint32_t initrd_end = 0;
 static uint32_t file_count = 0;
 static initrd_file_header_t* file_headers = NULL;
 

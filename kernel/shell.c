@@ -488,21 +488,41 @@ static void cmd_ps(const char* args) {
     terminal_write_colored("  PID  Estado    Nombre\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     terminal_write_colored("  ---  --------  ----------------\n", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
 
-    int count = task_get_count();
-    /* La API actual no expone iteración directa, pero sabemos que
-     * task 0 es kernel y podemos usar task_get_current() para la actual.
-     * Por ahora mostramos el count y la tarea actual. */
-    terminal_write_string("  ");
-    itoa_s(task_get_current()->id, buf, sizeof(buf), 10);
-    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-    terminal_write_string("    ");
-    terminal_write_colored(task_state_str(task_get_current()->state), VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-    terminal_write_string("  ");
-    terminal_write_string(task_get_current()->name);
-    terminal_write_string(" *\n");
+    int max_tasks = task_get_max();
+    int active_count = 0;
+    uint32_t current_id = task_get_current()->id;
+
+    for (int i = 0; i < max_tasks; i++) {
+        task_t* t = task_get_at(i);
+        if (t && t->state != 0 && t->state != TASK_DEAD) {
+            active_count++;
+            
+            /* PID */
+            terminal_write_string("  ");
+            itoa_s(t->id, buf, sizeof(buf), 10);
+            terminal_write_string(buf);
+            
+            /* Padding for PID */
+            int pid_len = strlen(buf);
+            for(int p=0; p < (4 - pid_len); p++) terminal_write_string(" ");
+
+            /* Estado */
+            terminal_write_colored(task_state_str(t->state), 
+                                  (t->id == current_id) ? VGA_COLOR_LIGHT_GREEN : VGA_COLOR_WHITE, 
+                                  VGA_COLOR_BLACK);
+            terminal_write_string("  ");
+
+            /* Nombre */
+            terminal_write_string(t->name);
+            if (t->id == current_id) {
+                terminal_write_colored(" *", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+            }
+            terminal_write_string("\n");
+        }
+    }
 
     terminal_write_string("\n  Total tareas activas: ");
-    itoa_s(count, buf, sizeof(buf), 10);
+    itoa_s(active_count, buf, sizeof(buf), 10);
     terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     terminal_write_string("\n\n");
 }

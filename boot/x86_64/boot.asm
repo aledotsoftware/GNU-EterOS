@@ -114,7 +114,6 @@ enable_a20:
 ; =============================================================================
 msg_stage1:      db '[eterOS] Bootloader Stage 1', 13, 10, 0
 msg_loading_s2:  db '  Cargando Stage 2... ', 0
-msg_loading_kern:db '  Cargando Kernel... ', 0
 msg_ok:          db 'OK', 13, 10, 0
 msg_disk_err:    db 'ERROR DISCO!', 13, 10, 0
 boot_drive:      db 0
@@ -144,6 +143,9 @@ stage2_start:
 
     ; ---- Detectar Mapa de Memoria (E820) ----
     call detect_memory
+
+    ; ---- Cargar Kernel ----
+    call load_kernel
 
     ; ---- Cargar Initrd ----
     call load_initrd
@@ -275,6 +277,23 @@ detect_memory:
     ret
 
 ; -----------------------------------------------------------------------------
+; load_kernel: Carga el Kernel desde disco
+; -----------------------------------------------------------------------------
+KERNEL_START_LBA    equ 1 + STAGE2_SECTORS
+
+load_kernel:
+    mov si, s2_msg_kern
+    call print_16
+
+    ; Leer sectores del Kernel
+    mov eax, KERNEL_START_LBA       ; LBA Inicio
+    mov ecx, KERNEL_SECTORS         ; Cantidad de sectores
+    mov edi, KERNEL_LOAD_ADDR       ; Destino (Linear Addr 0x10000)
+
+    call read_sectors_lba
+    ret
+
+; -----------------------------------------------------------------------------
 ; load_initrd: Carga el Initrd desde disco
 ; -----------------------------------------------------------------------------
 INITRD_LOAD_ADDR    equ 0x40000
@@ -294,10 +313,22 @@ load_initrd:
     ret
 
 ; -----------------------------------------------------------------------------
-; read_sectors_lba: Lee sectores usando conversión LBA -> CHS
+; Disk Address Packet (DAP) para int 0x13 ah=42h
+; -----------------------------------------------------------------------------
+align 4
+dap_struct:
+    db 0x10                     ; Tamaño del DAP
+    db 0                        ; Reservado
+    dw 0                        ; Cantidad de sectores (se llena dinamicamente)
+    dw 0                        ; Offset de destino (se llena dinamicamente)
+    dw 0                        ; Segmento de destino (se llena dinamicamente)
+    dq 0                        ; LBA de inicio (se llena dinamicamente)
+
+; -----------------------------------------------------------------------------
+; read_sectors_lba: Lee sectores usando int 0x13 Extensiones LBA
 ;   EAX = Start LBA
-;   CX  = Count (max 64KB total read due to segment limits if not careful, but loop handles 512b steps)
-;   EDI = Destination Linear Address
+;   CX  = Count
+;   EDI = Destination Linear Address (Debe ser < 1MB para BIOS real mode)
 ; -----------------------------------------------------------------------------
 read_sectors_lba:
 .loop:
@@ -305,50 +336,60 @@ read_sectors_lba:
     push cx
     push edi
 
-    ; LBA to CHS (Floppy 1.44MB: 18 SPT, 2 Heads)
-    xor edx, edx
-    mov ecx, 18
-    div ecx             ; EAX = LBA / 18, EDX = LBA % 18
-
-    inc edx             ; Sector (1-based)
-    mov cl, dl          ; CL = Sector
-
-    xor edx, edx
-    mov ebx, 2
-    div ebx             ; EAX = Cylinder, EDX = Head
-
-    mov ch, al          ; CH = Cylinder
-    mov dh, dl          ; DH = Head
-    mov dl, [boot_drive]; DL = Drive
-
-    ; Destination Address Conversion (Linear -> Seg:Off)
-    mov ebx, [esp]      ; Get EDI (saved on stack)
+    ; Preparar DAP
+    mov dword [dap_struct + 8], eax     ; LBA Low
+    mov dword [dap_struct + 12], 0      ; LBA High
+    mov word [dap_struct + 2], 1        ; Leer 1 sector a la vez para máxima compatibilidad
+    
+    ; Convertir Linear Address a Segment:Offset
+    mov ebx, edi
     mov eax, ebx
     shr eax, 4
-    mov es, ax          ; ES = EDI >> 4
-    and ebx, 0xF        ; BX = EDI & 0xF
+    mov word [dap_struct + 6], ax       ; Segmento
+    and ebx, 0x0F
+    mov word [dap_struct + 4], bx       ; Offset
 
-    mov ah, 0x02
-    mov al, 1           ; Read 1 sector
+    ; Reintentos (3 veces)
+    mov byte [read_retries], 3
+.retry:
+    mov ah, 0x42                        ; Extended Read
+    mov si, dap_struct
+    mov dl, [boot_drive]
     int 0x13
-    jc .disk_error
+    jnc .success
 
+    ; Si falla, resetear disco e intentar de nuevo
+    push ax
+    xor ah, ah
+    mov dl, [boot_drive]
+    int 0x13
+    pop ax
+    
+    dec byte [read_retries]
+    jnz .retry
+
+    ; Si fallan todos los reintentos, error fatal
+    jmp .disk_error
+
+.success:
     pop edi
     pop cx
     pop eax
 
-    inc eax             ; Next LBA
-    add edi, 512        ; Next Dest
+    inc eax                             ; Siguiente LBA
+    add edi, 512                        ; Siguiente dirección de destino
     dec cx
-    jnz .loop
+    jnz .loop                           ; Continuar hasta leer todos
 
     ret
 
 .disk_error:
-    mov si, msg_disk_err ; Reusamos mensaje de Stage 1
+    mov si, msg_disk_err
     call print_16
     cli
     hlt
+
+read_retries: db 0
 
 ; -----------------------------------------------------------------------------
 ; setup_vbe: Configura el modo de video VESA (1024x768x32)
@@ -452,7 +493,8 @@ s2_msg_no_lm:   db '  ERROR: CPU sin Long Mode!', 13, 10, 0
 s2_msg_pmode:   db '  Entrando en Modo Protegido...', 13, 10, 0
 s2_msg_mem_ok:  db '  Memoria detectada (E820)', 13, 10, 0
 s2_msg_mem_err: db '  ERROR: Fallo al detectar memoria!', 13, 10, 0
-s2_msg_initrd:  db '  Cargando Initrd...', 13, 10, 0
+s2_msg_kern:    db '  Cargando Kernel... ', 0
+s2_msg_initrd:  db '  Cargando Initrd... ', 0
 s2_msg_vbe_init:db '  Configurando VBE 1024x768...', 13, 10, 0
 s2_msg_vbe_err: db '  ERROR: VBE Init Failed!', 13, 10, 0
 

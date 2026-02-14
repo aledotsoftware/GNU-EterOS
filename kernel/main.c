@@ -19,14 +19,8 @@
 #include <mm.h>
 #include <gui_demo.h>
 #include <fs/initrd.h>
-#include "lwip/init.h"
-#include "lwip/netif.h"
-#include "lwip/dhcp.h"
-#include "lwip/etharp.h"
-#include "lwip/timeouts.h"
-#include "netif/ethernet.h"
-#include "ethernetif.h"
-#include "task.h"
+#include <vga.h>
+#include <task.h>
 
 /* Forward declarations for non-HAL kernel services */
 void pmm_init(void);
@@ -165,16 +159,27 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("  [INIT] Scheduler Round-Robin\n");
     scheduler_init();
 
-    /* ---- 8. Lanzar Entorno de Escritorio (Flux UI) ---- */
+    /* ---- 8. Lanzar Entorno de Escritorio (Flux UI) como Tarea Separada ---- */
     hal_console_write("  [INIT] Lanzando Flux UI...\n");
     
-    /* Nota: gui_demo_run() bloquea hasta que el usuario salga */
-    /* Aseguramos que la interrupción de teclado esté habilitada */
-    hal_interrupts_enable(); 
+    /* Crear la tarea para la GUI (será PID 1) */
+    int gui_pid = task_create("FluxUI", gui_demo_run);
     
-    gui_demo_run();
+    hal_interrupts_enable(); 
 
-    hal_console_write("  [INFO] GUI cerrada. Iniciando shell de texto...\n");
+    /* La Tarea 0 (Kernel) espera a que la GUI termine o sea 'matada' 
+       para evitar conflictos de teclado y recursos. */
+    while (gui_pid >= 0) {
+        task_t* t = task_get_by_id(gui_pid); 
+        /* Si la tarea ya no existe o está muerta, salimos del loop */
+        if (!t || t->state == TASK_DEAD) break;
+        task_sleep(200); /* No desperdiciar ciclos */
+    }
+
+    /* Al cerrar o matar la GUI, volvemos al modo texto */
+    hal_console_write("\n  [INFO] FluxUI finalizado. Retornando a consola...\n");
+    terminal_initialize(NULL); /* Reset terminal state & screen */
+    shell_run(); 
 
     /* ---- 9. Lanzar shell interactivo (Fallback) ---- */
     shell_run();  /* Nunca retorna (tarea 0 del kernel) */

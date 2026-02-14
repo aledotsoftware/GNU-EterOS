@@ -77,10 +77,12 @@ void framebuffer_clear(uint32_t color) {
 
     /* Optimización para 32-bit */
     if (fb_bpp == 32) {
-        for (uint32_t y = 0; y < fb_height; y++) {
-            uint32_t* row = (uint32_t*)((uint8_t*)target_buffer + (y * fb_pitch));
-            for (uint32_t x = 0; x < fb_width; x++) {
-                row[x] = color;
+        if (fb_pitch == fb_width * 4) {
+            memset32(target_buffer, color, fb_width * fb_height);
+        } else {
+            for (uint32_t y = 0; y < fb_height; y++) {
+                uint32_t* row = (uint32_t*)((uint8_t*)target_buffer + (y * fb_pitch));
+                memset32(row, color, fb_width);
             }
         }
     } else {
@@ -105,13 +107,8 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
     /* Optimized 32-bit path */
     if (fb_bpp == 32) {
         for (uint32_t i = 0; i < h; i++) {
-            /* Pointer arithmetic using uint8_t* to be safe with pitch */
             uint32_t* row_ptr = (uint32_t*)((uint8_t*)target_buffer + ((y + i) * fb_pitch)) + x;
-            
-            /* Fill row */
-            for (uint32_t j = 0; j < w; j++) {
-                row_ptr[j] = color;
-            }
+            memset32(row_ptr, color, w);
         }
     } else {
         /* Fallback */

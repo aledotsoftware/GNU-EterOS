@@ -20,6 +20,7 @@
 #include <shell.h>
 #include <pmm.h>
 #include <serial.h>
+#include <ui/image.h>
 
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
@@ -36,6 +37,7 @@ static window_t* win_sysinfo = NULL;
 static int32_t mouse_x = 512;
 static int32_t mouse_y = 384;
 static bool    mouse_left_btn = false;
+static bool    mouse_clicked = false;
 
 
 
@@ -283,14 +285,21 @@ static void term_create(void) {
 /* System Apps (SysInfo, Matrix)                                             */
 /* ========================================================================= */
 
-static void draw_progress_bar(window_t* win, int x, int y, int w, int h, float percent, uint32_t color) {
-    rect_t bg = {x, y, w, h};
-    wm_fill_rect(win, bg, 0x404040);
-    int fill_w = (int)((float)w * percent);
-    if (fill_w > w) fill_w = w;
-    if (fill_w < 0) fill_w = 0;
-    rect_t fill = {x, y, fill_w, h};
-    wm_fill_rect(win, fill, color);
+static void draw_progress_bar(window_t* win, int x, int y, int w, int h, int percent_1000, uint32_t color) {
+    rect_t r = {x, y, w, h};
+    if (win) {
+        wm_fill_rect(win, r, 0x404040);
+        int fill_w = (w * percent_1000) / 1000;
+        if (fill_w > w) fill_w = w;
+        if (fill_w < 0) fill_w = 0;
+        wm_fill_rect(win, (rect_t){x, y, fill_w, h}, color);
+    } else {
+        framebuffer_rect(x, y, w, h, 0x404040);
+        int fill_w = (w * percent_1000) / 1000;
+        if (fill_w > w) fill_w = w;
+        if (fill_w < 0) fill_w = 0;
+        framebuffer_rect(x, y, fill_w, h, color);
+    }
 }
 
 static void draw_sysinfo_content(void) {
@@ -313,14 +322,14 @@ static void draw_sysinfo_content(void) {
     uint64_t total = pmm_get_total_ram();
     uint64_t free  = pmm_get_free_ram();
     uint64_t used  = total - free;
-    float usage_pct = (float)used / (float)total;
+    int usage_pct_1000 = (total > 0) ? (used * 1000) / total : 0;
     
     char ram_buf[64] = "RAM: ";
     char num[16];
     itoa_s(used / (1024*1024), num, 16, 10); strlcat(ram_buf, num, 64); strlcat(ram_buf, " MB / ", 64);
     itoa_s(total / (1024*1024), num, 16, 10); strlcat(ram_buf, num, 64); strlcat(ram_buf, " MB", 64);
     wm_print_at(win_sysinfo, 40, 75, ram_buf);
-    draw_progress_bar(win_sysinfo, 40, 100, card_w - 40, 12, usage_pct, FLUX_ACCENT_AMBER);
+    draw_progress_bar(win_sysinfo, 40, 100, card_w - 40, 12, usage_pct_1000, FLUX_ACCENT_AMBER);
 
     /* CPU CARD with Live Graph */
     rect_t cpu_card = {w/2 + 10, 60, card_w, 100};
@@ -770,11 +779,11 @@ static void draw_sysmon_preview(int x, int y, int w, int h) {
     uint64_t total = pmm_get_total_ram();
     uint64_t free  = pmm_get_free_ram();
     uint64_t used  = total - free;
-    float ram_pct = (float)used / (float)total;
+    int ram_pct_1000 = (total > 0) ? (used * 1000) / total : 0;
     
     int bar_y = y + 60;
     ui_draw_string(NULL, x + 10, bar_y - 15, "RAM Usage", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
-    draw_progress_bar(NULL, x + 10, bar_y, w - 20, 8, ram_pct, (ram_pct > 0.8) ? UI_COLOR_RED : FLUX_ACCENT_AMBER);
+    draw_progress_bar(NULL, x + 10, bar_y, w - 20, 8, ram_pct_1000, (ram_pct_1000 > 800) ? UI_COLOR_RED : FLUX_ACCENT_AMBER);
     
     int wave_y = y + 100;
     ui_draw_string(NULL, x + 10, wave_y - 15, "CPU Activity", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
@@ -819,52 +828,58 @@ static void draw_santitravel_preview(int x, int y, int w, int h) {
     ui_draw_string(NULL, x + 20 + tick, start_y + 30, ">-o-o", 0xFFFFFF, FLUX_CARD_BG);
 }
 
+static void draw_circle(int cx, int cy, int r, uint32_t color) {
+    for (int y = -r; y <= r; y++) {
+        for (int x = -r; x <= r; x++) {
+            if (x*x + y*y <= r*r) {
+                if (cx + x >= 0 && cy + y >= 0) {
+                    framebuffer_putpixel(cx + x, cy + y, color);
+                }
+            }
+        }
+    }
+}
+
 void gui_draw_boot_logo(void) {
     uint32_t sw = framebuffer_get_width();
     uint32_t sh = framebuffer_get_height();
     if (sw == 0) sw = 1024;
     if (sh == 0) sh = 768;
 
-    framebuffer_clear(0x000000);
+    /* 1. White Background */
+    framebuffer_clear(0xFFFFFF);
 
-    /* Draw Logo (ASCII Art styled for professional look) */
-    const char* lines[] = {
-        " _____ _             _____ _____ ",
-        "|   __| |_ ___ ___  |     |   __|",
-        "|   __|  _| -_|  _| |  |  |__   |",
-        "|_____|_| |___|_|   |_____|_____|"
-    };
-    
-    int lx = (sw - (33 * 8)) / 2;
-    int ly = sh / 2 - 60;
-    
-    uint32_t colors[] = {0x00FFFF, 0x00E0E0, 0x00D0D0, 0x00B0B0};
+    /* 2. Draw Logo from File (logo.raw) */
+    int img_w = 200;
+    int img_h = 200;
+    ui_draw_image("logo.raw", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
 
-    for (int i=0; i<4; i++) {
-        ui_draw_string(NULL, lx, ly + (i * 16), lines[i], colors[i], 0x000000);
-    }
+    /* 3. Draw Text (Dark Grey) */
+    const char* title = "ETEROS GENESIS";
+    int title_w = strlen(title) * 8;
+    ui_draw_string(NULL, (sw - title_w) / 2, sh / 2 + 60, title, 0x333333, 0xFFFFFF);
     
-    ui_draw_string(NULL, (sw - (14 * 8)) / 2, ly + 80, "eterOS Genesis", 0xFFFFFF, 0x000000);
-    ui_draw_string(NULL, (sw - (24 * 8)) / 2, ly + 100, "Cargando subsistemas...", 0x888888, 0x000000);
+    const char* sub = "Cargando subsistemas...";
+    int sub_w = strlen(sub) * 8;
+    ui_draw_string(NULL, (sw - sub_w) / 2, sh / 2 + 80, sub, 0x666666, 0xFFFFFF);
     
-    /* Progress bar */
+    /* 4. Progress Bar (Light Grey Track, Cyan Fill) */
     int bw = 300;
     int bx = (sw - bw) / 2;
-    int by = ly + 130;
-    framebuffer_rect(bx, by, bw, 4, 0x222222);
+    int by = sh / 2 + 110;
+    framebuffer_rect(bx, by, bw, 4, 0xEEEEEE);
     
     framebuffer_flush();
     
-    /* Fake Progress Animation */
+    /* Fake Progress Animation (approx 2 seconds) */
     for (int i=0; i<=100; i+=2) {
-        framebuffer_rect(bx, by, (bw * i) / 100, 4, 0x00FFFF);
+        framebuffer_rect(bx, by, (bw * i) / 100, 4, 0x00AAAA);
         framebuffer_flush();
-        /* Wait a bit manually */
-        for (volatile int j=0; j<1000000; j++); 
+        task_sleep(40); /* 50 steps * 40ms = 2000ms */
     }
     
-    /* Final pause */
-    for (volatile int j=0; j<5000000; j++); 
+    /* Final pause (1 second) to complete the 3 seconds */
+    task_sleep(1000); 
 }
 
 /* ========================================================================= */
@@ -876,54 +891,69 @@ static void draw_global_status_bar(void) {
     if (screen_w == 0) screen_w = 1024;
     
     int bar_h = 32;
-    framebuffer_rect(0, 0, screen_w, bar_h, FLUX_BAR_BG);
-    framebuffer_rect(0, bar_h, screen_w, 1, 0x333333); /* Separator */
+    /* Deep Glassmorphism effect: Outer border + Inner fill */
+    framebuffer_rect(0, 0, screen_w, bar_h, 0x050505);
+    framebuffer_rect(0, bar_h - 1, screen_w, 1, 0x1A1A1A); 
 
-    /* Left: System Name */
-    ui_draw_string(NULL, 16, 8, "eterOS Genesis", FLUX_TEXT_PRIMARY, FLUX_BAR_BG);
+    /* Left: System Branding + Pulse */
+    int blink = (timer_get_ticks() / 50) % 2;
+    ui_draw_string(NULL, 16, 8, "eterOS", 0xFFFFFF, 0x050505);
+    framebuffer_rect(70, 14, 4, 4, blink ? FLUX_ACCENT_CYAN : 0x444444);
     
-    /* Center: Mode */
-    const char* mode_str = (current_zoom == FLUX_FOCUS) ? "FOCUS MODE" : "CONSTELLATION";
+    /* System Stats (Small, Technical) */
+    char stats_buf[64];
+    uint64_t total = pmm_get_total_ram();
+    uint64_t free  = pmm_get_free_ram();
+    uint64_t used_mb = (total - free) / (1024 * 1024);
+    int tasks = task_get_count();
+    
+    strlcpy(stats_buf, "RAM ", 64);
+    char n_buf[32];
+    itoa_s(used_mb, n_buf, 32, 10);
+    strlcat(stats_buf, n_buf, 64);
+    strlcat(stats_buf, "MB | PID[", 64);
+    itoa_s(tasks, n_buf, 32, 10);
+    strlcat(stats_buf, n_buf, 64);
+    strlcat(stats_buf, "]", 64);
+    
+    ui_draw_string(NULL, 100, 10, stats_buf, 0x666666, 0x050505);
+
+    /* Center: Mode Indicator with Glow */
+    const char* mode_str = (current_zoom == FLUX_FOCUS) ? "FOCUS" : "CONSTELACION";
     int mode_w = strlen(mode_str) * 8;
-    ui_draw_string(NULL, (screen_w - mode_w) / 2, 8, mode_str, FLUX_TEXT_SECONDARY, FLUX_BAR_BG);
+    int mode_x = (screen_w - mode_w) / 2;
+    ui_draw_string(NULL, mode_x, 8, mode_str, FLUX_TEXT_PRIMARY, 0x050505);
+    /* Subtle underline glow */
+    framebuffer_rect(mode_x, 24, mode_w, 1, (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_ACCENT_AMBER);
 
-    /* Right: Clock & "Battery" (Simulated) */
-    uint32_t now = timer_get_uptime_seconds();
-    int h = (now / 3600) % 24;
-    int m = (now / 60) % 60;
-    
-    /* Format Time */
-    char timebox[16];
-    char buf[4];
-    itoa_s(h, buf, 4, 10); 
-    strlcpy(timebox, (h < 10 ? "0" : ""), 16); 
-    strlcat(timebox, buf, 16);
-    strlcat(timebox, ":", 16);
-    
-    itoa_s(m, buf, 4, 10); 
-    strlcat(timebox, (m < 10 ? "0" : ""), 16); 
-    strlcat(timebox, buf, 16);
-    
+    /* Right Side */
     int right_margin = screen_w - 16;
     
-    /* Battery Icon (Fake 100%) */
-    int bat_w = 24;
-    int bat_h = 10;
+    /* Battery/Energy (Modern Style) */
+    int bat_w = 30;
+    int bat_h = 12;
     int bat_x = right_margin - bat_w;
     int bat_y = (bar_h - bat_h) / 2;
+    framebuffer_rect(bat_x - 1, bat_y - 1, bat_w + 2, bat_h + 2, 0x333333);
+    framebuffer_rect(bat_x, bat_y, bat_w, bat_h, 0x111111);
+    framebuffer_rect(bat_x + 2, bat_y + 2, bat_w - 4, bat_h - 4, 0x00CC00);
     
-    /* Battery Body */
-    framebuffer_rect(bat_x, bat_y, bat_w, bat_h, 0x888888); 
-    /* Battery Tip */
-    framebuffer_rect(bat_x + bat_w, bat_y + 2, 2, 6, 0x888888); 
-    /* Battery Fill (Green) */
-    framebuffer_rect(bat_x + 1, bat_y + 1, bat_w - 2, bat_h - 2, 0x00FF00);
+    right_margin -= (bat_w + 20);
+
+    /* Clock */
+    uint32_t uptime = timer_get_uptime_seconds();
+    int m = (uptime / 60) % 60;
+    int s = uptime % 60;
+    char clock_buf[16];
+    clock_buf[0] = '0' + (m/10);
+    clock_buf[1] = '0' + (m%10);
+    clock_buf[2] = ':';
+    clock_buf[3] = '0' + (s/10);
+    clock_buf[4] = '0' + (s%10);
+    clock_buf[5] = 0;
     
-    right_margin -= (bat_w + 16);
-    
-    /* Draw Time */
-    int time_w = strlen(timebox) * 8;
-    ui_draw_string(NULL, right_margin - time_w, 8, timebox, FLUX_TEXT_PRIMARY, FLUX_BAR_BG);
+    int clock_w = 5 * 8;
+    ui_draw_string(NULL, right_margin - clock_w, 8, clock_buf, 0xAAAAAA, 0x050505);
 }
 
 static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
@@ -949,23 +979,36 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
     int draw_y = y + shift_y;
 
     /* Capa 1: Contenedor (Using defined color) */
-    framebuffer_rect(draw_x, draw_y, w, h, FLUX_CARD_BG); 
+    uint32_t card_bg = FLUX_CARD_BG;
+    if (dist_sq < 10000) { /* Hover highlight */
+        card_bg = 0x1A1A1A;
+    }
+    
+    /* Pulse Effect for Active feel */
+    int pulse = (timer_get_ticks() / 20) % 2;
+    if (dist_sq < 40000 && pulse) {
+        framebuffer_rect(draw_x - 1, draw_y - 1, w + 2, h + 2, accent);
+    }
+
+    framebuffer_rect(draw_x, draw_y, w, h, card_bg); 
     
     /* Header */
-    ui_draw_string(NULL, draw_x + 10, draw_y + 10, title, FLUX_TEXT_PRIMARY, FLUX_CARD_BG);
-    framebuffer_rect(draw_x + 10, draw_y + 26, w - 20, 1, 0x505050);
+    ui_draw_string(NULL, draw_x + 10, draw_y + 10, title, FLUX_TEXT_PRIMARY, card_bg);
+    framebuffer_rect(draw_x + 10, draw_y + 26, w - 20, 1, 0x333333);
     
     /* Live Content / Icon Placeholder */
     int icon_cx = draw_x + (w/2);
     int icon_cy = draw_y + (h/2);
     
     if (node == NODE_TERMINAL) {
-        /* if (!terminals[0].used) term_create(); */ /* Don't create on draw, causes flicker/lag? */
         draw_term_preview(draw_x, draw_y, w, h, &terminals[0]);
-        /* Overlay Icon */
-        wm_fill_rect(NULL, (rect_t){icon_cx - 40, icon_cy - 30, 80, 60}, 0x000000);
-        framebuffer_rect(icon_cx - 40, icon_cy - 30, 80, 60, FLUX_ACCENT_CYAN);
-        ui_draw_string(NULL, icon_cx - 30, icon_cy - 10, ">_", FLUX_ACCENT_CYAN, 0x000000);
+        /* Overlay Icon - more transparent look */
+        for(int iy=0; iy<60; iy++) {
+            for(int ix=0; ix<80; ix++) {
+                if ((ix+iy)%2 == 0) framebuffer_putpixel(icon_cx-40+ix, icon_cy-30+iy, 0x000000);
+            }
+        }
+        ui_draw_string(NULL, icon_cx - 20, icon_cy - 10, ">_", FLUX_ACCENT_CYAN, 0x000000);
     } else if (node == NODE_SYSMON) {
         draw_sysmon_preview(draw_x, draw_y, w, h);
     } else if (node == NODE_MATRIX) {
@@ -978,8 +1021,10 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         draw_santitravel_preview(draw_x, draw_y, w, h);
     }
     
-    /* Active Border */
-    framebuffer_rect(draw_x, draw_y + h - 1, w, 2, accent);
+    /* Active Border (Glow effect on hover) */
+    uint32_t border_col = accent;
+    if (dist_sq < 40000) border_col = 0xFFFFFF;
+    framebuffer_rect(draw_x, draw_y + h - 2, w, 2, border_col);
 }
 
 /* ========================================================================= */
@@ -1035,13 +1080,22 @@ static void draw_constellation(void) {
     if (screen_w == 0) screen_w = 1024;
     if (screen_h == 0) screen_h = 768;
     
-    /* Draw Grid Background (Technical) */
-    int grid_size = 40;
+    /* Capa 0: Neural Ambient (Stars) */
+    /* Use fixed coordinates based on screen, dithered for depth */
+    for (int i = 0; i < 50; i++) {
+        int sx = (i * 12345) % screen_w;
+        int sy = (i * 6789) % screen_h;
+        uint32_t s_col = (i % 3 == 0) ? 0x333333 : 0x111111;
+        framebuffer_putpixel(sx, sy, s_col);
+    }
+
+    /* Draw Grid Background (Technical) - Very subtle */
+    int grid_size = 120;
     for (uint32_t x = 0; x < screen_w; x += grid_size) {
-        framebuffer_rect(x, 0, 1, screen_h, 0x333333);
+        framebuffer_rect(x, 0, 1, screen_h, 0x080808);
     }
     for (uint32_t y = 0; y < screen_h; y += grid_size) {
-        framebuffer_rect(0, y, screen_w, 1, 0x404040);
+        framebuffer_rect(0, y, screen_w, 1, 0x080808);
     }
     
     /* Header (Capa 3) */
@@ -1238,18 +1292,28 @@ static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
 static void flux_update_zoom(void) {
     /* Fixed-Point Spring Physics (1000 = 1.0) */
     int target = (target_zoom == FLUX_FOCUS) ? 1000 : 0;
-    int tension = 80;
-    int friction = 850;
+    int tension = 180; /* Brisk expansion */
+    int friction = 750;
     
-    int force = ((target - zoom_progress) * tension) / 1000;
+    int dist = target - zoom_progress;
+    int force = (dist * tension) / 1000;
+    
+    /* Minimum push to overcome integer division floor */
+    if (dist > 0 && force == 0) force = 1;
+    if (dist < 0 && force == 0) force = -1;
+
     zoom_velocity += force;
     zoom_velocity = (zoom_velocity * friction) / 1000;
     zoom_progress += zoom_velocity;
     
-    /* Snap to target */
-    if (zoom_velocity > -2 && zoom_velocity < 2) {
-        if (target == 1000 && zoom_progress > 990) zoom_progress = 1000;
-        if (target == 0 && zoom_progress < 10) zoom_progress = 0;
+    /* Stronger Snap to avoid getting stuck in current_zoom == -1 */
+    if (target == 1000 && zoom_progress > 980) {
+        zoom_progress = 1000;
+        zoom_velocity = 0;
+    }
+    if (target == 0 && zoom_progress < 20) {
+        zoom_progress = 0;
+        zoom_velocity = 0;
     }
 
     /* Update State */
@@ -1259,8 +1323,12 @@ static void flux_update_zoom(void) {
 }
 
 static void draw_zoom_transition(void) {
-    /* Draw Constellation Background */
-    draw_constellation();
+    /* Draw Constellation Background with optimization: skip heavy constellation if zoom is high */
+    if (zoom_progress < 800) {
+        draw_constellation();
+    } else {
+        framebuffer_clear(0x000000);
+    }
     
     /* Draw Expanding Card */
     /* Interpolate Rect using fixed-point */
@@ -1271,10 +1339,15 @@ static void draw_zoom_transition(void) {
     r.h = source_rect.h + ((target_rect.h - source_rect.h) * zoom_progress) / 1000;
     
     /* Draw Card Content Scaled */
-    wm_fill_rect(NULL, r, FLUX_CARD_BG);
+    framebuffer_rect(r.x, r.y, r.w, r.h, FLUX_CARD_BG);
     framebuffer_rect(r.x, r.y, r.w, 4, FLUX_ACCENT_CYAN); /* Top bar */
     
-    ui_draw_string(NULL, r.x + 20, r.y + 20, "Materializing...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    /* Avoid complex strings during fast transition */
+    if (zoom_progress < 900) {
+        ui_draw_string(NULL, r.x + 20, r.y + 20, "Cargando...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    } else {
+        ui_draw_string(NULL, r.x + 20, r.y + 20, "Materializando...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    }
 }
 
 static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
@@ -1287,7 +1360,7 @@ static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
     bool left_btn = (buttons & 1);
     
     if (left_btn && !mouse_left_btn) {
-        handle_flux_click();
+        mouse_clicked = true;
     }
     mouse_left_btn = left_btn;
 }
@@ -1313,6 +1386,15 @@ void gui_demo_run(void) {
     
     desktop_running = true;
     while (desktop_running) {
+        /* Handle Mouse Click in main thread context */
+        if (mouse_clicked) {
+            mouse_clicked = false;
+            handle_flux_click();
+        }
+
+        /* Update Logic */
+        flux_update_zoom();
+
         /* ... keyboard input ... */
         if (keyboard_has_input()) {
              char c = keyboard_getchar();
@@ -1330,7 +1412,13 @@ void gui_demo_run(void) {
                  /* Also handle ESC within this logic for now */
              }
              
-             if (c == 27) target_zoom = FLUX_MACRO;
+             if (c == 27) {
+                 if (current_zoom == FLUX_MACRO) {
+                     desktop_running = false;
+                 } else {
+                     target_zoom = FLUX_MACRO;
+                 }
+             }
              
              /* Pass input to terminal if focused */
              if (current_zoom == FLUX_FOCUS && focused_term && focused_term == (term_instance_t*)focused_term) {
@@ -1339,8 +1427,6 @@ void gui_demo_run(void) {
                  }
              }
         }
-        
-        flux_update_zoom();
         
         /* Capa 0: Deep Void (Premium Dark) */
         framebuffer_clear(0x000000);
@@ -1378,15 +1464,30 @@ void gui_demo_run(void) {
         /* Status Bar (Always Visible) */
         draw_global_status_bar();
         
-        /* Cursor (Light Orb) */
+        /* Cursor: Neural Orb (Reactive) */
         uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
-        /* Draw a small crosshair for now, imagining it as an Orb */
-        framebuffer_rect(mouse_x - 4, mouse_y, 9, 1, cursor_col); 
-        framebuffer_rect(mouse_x, mouse_y - 4, 1, 9, cursor_col); 
+        
+        /* Glow Effect (Dithered) */
+        int pulse = (timer_get_ticks() / 10) % 4;
+        for (int gy = -8; gy <= 8; gy++) {
+            for (int gx = -8; gx <= 8; gx++) {
+                int dist = (gx*gx) + (gy*gy);
+                if (dist < (32 + pulse)) {
+                    if ((gx + gy + (int)timer_get_ticks()) % 3 == 0) {
+                        framebuffer_putpixel(mouse_x + gx, mouse_y + gy, 0x404040); 
+                    }
+                }
+            }
+        }
+        
+        /* Core Orb */
+        framebuffer_rect(mouse_x - 2, mouse_y - 2, 4, 4, cursor_col);
+        framebuffer_rect(mouse_x - 1, mouse_y - 3, 2, 6, cursor_col);
+        framebuffer_rect(mouse_x - 3, mouse_y - 1, 6, 2, cursor_col);
         
         framebuffer_flush(); 
-        for (volatile int i = 0; i < 5000; i++); 
-        task_yield();
+        task_sleep(10); /* Cap FPS to ~100 to avoid CPU saturation */
     }
+    
     terminal_initialize(NULL);
 }

@@ -317,3 +317,13 @@ task_t* task_get_at(int index) {
 int task_get_max(void) {
     return MAX_TASKS;
 }
+
+task_t* task_get_by_id(uint32_t id) {
+    if (!scheduler_active) return NULL;
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (tasks[i].id == id && tasks[i].state != 0 && tasks[i].state != TASK_DEAD) {
+            return &tasks[i];
+        }
+    }
+    return NULL;
+}
