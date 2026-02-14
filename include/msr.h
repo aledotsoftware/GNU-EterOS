@@ -18,6 +18,7 @@
 
 /* Funciones helper para leer/escribir MSRs */
 
+#ifndef __ETEROS_HOST_TEST__
 static inline void wrmsr(uint32_t msr, uint64_t value) {
     uint32_t low = value & 0xFFFFFFFF;
     uint32_t high = value >> 32;
@@ -29,5 +30,10 @@ static inline uint64_t rdmsr(uint32_t msr) {
     __asm__ volatile ("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
     return ((uint64_t)high << 32) | low;
 }
+#else
+/* Declaraciones para tests */
+void wrmsr(uint32_t msr, uint64_t value);
+uint64_t rdmsr(uint32_t msr);
+#endif
 
 #endif /* ETEROS_MSR_H */

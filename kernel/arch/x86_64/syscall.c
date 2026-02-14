@@ -58,7 +58,6 @@ void syscall_handler(struct syscall_regs* regs) {
     serial_write_string("\n");
 
     uint64_t ret = (uint64_t)-38; /* -ENOSYS */
-    task_t* current_task = task_get_current();
 
     if (regs->rax == 0xCAFEBABE) {
         serial_write_string("[SYSCALL] Magic Number Detected!\n");
