@@ -11,6 +11,7 @@
 
 /* Capture standard library functions before they are renamed */
 static void* (*std_memset)(void*, int, size_t) = memset;
+static void* (*std_memcpy)(void*, const void*, size_t) = memcpy;
 
 /* Undefine PAGE_SIZE if defined by system headers to avoid conflict with pmm.h */
 #ifdef PAGE_SIZE
@@ -34,6 +35,10 @@ void serial_write_string(const char* str) {
 /* Implement string functions used by heap.c */
 void* eteros_memset(void* dest, int c, size_t n) {
     return std_memset(dest, c, n);
+}
+
+void* eteros_memcpy(void* dest, const void* src, size_t n) {
+    return std_memcpy(dest, src, n);
 }
 
 void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {

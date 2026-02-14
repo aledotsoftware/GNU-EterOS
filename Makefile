@@ -122,7 +122,9 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
               $(KERNEL_DIR)/arch/x86_64/gdt.c \
-              $(KERNEL_DIR)/arch/x86_64/syscall.c
+              $(KERNEL_DIR)/arch/x86_64/syscall.c \
+              $(KERNEL_DIR)/crypto/sha256.c \
+              $(KERNEL_DIR)/crypto/ed25519.c
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
@@ -188,6 +190,7 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/mm
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/fs
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/ui
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/crypto
 
 # ---- Bootloader (Solo x86_64) ----
 boot: dirs $(BOOT_BIN)
