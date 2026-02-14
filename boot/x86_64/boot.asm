@@ -350,8 +350,8 @@ load_kernel:
 ; -----------------------------------------------------------------------------
 ; load_initrd: Carga el Initrd desde disco
 ; -----------------------------------------------------------------------------
-INITRD_LOAD_ADDR    equ 0x40000
-INITRD_SECTORS      equ 64
+INITRD_LOAD_ADDR    equ 0x40000     ; ⚡ BOLT: Restored to safe sub-1MB zone
+INITRD_SECTORS      equ 128         ; Keep the increased limit
 INITRD_START_LBA    equ 1 + STAGE2_SECTORS + KERNEL_SECTORS
 
 load_initrd:
@@ -608,7 +608,7 @@ protected_mode_start:
 ;     PDPT[0] → PD   (en PAGE_TABLE_ADDR + 0x2000)
 ;     PD[0-3] → 4 páginas de 2 MB cada una = 8 MB
 ; -----------------------------------------------------------------------------
-PAGE_TABLE_ADDR equ 0x70000             ; Dirección base de las tablas
+PAGE_TABLE_ADDR equ 0x70000             ; ⚡ BOLT: Restored to safe sub-1MB zone
 
 setup_page_tables:
     ; 1. Limpiar 6 páginas de 4 KB (PML4 + PDPT + 4*PD = 24 KB)

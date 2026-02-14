@@ -127,12 +127,9 @@ void pmm_init(void) {
     terminal_write_string(ram_str);
     terminal_write_string(" MB\n");
 
-    /* 2. Ubicar el Bitmap después del Kernel */
-    /* _kernel_end es un símbolo del linker, su dirección es lo que importa */
-    uint64_t kernel_end_addr = (uint64_t)&_kernel_end;
-    
-    /* Alinear al siguiente page boundary */
-    pmm_bitmap = (uint8_t*)PAGE_ALIGN_UP(kernel_end_addr);
+    /* 2. Ubicar el Bitmap en una zona segura (4MB) */
+    /* ⚡ BOLT: Evitamos colisiones con kernel (1MB), stacks (0.6MB) y tablas (2MB) */
+    pmm_bitmap = (uint8_t*)0x400000;
     
     /* Calcular tamaño del bitmap (1 bit por página) */
     pmm_bitmap_size = total_pages / 8;
@@ -154,16 +151,12 @@ void pmm_init(void) {
 
     /* 4. Marcar regiones críticas como OCUPADAS de nuevo */
     
-    /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel, Bitmap) */
-    /*    El kernel está en 0x10000 y el bitmap justo después (~0x18000).  */
-    /*    Ambos están DENTRO del primer 1MB, así que una sola reserva basta. */
+    /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel) */
     pmm_mark_region_used(0x0, 0x100000); 
-    
-    /* b) Si el kernel/bitmap se extiende MÁS ALLÁ de 1MB, reservar eso también */
+
+    /* b) Reservar explícitamente el espacio del Bitmap */
     uint64_t pmm_end = (uint64_t)pmm_bitmap + pmm_bitmap_size;
-    if (pmm_end > 0x100000) {
-        pmm_mark_region_used(0x100000, pmm_end - 0x100000);
-    }
+    pmm_mark_region_used((uint64_t)pmm_bitmap, pmm_bitmap_size);
     
     /* c) Tablas de paginación del bootloader (0x70000-0x76000, ya dentro del 1MB) */
 
