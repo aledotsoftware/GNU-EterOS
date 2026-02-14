@@ -31,6 +31,9 @@
 #include "../include/gui_demo.h"
 #include "../include/rtc.h"
 #include "../include/rtc.h"
+#include "../include/user_mode.h"
+#include "../include/pmm.h"
+#include "../include/vmm.h"
 /* #include "../include/apps/wget.h" */
 
 /* ========================================================================= */
@@ -73,7 +76,7 @@ static void cmd_ps(const char* args);
 static void cmd_kill(const char* args);
 static void cmd_demo(const char* args);
 static void cmd_date(const char* args);
-static void cmd_date(const char* args);
+static void cmd_usermode(const char* args);
 /* static void cmd_wget(const char* args); */
 
 /* ========================================================================= */
@@ -81,6 +84,7 @@ static void cmd_date(const char* args);
 /* ========================================================================= */
 static const shell_command_t commands[] = {
     { "help",     "Muestra esta lista de comandos",              cmd_help    },
+    { "usermode", "Entrar a modo usuario (Ring 3)",              cmd_usermode},
     { "clear",    "Limpia la pantalla",                          cmd_clear   },
     { "version",  "Muestra la version del sistema",              cmd_version },
     { "sysinfo",  "Informacion del sistema",                     cmd_sysinfo },
@@ -453,6 +457,74 @@ static void cmd_date(const char* args) {
     print_time(&utc,   "  UTC:       ");
     print_time(&local, "  Argentina: ");
     terminal_write_string("\n");
+}
+
+static void cmd_usermode(const char* args) {
+    (void)args;
+    terminal_write_string("\n  [USER] Preparing to enter User Mode (Ring 3)...\n");
+
+    /* 1. Allocate a page for User Code */
+    void* code_page = pmm_alloc_page();
+    if (!code_page) {
+        terminal_write_string("  Error: No memory for user code.\n");
+        return;
+    }
+
+    /* 2. Allocate a page for User Stack */
+    void* stack_page = pmm_alloc_page();
+    if (!stack_page) {
+        terminal_write_string("  Error: No memory for user stack.\n");
+        return;
+    }
+
+    /* 3. Map pages as USER (Ring 3 accessible) */
+    /* We assume Identity Mapping for simplicity in this test */
+    uint64_t code_virt = (uint64_t)code_page;
+    uint64_t stack_virt = (uint64_t)stack_page;
+
+    /* Ensure pages are mapped with USER flag */
+    vmm_map_page((uint64_t)code_page, code_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+    vmm_map_page((uint64_t)stack_page, stack_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+
+    /* 4. Write User Code */
+    /* Payload:
+       mov rax, 0xCAFEBABE
+       syscall
+       jmp $
+    */
+    uint8_t* code = (uint8_t*)code_virt;
+
+    /* mov rax, 0xCAFEBABE */
+    /* 48 C7 C0 BE BA FE CA */
+    code[0] = 0x48; code[1] = 0xC7; code[2] = 0xC0;
+    code[3] = 0xBE; code[4] = 0xBA; code[5] = 0xFE; code[6] = 0xCA;
+
+    /* syscall (Opcode 0x0F 0x05) */
+    code[7] = 0x0F; code[8] = 0x05;
+
+    /* jmp $ (EB FE) */
+    code[9] = 0xEB; code[10] = 0xFE;
+
+    terminal_write_string("  [USER] Code loaded at 0x");
+    char buf[32];
+    utoa_hex_s(code_virt, buf, sizeof(buf));
+    terminal_write_string(buf);
+    terminal_write_string("\n  [USER] Stack at 0x");
+    utoa_hex_s(stack_virt, buf, sizeof(buf));
+    terminal_write_string(buf);
+    terminal_write_string("\n  [USER] JUMPING TO RING 3!\n");
+
+    /* 5. Enter User Mode */
+    /* Stack grows down, so stack pointer is at the END of the page */
+    void* stack_top = (void*)(stack_virt + PAGE_SIZE);
+
+    /* Disable interrupts to prevent scheduler from interrupting us before we are fully in user mode?
+       Actually enter_user_mode does CLI. */
+
+    enter_user_mode((void*)code_virt, stack_top);
+
+    /* Should not return here (user code loops) */
+    terminal_write_string("  [USER] Returned? (Should not happen)\n");
 }
 
 /* static void cmd_wget(const char* args) {

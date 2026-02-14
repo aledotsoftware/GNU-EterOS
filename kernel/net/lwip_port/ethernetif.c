@@ -91,7 +91,7 @@ low_level_output(struct netif *netif, struct pbuf *p)
   (void)netif;
 
   struct pbuf *q;
-  int len = 0;
+  size_t len = 0;
 
   /* initiate transfer(); */
 #if ETH_PAD_SIZE
@@ -112,7 +112,7 @@ low_level_output(struct netif *netif, struct pbuf *p)
   }
 
   /* signal that packet should be sent(); */
-  if (e1000_send_packet(tx_temp_buffer, len) != 0) {
+  if (e1000_send_packet(tx_temp_buffer, (u16_t)len) != 0) {
       return ERR_IF;
   }
 

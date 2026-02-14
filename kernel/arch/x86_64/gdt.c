@@ -174,3 +174,7 @@ void gdt_init(void) {
 
     serial_write_string("[GDT] GDT cargada. TSS activa.\n");
 }
+
+void tss_set_rsp0(uint64_t rsp0) {
+    tss.rsp0 = rsp0;
+}
