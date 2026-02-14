@@ -131,10 +131,10 @@ static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */
 /* Terminal App Logica Multi-instancia con Scroll                            */
 /* ========================================================================= */
 
-#define TERM_VISIBLE_LINES 14
-#define TERM_VISIBLE_COLS  40
+#define TERM_VISIBLE_LINES 16
+#define TERM_VISIBLE_COLS  42
 /* Aumentamos buffer para permitir "scroll back" conceptual */
-#define TERM_BUFFER_LINES  50 
+#define TERM_BUFFER_LINES  100 
 #define MAX_TERMINALS 15
 
 typedef struct {
@@ -207,6 +207,7 @@ static void term_print(term_instance_t* term, const char* text) {
 
 static void gui_term_hook(char c) {
     if (hook_term) term_putc(hook_term, c);
+    serial_putchar(c); /* Mirror to serial for easier debugging */
 }
 
 static void term_execute_cmd(term_instance_t* term, const char* cmd) {
@@ -238,7 +239,9 @@ static void term_execute_cmd(term_instance_t* term, const char* cmd) {
 }
 
 static void term_handle_key(term_instance_t* term, char c) {
-    if (!term) return;
+    if (!term) { serial_write_string("[TERM] Err: term is NULL\n"); return; }
+    
+    serial_write_string("[TERM] Handled Key\n");
 
     if (c == '\n') {
         term_execute_cmd(term, term->input_buf);
@@ -318,6 +321,7 @@ static void term_create(void) {
     if (!terminals[slot].win) return;
     
     terminals[slot].win->bg_color = UI_COLOR_BLACK;
+    terminals[slot].win->fg_color = UI_COLOR_WHITE; /* Ensure text is visible */
     terminals[slot].used = true;
     
     term_clear(&terminals[slot]);
@@ -885,7 +889,7 @@ void gui_draw_boot_logo(void) {
     /* 2. Draw Logo from File (logo.raw) */
     int img_w = 200;
     int img_h = 200;
-    ui_draw_image("logo.raw", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
+    ui_draw_image("logo.png", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
 
     /* 3. Draw Text (Dark Grey) */
     const char* title = "ETEROS GENESIS";
@@ -1337,26 +1341,26 @@ static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
 static void flux_update_zoom(void) {
     /* Fixed-Point Spring Physics (1000 = 1.0) */
     int target = (target_zoom == FLUX_FOCUS) ? 1000 : 0;
-    int tension = 180; /* Brisk expansion */
-    int friction = 750;
+    int tension = 250; /* Faster snap (was 180) */
+    int friction = 700; /* Less friction (was 750) */
     
     int dist = target - zoom_progress;
     int force = (dist * tension) / 1000;
     
     /* Minimum push to overcome integer division floor */
-    if (dist > 0 && force == 0) force = 1;
-    if (dist < 0 && force == 0) force = -1;
+    if (dist > 0 && force == 0) force = 2;
+    if (dist < 0 && force == 0) force = -2;
 
     zoom_velocity += force;
     zoom_velocity = (zoom_velocity * friction) / 1000;
     zoom_progress += zoom_velocity;
     
-    /* Stronger Snap to avoid getting stuck in current_zoom == -1 */
-    if (target == 1000 && zoom_progress > 980) {
+    /* Stronger Snap */
+    if (target == 1000 && zoom_progress > 950) {
         zoom_progress = 1000;
         zoom_velocity = 0;
     }
-    if (target == 0 && zoom_progress < 20) {
+    if (target == 0 && zoom_progress < 50) {
         zoom_progress = 0;
         zoom_velocity = 0;
     }
@@ -1365,6 +1369,46 @@ static void flux_update_zoom(void) {
     if (zoom_progress == 1000) current_zoom = FLUX_FOCUS;
     else if (zoom_progress == 0) current_zoom = FLUX_MACRO;
     else current_zoom = -1; /* Transitioning */
+}
+
+static rect_t draw_zoom_transition(void) {
+    /* Optimization: Clear only the potential area of the window (Target Rect) */
+    /* This allows us to keep the rest of the screen static (Constellation) */
+    /* and drastically reduces bandwidth by flushing only this area. */
+    
+    /* Clear Maximum Bounds (Target Rect) to Black to erase trails */
+    /* We use a slightly larger area to be safe? No, target_rect is the max size. */
+    /* But if we are shrinking, we start at target_rect and go to source_rect. */
+    /* So wiping target_rect is always safe to clear trails. */
+    
+    /* However, wiping Target Rect (big) every frame is costlier than necessary if small */
+    /* But standard rect fill is very fast. The bottleneck is FLUSH (PCI bus). */
+    /* So we fill big rect, draw small rect, flush big rect. */
+    
+    /* Determine bounds */
+    int bx = (source_rect.x < target_rect.x) ? source_rect.x : target_rect.x;
+    int by = (source_rect.y < target_rect.y) ? source_rect.y : target_rect.y;
+    int bw = (source_rect.w > target_rect.w) ? source_rect.w : target_rect.w;
+    int bh = (source_rect.h > target_rect.h) ? source_rect.h : target_rect.h;
+    
+    /* Align to bounds union */
+    framebuffer_rect(bx, by, bw, bh, 0x000000);
+
+    /* Draw Expanding Card */
+    rect_t r;
+    r.x = source_rect.x + ((target_rect.x - source_rect.x) * zoom_progress) / 1000;
+    r.y = source_rect.y + ((target_rect.y - source_rect.y) * zoom_progress) / 1000;
+    r.w = source_rect.w + ((target_rect.w - source_rect.w) * zoom_progress) / 1000;
+    r.h = source_rect.h + ((target_rect.h - source_rect.h) * zoom_progress) / 1000;
+    
+    framebuffer_rect(r.x, r.y, r.w, r.h, FLUX_CARD_BG);
+    framebuffer_rect(r.x, r.y, r.w, 4, FLUX_ACCENT_CYAN); 
+    
+    if (zoom_progress > 900) {
+         ui_draw_string(NULL, r.x + 20, r.y + 20, "Materializando...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    }
+    
+    return (rect_t){bx, by, bw, bh};
 }
 
 static void draw_generic_app_content(window_t* win, const char* title, uint32_t bg_col) {
@@ -1418,33 +1462,7 @@ static void draw_clock_content(window_t* win) {
     wm_print_at(win, 80, 90, time_str);
 }
 
-static void draw_zoom_transition(void) {
-    /* Draw Constellation Background with optimization: skip heavy constellation if zoom is high */
-    if (zoom_progress < 800) {
-        draw_constellation();
-    } else {
-        framebuffer_clear(0x000000);
-    }
-    
-    /* Draw Expanding Card */
-    /* Interpolate Rect using fixed-point */
-    rect_t r;
-    r.x = source_rect.x + ((target_rect.x - source_rect.x) * zoom_progress) / 1000;
-    r.y = source_rect.y + ((target_rect.y - source_rect.y) * zoom_progress) / 1000;
-    r.w = source_rect.w + ((target_rect.w - source_rect.w) * zoom_progress) / 1000;
-    r.h = source_rect.h + ((target_rect.h - source_rect.h) * zoom_progress) / 1000;
-    
-    /* Draw Card Content Scaled */
-    framebuffer_rect(r.x, r.y, r.w, r.h, FLUX_CARD_BG);
-    framebuffer_rect(r.x, r.y, r.w, 4, FLUX_ACCENT_CYAN); /* Top bar */
-    
-    /* Avoid complex strings during fast transition */
-    if (zoom_progress < 900) {
-        ui_draw_string(NULL, r.x + 20, r.y + 20, "Cargando...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
-    } else {
-        ui_draw_string(NULL, r.x + 20, r.y + 20, "Materializando...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
-    }
-}
+
 
 static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
     mouse_x += dx; mouse_y += dy;
@@ -1463,25 +1481,42 @@ static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
 
 void gui_demo_run(void) {
     serial_write_string("[GUI] Starting GUI...\n");
+    
+    /* Reset state on launch/re-launch */
+    desktop_running = true;
+    serial_write_string("[GUI] Initializing terminals...\n");
+    term_init_all();
 
+    serial_write_string("[GUI] Initializing WM...\n");
     wm_init();
     
-    /* DISABLE DOUBLE BUFFER FOR DEBUGGING */
-    framebuffer_enable_double_buffer();
+    serial_write_string("[GUI] Creating terminal window...\n");
+    term_create(); 
     
+    /* Re-enable Double Buffer for flicker-free rendering */
+    framebuffer_enable_double_buffer();
     
     mouse_set_callback(on_mouse_event);
     
     /* Init Apps */
-    term_init_all();
+    /* term_init_all(); -- Removed duplicate call */
     
     /* Force State */
     current_zoom = FLUX_MACRO;
     target_zoom = FLUX_MACRO;
     zoom_progress = 0;
     
+    /* Initial Draw */
+    serial_write_string("[GUI] Initial Draw...\n");
+    draw_constellation();
+    wm_draw_all();
+    
+    serial_write_string("[GUI] Entering Main Loop...\n");
+    
     desktop_running = true;
     while (desktop_running) {
+        rect_t dirty = {0, 0, 1024, 768};
+
         /* Handle Mouse Click in main thread context */
         if (mouse_clicked) {
             mouse_clicked = false;
@@ -1512,19 +1547,19 @@ void gui_demo_run(void) {
                  /* Infinite Zoom Controls (Arrows) - Only if NOT typing in terminal */
                  bool typing_in_term = (current_zoom == FLUX_FOCUS && focused_term != NULL);
                  
-                 if (!typing_in_term) {
-                     if (c == 72) { /* UP Arrow */
-                         if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
-                             flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL); 
-                             flux_launch_space(NODE_TERMINAL); 
-                         }
-                     }
-                     else if (c == 80) { /* DOWN Arrow */
-                         if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
-                             target_zoom = FLUX_MACRO;
-                         }
-                     }
-                 }
+                  if (!typing_in_term) {
+                      if ((unsigned char)c == KEY_UP) { /* UP Arrow */
+                          if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
+                              flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL); 
+                              flux_launch_space(NODE_TERMINAL); 
+                          }
+                      }
+                      else if ((unsigned char)c == KEY_DOWN) { /* DOWN Arrow */
+                          if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
+                              target_zoom = FLUX_MACRO;
+                          }
+                      }
+                  }
                  
                  /* Pass input to terminal if focused */
                  if (current_zoom == FLUX_FOCUS && focused_term != NULL) {
@@ -1538,33 +1573,20 @@ void gui_demo_run(void) {
         }
         
         /* Capa 0: Deep Void (Premium Dark) */
-        framebuffer_clear(0x000000);
+        
+        if (current_zoom == -1) {
+             /* Transitioning: Clearing is handled inside draw_zoom_transition (localized) */
+        } else {
+             framebuffer_clear(0x000000);
+        }
         
         if (current_zoom == FLUX_MACRO) {
             draw_constellation();
-            
-            /* 9.1 Modelo Cognitivo: Ghost Onboarding */
-            /* If idle for > 3 seconds, show ghost guidance */
-            if (timer_get_ticks() > 300 && current_zoom == FLUX_MACRO) {
-                 /* Simple orbital animation without floats/sin/cos */
-                 int tick = timer_get_ticks();
-                 int ghost_x = 512 + ((tick / 2) % 200) - 100;
-                 int ghost_y = 384 + ((tick / 3) % 100) - 50;
-                 
-                 /* Ghost Cursor (Translucent White Circle equivalent) */
-                 /* Dithered pattern to simulate transparency */
-                 for(int gy=-5; gy<5; gy++) {
-                     for(int gx=-5; gx<5; gx++) {
-                         if ((gx+gy)%2 == 0) framebuffer_putpixel(ghost_x+gx, ghost_y+gy, 0x505050);
-                     }
-                 }
-                 ui_draw_string(NULL, ghost_x + 10, ghost_y, "Explora...", 0x808080, 0x111111);
-            }
         } else if (current_zoom == FLUX_FOCUS) {
             draw_focus_mode();
         } else {
              /* Transitioning */
-             draw_zoom_transition();
+             dirty = draw_zoom_transition();
         }
         
         /* Layer 3: System Notifications (Always on top) */
@@ -1576,27 +1598,42 @@ void gui_demo_run(void) {
         /* Cursor: Neural Orb (Reactive) */
         uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
         
-        /* Glow Effect (Dithered) */
+        /* Glow Effect (Simplified for performance) */
+         /* Only draw glow every other frame or if not moving fast? 
+            Let's keep it but maybe reduce radius if slow */
+            
         int pulse = (timer_get_ticks() / 10) % 4;
-        for (int gy = -8; gy <= 8; gy++) {
-            for (int gx = -8; gx <= 8; gx++) {
-                int dist = (gx*gx) + (gy*gy);
-                if (dist < (32 + pulse)) {
-                    if ((gx + gy + (int)timer_get_ticks()) % 3 == 0) {
-                        framebuffer_putpixel(mouse_x + gx, mouse_y + gy, 0x404040); 
-                    }
+        /* Reduce loop range from -8..8 to -4..4 for speed */
+        for (int gy = -4; gy <= 4; gy++) {
+            for (int gx = -4; gx <= 4; gx++) {
+                if ((gx*gx) + (gy*gy) < (16 + pulse)) {
+                     /* Simple pixel */
+                     framebuffer_putpixel(mouse_x + gx, mouse_y + gy, 0x404040); 
                 }
             }
         }
         
         /* Core Orb */
         framebuffer_rect(mouse_x - 2, mouse_y - 2, 4, 4, cursor_col);
-        framebuffer_rect(mouse_x - 1, mouse_y - 3, 2, 6, cursor_col);
-        framebuffer_rect(mouse_x - 3, mouse_y - 1, 6, 2, cursor_col);
         
-        framebuffer_flush(); 
-        /* Smoother loop: Higher FPS cap (5 ms) */
-        task_sleep(5); 
+        /* Optimization: Flush only dirty regions during transition */
+        if (current_zoom == -1) {
+            /* 1. Flush Animation Area */
+            framebuffer_flush_rect(dirty.x, dirty.y, dirty.w, dirty.h);
+            
+            /* 2. Flush Mouse Area (approx 40x40 around pointer) */
+            int mk_x = mouse_x - 20; if (mk_x < 0) mk_x = 0;
+            int mk_y = mouse_y - 20; if (mk_y < 0) mk_y = 0;
+            framebuffer_flush_rect(mk_x, mk_y, 40, 40);
+            
+            /* 3. Flush Status Bar (Assume top 40px and bottom 40px cover it) */
+            framebuffer_flush_rect(0, 0, 1024, 40);
+            framebuffer_flush_rect(0, 768-40, 1024, 40);
+        } else {
+            framebuffer_flush(); 
+        } 
+        /* Smoother loop: Unlocked framerate (Yield to scheduler) */
+        task_yield(); 
     }
     
     terminal_initialize(NULL);

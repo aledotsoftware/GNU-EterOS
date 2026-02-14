@@ -246,5 +246,42 @@ void* kcalloc(size_t num, size_t size) {
     return ptr;
 }
 
+void* krealloc(void* ptr, size_t size) {
+    if (!ptr) return kmalloc(size);
+    if (size == 0) {
+        kfree(ptr);
+        return NULL;
+    }
+
+    /* Get block header */
+    block_header_t* block = (block_header_t*)((uintptr_t)ptr - sizeof(block_header_t));
+    
+    /* Sanity check */
+    if (block->magic != HEAP_MAGIC) {
+        serial_write_string("[MM] Error: krealloc of invalid address\n");
+        return NULL;
+    }
+
+    /* If current block is large enough, return it (we don't split for now) */
+    /* Alignment is already handled in allocation size, so block->size is usable */
+    if (block->size >= size) {
+        return ptr;
+    }
+
+    /* Allocate new block */
+    void* new_ptr = kmalloc(size);
+    if (!new_ptr) return NULL;
+
+    /* Copy old data */
+    /* We copy only the data we had (block->size) or the new size, whichever is smaller? */
+    /* Since we are expanding, we copy block->size. */
+    memcpy(new_ptr, ptr, block->size);
+
+    /* Free old block */
+    kfree(ptr);
+
+    return new_ptr;
+}
+
 size_t mm_get_total_memory(void) { return memory_total; }
 size_t mm_get_used_memory(void) { return memory_used; }

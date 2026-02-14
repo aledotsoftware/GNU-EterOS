@@ -10,6 +10,9 @@ static uint32_t fb_pitch = 0;
 static uint32_t fb_bpp = 0;
 static uint32_t fb_size_bytes = 0;
 
+/* Cached pointer to current drawing buffer (front or back) */
+static uint32_t* active_buffer = 0;
+
 void framebuffer_init(boot_info_t* info) {
     if (!info || !info->fb_addr) return;
 
@@ -20,6 +23,9 @@ void framebuffer_init(boot_info_t* info) {
     fb_bpp = info->fb_bpp;
     
     fb_size_bytes = fb_height * fb_pitch;
+    
+    /* Default to front buffer */
+    active_buffer = fb_buffer;
 }
 
 uint32_t framebuffer_get_width(void) { return fb_width; }
@@ -35,10 +41,14 @@ void framebuffer_enable_double_buffer(void) {
     
     /* Copiar contenido actual */
     memcpy(back_buffer, fb_buffer, fb_size_bytes);
+    
+    /* Switch drawing to back buffer */
+    active_buffer = back_buffer;
 }
 
 void framebuffer_flush(void) {
     if (back_buffer && fb_buffer) {
+        /* Optimized flush? memcpy is already rep movsq */
         memcpy(fb_buffer, back_buffer, fb_size_bytes);
     }
 }
@@ -65,49 +75,55 @@ void framebuffer_flush_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
 }
 
 void framebuffer_putpixel(uint32_t x, uint32_t y, uint32_t color) {
+    /* Fast path for bounds check removal? No, safety first. */
     if (x >= fb_width || y >= fb_height) return;
     
-    /* Si hay doble buffer, dibujar ahí. Si no, directo a VRAM */
-    uint8_t* buffer_start = (uint8_t*)(back_buffer ? back_buffer : fb_buffer);
-    if (!buffer_start) return;
+    /* Use cached active_buffer */
+    if (!active_buffer) return;
 
-    uint8_t* pixel_addr = buffer_start + (y * fb_pitch) + (x * (fb_bpp / 8));
-
+    /* 32-bit optimization (Most common case) */
     if (fb_bpp == 32) {
-        *(uint32_t*)pixel_addr = color;
+         /* Assumption: fb_pitch is bytes. Pixel address = y*pitch + x*4 */
+         /* Avoid multiplication if possible? No easy way without Y lookup table. */
+         /* Compiler should optimize this multiply-add */
+         uint32_t* pixel = (uint32_t*)((uint8_t*)active_buffer + (y * fb_pitch) + (x * 4));
+         *pixel = color;
     } 
-    else if (fb_bpp == 24) {
-        pixel_addr[0] = (color) & 0xFF;
-        pixel_addr[1] = (color >> 8) & 0xFF;
-        pixel_addr[2] = (color >> 16) & 0xFF;
-    }
-    else if (fb_bpp == 16) {
-        uint8_t r = (color >> 16) & 0xFF;
-        uint8_t g = (color >> 8) & 0xFF;
-        uint8_t b = (color) & 0xFF;
-        uint16_t c = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
-        *(uint16_t*)pixel_addr = c;
+    else {
+        /* Fallback for other depths */
+        uint8_t* pixel_addr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * (fb_bpp / 8));
+        if (fb_bpp == 24) {
+            pixel_addr[0] = (color) & 0xFF;
+            pixel_addr[1] = (color >> 8) & 0xFF;
+            pixel_addr[2] = (color >> 16) & 0xFF;
+        }
+        else if (fb_bpp == 16) {
+            uint8_t r = (color >> 16) & 0xFF;
+            uint8_t g = (color >> 8) & 0xFF;
+            uint8_t b = (color) & 0xFF;
+            uint16_t c = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+            *(uint16_t*)pixel_addr = c;
+        }
     }
 }
 
 extern const uint8_t font8x16[];
 
 void framebuffer_clear(uint32_t color) {
-    uint32_t* target_buffer = back_buffer ? back_buffer : fb_buffer;
-    if (!target_buffer) return;
+    if (!active_buffer) return;
 
     /* Optimización para 32-bit */
     if (fb_bpp == 32) {
         if (fb_pitch == fb_width * 4) {
-            memset32(target_buffer, color, fb_width * fb_height);
+            memset32(active_buffer, color, fb_width * fb_height);
         } else {
             for (uint32_t y = 0; y < fb_height; y++) {
-                uint32_t* row = (uint32_t*)((uint8_t*)target_buffer + (y * fb_pitch));
+                uint32_t* row = (uint32_t*)((uint8_t*)active_buffer + (y * fb_pitch));
                 memset32(row, color, fb_width);
             }
         }
     } else {
-        /* Genérico (lento pero seguro) */
+        /* Genérico */
         for (uint32_t y = 0; y < fb_height; y++) {
             for (uint32_t x = 0; x < fb_width; x++) {
                 framebuffer_putpixel(x, y, color);
@@ -122,13 +138,14 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
     if (x + w > fb_width) w = fb_width - x;
     if (y + h > fb_height) h = fb_height - y;
 
-    uint32_t* target_buffer = back_buffer ? back_buffer : fb_buffer;
-    if (!target_buffer) return;
+    if (!active_buffer) return;
 
     /* Optimized 32-bit path */
     if (fb_bpp == 32) {
         for (uint32_t i = 0; i < h; i++) {
-            uint32_t* row_ptr = (uint32_t*)((uint8_t*)target_buffer + ((y + i) * fb_pitch)) + x;
+            /* Calculate row pointer directly */
+            uint32_t* row_ptr = (uint32_t*)((uint8_t*)active_buffer + ((y + i) * fb_pitch));
+            row_ptr += x; /* Offset x */
             memset32(row_ptr, color, w);
         }
     } else {
@@ -144,22 +161,51 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
 extern const uint8_t font8x16[];
 
 void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t bg) {
-    if (!fb_buffer) return;
+    if (!active_buffer) return;
 
-    /* Usar unsigned char para acceder a los 256 caracteres del font estándar VGA */
+    /* Clip basic check */
+    if (x >= fb_width || y >= fb_height - 16) return;
+
     unsigned char uc = (unsigned char)c;
-
-    /* Puntero al bitmap del caracter (16 bytes por char) */
     const uint8_t* glyph = &font8x16[uc * 16];
 
-    for (int row = 0; row < 16; row++) {
-        uint8_t bits = glyph[row];
-        for (int col = 0; col < 8; col++) {
-            /* Bit 7 es el pixel más a la izquierda */
-            if (bits & (1 << (7 - col))) {
-                framebuffer_putpixel(x + col, y + row, fg);
-            } else {
-                framebuffer_putpixel(x + col, y + row, bg);
+    /* Optimized 32-bit drawing */
+    if (fb_bpp == 32) {
+        for (int row = 0; row < 16; row++) {
+            /* Get pointer to start of row in buffer */
+            uint32_t* row_ptr = (uint32_t*)((uint8_t*)active_buffer + ((y + row) * fb_pitch));
+            row_ptr += x; /* Add X offset */
+            
+            uint8_t bits = glyph[row];
+            
+            /* Unroll loop manually for 8 pixels - massive speedup over loops + checks + calls */
+            /* Bit 7 */
+            *row_ptr++ = (bits & 0x80) ? fg : bg;
+            /* Bit 6 */
+            *row_ptr++ = (bits & 0x40) ? fg : bg;
+            /* Bit 5 */
+            *row_ptr++ = (bits & 0x20) ? fg : bg;
+            /* Bit 4 */
+            *row_ptr++ = (bits & 0x10) ? fg : bg;
+            /* Bit 3 */
+            *row_ptr++ = (bits & 0x08) ? fg : bg;
+            /* Bit 2 */
+            *row_ptr++ = (bits & 0x04) ? fg : bg;
+            /* Bit 1 */
+            *row_ptr++ = (bits & 0x02) ? fg : bg;
+            /* Bit 0 */
+            *row_ptr++ = (bits & 0x01) ? fg : bg;
+        }
+    } else {
+        /* Fallback legacy loop */
+        for (int row = 0; row < 16; row++) {
+            uint8_t bits = glyph[row];
+            for (int col = 0; col < 8; col++) {
+                if (bits & (1 << (7 - col))) {
+                    framebuffer_putpixel(x + col, y + row, fg);
+                } else {
+                    framebuffer_putpixel(x + col, y + row, bg);
+                }
             }
         }
     }

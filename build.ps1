@@ -216,7 +216,8 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\task.c",
     "$KERNEL_DIR\fs\initrd.c",
     "$KERNEL_DIR\fs\vfs.c",
-    "$KERNEL_DIR\ui\image.c"
+    "$KERNEL_DIR\ui\image.c",
+    "$KERNEL_DIR\ui\upng.c"
 )
 
 # Archivos específicos de arquitectura

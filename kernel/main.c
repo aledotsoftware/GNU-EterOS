@@ -196,7 +196,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     while (gui_pid >= 0) {
         task_t* t = task_get_by_id(gui_pid); 
         /* Si la tarea ya no existe o está muerta, salimos del loop */
-        if (!t || t->state == TASK_DEAD) break;
+        if (!t || t->state == TASK_DEAD) {
+            hal_debug_write("[MAIN] GUI Task DEAD or NULL. Exiting loop.\n");
+            break;
+        }
+        // hal_debug_write("[MAIN] GUI running...\n"); /* Uncomment for spam debug */
         task_sleep(200); /* No desperdiciar ciclos */
     }
 
