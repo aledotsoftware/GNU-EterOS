@@ -18,6 +18,7 @@
 #include <shell.h>
 #include <mm.h>
 #include <gui_demo.h>
+#include <fs/initrd.h>
 
 /* Forward declarations for non-HAL kernel services */
 void pmm_init(void);
@@ -83,6 +84,13 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
         /* Heap Manager (Generic) */
         mm_init(boot_info);
+
+        /* ---- 3.5 Inicializar Initrd ---- */
+        #if defined(ARCH_X86_64)
+        if (boot_info && boot_info->initrd_addr != 0) {
+            initrd_init(boot_info->initrd_addr, boot_info->initrd_size);
+        }
+        #endif
     #else
         /* Tier 1 (Microcontroller): Use simple static heap or similar if needed */
         /* For now, assume simple stack usage or static buffers */

@@ -15,11 +15,16 @@
 
 # ---- Configuración de Arquitectura ----
 ARCH ?= x86_64
+AS   ?= nasm
 
 # ---- Directorios ----
+BOOT_DIR    = boot/$(ARCH)
 KERNEL_DIR  = kernel
 INCLUDE_DIR = include
 BUILD_DIR   = build
+
+# ---- Herramientas ----
+OBJCOPY ?= objcopy
 
 # ---- Flags de compilación ----
 ASFLAGS = -f elf64
@@ -62,17 +67,34 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/net/dhcp.c             \
               $(KERNEL_DIR)/net/dhcp_parser.c      \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
-              $(KERNEL_DIR)/apps/gui_demo.c
+              $(KERNEL_DIR)/fs/initrd.c            \
+              $(KERNEL_DIR)/apps/gui_demo.c        \
+              $(KERNEL_DIR)/task.c                 \
+              $(KERNEL_DIR)/ui/primitives.c        \
+              $(KERNEL_DIR)/ui/window.c            \
+              $(KERNEL_DIR)/drivers/video/framebuffer.c \
+              $(KERNEL_DIR)/drivers/video/font.c   \
+              $(KERNEL_DIR)/mm/pmm.c               \
+              $(KERNEL_DIR)/mm/vmm.c               \
+              $(KERNEL_DIR)/drivers/input/mouse.c  \
+              $(KERNEL_DIR)/arch/x86_64/gdt.c
+
+KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
+                  $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
+                  $(KERNEL_DIR)/arch/x86_64/interrupts.asm
 
 # ---- Archivos objeto ----
 # Mapear .c -> .o en el directorio de build
-KERNEL_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_SRCS))
+KERNEL_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_SRCS)) \
+              $(patsubst %.asm,$(BUILD_DIR)/%.o,$(KERNEL_ASM_SRCS))
 
 # ---- Archivos de salida ----
+BOOT_BIN    = $(BUILD_DIR)/boot.bin
 KERNEL_ELF  = $(BUILD_DIR)/kernel.elf
 KERNEL_BIN  = $(BUILD_DIR)/kernel.bin
 OS_IMAGE    = $(BUILD_DIR)/eteros.img
-
+INITRD_IMG  = $(BUILD_DIR)/initrd.img
+INITRD_DIR  = initrd_root
 
 # =============================================================================
 # Targets
@@ -113,6 +135,8 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/pci
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/mm
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/fs
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/ui
 
 # ---- Bootloader (Solo x86_64) ----
 boot: dirs $(BOOT_BIN)
@@ -120,7 +144,7 @@ boot: dirs $(BOOT_BIN)
 $(BOOT_BIN): $(BOOT_SRC)
 ifeq ($(ARCH), x86_64)
 	@echo "[ASM]  $<"
-	$(AS) -f bin $< -o $@
+	nasm -f bin $< -o $@
 else
 	@echo "[SKIP] Bootloader no necesario para $(ARCH) (o no implementado)"
 endif
@@ -133,6 +157,11 @@ $(BUILD_DIR)/%.o: %.c
 	@echo "[CC]   $<"
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Compilar archivos .asm a .o (Kernel)
+$(BUILD_DIR)/%.o: %.asm
+	@echo "[ASM]  $<"
+	nasm -f elf64 $< -o $@
+
 # Enlazar objetos en un ELF, luego extraer binario plano
 $(KERNEL_BIN): $(KERNEL_OBJS)
 	@echo "[LD]   Enlazando kernel..."
@@ -141,8 +170,16 @@ $(KERNEL_BIN): $(KERNEL_OBJS)
 	$(OBJCOPY) -O binary $(KERNEL_ELF) $(KERNEL_BIN)
 	@echo "[INFO] Tamaño del kernel: $$(wc -c < $(KERNEL_BIN)) bytes"
 
+# ---- Initrd ----
+initrd: $(INITRD_IMG)
+
+$(INITRD_IMG):
+	@echo "[INITRD] Generando initrd..."
+	@mkdir -p $(INITRD_DIR)
+	./tools/mkinitrd.py $(INITRD_DIR) $(INITRD_IMG)
+
 # ---- Imagen de disco ----
-image: boot kernel
+image: boot kernel initrd
 ifeq ($(ARCH), x86_64)
 	@echo "[IMG]  Generando imagen de disco..."
 	@# Crear imagen vacía de 1.44 MB (formato floppy)
@@ -150,8 +187,10 @@ ifeq ($(ARCH), x86_64)
 	@# Escribir bootloader completo (Stage 1 + Stage 2)
 	dd if=$(BOOT_BIN) of=$(OS_IMAGE) bs=512 conv=notrunc 2>/dev/null
 	@# Escribir kernel después del bootloader
-	@# Stage 1 = 1 sector, Stage 2 = 8 sectores, kernel va en sector 9
-	dd if=$(KERNEL_BIN) of=$(OS_IMAGE) bs=512 seek=9 conv=notrunc 2>/dev/null
+	@# Stage 1 = 1 sector, Stage 2 = 16 sectores, kernel va en sector 17 (0-indexed seek)
+	dd if=$(KERNEL_BIN) of=$(OS_IMAGE) bs=512 seek=17 conv=notrunc 2>/dev/null
+	@# Escribir Initrd después del kernel (Sector 17 + 256 = 273)
+	dd if=$(INITRD_IMG) of=$(OS_IMAGE) bs=512 seek=273 conv=notrunc 2>/dev/null
 	@echo "[IMG]  Imagen generada: $(OS_IMAGE) ($$(wc -c < $(OS_IMAGE)) bytes)"
 else
 	@echo "[IMG]  Generación de imagen para $(ARCH) no implementada."

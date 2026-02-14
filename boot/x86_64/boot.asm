@@ -23,7 +23,7 @@
 STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
 STAGE2_SECTORS      equ 16             ; Sectores de Stage 2 (8 KB)
 KERNEL_LOAD_ADDR    equ 0x10000         ; Dirección donde se carga el kernel
-KERNEL_SECTORS      equ 128            ; Sectores del kernel (64 KB)
+KERNEL_SECTORS      equ 256            ; Sectores del kernel (128 KB)
 STACK_TOP           equ 0x7C00          ; El stack crece hacia abajo
 
 ; =============================================================================
@@ -162,6 +162,9 @@ stage2_start:
     ; ---- Detectar Mapa de Memoria (E820) ----
     call detect_memory
 
+    ; ---- Cargar Initrd ----
+    call load_initrd
+
     ; ---- Configurar Video (VBE) ----
     call setup_vbe
 
@@ -277,6 +280,82 @@ detect_memory:
     ret
 
 ; -----------------------------------------------------------------------------
+; load_initrd: Carga el Initrd desde disco
+; -----------------------------------------------------------------------------
+INITRD_LOAD_ADDR    equ 0x40000
+INITRD_SECTORS      equ 64
+INITRD_START_LBA    equ 1 + STAGE2_SECTORS + KERNEL_SECTORS
+
+load_initrd:
+    mov si, s2_msg_initrd
+    call print_16
+
+    ; Leer sectores del Initrd
+    mov eax, INITRD_START_LBA       ; LBA Inicio
+    mov ecx, INITRD_SECTORS         ; Cantidad de sectores
+    mov edi, INITRD_LOAD_ADDR       ; Destino (Linear Addr)
+
+    call read_sectors_lba
+    ret
+
+; -----------------------------------------------------------------------------
+; read_sectors_lba: Lee sectores usando conversión LBA -> CHS
+;   EAX = Start LBA
+;   CX  = Count (max 64KB total read due to segment limits if not careful, but loop handles 512b steps)
+;   EDI = Destination Linear Address
+; -----------------------------------------------------------------------------
+read_sectors_lba:
+.loop:
+    push eax
+    push cx
+    push edi
+
+    ; LBA to CHS (Floppy 1.44MB: 18 SPT, 2 Heads)
+    xor edx, edx
+    mov ecx, 18
+    div ecx             ; EAX = LBA / 18, EDX = LBA % 18
+
+    inc edx             ; Sector (1-based)
+    mov cl, dl          ; CL = Sector
+
+    xor edx, edx
+    mov ebx, 2
+    div ebx             ; EAX = Cylinder, EDX = Head
+
+    mov ch, al          ; CH = Cylinder
+    mov dh, dl          ; DH = Head
+    mov dl, [boot_drive]; DL = Drive
+
+    ; Destination Address Conversion (Linear -> Seg:Off)
+    mov ebx, [esp]      ; Get EDI (saved on stack)
+    mov eax, ebx
+    shr eax, 4
+    mov es, ax          ; ES = EDI >> 4
+    and ebx, 0xF        ; BX = EDI & 0xF
+
+    mov ah, 0x02
+    mov al, 1           ; Read 1 sector
+    int 0x13
+    jc .disk_error
+
+    pop edi
+    pop cx
+    pop eax
+
+    inc eax             ; Next LBA
+    add edi, 512        ; Next Dest
+    dec cx
+    jnz .loop
+
+    ret
+
+.disk_error:
+    mov si, msg_disk_err ; Reusamos mensaje de Stage 1
+    call print_16
+    cli
+    hlt
+
+; -----------------------------------------------------------------------------
 ; setup_vbe: Configura el modo de video VESA (1024x768x32)
 ;   Usa 0xA000 para BootInfo struct
 ;   Usa 0xB000 para buffers temporales de VBE Mode Info Block
@@ -347,6 +426,11 @@ setup_vbe:
     movzx eax, al
     mov [di + 36], eax                  ; BPP
 
+    ; Initrd Info
+    mov dword [di + 40], INITRD_LOAD_ADDR
+    mov dword [di + 44], 0
+    mov dword [di + 48], (INITRD_SECTORS * 512)
+
     ret
 
 .vbe_fail:
@@ -372,6 +456,7 @@ s2_msg_no_lm:   db '  ERROR: CPU sin Long Mode!', 13, 10, 0
 s2_msg_pmode:   db '  Entrando en Modo Protegido...', 13, 10, 0
 s2_msg_mem_ok:  db '  Memoria detectada (E820)', 13, 10, 0
 s2_msg_mem_err: db '  ERROR: Fallo al detectar memoria!', 13, 10, 0
+s2_msg_initrd:  db '  Cargando Initrd...', 13, 10, 0
 s2_msg_vbe_init:db '  Configurando VBE 1024x768...', 13, 10, 0
 s2_msg_vbe_err: db '  ERROR: VBE Init Failed!', 13, 10, 0
 
