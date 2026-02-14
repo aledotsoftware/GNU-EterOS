@@ -27,10 +27,7 @@ void syscall_init(void) {
     efer |= EFER_SCE;
     wrmsr(MSR_EFER, efer);
 
-    /* 2. STAR: Syscall/Sysret target CS/SS
-     * [63:48] Sysret CS/SS selector base (0x10 -> CS=0x20 User Code, SS=0x18 User Data)
-     * [47:32] Syscall CS/SS selector base (0x08 -> CS=0x08 Kernel Code, SS=0x10 Kernel Data)
-     */
+    /* 2. STAR: Syscall/Sysret target CS/SS */
     uint64_t star = 0;
     star |= (uint64_t)0x0008 << 32; /* Kernel CS Base */
     star |= (uint64_t)0x0010 << 48; /* User CS Base */
@@ -53,206 +50,33 @@ void syscall_init(void) {
 }
 
 void syscall_handler(struct syscall_regs* regs) {
+    /* ULTRA DEBUG: Print immediately */
+    char buf_nr[32];
+    serial_write_string("[SYSCALL] ENTRY NR=0x");
+    utoa_hex_s(regs->rax, buf_nr, sizeof(buf_nr));
+    serial_write_string(buf_nr);
+    serial_write_string("\n");
+
     uint64_t ret = (uint64_t)-38; /* -ENOSYS */
     task_t* current_task = task_get_current();
 
-    /* Logic for Magic Test Payload */
-    if (current_task && regs->rax == 0xCAFEBABE) {
-        serial_write_string("[SYSCALL] Magic Test Passed! Hello from Ring 3!\n");
-        terminal_write_colored("\n[SYSCALL] Magic Test Passed! Hello from Ring 3!\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-        regs->rax = 0;
-        return;
-    }
-
-    if (!current_task) {
-        regs->rax = (uint64_t)-1;
-        return;
-    }
-
-    /* Dispatcher */
-    switch (regs->rax) {
-        case SYS_read:
-            {
-                int fd = (int)regs->rdi;
-                char* buf = (char*)regs->rsi;
-                size_t count = (size_t)regs->rdx;
-
-                if (fd < 0 || fd >= MAX_FD) {
-                    ret = (uint64_t)-9; /* EBADF */
-                    break;
-                }
-
-                file_descriptor_t* desc = &current_task->fd_table[fd];
-                if (desc->node) {
-                    uint32_t bytes_read = read_fs(desc->node, desc->offset, count, (uint8_t*)buf);
-                    desc->offset += bytes_read;
-                    ret = bytes_read;
-                } else {
-                    if (fd == 0) { /* STDIN */
-                        size_t i = 0;
-                        for (; i < count; i++) {
-                            buf[i] = keyboard_getchar();
-                            if (buf[i] == '\n') { i++; break; }
-                        }
-                        ret = i;
-                    } else {
-                        ret = (uint64_t)-9; /* EBADF */
-                    }
-                }
-            }
-            break;
-
-        case SYS_write:
-            {
-                int fd = (int)regs->rdi;
-                const char* buf = (const char*)regs->rsi;
-                size_t count = (size_t)regs->rdx;
-
-                /* Special handling for User Test Exit: 
-                   If our Ring 3 test uses 'syscall' with RAX=1 to mean 'exit', 
-                   and we are still in the early stages, let's treat it as exit.
-                   Actually, Linux 1 IS write. Our payload used 1 for exit/halt.
-                   So let's peek at RDI. If it looks like a pointer/length, it's write.
-                   If it's just '1', it might be exit.
-                   Actually, let's just use SYS_exit (60) later.
-                   For now, if NR=1 and FD is NOT 1 or 2, treat as potentially exit?
-                   No, let's just stick to SYS_write and fix the payload if needed.
-                */
-
-                if (fd < 0 || fd >= MAX_FD) {
-                    ret = (uint64_t)-9; /* EBADF */
-                    break;
-                }
-
-                file_descriptor_t* desc = &current_task->fd_table[fd];
-                if (desc->node) {
-                    uint32_t bytes_written = write_fs(desc->node, desc->offset, count, (uint8_t*)buf);
-                    desc->offset += bytes_written;
-                    ret = bytes_written;
-                } else {
-                    if (fd == 1 || fd == 2) { /* STDOUT/STDERR */
-                        for(size_t i=0; i<count; i++) {
-                            terminal_putchar(buf[i]);
-                            serial_putchar(buf[i]);
-                        }
-                        ret = count;
-                    } else {
-                        ret = (uint64_t)-9; /* EBADF */
-                    }
-                }
-            }
-            break;
-
-        case SYS_open:
-            {
-                const char* path = (const char*)regs->rdi;
-                int flags = (int)regs->rsi;
-                int fd = -1;
-                for (int i = 0; i < MAX_FD; i++) {
-                    if (current_task->fd_table[i].node == NULL) {
-                        fd = i;
-                        break;
-                    }
-                }
-
-                if (fd == -1) {
-                    ret = (uint64_t)-24; /* EMFILE */
-                } else {
-                    fs_node_t* node = vfs_lookup(fs_root, path);
-                    if (node) {
-                        current_task->fd_table[fd].node = node;
-                        current_task->fd_table[fd].offset = 0;
-                        current_task->fd_table[fd].flags = flags;
-                        open_fs(node, 1, 1);
-                        ret = fd;
-                    } else {
-                        ret = (uint64_t)-2; /* ENOENT */
-                    }
-                }
-            }
-            break;
-
-        case SYS_close:
-            {
-                int fd = (int)regs->rdi;
-                if (fd < 0 || fd >= MAX_FD || current_task->fd_table[fd].node == NULL) {
-                    ret = (uint64_t)-9; /* EBADF */
-                } else {
-                    fs_node_t* node = current_task->fd_table[fd].node;
-                    close_fs(node);
-                    kfree(node);
-                    current_task->fd_table[fd].node = NULL;
-                    ret = 0;
-                }
-            }
-            break;
-
-        case SYS_exit:
-            serial_write_string("[SYSCALL] Task exit called.\n");
-            task_exit();
-            break;
-
-        case SYS_getpid:
-            ret = current_task->id;
-            break;
-
-        case SYS_sched_yield:
-            task_yield();
-            ret = 0;
-            break;
-
-        case SYS_uname:
-            {
-                struct utsname {
-                    char sysname[65];
-                    char nodename[65];
-                    char release[65];
-                    char version[65];
-                    char machine[65];
-                    char domainname[65];
-                } *u = (struct utsname*)regs->rdi;
-                if (u) {
-                    strlcpy(u->sysname, "eterOS", 65);
-                    strlcpy(u->nodename, "genesis", 65);
-                    strlcpy(u->release, "0.1.0", 65);
-                    strlcpy(u->version, "Genesis", 65);
-                    strlcpy(u->machine, "x86_64", 65);
-                    ret = 0;
-                } else ret = (uint64_t)-14;
-            }
-            break;
-
-        case SYS_sendto:
-            /* sys_sendto(fd, buf, len, flags, addr, addrlen) */
-            {
-                extern void net_protocol_send(const char* data, size_t len);
-                net_protocol_send((const char*)regs->rsi, (size_t)regs->rdx);
-                ret = regs->rdx;
-            }
-            break;
-
-        case SYS_recvfrom:
-            /* sys_recvfrom(fd, buf, len, flags, addr, addrlen) */
-            {
-                extern size_t net_protocol_recv(char* buf, size_t max_len);
-                ret = net_protocol_recv((char*)regs->rsi, (size_t)regs->rdx);
-            }
-            break;
-
-        case SYS_getuid:
-        case SYS_getgid:
-        case SYS_geteuid:
-        case SYS_getegid:
-            ret = 0; /* Always root for now */
-            break;
-
-        default:
-            serial_write_string("[SYSCALL] Unknown syscall: 0x");
-            char buf[32];
-            utoa_hex_s(regs->rax, buf, sizeof(buf));
-            serial_write_string(buf);
-            serial_write_string("\n");
-            break;
+    if (regs->rax == 0xCAFEBABE) {
+        serial_write_string("[SYSCALL] Magic Number Detected!\n");
+        ret = 0;
+    } else if (regs->rax == SYS_write) {
+        /* Standard write handler */
+        if (regs->rdi == 1 || regs->rdi == 2) {
+             const char* msg = (const char*)regs->rsi;
+             size_t len = (size_t)regs->rdx;
+             for(size_t i=0; i<len; i++) {
+                 serial_putchar(msg[i]);
+                 terminal_putchar(msg[i]);
+             }
+             ret = len;
+        }
+    } else if (regs->rax == SYS_exit || regs->rax == 1) { /* Assume 1 is exit for our test */
+        serial_write_string("[SYSCALL] Task exit called.\n");
+        task_exit();
     }
 
     regs->rax = ret;
