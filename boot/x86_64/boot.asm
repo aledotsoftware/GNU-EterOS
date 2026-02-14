@@ -619,13 +619,13 @@ setup_page_tables:
 
     ; 2. Configurar PML4[0] → PDPT
     mov eax, PAGE_TABLE_ADDR + 0x1000   ; Dirección de PDPT
-    or eax, 0x03                        ; Present + Writable
+    or eax, 0x07                        ; Present + Writable + USER
     mov [PAGE_TABLE_ADDR], eax
 
     ; 3. Configurar PDPT[0..3] → PD0..PD3 (Mapear 4GB)
     mov edi, PAGE_TABLE_ADDR + 0x1000   ; PDPT Base
     mov eax, PAGE_TABLE_ADDR + 0x2000   ; Base del primer PD
-    or eax, 0x03                        ; Present + RW
+    or eax, 0x07                        ; Present + RW + USER
     mov ecx, 4                          ; 4 PDs para cubrir 4GB
 .loop_pdpt:
     mov [edi], eax
