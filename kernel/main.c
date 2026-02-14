@@ -59,6 +59,10 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("\n");
     hal_debug_write("[eterOS] HAL Inicializada.\n");
 
+    /* ---- 1.5 Mostrar Logo de Arranque ---- */
+    /* Mostramos el logo de eterOS mientras cargamos el resto */
+    gui_draw_boot_logo();
+
     /* ---- 2. Obtener Info del Bootloader (si aplica) ---- */
     /* En x86, esto está en 0xA000. En ARM, puede ser NULL o DTB. */
     #if defined(ARCH_X86_64)
