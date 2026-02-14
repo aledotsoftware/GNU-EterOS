@@ -33,6 +33,9 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 ## 📂 Estructura del Proyecto
 
 ```
+## 📂 Estructura del Proyecto
+
+```
 éterOS/
 ├── boot/                       # El despertar del metal (Bootloader)
 │   └── x86_64/
@@ -47,34 +50,45 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 │   │   │   ├── idt.c           # IDT + ISRs (256 vectores)
 │   │   │   ├── gdt.c           # GDT + TSS (64-bit)
 │   │   │   ├── pic.c           # PIC 8259 remapeado
+│   │   │   ├── syscall.c       # Syscalls (MSRs, STAR, LSTAR)
 │   │   │   └── interrupts.asm  # Stubs de interrupción ASM
-│   │   ├── aarch64/            # 🔜 Planificado (RPi, phones, satélites)
-│   │   ├── arm-cortex-m/       # 🔜 Planificado (STM32, Pico, IoT)
-│   │   ├── riscv64/            # 🔜 Planificado (SiFive, StarFive)
-│   │   └── xtensa/             # 🔜 Planificado (ESP32)
+│   │   ├── aarch64/            # � En Desarrollo (RPi, phones, satélites)
+│   │   ├── arm-cortex-m/       # � En Desarrollo (STM32, Pico, IoT)
+│   │   ├── riscv64/            # ⚠️ Implementación Preliminar (HAL, UART, PLIC, SBI)
+│   │   └── xtensa/             # � En Desarrollo (ESP32)
 │   ├── mm/                     # Gestión de Memoria
 │   │   ├── pmm.c               # Physical Memory Manager (bitmap, E820)
 │   │   ├── vmm.c               # Virtual Memory Manager (4-Level Paging)
 │   │   └── heap.c              # Heap dinámico (kmalloc/kfree/kcalloc)
 │   ├── task.c                  # Scheduler Round-Robin (Multitarea)
+│   ├── fs/                     # Sistema de Archivos Virtual (VFS)
+│   │   ├── vfs.c               # Capa de abstracción (read/write/open/close)
+│   │   ├── fat32.c             # Driver FAT32 (Lectura de archivos/dir)
+│   │   └── initrd.c            # Initial Ramdisk (Carga de assets en boot)
 │   ├── drivers/                # El sistema sensorial
 │   │   ├── video/              # Drivers de Video
 │   │   │   ├── vga.c           # Modo Texto Legacy
 │   │   │   ├── framebuffer.c   # Linear Framebuffer (GOP/VBE)
 │   │   │   └── font.c          # Fuente Bitmap 8x16
 │   │   ├── serial/serial.c     # UART 16550 para depuración
-│   │   ├── input/keyboard.c    # Teclado PS/2 (Set 1 + Extended, IRQ1)
+│   │   ├── input/              # Dispositivos de Entrada
+│   │   │   ├── keyboard.c      # Teclado PS/2 (Set 1 + Extended)
+│   │   │   └── mouse.c         # Mouse PS/2 (Packet parsing básico)
 │   │   ├── timer/pit.c         # PIT 8254 @ 100 Hz (uptime, delays)
+│   │   ├── rtc/rtc.c           # Real Time Clock (CMOS)
+│   │   ├── pci/pci.c           # Bus PCI (Escaneo y detección)
 │   │   └── net/e1000.c         # Intel PRO/1000 NIC driver
 │   ├── ui/                     # AetherGraphics (GUI System)
 │   │   ├── window.c            # Window Manager & Compositor
 │   │   └── primitives.c        # Primitivas de dibujo 2D
 │   ├── net/                    # Stack de Red
-│   │   └── dhcp.c              # Cliente DHCP (Discover/Offer)
+│   │   ├── dhcp.c              # Cliente DHCP (Discover/Offer)
+│   │   └── lwip_port/          # Port del stack lwIP (TCP/IP) - En progreso
 │   └── apps/                   # Aplicaciones del kernel
 │       ├── santitravel.c       # Juego de texto (aventuras)
 │       ├── sysmon.c            # Monitor del sistema
-│       └── gui_demo.c          # Flux UI Demo (Multitarea gráfica)
+│       ├── gui_demo.c          # Flux UI Demo (Multitarea gráfica)
+│       └── wget.c              # Downloader de archivos
 ├── include/                    # API del sistema
 │   ├── hal.h                   # 🌍 HAL universal (interfaz multi-arch)
 │   ├── types.h                 # Tipos freestanding
@@ -85,6 +99,13 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 │   ├── pci.h                   # Escaneo de bus PCI
 │   ├── vga.h / serial.h        # Video y debug
 │   └── io.h / string.h         # I/O y utilidades
+├── tools/                      # Herramientas de soporte
+│   ├── gen_logo.py             # Generador de bitmaps para boot
+│   └── mkinitrd.py             # Creador de imágenes Initrd
+├── tests/                      # Suite de pruebas unitarias
+│   ├── test_fat32.c            # Test de lectura FAT32
+│   ├── test_heap.c             # Stress handling del Heap
+│   └── ...                     # Tests de syscalls, pci, dhcp...
 ├── scripts/                    # Herramientas de despliegue
 │   ├── setup_wsl.sh            # Setup para WSL2
 │   ├── setup_windows.ps1       # Setup para Windows nativo
@@ -165,6 +186,8 @@ Dirección       | Contenido
 - [x] **Driver de Video VBE/GOP:** Framebuffer de alta resolución (Linear Framebuffer)
 - [x] **Terminal Gráfica:** Logger en pantalla usando Framebuffer (sysmon, panics)
 - [x] **Mouse PS/2:** Soporte básico para puntero en pantalla (drivers/input/mouse.c)
+- [x] **Bus PCI:** Enumeración de dispositivos y lectura de configuración.
+- [x] **RTC (Real Time Clock):** Lectura de tiempo CMOS.
 
 ### Fase 2.5: Compatibilidad de Arranque (Boot Compatibility) ✅
 - [x] **PXE Boot (Network):** Soporte para arranque sin disco via TFTP (SiS191/Universal PXE)
@@ -174,20 +197,37 @@ Dirección       | Contenido
 ### Fase 3: Kernel Moderno y Multitarea
 - [x] **Heap Manager:** `kmalloc()`, `kfree()`, `kcalloc()` para el kernel (completado en Fase 1)
 - [x] **Scheduler Round-Robin:** Multitarea preemptiva (comandos `ps`, `kill`, `demo`) - `kernel/task.c`
-- [ ] **VFS (Virtual File System):** Abstracción de sistemas de archivos
+- [x] **VFS (Virtual File System):** Abstracción de sistemas de archivos (`kernel/fs/vfs.c`) - *Implementación básica*
 - [x] **Initrd:** Carga de módulos y assets (Completado en Fase 2.5)
 
 ### Fase 3.5: Networking & Storage
 - [x] **Driver NIC:** Intel PRO/1000 (e1000) con detección PCI y MAC
 - [x] **Cliente DHCP:** Discover/Offer para obtención de IP
-- [ ] **Integración lwIP:** Stack TCP/IP ligero para networking completo
-- [ ] **Soporte FAT32:** Lectura básica de archivos
+- [~] **Integración lwIP:** Stack TCP/IP completo (Porting layer en progreso en `kernel/net/lwip_port`)
+- [x] **Soporte FAT32:** Lectura de archivos y directorios con soporte 8.3.
+- [x] **Wget:** Downloader HTTP básico (`kernel/apps/wget.c`).
 
-sistema de actualizaciones?
+### Fase 3.6: Infraestructura de Actualización y Red
+*Objetivo: Integrar el sistema de actualizaciones OTA (Over-the-Air) en éterOS, centrándose en la infraestructura de red básica y la persistencia atómica.*
+
+Para que el sistema sea considerado "listo para producción", el flujo de actualización debe incluir validación en el VFS (entorno "shadow"), seguridad de firma (Ed25519) y manejo de errores con rollback automático.
+
+- [ ] **Stack de Red Minimalista (TCP/IP):** Implementación de sockets básicos en el kernel o vía driver para permitir la comunicación con el servidor FTP.
+  - *Archivos:* `kernel/net/tcp.c`, `kernel/net/stack.c`
+- [ ] **Módulo de Criptografía (Ed25519/SHA-256):** Integración de funciones de hashing y verificación de firmas dentro del kernel para validar componentes antes de la ejecución.
+  - *Archivos:* `kernel/crypto/sha256.c`, `kernel/crypto/ed25519.c`
+- [ ] **Driver de Almacenamiento con Soporte A/B:** Lógica de particionado que permita al VFS identificar y escribir en la partición "pasiva" sin desmontar la "activa".
+  - *Archivo:* `kernel/drivers/disk/partition.c`
+- [ ] **Sistema de Commits Atómicos:** Implementación de un flag en el sector de booteo o NVRAM que determine qué partición es la principal.
+  - *Archivo:* `kernel/arch/x64/boot/nvram.c`
+- [ ] **Implementación de Build Update (Toolchain):** Script externo que automatiza el empaquetado `.zst`, firma el manifiesto y realiza la carga vía FTP de forma estructurada.
+  - *Archivo:* `tools/updater/build_update.sh`
+
+
 
 ### Fase 4: Espacio de Usuario (Userland)
-- [ ] **Context Switching:** Transición Ring 0 → Ring 3
-- [ ] **Syscalls (SYSCALL/SYSRET):** Instrucciones nativas x86_64 (no `int 0x80`)
+- [x] **Context Switching:** Transición Ring 0 → Ring 3 (`iretq`)
+- [~] **Syscalls (SYSCALL/SYSRET):** Instrucciones nativas x86_64 habilitadas, handler inicial implementado.
 - [ ] **Memoria de Usuario:** Separación de espacio kernel/usuario
 - [ ] **Cargador ELF64:** Cargar y ejecutar binarios externos
 - [ ] **Multiprocesamiento (fork/clone):** Duplicar procesos para paralelismo
@@ -204,6 +244,7 @@ sistema de actualizaciones?
 - [ ] **Event Loop:** Sistema de mensajes (mouse, teclado → ventanas)
 - [x] **Gestor de Ventanas (Compositor):** Superposición de ventanas con foco (Flux UI - `kernel/ui/window.c`)
 - [x] **Primera App:** Flux UI Demo (gui_demo.c) con multitarea visual
+- [ ] **Widgets Basicos:** Botones, Inputs, Labels.
 
 ### Fase 5.5: Subsistema de Compatibilidad Linux (Aether-Linux-Subsystem)
 *Objetivo: Ejecutar binarios ELF de Linux sin máquinas virtuales.*
@@ -230,7 +271,7 @@ sistema de actualizaciones?
 
 ### Fase 5.10: Subsistema de Compatibilidad Web (Aether-Web)
 - [ ] **Chromium Embedded:** Port nativo del motor Blink.
-- [ ] **PWA Runtime:** Ejecución de aplicaciones web como nativas (.crx, .wbn).
+- [ ] **PWA Runtime:** Ejecución de aplicaciones web como nativas (.crx, .wbn o pwa online).
 
 
 

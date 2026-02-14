@@ -69,8 +69,44 @@ typedef enum {
     NODE_SETTINGS,
     NODE_FILES,
     NODE_SANTITRAVEL,
+    /* Nuevas Apps */
+    NODE_CALC,
+    NODE_EDITOR,
+    NODE_CLOCK,
+    NODE_WEATHER,
+    NODE_PAINT,
+    NODE_MUSIC,
+    NODE_GALLERY,
+    NODE_BROWSER,
+    NODE_CALENDAR,
+    NODE_PONG,
     NODE_COUNT
 } flux_node_id_t;
+
+typedef struct {
+    flux_node_id_t id;
+    const char* title;
+    uint32_t color;
+} flux_app_meta_t;
+
+static const flux_app_meta_t FLUX_APPS[] = {
+    { NODE_TERMINAL, "Terminal",     FLUX_ACCENT_CYAN },
+    { NODE_SYSMON,   "Monitor",      FLUX_ACCENT_VIOLET },
+    { NODE_MATRIX,   "The Matrix",   0x00FF00 },
+    { NODE_SETTINGS, "Ajustes",      FLUX_TEXT_SECONDARY },
+    { NODE_FILES,    "Archivos",     FLUX_ACCENT_AMBER },
+    { NODE_SANTITRAVEL,"Viajes",     0xFF5555 },
+    { NODE_CALC,     "Calc",         0x4488FF },
+    { NODE_EDITOR,   "Notas",        0xFFDD44 },
+    { NODE_CLOCK,    "Reloj",        0xAAFFEE },
+    { NODE_WEATHER,  "Clima",        0x88CCFF },
+    { NODE_PAINT,    "Lienzo",       0xFF00FF },
+    { NODE_MUSIC,    "Musica",       0xFF4488 },
+    { NODE_GALLERY,  "Galeria",      0xAADD55 },
+    { NODE_BROWSER,  "Navegador",    0x44FFFF },
+    { NODE_CALENDAR, "Calendario",   0xDDAA55 },
+    { NODE_PONG,     "Pong",         0xFFFFFF }
+};
 
 
 /* Forward declarations */
@@ -78,8 +114,17 @@ static void flux_notify(const char* title, const char* message, uint32_t accent)
 static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node);
 static void flux_launch_space(flux_node_id_t node);
 
+/* Helper Draw Functions */
+static void draw_generic_app_content(window_t* win, const char* title, uint32_t bg_col);
+static void draw_pong_content(window_t* win);
+static void draw_clock_content(window_t* win);
+
 /* Animation State Forward Decl (needed for input handling) */
-static flux_zoom_level_t target_zoom; 
+static int zoom_progress = 0; 
+static flux_zoom_level_t target_zoom = FLUX_MACRO;
+static flux_node_id_t zooming_node = NODE_TERMINAL;
+static rect_t source_rect = {0,0,0,0}; /* Constellation rect */
+static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */ 
 
 
 /* ========================================================================= */
@@ -828,18 +873,6 @@ static void draw_santitravel_preview(int x, int y, int w, int h) {
     ui_draw_string(NULL, x + 20 + tick, start_y + 30, ">-o-o", 0xFFFFFF, FLUX_CARD_BG);
 }
 
-static void draw_circle(int cx, int cy, int r, uint32_t color) {
-    for (int y = -r; y <= r; y++) {
-        for (int x = -r; x <= r; x++) {
-            if (x*x + y*y <= r*r) {
-                if (cx + x >= 0 && cy + y >= 0) {
-                    framebuffer_putpixel(cx + x, cy + y, color);
-                }
-            }
-        }
-    }
-}
-
 void gui_draw_boot_logo(void) {
     uint32_t sw = framebuffer_get_width();
     uint32_t sh = framebuffer_get_height();
@@ -1037,6 +1070,11 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         draw_files_preview(draw_x, draw_y, w, h);
     } else if (node == NODE_SANTITRAVEL) {
         draw_santitravel_preview(draw_x, draw_y, w, h);
+    } else {
+        /* Generic Preview for new apps */
+        wm_fill_rect(NULL, (rect_t){draw_x+10, draw_y+40, w-20, h-50}, 0x111111);
+        /* Draw big initial? For now just color block */
+        framebuffer_rect(icon_cx-20, icon_cy-20, 40, 40, accent);
     }
     
     /* Active Border (Glow effect on hover) */
@@ -1052,6 +1090,7 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
 static void flux_launch_space(flux_node_id_t node) {
     /* Trigger Animation */
     flux_set_zoom(FLUX_FOCUS, node);
+    zooming_node = node;
     // current_zoom = FLUX_FOCUS; /* Removed to allow animation to finish */
     
     /* Trigger Contextual Notification */
@@ -1120,28 +1159,29 @@ static void draw_constellation(void) {
     ui_draw_string(NULL, 50, 50, "CONSTELACION", FLUX_TEXT_SECONDARY, 0x000000);
     
     /* Grid de Nodos Centrada */
-    int card_w = 200;
-    int card_h = 240;
-    int gap = 40;
+    /* Grid de Nodos Dynamic 4x4 */
+    int card_w = 180;
+    int card_h = 140;
+    int gap_x = 30;
+    int gap_y = 30;
     
-    int total_w = (card_w * 3) + (gap * 2);
+    int total_w = (card_w * 4) + (gap_x * 3);
     int start_x = (int)screen_w - total_w; 
     start_x /= 2;
-    if (start_x < 20) start_x = 20; 
+    int start_y = 120;
     
-    int start_y = 200;
-    if (screen_h < 600) start_y = 100; 
-    
-    /* Row 1: Term, Sys, Files */
-    flux_draw_card(start_x, start_y, card_w, card_h, "TERMINAL", FLUX_ACCENT_CYAN, NODE_TERMINAL);
-    flux_draw_card(start_x + card_w + gap, start_y, card_w, card_h, "SYSTEM", FLUX_ACCENT_AMBER, NODE_SYSMON);
-    flux_draw_card(start_x + (card_w + gap)*2, start_y, card_w, card_h, "FILES", FLUX_ACCENT_AMBER, NODE_FILES);
-    
-    /* Row 2: Matrix, Settings, SantiTravel */
-    int row2_y = start_y + card_h + gap;
-    flux_draw_card(start_x, row2_y, card_w, card_h, "MATRIX", FLUX_ACCENT_VIOLET, NODE_MATRIX);
-    flux_draw_card(start_x + card_w + gap, row2_y, card_w, card_h, "SETTINGS", 0xFFFFFF, NODE_SETTINGS);
-    flux_draw_card(start_x + (card_w+gap)*2, row2_y, card_w, card_h, "SANTITRAVEL", 0x55AAFF, NODE_SANTITRAVEL);
+    for (int i = 0; i < NODE_COUNT; i++) {
+        int col = i % 4;
+        int row = i / 4;
+        
+        int x = start_x + col * (card_w + gap_x);
+        int y = start_y + row * (card_h + gap_y);
+        
+        /* Safe check for array bounds though NODE_COUNT matches */
+        if (i < (int)(sizeof(FLUX_APPS)/sizeof(FLUX_APPS[0]))) {
+            flux_draw_card(x, y, card_w, card_h, FLUX_APPS[i].title, FLUX_APPS[i].color, (flux_node_id_t)i);
+        }
+    }
 }
 
 static void draw_focus_mode(void) {
@@ -1160,24 +1200,31 @@ static void draw_focus_mode(void) {
     framebuffer_rect(focused_space->bounds.x - 2, focused_space->bounds.y - 2, 
                      focused_space->bounds.w + 4, focused_space->bounds.h + 4, FLUX_ACCENT_CYAN); 
                      
-    if (focused_space == win_sysinfo) {
-         wm_fill_rect(focused_space, (rect_t){0,0,focused_space->bounds.w, focused_space->bounds.h}, FLUX_CARD_BG);
-         draw_sysinfo_content(); 
-    } 
-    else if (focused_space == win_settings) {
+    /* Dispatch Draw Content based on Node ID */
+    if (zooming_node == NODE_TERMINAL) {
+         draw_terminal_content(focused_term);
+    } else if (zooming_node == NODE_SYSMON) {
+         if (focused_space == win_sysinfo) {
+             wm_fill_rect(focused_space, (rect_t){0,0,focused_space->bounds.w, focused_space->bounds.h}, FLUX_CARD_BG);
+             draw_sysinfo_content();
+         }
+    } else if (zooming_node == NODE_MATRIX) {
+         /* Matrix is auto-drawn by tasks, but we can draw overlay here if needed */
+    } else if (zooming_node == NODE_SETTINGS) {
          draw_settings_content();
-    }
-    else if (focused_space == win_files) {
+    } else if (zooming_node == NODE_FILES) {
          draw_files_content();
-    }
-    else if (focused_space == win_santitravel) {
+    } else if (zooming_node == NODE_SANTITRAVEL) {
          draw_santitravel_content();
-    }
-    else if (focused_space == win_matrix) {
-        /* Matrix is auto-drawn */
-    }
-    else {
-         draw_terminal_content(focused_term); 
+    } else if (zooming_node == NODE_PONG) {
+         draw_pong_content(focused_space);
+    } else if (zooming_node == NODE_CLOCK) {
+         draw_clock_content(focused_space);
+    } else {
+         /* Generic for others */
+         if (zooming_node < sizeof(FLUX_APPS)/sizeof(FLUX_APPS[0])) {
+             draw_generic_app_content(focused_space, FLUX_APPS[zooming_node].title, 0x222222);
+         }
     }
     
     /* Capa 2: Controles de Navegación (Reactive Bottom Bar) */
@@ -1202,35 +1249,29 @@ static void handle_flux_click(void) {
     if (screen_h == 0) screen_h = 768;
 
     if (current_zoom == FLUX_MACRO) {
-        /* Hit testing Constellation Cards */
-        int card_w = 200;
-        int card_h = 240;
-        int gap = 40;
+        /* Hit testing Constellation Cards - 4x4 Grid */
+        int card_w = 180;
+        int card_h = 140;
+        int gap_x = 30;
+        int gap_y = 30;
         
-        int total_w = (card_w * 3) + (gap * 2);
+        int total_w = (card_w * 4) + (gap_x * 3);
         int start_x = (int)screen_w - total_w; 
         start_x /= 2;
-        if (start_x < 20) start_x = 20; 
-        
-        int start_y = 200;
-        if (screen_h < 600) start_y = 100; 
+        int start_y = 120;
 
-        int row2_y = start_y + card_h + gap;
-
-        #define HIT_CARD(x, y, wa, ha, node) \
-            if (mouse_x >= x && mouse_x <= x + wa && mouse_y >= y && mouse_y <= y + ha) { \
-                flux_launch_space(node); return; \
-            }
+        for (int i = 0; i < NODE_COUNT; i++) {
+            int col = i % 4;
+            int row = i / 4;
             
-        /* Row 1 */
-        HIT_CARD(start_x, start_y, card_w, card_h, NODE_TERMINAL);
-        HIT_CARD(start_x + card_w + gap, start_y, card_w, card_h, NODE_SYSMON);
-        HIT_CARD(start_x + (card_w+gap)*2, start_y, card_w, card_h, NODE_FILES);
-        
-        /* Row 2 */
-        HIT_CARD(start_x, row2_y, card_w, card_h, NODE_MATRIX);
-        HIT_CARD(start_x + card_w + gap, row2_y, card_w, card_h, NODE_SETTINGS);
-        HIT_CARD(start_x + (card_w+gap)*2, row2_y, card_w, card_h, NODE_SANTITRAVEL);
+            int x = start_x + col * (card_w + gap_x);
+            int y = start_y + row * (card_h + gap_y);
+            
+            if (mouse_x >= x && mouse_x <= x + card_w && mouse_y >= y && mouse_y <= y + card_h) {
+                flux_launch_space((flux_node_id_t)i); 
+                return;
+            }
+        }
         
         /* Focus Mode Input (Not applicable in MACRO, but logic flow check) */
     } else if (current_zoom == FLUX_FOCUS) {
@@ -1263,11 +1304,7 @@ static void handle_flux_click(void) {
 /* ========================================================================= */
 /* Flux Animation State (Fixed-Point Math 1000 = 1.0)                        */
 /* ========================================================================= */
-static int zoom_progress = 0; 
-static flux_zoom_level_t target_zoom = FLUX_MACRO;
-static flux_node_id_t zooming_node = NODE_TERMINAL;
-static rect_t source_rect = {0,0,0,0}; /* Constellation rect */
-static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */
+/* Moved to top of file to avoid forward declaration issues */
 
 /* Physics State */
 static int zoom_velocity = 0;
@@ -1277,31 +1314,21 @@ static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
     if (level == FLUX_FOCUS) {
         zooming_node = node;
         /* Calculate source rect for the node */
-        int card_w = 200;
-        int card_h = 240;
-        int gap = 40;
-        /* 3 Columns Layout */
-        int total_w = (card_w * 3) + (gap * 2);
+        /* Calculate source rect for the node using 4x4 Grid */
+        int card_w = 180;
+        int card_h = 140;
+        int gap_x = 30;
+        int gap_y = 30;
+        int total_w = (card_w * 4) + (gap_x * 3);
         int start_x = (1024 - total_w) / 2;
-        int start_y = 200;
-        int row2_y = start_y + card_h + gap;
-        int x = start_x;
-        int y = start_y;
+        int start_y = 120;
+
+        int i = (int)node;
+        int col = i % 4;
+        int row = i / 4;
         
-        if (node == NODE_SYSMON) { x += card_w + gap; }
-        else if (node == NODE_FILES) { x += (card_w + gap) * 2; }
-        else if (node == NODE_MATRIX) { /* Row 2, Col 1 */
-             x = start_x;
-             y = row2_y;
-        }
-        else if (node == NODE_SETTINGS) { 
-             x = start_x + card_w + gap; 
-             y = row2_y; 
-        }
-        else if (node == NODE_SANTITRAVEL) {
-             x = start_x + (card_w + gap) * 2;
-             y = row2_y;
-        }
+        int x = start_x + col * (card_w + gap_x);
+        int y = start_y + row * (card_h + gap_y);
         
         source_rect = (rect_t){x, y, card_w, card_h};
     }
@@ -1338,6 +1365,57 @@ static void flux_update_zoom(void) {
     if (zoom_progress == 1000) current_zoom = FLUX_FOCUS;
     else if (zoom_progress == 0) current_zoom = FLUX_MACRO;
     else current_zoom = -1; /* Transitioning */
+}
+
+static void draw_generic_app_content(window_t* win, const char* title, uint32_t bg_col) {
+    if (!win) return;
+    wm_fill_rect(win, (rect_t){0, 0, win->bounds.w, win->bounds.h}, bg_col);
+    wm_print_at(win, 20, 20, title);
+    wm_print_at(win, 20, 40, "Aplicacion en construccion...");
+}
+
+static void draw_pong_content(window_t* win) {
+    if (!win) return;
+    wm_fill_rect(win, (rect_t){0, 0, win->bounds.w, win->bounds.h}, 0x000000);
+    /* Draw Net */
+    for(int y=10; y<win->bounds.h-10; y+=20) {
+        wm_fill_rect(win, (rect_t){win->bounds.w/2 - 2, y, 4, 10}, 0xFFFFFF);
+    }
+    /* Draw Paddles */
+    wm_fill_rect(win, (rect_t){20, 100, 10, 60}, 0xFFFFFF);
+    wm_fill_rect(win, (rect_t){win->bounds.w - 30, 150, 10, 60}, 0xFFFFFF);
+    /* Draw Ball */
+    wm_fill_rect(win, (rect_t){win->bounds.w/2 - 50, 120, 10, 10}, 0xFFFFFF);
+    
+    wm_print_at(win, win->bounds.w/2 - 40, 20, "PONG - 0 : 0");
+}
+
+static void draw_clock_content(window_t* win) {
+    if (!win) return;
+    wm_fill_rect(win, (rect_t){0, 0, win->bounds.w, win->bounds.h}, 0x101020);
+    
+    char time_str[32];
+    uint32_t ticks = timer_get_ticks();
+    int sec = (ticks / 100) % 60;
+    int min = (ticks / 6000) % 60;
+    int hour = (ticks / 360000) % 24;
+    
+    /* Simple fake time based on uptime */
+    char buf[8];
+    itoa_s(hour, buf, sizeof(buf), 10);
+    strlcpy(time_str, buf, sizeof(time_str));
+    strlcat(time_str, ":", sizeof(time_str));
+    itoa_s(min, buf, sizeof(buf), 10);
+    if(min<10) strlcat(time_str, "0", sizeof(time_str));
+    strlcat(time_str, buf, sizeof(time_str));
+    strlcat(time_str, ":", sizeof(time_str));
+    itoa_s(sec, buf, sizeof(buf), 10);
+    if(sec<10) strlcat(time_str, "0", sizeof(time_str));
+    strlcat(time_str, buf, sizeof(time_str));
+    
+    /* Big Text (Fake implementation) */
+    wm_print_at(win, 60, 60, "HORA DEL SISTEMA");
+    wm_print_at(win, 80, 90, time_str);
 }
 
 static void draw_zoom_transition(void) {
@@ -1416,34 +1494,47 @@ void gui_demo_run(void) {
         /* ... keyboard input ... */
         if (keyboard_has_input()) {
              char c = keyboard_getchar();
-             /* Infinite Zoom Controls */
-             if (c == 72) { /* UP Arrow */
-                 if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
-                     flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL); 
-                     flux_launch_space(NODE_TERMINAL); 
-                 }
-             }
-             else if (c == 80) { /* DOWN Arrow */
-                 if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
-                     target_zoom = FLUX_MACRO;
-                 }
-                 /* Also handle ESC within this logic for now */
-             }
              
-             if (c == 27) {
+             /* Global Navigation Hotkeys */
+             if (c == 27) { /* ESC */
                  if (current_zoom == FLUX_MACRO) {
                      desktop_running = false;
                  } else {
                      target_zoom = FLUX_MACRO;
+                     flux_set_zoom(FLUX_MACRO, NODE_TERMINAL); /* Node doesn't matter for macro */
                  }
-             }
-             
-             /* Pass input to terminal if focused */
-             if (current_zoom == FLUX_FOCUS && focused_term && focused_term == (term_instance_t*)focused_term) {
-                 if (focused_space == terminals[0].win) {
-                     term_handle_key(focused_term, c);
+                 /* continue; would skip the rest of the loop, including drawing! 
+                    We should just stop processing input for this frame or handle logic carefully. 
+                    Actually, 'continue' in a 'while' loop skips to next iteration. 
+                    So drawing is skipped. This causes flickering or black screen if held.
+                    Better to just not process move/term logic. */
+             } else {
+                 /* Infinite Zoom Controls (Arrows) - Only if NOT typing in terminal */
+                 bool typing_in_term = (current_zoom == FLUX_FOCUS && focused_term != NULL);
+                 
+                 if (!typing_in_term) {
+                     if (c == 72) { /* UP Arrow */
+                         if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
+                             flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL); 
+                             flux_launch_space(NODE_TERMINAL); 
+                         }
+                     }
+                     else if (c == 80) { /* DOWN Arrow */
+                         if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
+                             target_zoom = FLUX_MACRO;
+                         }
+                     }
                  }
-             }
+                 
+                 /* Pass input to terminal if focused */
+                 if (current_zoom == FLUX_FOCUS && focused_term != NULL) {
+                     /* We assume focused_term is valid if set. 
+                        Ideally we check if focused_space matches focused_term->win */
+                     if (focused_term->win && focused_term->win->active) {
+                         term_handle_key(focused_term, c);
+                     }
+                 }
+            }
         }
         
         /* Capa 0: Deep Void (Premium Dark) */

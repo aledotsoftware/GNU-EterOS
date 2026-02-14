@@ -19,50 +19,39 @@ syscall_entry:
     ; RSP = GS:[0]
     mov rsp, [gs:0]
 
-    ; 4. Save Registers (System V AMD64 ABI + Caller Saved)
-    ; RCX = Return RIP (saved by syscall)
-    ; R11 = Return RFLAGS (saved by syscall)
-
-    push rcx    ; Save User RIP
-    push r11    ; Save User RFLAGS
-    push rbp    ; Save Base Pointer
-    push rbx    ; Save Callee-saved
-    push r12
-    push r13
-    push r14
-    push r15
+    ; 4. Save Registers to match struct syscall_regs
+    ; Struct: r11, rcx, rbp, rdi, rsi, rdx, r10, r8, r9, rax
+    ; Push in reverse order
+    push rax    ; Syscall Number
+    push r9     ; Arg 6
+    push r8     ; Arg 5
+    push r10    ; Arg 4 (RCX is used for RIP, R10 for Arg 4)
+    push rdx    ; Arg 3
+    push rsi    ; Arg 2
+    push rdi    ; Arg 1
+    push rbp    ; Base Pointer
+    push rcx    ; RIP (Saved by syscall)
+    push r11    ; RFLAGS (Saved by syscall)
 
     ; 5. Call Handler
-    ; Handler signature: void syscall_handler(uint64_t syscall_number, args...)
-    ; C Args: RDI, RSI, RDX, RCX, R8, R9
-    ; Syscall Args (Linux/standard): RAX (num), RDI, RSI, RDX, R10, R8, R9
-
-    ; Mapping:
-    ; Handler Arg 1 (RDI) = RAX (Syscall Num)
-    ; Handler Arg 2 (RSI) = RDI (Arg 1)
-    ; Handler Arg 3 (RDX) = RSI (Arg 2)
-    ; Handler Arg 4 (RCX) = RDX (Arg 3)
-
-    mov rcx, rdx ; 4th arg
-    mov rdx, rsi ; 3rd arg
-    mov rsi, rdi ; 2nd arg
-    mov rdi, rax ; 1st arg
-
-    ; Align stack if necessary (RSP should be 16-byte aligned before call)
-    ; Pushed 8 regs (8*8=64 bytes). If we started aligned, we are aligned.
-
-    cld         ; Clear direction flag (C ABI requirement)
+    ; void syscall_handler(struct syscall_regs* regs);
+    ; RDI = &regs (which is RSP)
+    mov rdi, rsp
+    
+    cld
     call syscall_handler
 
     ; 6. Restore Registers
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rbx
+    pop r11
+    pop rcx
     pop rbp
-    pop r11     ; Restore RFLAGS to R11
-    pop rcx     ; Restore RIP to RCX
+    pop rdi
+    pop rsi
+    pop rdx
+    pop r10
+    pop r8
+    pop r9
+    pop rax     ; Restore RAX (return value? If we want to return value, we should modify it in struct)
 
     ; 7. Restore User Stack
     mov rsp, [gs:8]

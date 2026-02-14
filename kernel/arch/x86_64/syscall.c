@@ -54,20 +54,23 @@ void syscall_init(void) {
     serial_write_string("[SYSCALL] Enabled.\n");
 }
 
-void syscall_handler(uint64_t syscall_number, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
+void syscall_handler(struct syscall_regs* regs) {
     char buf[32];
+    uint64_t syscall_number = regs->rax;
 
-    /* Log syscall */
-    /* serial_write_string("[SYSCALL] #"); */
-    /* utoa_hex_s(syscall_number, buf, sizeof(buf)); */
-    /* serial_write_string(buf); */
-    /* serial_write_string("\n"); */
+    /* Log syscall 
+    serial_write_string("[SYSCALL] #");
+    utoa_hex_s(syscall_number, buf, sizeof(buf));
+    serial_write_string(buf);
+    serial_write_string("\n");
+    */
 
     if (syscall_number == 0xCAFEBABE) {
         serial_write_string("[SYSCALL] Magic Test Passed! Hello from Ring 3!\n");
         terminal_write_colored("\n[SYSCALL] Magic Test Passed! Hello from Ring 3!\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-    } else if (syscall_number == 1) {
-        /* exit/halt */
+    } else if (syscall_number == 1) { // SYS_write (or exit? Linux exit is 60. 1 is write in Linux x64)
+        /* map 1 to write just for test, or stick to user code expecting something else? */
+        /* original code had 1 as exit/halt */
         serial_write_string("[SYSCALL] Exit called. Halting.\n");
         for(;;) __asm__ volatile("hlt");
     } else {
