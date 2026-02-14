@@ -21,6 +21,7 @@
 #include <pmm.h>
 #include <serial.h>
 #include <ui/image.h>
+#include <rtc.h>
 
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
@@ -995,17 +996,24 @@ static void draw_global_status_bar(void) {
     
     right_margin -= (bat_w + 20);
 
-    /* Clock */
-    uint32_t uptime = timer_get_uptime_seconds();
-    int m = (uptime / 60) % 60;
-    int s = uptime % 60;
-    char clock_buf[16];
-    clock_buf[0] = '0' + (m/10);
-    clock_buf[1] = '0' + (m%10);
-    clock_buf[2] = ':';
-    clock_buf[3] = '0' + (s/10);
-    clock_buf[4] = '0' + (s%10);
-    clock_buf[5] = 0;
+    /* Clock (Real-Time - Argentina) */
+    static char clock_buf[16] = "--:--";
+    static uint32_t last_clock_upd = 0;
+    
+    if (timer_get_ticks() - last_clock_upd > 50 || last_clock_upd == 0) {
+        rtc_time_t utc, local;
+        rtc_get_time(&utc);
+        rtc_to_argentina(&utc, &local);
+        
+        clock_buf[0] = '0' + (local.hours / 10);
+        clock_buf[1] = '0' + (local.hours % 10);
+        clock_buf[2] = ':';
+        clock_buf[3] = '0' + (local.minutes / 10);
+        clock_buf[4] = '0' + (local.minutes % 10);
+        clock_buf[5] = 0;
+        
+        last_clock_upd = timer_get_ticks();
+    }
     
     int clock_w = 5 * 8;
     ui_draw_string(NULL, right_margin - clock_w, 8, clock_buf, 0xAAAAAA, 0x050505);
@@ -1036,13 +1044,12 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
     /* Capa 1: Contenedor (Using defined color) */
     uint32_t card_bg = FLUX_CARD_BG;
     if (dist_sq < 10000) { /* Hover highlight */
-        card_bg = 0x1A1A1A;
+        card_bg = 0x383838; /* Lighter for visibility (was 0x1A1A1A) */
     }
     
-    /* Pulse Effect for Active feel */
-    int pulse = (timer_get_ticks() / 20) % 2;
-    if (dist_sq < 40000 && pulse) {
-        framebuffer_rect(draw_x - 1, draw_y - 1, w + 2, h + 2, accent);
+    /* Active Glow (Steady, no strobing for A11y) */
+    if (dist_sq < 40000) {
+        framebuffer_rect(draw_x - 2, draw_y - 2, w + 4, h + 4, accent);
     }
 
     framebuffer_rect(draw_x, draw_y, w, h, card_bg); 
