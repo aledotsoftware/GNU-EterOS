@@ -146,6 +146,16 @@ void* kmalloc(size_t size) {
     if (size == 0) return NULL;
     if (!heap_start) return NULL; /* Heap no inicializado */
 
+    /* Overflow check: prevent align() wrap-around and excessive size */
+    if (size > SIZE_MAX - HEAP_ALIGNMENT - sizeof(block_header_t)) {
+        return NULL;
+    }
+
+    /* Safety check: prevent allocation larger than total heap size */
+    if (size > memory_total) {
+        return NULL;
+    }
+
     size_t aligned_size = align(size);
     block_header_t* curr = heap_start;
     
