@@ -87,6 +87,23 @@ void* memset16(void* dest, uint16_t c, size_t n) {
 #endif
 }
 
+void* memset32(void* dest, uint32_t c, size_t n) {
+#ifdef __x86_64__
+    void* original_dest = dest;
+    __asm__ volatile (
+        "cld; rep stosl"
+        : "+D"(dest), "+c"(n)
+        : "a"(c)
+        : "memory"
+    );
+    return original_dest;
+#else
+    uint32_t* d = (uint32_t*)dest;
+    while (n--) *d++ = c;
+    return dest;
+#endif
+}
+
 void* memmove(void* dest, const void* src, size_t n) {
     uint8_t* d = (uint8_t*)dest;
     const uint8_t* s = (const uint8_t*)src;
