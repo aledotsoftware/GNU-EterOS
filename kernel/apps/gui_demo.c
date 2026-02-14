@@ -20,6 +20,7 @@
 #include <shell.h>
 #include <pmm.h>
 #include <serial.h>
+#include <ui/image.h>
 
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
@@ -848,45 +849,37 @@ void gui_draw_boot_logo(void) {
     /* 1. White Background */
     framebuffer_clear(0xFFFFFF);
 
-    /* 2. Draw Flux Orb (Violet Core, Cyan Rim) */
-    int cx = sw / 2;
-    int cy = sh / 2 - 40;
-    int r = 60;
-    
-    /* Outer Rim (Cyan) */
-    draw_circle(cx, cy, r, 0x00B0B0);
-    /* Inner Core (Violet) */
-    draw_circle(cx, cy, r - 4, 0x9D00FF);
-    /* Highlight (White reflection) */
-    draw_circle(cx - 20, cy - 20, 10, 0xFFFFFF);
+    /* 2. Draw Logo from File (logo.raw) */
+    int img_w = 200;
+    int img_h = 200;
+    ui_draw_image("logo.raw", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
 
     /* 3. Draw Text (Dark Grey) */
-    const char* title = "eterOS Genesis";
+    const char* title = "ETEROS GENESIS";
     int title_w = strlen(title) * 8;
-    ui_draw_string(NULL, (sw - title_w) / 2, cy + 80, title, 0x333333, 0xFFFFFF);
+    ui_draw_string(NULL, (sw - title_w) / 2, sh / 2 + 60, title, 0x333333, 0xFFFFFF);
     
     const char* sub = "Cargando subsistemas...";
     int sub_w = strlen(sub) * 8;
-    ui_draw_string(NULL, (sw - sub_w) / 2, cy + 100, sub, 0x666666, 0xFFFFFF);
+    ui_draw_string(NULL, (sw - sub_w) / 2, sh / 2 + 80, sub, 0x666666, 0xFFFFFF);
     
     /* 4. Progress Bar (Light Grey Track, Cyan Fill) */
     int bw = 300;
     int bx = (sw - bw) / 2;
-    int by = cy + 130;
+    int by = sh / 2 + 110;
     framebuffer_rect(bx, by, bw, 4, 0xEEEEEE);
     
     framebuffer_flush();
     
-    /* Fake Progress Animation */
+    /* Fake Progress Animation (approx 2 seconds) */
     for (int i=0; i<=100; i+=2) {
         framebuffer_rect(bx, by, (bw * i) / 100, 4, 0x00AAAA);
         framebuffer_flush();
-        /* Wait a bit manually */
-        for (volatile int j=0; j<1000000; j++); 
+        task_sleep(40); /* 50 steps * 40ms = 2000ms */
     }
     
-    /* Final pause */
-    for (volatile int j=0; j<5000000; j++); 
+    /* Final pause (1 second) to complete the 3 seconds */
+    task_sleep(1000); 
 }
 
 /* ========================================================================= */

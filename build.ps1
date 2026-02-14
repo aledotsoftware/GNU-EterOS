@@ -214,7 +214,8 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\apps\sysmon.c",
     "$KERNEL_DIR\apps\gui_demo.c",
     "$KERNEL_DIR\task.c",
-    "$KERNEL_DIR\fs\initrd.c"
+    "$KERNEL_DIR\fs\initrd.c",
+    "$KERNEL_DIR\ui\image.c"
 )
 
 # Archivos específicos de arquitectura
@@ -350,6 +351,27 @@ function Invoke-KernelBuild {
     Write-Step "OK" "Kernel: $size bytes"
 }
 
+function Invoke-InitrdBuild {
+    $initrdBin = "$BUILD_DIR\initrd.bin"
+    $initrdSrc = "initrd_root"
+    
+    if (!(Test-Path $initrdSrc)) {
+        New-Item -ItemType Directory -Path $initrdSrc -Force | Out-Null
+    }
+
+    Write-Step "BIN" "Generando Initrd.bin..."
+    & python tools/gen_logo.py
+    & python tools/mkinitrd.py $initrdSrc $initrdBin
+    if ($LASTEXITCODE -ne 0) {
+        Write-Step "ERR" "Fallo al generar Initrd (Asegurate de tener Python instalado)"
+        # No salimos con error fatal porque el sistema puede bootear sin initrd
+    }
+    else {
+        $size = (Get-Item $initrdBin).Length
+        Write-Step "OK" "Initrd: $size bytes"
+    }
+}
+
 function Invoke-ImageBuild {
     Write-Step "IMG" "Generando imagen de disco..."
 
@@ -370,6 +392,21 @@ function Invoke-ImageBuild {
     $kernelData = [System.IO.File]::ReadAllBytes($kernelPath)
     $kernelOffset = 17 * 512
     [System.Array]::Copy($kernelData, 0, $imageData, $kernelOffset, $kernelData.Length)
+
+    # Leer el Initrd y copiarlo después del kernel
+    # El bootloader espera el initrd en el sector después del kernel (Sector 1 + 16 + 256 = 273)
+    $initrdPath = "$BUILD_DIR\initrd.bin"
+    if (Test-Path $initrdPath) {
+        $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
+        $initrdOffset = (1 + 16 + 256) * 512
+        if ($initrdOffset + $initrdData.Length -le $imageSize) {
+            [System.Array]::Copy($initrdData, 0, $imageData, $initrdOffset, $initrdData.Length)
+            Write-Step "OK" "Initrd inyectado en la imagen."
+        }
+        else {
+            Write-Step "ERR" "Initrd demasiado grande para el floppy de 1.44MB!"
+        }
+    }
 
     # Escribir imagen final
     [System.IO.File]::WriteAllBytes($imagePath, $imageData)
@@ -591,6 +628,7 @@ switch ($Target) {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-InitrdBuild
         Invoke-ImageBuild
         Invoke-VdiBuild
         Write-Host ""
