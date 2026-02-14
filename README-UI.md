@@ -173,6 +173,15 @@ Flux UI es nativo para Realidad Extendida.
 
 ## Roadmap Visual (Próximos Pasos)
 
-1.  **Prototipo "Toque Magnético"**: Implementar la deformación de botones al acercar el cursor (en `gui_demo.c`).
-2.  **Zoom de Texto**: Implementar LOD (Level of Detail) en tipografía al hacer zoom.
+### Fase 0: Base Técnica (Kernel Support) ✅
+1.  [x] **Framebuffer Lineal**: Acceso directo a VRAM (32-bit color).
+2.  [x] **Doble Buffer**: Renderizado off-screen para eliminar parpadeo.
+3.  [x] **Primitivas de Dibujo**: Rectángulos, Líneas, Texto (Bitmap Font).
+4.  [x] **Carga de Assets**: Lectura de imágenes RAW desde Initrd.
+
+### Fase 1: Interacción Básica
+1.  **Cursor por Software**: Dibujar puntero del mouse sobre el frame usando composición Alpha (sin hardware sprite).
+2.  **Prototipo "Toque Magnético"**: Implementar la deformación de botones al acercar el cursor.
+3.  **Sistema de Ventanas (Window Manager)**: Estructura de árbol para manejar redibujado y clipping.
+4.  **Zoom de Texto**: Implementar LOD (Level of Detail) en tipografía.
 3.  **Transición de Gravedad**: Rotación de layout fluido en el demo.
