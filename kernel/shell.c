@@ -512,8 +512,8 @@ static void cmd_demo(const char* args) {
 #define HISTORY_LEN     SHELL_MAX_INPUT
 
 static char history[HISTORY_SIZE][HISTORY_LEN];
-static int  history_count = 0;
-static int  history_idx   = 0;
+static unsigned int  history_count = 0;
+static unsigned int  history_idx   = 0;
 
 /* Ejecuta un comando (sin prompt, ni history management) */
 int shell_exec(char* input) {
@@ -633,15 +633,15 @@ void shell_run(void) {
             /* ---- Flecha Arriba: historial anterior ---- */
             if (history_count > 0 && history_idx > 0) {
                 history_idx--;
-                int idx = history_idx % HISTORY_SIZE;
+                unsigned int idx = history_idx % HISTORY_SIZE;
                 shell_replace_line(input, &pos, history[idx]);
             }
 
         } else if ((unsigned char)c == KEY_DOWN) {
             /* ---- Flecha Abajo: historial siguiente ---- */
-            if (history_idx < history_count - 1) {
+            if (history_idx + 1 < history_count) {
                 history_idx++;
-                int idx = history_idx % HISTORY_SIZE;
+                unsigned int idx = history_idx % HISTORY_SIZE;
                 shell_replace_line(input, &pos, history[idx]);
             } else if (history_idx < history_count) {
                 history_idx = history_count;
