@@ -19,6 +19,7 @@
 #include <framebuffer.h>
 #include <shell.h>
 #include <pmm.h>
+#include <serial.h>
 
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
@@ -43,13 +44,15 @@ static bool    mouse_left_btn = false;
 /* ========================================================================= */
 
 /* Ontología del Sistema: Colores y Materiales */
-#define FLUX_VOID           0x050505  /* Deep Void (Capa 0) */
-#define FLUX_ACCENT_CYAN    0x00FFFF  /* Flujo Activo */
-#define FLUX_ACCENT_VIOLET  0x9D00FF  /* Profundidad */
-#define FLUX_ACCENT_AMBER   0xFFBF00  /* Alerta / Foco */
-#define FLUX_CARD_BG        0x101010  /* Espacios (Capa 1) */
+/* Ontología del Sistema: Colores y Materiales */
+#define FLUX_VOID           0x000000  /* Pure Void for scaling contrast */
+#define FLUX_ACCENT_CYAN    0x00FFFF  /* Flow */
+#define FLUX_ACCENT_VIOLET  0x9D00FF  /* Deep */
+#define FLUX_ACCENT_AMBER   0xFFBF00  /* Alert */
+#define FLUX_CARD_BG        0x2A2A2A  /* Lighter grey for visibility */
+#define FLUX_BAR_BG         0x151515  /* Status Bar */
 #define FLUX_TEXT_PRIMARY   0xFFFFFF
-#define FLUX_TEXT_SECONDARY 0x888888
+#define FLUX_TEXT_SECONDARY 0xAAAAAA
 
 typedef enum {
     FLUX_MACRO = 0,   /* Constellation (Overview) */
@@ -62,6 +65,7 @@ typedef enum {
     NODE_SYSMON,
     NODE_MATRIX,
     NODE_SETTINGS,
+    NODE_FILES,
     NODE_COUNT
 } flux_node_id_t;
 
@@ -289,7 +293,7 @@ static void draw_progress_bar(window_t* win, int x, int y, int w, int h, float p
 }
 
 static void draw_sysinfo_content(void) {
-    wm_fill_rect(win_sysinfo, (rect_t){0, 0, 240, 140}, UI_COLOR_DARK);
+    wm_fill_rect(win_sysinfo, (rect_t){0, 0, 300, 400}, UI_COLOR_DARK);
     wm_print_at(win_sysinfo, 10, 10, "eterOS Genesis - Monitor");
     wm_print_at(win_sysinfo, 10, 30, "CPU: x86_64 (1 Core)");
     
@@ -311,6 +315,7 @@ static void draw_sysinfo_content(void) {
     uint32_t bar_color = (usage_pct > 0.8f) ? UI_COLOR_RED : UI_COLOR_GREEN;
     draw_progress_bar(win_sysinfo, 10, 65, 180, 10, usage_pct, bar_color);
 
+    /* Uptime */
     uint32_t uptime = timer_get_uptime_seconds();
     int min = uptime / 60; int sec = uptime % 60;
     char time_str[32];
@@ -321,7 +326,42 @@ static void draw_sysinfo_content(void) {
     itoa_s(sec, buf, sizeof(buf), 10);
     strlcpy(time_str + strlen(time_str), buf, 32);
     strlcpy(time_str + strlen(time_str), "s", 32);
-    wm_print_at(win_sysinfo, 10, 90, time_str);
+    wm_print_at(win_sysinfo, 10, 85, time_str);
+
+    /* Process List */
+    int list_y = 110;
+    wm_print_at(win_sysinfo, 10, list_y, "Active Processes:");
+    wm_fill_rect(win_sysinfo, (rect_t){10, list_y + 12, 200, 1}, 0x606060);
+    wm_print_at(win_sysinfo, 10, list_y + 18, "PID   State   Name");
+    
+    int row = 0;
+    int max_slots = task_get_max();
+    for (int i = 0; i < max_slots; i++) {
+        task_t* t = task_get_at(i);
+        /* Check valid task: name not empty */
+        if (t && t->name[0] != '\0' && t->state != TASK_DEAD) {
+             char row_buf[64] = "";
+             char pid_s[8];
+             itoa_s(t->id, pid_s, 8, 10);
+             
+             /* PAD PID (3 chars) */
+             strlcpy(row_buf, pid_s, 64);
+             int pad = 6 - strlen(pid_s);
+             while(pad-- > 0) strlcat(row_buf, " ", 64);
+             
+             /* State */
+             const char* st = (t->state == TASK_RUNNING) ? "RUN " : 
+                              (t->state == TASK_READY) ? "RDY " : 
+                              (t->state == TASK_SLEEPING) ? "SLP " : "BLK ";
+             strlcat(row_buf, st, 64);
+             strlcat(row_buf, "    ", 64);
+             strlcat(row_buf, t->name, 64);
+             
+             wm_print_at(win_sysinfo, 10, list_y + 32 + (row * 12), row_buf);
+             row++;
+             if (row > 8) break; /* Limit list size */
+        }
+    }
 }
 
 static window_t* win_matrix = NULL;
@@ -459,6 +499,72 @@ static void draw_settings_content(void) {
     }
 }
 
+/* ========================================================================= */
+/* Files App (Mock VFS)                                                      */
+/* ========================================================================= */
+
+static window_t* win_files = NULL;
+static char current_path[64] = "/";
+
+static void draw_files_content(void) {
+    if (!win_files) return;
+    
+    int w = win_files->bounds.w;
+    int h = win_files->bounds.h;
+    
+    /* Background */
+    wm_fill_rect(win_files, (rect_t){0, 0, w, h}, 0x202020);
+    
+    /* Header Bar */
+    wm_fill_rect(win_files, (rect_t){0, 0, w, 40}, 0x303030);
+    wm_print_at(win_files, 20, 12, "Archivos");
+    
+    /* Path Bar */
+    wm_fill_rect(win_files, (rect_t){0, 40, w, 30}, 0x252525);
+    wm_print_at(win_files, 20, 48, current_path);
+    
+    /* File List */
+    int start_y = 90;
+    int item_h = 30;
+    
+    #define DRAW_ITEM(y, icon, name) \
+        wm_print_at(win_files, 20, y, icon); \
+        wm_print_at(win_files, 50, y, name); \
+        /* Divider */ \
+        wm_fill_rect(win_files, (rect_t){20, y + 25, w - 40, 1}, 0x404040);
+
+    if (strcmp(current_path, "/") == 0) {
+        DRAW_ITEM(start_y, "[DIR]", "home");
+        DRAW_ITEM(start_y + item_h, "[DIR]", "etc");
+        DRAW_ITEM(start_y + item_h*2, "[DIR]", "var");
+        DRAW_ITEM(start_y + item_h*3, "[DIR]", "bin");
+    } else if (strcmp(current_path, "/home") == 0) {
+        DRAW_ITEM(start_y, "[..]", "..");
+        DRAW_ITEM(start_y + item_h, "[DIR]", "user");
+        DRAW_ITEM(start_y + item_h*2, "[FILE]", "notes.txt");
+    } else {
+        DRAW_ITEM(start_y, "[..]", "..");
+        DRAW_ITEM(start_y + item_h, "[FILE]", "config.sys");
+    }
+}
+
+static void handle_files_click(int win_local_x, int win_local_y) {
+    int start_y = 90;
+    int item_h = 30;
+    
+    /* Check Click on Items */
+    if (win_local_y >= start_y) {
+        int index = (win_local_y - start_y) / item_h;
+        
+        if (strcmp(current_path, "/") == 0) {
+            if (index == 0) strlcpy(current_path, "/home", 64);
+            if (index == 1) strlcpy(current_path, "/etc", 64);
+        } else {
+            /* Go Back on first item (..) */
+            if (index == 0) strlcpy(current_path, "/", 64);
+        }
+    }
+}
 static void handle_settings_click(int win_local_x, int win_local_y) {
     /* Hub Navigation */
     if (settings_tab == TAB_HUB) {
@@ -634,9 +740,72 @@ static void draw_settings_preview(int x, int y, int w, int h) {
     ui_draw_string(NULL, x + 20, start_y + 40, "Lang: ES/EN", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
 }
 
+static void draw_files_preview(int x, int y, int w, int h) {
+    (void)w;
+    int start_y = y + 50;
+    ui_draw_string(NULL, x + 20, start_y, "/home", FLUX_ACCENT_AMBER, FLUX_CARD_BG);
+    ui_draw_string(NULL, x + 20, start_y + 20, "/etc", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    ui_draw_string(NULL, x + 20, start_y + 40, "/var", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+}
+
 /* ========================================================================= */
-/* Flux Rendering Primitives                                                 */
+/* Flux Status Bar                                                           */
 /* ========================================================================= */
+
+static void draw_global_status_bar(void) {
+    uint32_t screen_w = framebuffer_get_width();
+    if (screen_w == 0) screen_w = 1024;
+    
+    int bar_h = 32;
+    framebuffer_rect(0, 0, screen_w, bar_h, FLUX_BAR_BG);
+    framebuffer_rect(0, bar_h, screen_w, 1, 0x333333); /* Separator */
+
+    /* Left: System Name */
+    ui_draw_string(NULL, 16, 8, "eterOS Genesis", FLUX_TEXT_PRIMARY, FLUX_BAR_BG);
+    
+    /* Center: Mode */
+    const char* mode_str = (current_zoom == FLUX_FOCUS) ? "FOCUS MODE" : "CONSTELLATION";
+    int mode_w = strlen(mode_str) * 8;
+    ui_draw_string(NULL, (screen_w - mode_w) / 2, 8, mode_str, FLUX_TEXT_SECONDARY, FLUX_BAR_BG);
+
+    /* Right: Clock & "Battery" (Simulated) */
+    uint32_t now = timer_get_uptime_seconds();
+    int h = (now / 3600) % 24;
+    int m = (now / 60) % 60;
+    
+    /* Format Time */
+    char timebox[16];
+    char buf[4];
+    itoa_s(h, buf, 4, 10); 
+    strlcpy(timebox, (h < 10 ? "0" : ""), 16); 
+    strlcat(timebox, buf, 16);
+    strlcat(timebox, ":", 16);
+    
+    itoa_s(m, buf, 4, 10); 
+    strlcat(timebox, (m < 10 ? "0" : ""), 16); 
+    strlcat(timebox, buf, 16);
+    
+    int right_margin = screen_w - 16;
+    
+    /* Battery Icon (Fake 100%) */
+    int bat_w = 24;
+    int bat_h = 10;
+    int bat_x = right_margin - bat_w;
+    int bat_y = (bar_h - bat_h) / 2;
+    
+    /* Battery Body */
+    framebuffer_rect(bat_x, bat_y, bat_w, bat_h, 0x888888); 
+    /* Battery Tip */
+    framebuffer_rect(bat_x + bat_w, bat_y + 2, 2, 6, 0x888888); 
+    /* Battery Fill (Green) */
+    framebuffer_rect(bat_x + 1, bat_y + 1, bat_w - 2, bat_h - 2, 0x00FF00);
+    
+    right_margin -= (bat_w + 16);
+    
+    /* Draw Time */
+    int time_w = strlen(timebox) * 8;
+    ui_draw_string(NULL, right_margin - time_w, 8, timebox, FLUX_TEXT_PRIMARY, FLUX_BAR_BG);
+}
 
 static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
     /* Physics: Magnetic Influence Field */
@@ -684,6 +853,8 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         draw_matrix_preview(draw_x, draw_y, w, h);
     } else if (node == NODE_SETTINGS) {
         draw_settings_preview(draw_x, draw_y, w, h);
+    } else if (node == NODE_FILES) {
+        draw_files_preview(draw_x, draw_y, w, h);
     }
     
     /* Active Border */
@@ -725,57 +896,58 @@ static void flux_launch_space(flux_node_id_t node) {
          if (!win_settings) win_settings = wm_create_window(0, 0, 800, 600, "Configuracion");
          win_settings->active = true;
          focused_space = win_settings;
+    } else if (node == NODE_FILES) {
+         flux_notify("Files", "Sistema de Archivos en linea", FLUX_ACCENT_AMBER);
+         if (!win_files) win_files = wm_create_window(0, 0, 800, 600, "Archivos");
+         win_files->active = true;
+         focused_space = win_files;
     }
 }
 
 static void draw_constellation(void) {
     uint32_t screen_w = framebuffer_get_width();
     uint32_t screen_h = framebuffer_get_height();
-    if (screen_w == 0) screen_w = 1024; /* Fallback */
+    if (screen_w == 0) screen_w = 1024;
+    
+    /* Draw Grid Background (High Contrast for Debug) */
+    int grid_size = 40;
+    for (uint32_t x = 0; x < screen_w; x += grid_size) {
+        framebuffer_rect(x, 0, 1, screen_h, 0x404040);
+    }
+    for (uint32_t y = 0; y < screen_h; y += grid_size) {
+        framebuffer_rect(0, y, screen_w, 1, 0x404040);
+    }
     
     /* Header (Capa 3) */
     ui_draw_string(NULL, 50, 50, "CONSTELACION", FLUX_TEXT_SECONDARY, FLUX_VOID);
     
-    /* Debug Resolution */
-    char res_buf[32];
-    itoa_s(screen_w, res_buf, 10, 10);
-    strlcpy(res_buf + strlen(res_buf), "x", 32);
-    char h_buf[10];
-    itoa_s(screen_h, h_buf, 10, 10);
-    strlcpy(res_buf + strlen(res_buf), h_buf, 32);
-    ui_draw_string(NULL, 10, 10, res_buf, 0xFF00FF, 0x000000); 
-
-    /* Clock */
-    uint32_t now = timer_get_uptime_seconds();
-    int h = (now / 3600) % 24;
-    int m = (now / 60) % 60;
-    char timebox[16];
-    char buf[4];
-    itoa_s(h, buf, 4, 10); strlcpy(timebox, (h<10?"0":""), 16); strlcpy(timebox+strlen(timebox), buf, 16);
-    strlcpy(timebox+strlen(timebox), ":", 16);
-    itoa_s(m, buf, 4, 10); strlcpy(timebox+strlen(timebox), (m<10?"0":""), 16); strlcpy(timebox+strlen(timebox), buf, 16);
-    ui_draw_string(NULL, screen_w - 120, 50, timebox, FLUX_TEXT_PRIMARY, FLUX_VOID);
-
+    /* Grid de Nodos Centrada */
+    
     /* Grid de Nodos Centrada */
     int card_w = 200;
     int card_h = 240;
     int gap = 40;
     
-    /* Calculate dynamic center with Underflow Protection */
-    int total_w = (card_w * 2) + gap;
+    int total_w = (card_w * 3) + (gap * 2);
     int start_x = (int)screen_w - total_w; 
     start_x /= 2;
-    if (start_x < 20) start_x = 20; /* Margin clamp */
+    if (start_x < 20) start_x = 20; 
     
     int start_y = 200;
-    if (screen_h < 600) start_y = 100; /* Compact vertical */
+    if (screen_h < 600) start_y = 100; 
     
+    /* Row 1: Term, Sys, Files */
     flux_draw_card(start_x, start_y, card_w, card_h, "TERMINAL", FLUX_ACCENT_CYAN, NODE_TERMINAL);
     flux_draw_card(start_x + card_w + gap, start_y, card_w, card_h, "SYSTEM", FLUX_ACCENT_AMBER, NODE_SYSMON);
+    flux_draw_card(start_x + (card_w + gap)*2, start_y, card_w, card_h, "FILES", FLUX_ACCENT_AMBER, NODE_FILES);
     
+    /* Row 2: Matrix, Settings (Centered) */
     int row2_y = start_y + card_h + gap;
-    flux_draw_card(start_x, row2_y, card_w, card_h, "MATRIX", FLUX_ACCENT_VIOLET, NODE_MATRIX);
-    flux_draw_card(start_x + card_w + gap, row2_y, card_w, card_h, "SETTINGS", 0xFFFFFF, NODE_SETTINGS);
+    int row2_w = (card_w * 2) + gap;
+    int row2_start_x = (screen_w - row2_w) / 2;
+    
+    flux_draw_card(row2_start_x, row2_y, card_w, card_h, "MATRIX", FLUX_ACCENT_VIOLET, NODE_MATRIX);
+    flux_draw_card(row2_start_x + card_w + gap, row2_y, card_w, card_h, "SETTINGS", 0xFFFFFF, NODE_SETTINGS);
 }
 
 static void draw_focus_mode(void) {
@@ -800,6 +972,9 @@ static void draw_focus_mode(void) {
     } 
     else if (focused_space == win_settings) {
          draw_settings_content();
+    }
+    else if (focused_space == win_files) {
+         draw_files_content();
     }
     else if (focused_space == win_matrix) {
         /* Matrix is auto-drawn */
@@ -835,7 +1010,7 @@ static void handle_flux_click(void) {
         int card_h = 240;
         int gap = 40;
         
-        int total_w = (card_w * 2) + gap;
+        int total_w = (card_w * 3) + (gap * 2);
         int start_x = (int)screen_w - total_w; 
         start_x /= 2;
         if (start_x < 20) start_x = 20; 
@@ -844,16 +1019,22 @@ static void handle_flux_click(void) {
         if (screen_h < 600) start_y = 100; 
 
         int row2_y = start_y + card_h + gap;
+        int row2_w = (card_w * 2) + gap;
+        int row2_start_x = (screen_w - row2_w) / 2;
 
         #define HIT_CARD(x, y, wa, ha, node) \
             if (mouse_x >= x && mouse_x <= x + wa && mouse_y >= y && mouse_y <= y + ha) { \
                 flux_launch_space(node); return; \
             }
             
+        /* Row 1 */
         HIT_CARD(start_x, start_y, card_w, card_h, NODE_TERMINAL);
         HIT_CARD(start_x + card_w + gap, start_y, card_w, card_h, NODE_SYSMON);
-        HIT_CARD(start_x, row2_y, card_w, card_h, NODE_MATRIX);
-        HIT_CARD(start_x + card_w + gap, row2_y, card_w, card_h, NODE_SETTINGS);
+        HIT_CARD(start_x + (card_w+gap)*2, start_y, card_w, card_h, NODE_FILES);
+        
+        /* Row 2 (Centered) */
+        HIT_CARD(row2_start_x, row2_y, card_w, card_h, NODE_MATRIX);
+        HIT_CARD(row2_start_x + card_w + gap, row2_y, card_w, card_h, NODE_SETTINGS);
         
         /* Focus Mode Input (Not applicable in MACRO, but logic flow check) */
     } else if (current_zoom == FLUX_FOCUS) {
@@ -865,22 +1046,18 @@ static void handle_flux_click(void) {
         }
         
         /* Pass clicks to active window if inside bounds */
-        /* TODO: Implement proper window hit testing if we have multiple windows */
-        if (focused_space && focused_space == win_settings) {
-             /* Handle Settings Click (which assumes 800x600 relative coords currently) */
-             /* Transform mouse to window local coords */
-             /* For now, just pass raw if window is fullscreen-ish */
-             handle_settings_click(mouse_x - focused_space->bounds.x, mouse_y - focused_space->bounds.y);
-        }
-    }
-}
-        
-        /* Pass input to active app controls */
-        if (focused_space == win_settings) {
-             /* wm_ library usually offsets drawing by TITLE_BAR_HEIGHT (20px).
-                So visual content starts at win->y + 20.
-                Click Y (content relative) = Mouse Y - (win->y + 20). */
-             handle_settings_click(mouse_x - focused_space->bounds.x, mouse_y - focused_space->bounds.y - TITLE_BAR_HEIGHT); 
+        if (focused_space) {
+             int lx = mouse_x - focused_space->bounds.x;
+             int ly = mouse_y - focused_space->bounds.y;
+             
+             /* Content usually handles its own absolute coords? No, window relative. */
+             /* The handlers below assume Window-Local coordinates */
+             
+             if (focused_space == win_settings) {
+                 handle_settings_click(lx, ly - TITLE_BAR_HEIGHT);
+             } else if (focused_space == win_files) {
+                 handle_files_click(lx, ly - TITLE_BAR_HEIGHT);
+             }
         }
     }
 }
@@ -908,7 +1085,9 @@ static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
         int card_w = 200;
         int card_h = 240;
         int gap = 40;
-        int start_x = (1024 - ((card_w * 2) + gap)) / 2;
+        /* 3 Columns Layout */
+        int total_w = (card_w * 3) + (gap * 2);
+        int start_x = (1024 - total_w) / 2;
         int start_y = 200;
         int row2_y = start_y + card_h + gap;
         
@@ -916,8 +1095,20 @@ static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
         int y = start_y;
         
         if (node == NODE_SYSMON) { x += card_w + gap; }
-        else if (node == NODE_MATRIX) { y = row2_y; }
-        else if (node == NODE_SETTINGS) { x += card_w + gap; y = row2_y; }
+        else if (node == NODE_FILES) { x += (card_w + gap) * 2; }
+        else if (node == NODE_MATRIX) { /* Row 2, Col 1 */
+             /* Center row 2 (only 2 items) */
+             int row2_w = (card_w * 2) + gap;
+             int row2_start_x = (1024 - row2_w) / 2;
+             x = row2_start_x;
+             y = row2_y;
+        }
+        else if (node == NODE_SETTINGS) { 
+             int row2_w = (card_w * 2) + gap;
+             int row2_start_x = (1024 - row2_w) / 2;
+             x = row2_start_x + card_w + gap; 
+             y = row2_y; 
+        }
         
         source_rect = (rect_t){x, y, card_w, card_h};
     }
@@ -981,12 +1172,23 @@ static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
 }
 
 void gui_demo_run(void) {
+    serial_write_string("[GUI] Starting GUI...\n");
+
     wm_init();
-    /* framebuffer_enable_double_buffer(); */ /* DEBUG: Disable DB to test direct VRAM write */
+    
+    /* DISABLE DOUBLE BUFFER FOR DEBUGGING */
+    framebuffer_enable_double_buffer();
+    
+    
     mouse_set_callback(on_mouse_event);
     
     /* Init Apps */
     term_init_all();
+    
+    /* Force State */
+    current_zoom = FLUX_MACRO;
+    target_zoom = FLUX_MACRO;
+    zoom_progress = 0.0f;
     
     desktop_running = true;
     while (desktop_running) {
@@ -1020,7 +1222,7 @@ void gui_demo_run(void) {
         flux_update_zoom();
         
         /* Capa 0: Deep Void (Premium Dark) */
-        framebuffer_clear(0x111111);
+        framebuffer_clear(0x000000);
         
         if (current_zoom == FLUX_MACRO) {
             draw_constellation();
@@ -1052,14 +1254,17 @@ void gui_demo_run(void) {
         /* Layer 3: System Notifications (Always on top) */
         draw_notifications();
         
+        /* Status Bar (Always Visible) */
+        draw_global_status_bar();
+        
         /* Cursor (Light Orb) */
         uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
         /* Draw a small crosshair for now, imagining it as an Orb */
         framebuffer_rect(mouse_x - 4, mouse_y, 9, 1, cursor_col); 
         framebuffer_rect(mouse_x, mouse_y - 4, 1, 9, cursor_col); 
         
-        /* framebuffer_flush(); */ /* Direct Draw Mode */
-        for (volatile int i = 0; i < 50000; i++); 
+        framebuffer_flush(); 
+        for (volatile int i = 0; i < 5000; i++); 
         task_yield();
     }
     terminal_initialize(NULL);

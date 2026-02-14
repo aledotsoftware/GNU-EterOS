@@ -99,6 +99,18 @@ task_t* task_get_current(void);
 int task_get_count(void);
 
 /**
+ * Obtiene una tarea por su índice en la tabla interna.
+ * Útil para listar todas las tareas (ps).
+ * @return Puntero a la tarea, o NULL si índice inválido.
+ */
+task_t* task_get_at(int index);
+
+/**
+ * Retorna el tamaño máximo de la tabla de tareas.
+ */
+int task_get_max(void);
+
+/**
  * Termina una tarea específica por PID.
  * @param pid ID de la tarea a matar. (0 = kernel, no permitido)
  * @return 0 si éxito, -1 si error o no encontrada.

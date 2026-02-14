@@ -303,5 +303,17 @@ int task_kill(uint32_t pid) {
             return 0;
         }
     }
+
     return -1;
+}
+
+task_t* task_get_at(int index) {
+    if (index >= 0 && index < MAX_TASKS) {
+        return &tasks[index];
+    }
+    return NULL;
+}
+
+int task_get_max(void) {
+    return MAX_TASKS;
 }

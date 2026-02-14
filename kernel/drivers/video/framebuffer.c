@@ -94,9 +94,31 @@ void framebuffer_clear(uint32_t color) {
 }
 
 void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color) {
-    for (uint32_t i = 0; i < h; i++) {
-        for (uint32_t j = 0; j < w; j++) {
-            framebuffer_putpixel(x + j, y + i, color);
+    /* Safety Clip */
+    if (x >= fb_width || y >= fb_height) return;
+    if (x + w > fb_width) w = fb_width - x;
+    if (y + h > fb_height) h = fb_height - y;
+
+    uint32_t* target_buffer = back_buffer ? back_buffer : fb_buffer;
+    if (!target_buffer) return;
+
+    /* Optimized 32-bit path */
+    if (fb_bpp == 32) {
+        for (uint32_t i = 0; i < h; i++) {
+            /* Pointer arithmetic using uint8_t* to be safe with pitch */
+            uint32_t* row_ptr = (uint32_t*)((uint8_t*)target_buffer + ((y + i) * fb_pitch)) + x;
+            
+            /* Fill row */
+            for (uint32_t j = 0; j < w; j++) {
+                row_ptr[j] = color;
+            }
+        }
+    } else {
+        /* Fallback */
+        for (uint32_t i = 0; i < h; i++) {
+            for (uint32_t j = 0; j < w; j++) {
+                framebuffer_putpixel(x + j, y + i, color);
+            }
         }
     }
 }

@@ -188,6 +188,14 @@ size_t strlcpy(char* dest, const char* src, size_t size) {
     return strlen(src);
 }
 
+size_t strlcat(char* dest, const char* src, size_t size) {
+    size_t dlen = strlen(dest);
+    if (dlen >= size) {
+        return size + strlen(src);
+    }
+    return dlen + strlcpy(dest + dlen, src, size - dlen);
+}
+
 int strcmp(const char* s1, const char* s2) {
     while (*s1 && (*s1 == *s2)) {
         s1++;

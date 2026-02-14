@@ -1,33 +1,6 @@
-
 [eterOS] HAL Inicializada.
-[PMM] Region: Base=0x0x0000000000000000 Len=0x0x000000000009FC00 Type=1
-[PMM] Region: Base=0x0x000000000009FC00 Len=0x0x0000000000000400 Type=2
-[PMM] Region: Base=0x0x00000000000F0000 Len=0x0x0000000000010000 Type=2
-[PMM] Region: Base=0x0x0000000000100000 Len=0x0x0000000007EF0000 Type=1
-[PMM] Region: Base=0x0x0000000007FF0000 Len=0x0x0000000000010000 Type=3
-[PMM] Region: Base=0x0x00000000FEC00000 Len=0x0x0000000000001000 Type=2
-[PMM] Region: Base=0x0x00000000FEE00000 Len=0x0x0000000000001000 Type=2
-[PMM] Region: Base=0x0x00000000FFFC0000 Len=0x0x0000000000040000 Type=2
-     Start: 0x0x0000000000100000
-     Size:  126 MB
-
-  [NET]  Escaneando dispositivos de red...
-[E1000] MMIO Base: 0x0x00000000F0000000
-
-          _             ___  ____  
-     ___ | |_ ___  _ _ / _ \/ ___| 
-    / _ \| __/ _ \| '_| | | \___ \ 
-   |  __/| ||  __/| | | |_| |___) |
-    \___| \__\___||_|  \___/|____/ 
-
-  ========================================
-    Version 0.1.0 ("Genesis")
+0x00000000000000000x000000000009FC0010x000000000009FC000x000000000000040020x00000000000F00000x000000000001000020x00000000001000000x0000000007EF000010x0000000007FF00000x000000000001000030x00000000FEC000000x000000000000100020x00000000FEE000000x000000000000100020x00000000FFFC00000x000000000004000020x0000000000100000126 MB
+[E1000] MMIO Base: 0x0x00000000F0000000    Version 010 ("")
     (c) 2026 Tudex Networks
-  ========================================
-
 [eterOS] Kernel cargado.
-[eterOS] (c) 2026 Tudex Networks
-  [INFO] Arquitectura: x86_64
-  [INFO] Board/Target: Generic
-  [INIT] Scheduler Round-Robin
-  [INIT] Lanzando Flux UI...
+  [INFO] Arquitectura: x86_64  [INIT] Lanzando Flux UI...

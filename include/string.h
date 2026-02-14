@@ -72,6 +72,11 @@ char* strncpy(char* dest, const char* src, size_t n);
 size_t strlcpy(char* dest, const char* src, size_t size);
 
 /**
+ * Concatena src al final de dest, asegurando terminación null.
+ */
+size_t strlcat(char* dest, const char* src, size_t size);
+
+/**
  * Compara dos cadenas.
  * Retorna 0 si son iguales.
  */
