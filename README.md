@@ -264,6 +264,13 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
     - `santitravel.c`: Juego de texto portado.
     - `sysmon.c`: Monitor de recursos del sistema.
     - `wget.c`: Utilidad de descarga.
+- [] ** Introducir la terminal en el entorno grafico**
+- [] ** Introducir el navegador en el entorno grafico**
+
+
+### Fase 5.1: Optimizacion de la interfaz grafica y aplicaciones
+
+
 
 ### Fase 5.5: Subsistema de Compatibilidad Linux (Aether-Linux-Subsystem)
 *Objetivo: Ejecutar binarios ELF de Linux sin máquinas virtuales.*
