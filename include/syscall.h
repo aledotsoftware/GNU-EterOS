@@ -106,6 +106,10 @@
 #define SYS_getrusage           98
 #define SYS_sysinfo             99
 #define SYS_times               100
+#define SYS_getuid              102
+#define SYS_getgid              104
+#define SYS_geteuid             107
+#define SYS_getegid             108
 
 /* ========================================================================= */
 /* Syscall Registers Structure                                               */

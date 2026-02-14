@@ -79,4 +79,7 @@ struct tcp_header {
 #define TCP_PSH (1 << 3)
 #define TCP_ACK (1 << 4)
 
+/* Checksum helper (implemented in stack.c) */
+uint16_t net_checksum(void* vdata, size_t length);
+
 #endif /* ETEROS_NET_DEFS_H */

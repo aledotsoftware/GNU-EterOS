@@ -12,6 +12,8 @@
 #include "../include/task.h"
 #include "../include/vga.h"
 #include "../include/keyboard.h"
+#include <fs/vfs.h>
+#include <mm.h>
 
 /* ========================================================================= */
 /* Constantes MSR                                                            */
@@ -51,6 +53,7 @@ void syscall_init(void) {
 void syscall_handler(struct syscall_regs* regs) {
     /* Por defecto, retornamos -ENOSYS (-38) */
     uint64_t ret = (uint64_t)-38;
+    task_t* current_task = task_get_current();
 
     /* Debug: imprimir syscall number */
     /*
@@ -63,41 +66,116 @@ void syscall_handler(struct syscall_regs* regs) {
 
     switch (regs->rax) {
         case SYS_read:
-            /* sys_read(fd, buf, count) */
-            if (regs->rdi == 0) { /* STDIN */
+            {
+                int fd = (int)regs->rdi;
                 char* buf = (char*)regs->rsi;
                 size_t count = (size_t)regs->rdx;
-                size_t i = 0;
-                /* Simple implementation: read from keyboard buffer */
-                for (; i < count; i++) {
-                    buf[i] = keyboard_getchar();
-                    /* Echo? Maybe not here. */
-                    if (buf[i] == '\n') { i++; break; } /* Line buffered-ish */
+
+                if (fd < 0 || fd >= MAX_FD) {
+                    ret = (uint64_t)-9; /* EBADF */
+                    break;
                 }
-                ret = i;
-            } else {
-                ret = (uint64_t)-9; /* EBADF */
+
+                file_descriptor_t* desc = &current_task->fd_table[fd];
+                if (desc->node) {
+                    uint32_t bytes_read = read_fs(desc->node, desc->offset, count, (uint8_t*)buf);
+                    desc->offset += bytes_read;
+                    ret = bytes_read;
+                } else {
+                    /* Fallback for stdin */
+                    if (fd == 0) {
+                        size_t i = 0;
+                        for (; i < count; i++) {
+                            buf[i] = keyboard_getchar();
+                            if (buf[i] == '\n') { i++; break; }
+                        }
+                        ret = i;
+                    } else {
+                        ret = (uint64_t)-9; /* EBADF */
+                    }
+                }
             }
             break;
 
         case SYS_write:
-            /* sys_write(fd, buf, count) */
-            /* Implementación temporal directa a consola */
-            if (regs->rdi == 1 || regs->rdi == 2) {
-                const char* s = (const char*)regs->rsi;
-                size_t len = (size_t)regs->rdx;
-                /* Validar puntero s (TODO) */
-                for(size_t i=0; i<len; i++) {
-                    terminal_putchar(s[i]);
+            {
+                int fd = (int)regs->rdi;
+                const char* buf = (const char*)regs->rsi;
+                size_t count = (size_t)regs->rdx;
+
+                if (fd < 0 || fd >= MAX_FD) {
+                    ret = (uint64_t)-9; /* EBADF */
+                    break;
                 }
-                ret = len;
-            } else {
-                ret = (uint64_t)-9; /* EBADF (-9) */
+
+                file_descriptor_t* desc = &current_task->fd_table[fd];
+                if (desc->node) {
+                    uint32_t bytes_written = write_fs(desc->node, desc->offset, count, (uint8_t*)buf);
+                    desc->offset += bytes_written;
+                    ret = bytes_written;
+                } else {
+                    /* Fallback for stdout/stderr */
+                    if (fd == 1 || fd == 2) {
+                        for(size_t i=0; i<count; i++) {
+                            terminal_putchar(buf[i]);
+                        }
+                        ret = count;
+                    } else {
+                        ret = (uint64_t)-9; /* EBADF */
+                    }
+                }
             }
             break;
 
         case SYS_open:
+            {
+                const char* path = (const char*)regs->rdi;
+                int flags = (int)regs->rsi;
+                /* int mode = (int)regs->rdx; */
+
+                /* Find free FD */
+                int fd = -1;
+                for (int i = 0; i < MAX_FD; i++) {
+                    if (current_task->fd_table[i].node == NULL) {
+                        fd = i;
+                        break;
+                    }
+                }
+
+                if (fd == -1) {
+                    ret = (uint64_t)-24; /* EMFILE */
+                } else {
+                    fs_node_t* node = vfs_lookup(fs_root, path);
+                    if (node) {
+                        current_task->fd_table[fd].node = node;
+                        current_task->fd_table[fd].offset = 0;
+                        current_task->fd_table[fd].flags = flags;
+                        open_fs(node, 1, 1);
+                        ret = fd;
+                    } else {
+                        ret = (uint64_t)-2; /* ENOENT */
+                    }
+                }
+            }
+            break;
+
         case SYS_close:
+            {
+                int fd = (int)regs->rdi;
+                if (fd < 0 || fd >= MAX_FD || current_task->fd_table[fd].node == NULL) {
+                    ret = (uint64_t)-9; /* EBADF */
+                } else {
+                    fs_node_t* node = current_task->fd_table[fd].node;
+                    close_fs(node);
+                    kfree(node);
+                    current_task->fd_table[fd].node = NULL;
+                    current_task->fd_table[fd].offset = 0;
+                    current_task->fd_table[fd].flags = 0;
+                    ret = 0;
+                }
+            }
+            break;
+
         case SYS_stat:
         case SYS_fstat:
         case SYS_lstat:
@@ -153,6 +231,166 @@ void syscall_handler(struct syscall_regs* regs) {
                 extern size_t net_protocol_recv(char* buf, size_t max_len);
                 ret = net_protocol_recv((char*)regs->rsi, (size_t)regs->rdx);
             }
+            break;
+
+        /* Essential POSIX Syscalls (Stubs) */
+        case SYS_lseek:
+            {
+                int fd = (int)regs->rdi;
+                uint64_t offset = (uint64_t)regs->rsi; /* off_t */
+                int whence = (int)regs->rdx;
+
+                if (fd < 0 || fd >= MAX_FD || current_task->fd_table[fd].node == NULL) {
+                     ret = (uint64_t)-9; /* EBADF */
+                     break;
+                }
+
+                file_descriptor_t* desc = &current_task->fd_table[fd];
+                /* SEEK_SET 0, SEEK_CUR 1, SEEK_END 2 */
+                if (whence == 0) desc->offset = (uint32_t)offset;
+                else if (whence == 1) desc->offset += (uint32_t)offset;
+                else if (whence == 2) desc->offset = desc->node->length + (uint32_t)offset;
+                else { ret = (uint64_t)-22; break; } /* EINVAL */
+
+                ret = desc->offset;
+            }
+            break;
+
+        case SYS_poll:
+        case SYS_mmap:
+        case SYS_mprotect:
+        case SYS_munmap:
+        case SYS_brk:
+        case SYS_rt_sigaction:
+        case SYS_rt_sigprocmask:
+        case SYS_rt_sigreturn:
+        case SYS_ioctl:
+        case SYS_pread64:
+        case SYS_pwrite64:
+        case SYS_readv:
+        case SYS_writev:
+        case SYS_access:
+        case SYS_pipe:
+        case SYS_select:
+        case SYS_mremap:
+        case SYS_msync:
+        case SYS_mincore:
+        case SYS_madvise:
+        case SYS_shmget:
+        case SYS_shmat:
+        case SYS_shmctl:
+        case SYS_dup:
+        case SYS_dup2:
+        case SYS_pause:
+        case SYS_nanosleep:
+        case SYS_getitimer:
+        case SYS_alarm:
+        case SYS_setitimer:
+        case SYS_sendfile:
+        case SYS_socket:
+        case SYS_connect:
+        case SYS_accept:
+        case SYS_sendmsg:
+        case SYS_recvmsg:
+        case SYS_shutdown:
+        case SYS_bind:
+        case SYS_listen:
+        case SYS_getsockname:
+        case SYS_getpeername:
+        case SYS_socketpair:
+        case SYS_setsockopt:
+        case SYS_getsockopt:
+        case SYS_wait4:
+            ret = (uint64_t)-38; /* ENOSYS for wait4 */
+            break;
+
+        case SYS_kill:
+            {
+                pid_t pid = (pid_t)regs->rdi;
+                int sig = (int)regs->rsi;
+                task_t* target = task_get_by_id(pid);
+                if (target) {
+                    if (sig > 0 && sig < 32) {
+                        target->signal_pending |= (1 << (sig - 1));
+                    }
+                    ret = 0;
+                } else {
+                    ret = (uint64_t)-3; /* ESRCH */
+                }
+            }
+            break;
+
+        case SYS_uname:
+            {
+                struct utsname {
+                    char sysname[65];
+                    char nodename[65];
+                    char release[65];
+                    char version[65];
+                    char machine[65];
+                    char domainname[65];
+                } *u = (struct utsname*)regs->rdi;
+
+                if (u) {
+                    strlcpy(u->sysname, "eterOS", 65);
+                    strlcpy(u->nodename, "genesis", 65);
+                    strlcpy(u->release, "0.1.0", 65);
+                    strlcpy(u->version, "Genesis", 65);
+                    strlcpy(u->machine, "x86_64", 65);
+                    strlcpy(u->domainname, "local", 65);
+                    ret = 0;
+                } else {
+                    ret = (uint64_t)-14; /* EFAULT */
+                }
+            }
+            break;
+
+        case SYS_getuid:
+        case SYS_getgid:
+        case SYS_geteuid:
+        case SYS_getegid:
+            ret = 0; /* Always root for now */
+            break;
+
+        case SYS_semget:
+        case SYS_semop:
+        case SYS_semctl:
+        case SYS_shmdt:
+        case SYS_msgget:
+        case SYS_msgsnd:
+        case SYS_msgrcv:
+        case SYS_msgctl:
+        case SYS_fcntl:
+        case SYS_flock:
+        case SYS_fsync:
+        case SYS_fdatasync:
+        case SYS_truncate:
+        case SYS_ftruncate:
+        case SYS_getdents:
+        case SYS_getcwd:
+        case SYS_chdir:
+        case SYS_fchdir:
+        case SYS_rename:
+        case SYS_mkdir:
+        case SYS_rmdir:
+        case SYS_creat:
+        case SYS_link:
+        case SYS_unlink:
+        case SYS_symlink:
+        case SYS_readlink:
+        case SYS_chmod:
+        case SYS_fchmod:
+        case SYS_chown:
+        case SYS_fchown:
+        case SYS_lchown:
+        case SYS_umask:
+        case SYS_gettimeofday:
+        case SYS_getrlimit:
+        case SYS_getrusage:
+        case SYS_sysinfo:
+        case SYS_times:
+            /* Not implemented yet, returns ENOSYS (-38) */
+            // serial_write_string("[SYSCALL] Unimplemented syscall called\n");
             break;
 
         default:

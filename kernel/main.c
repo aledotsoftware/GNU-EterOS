@@ -22,6 +22,7 @@
 #include <fs/vfs.h>
 #include <vga.h>
 #include <task.h>
+#include <net/socket.h>
 
 #include "lwip/init.h"
 #include "lwip/netif.h"
@@ -52,26 +53,9 @@ static void kernel_print_banner(void);
 static void kernel_print_sysinfo(void);
 static void kernel_halt(void);
 
-static struct netif e1000_netif;
-
-/* Stubs for legacy GUI browser support */
-int network_ready = 0;
-int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
-    (void)host; (void)path; (void)response_buf; (void)max_len;
-    return -1;
-}
-
 static void network_task(void) {
     while(1) {
-        ethernetif_poll(&e1000_netif);
-        sys_check_timeouts();
-
-        /* Check if we got an IP */
-        if (!network_ready && e1000_netif.ip_addr.addr != 0) {
-            network_ready = 1;
-            hal_console_write("[NET] DHCP Success. IP Obtained.\n");
-        }
-
+        net_poll();
         task_yield();
     }
 }
@@ -152,24 +136,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
     /* Attempt to init E1000 (Generic Driver but requires PCI) */
     if (e1000_init(NULL) == 0) {
-        hal_console_write("  [NET]  Hardware inicializado. Iniciando Stack TCP/IP (lwIP)...\n");
-
-        lwip_init();
-
-        ip4_addr_t ipaddr, netmask, gw;
-        IP4_ADDR(&ipaddr, 0, 0, 0, 0);
-        IP4_ADDR(&netmask, 0, 0, 0, 0);
-        IP4_ADDR(&gw, 0, 0, 0, 0);
-
-        netif_add(&e1000_netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, ethernet_input);
-        netif_set_default(&e1000_netif);
-        netif_set_up(&e1000_netif);
-
-        dhcp_start(&e1000_netif);
-        hal_console_write("  [NET]  DHCP iniciado.\n");
-
+        hal_console_write("  [NET]  Hardware inicializado.\n");
+        net_init();
+        extern void dhcp_discover(void);
+        dhcp_discover();
         task_create("Network", network_task);
-
     } else {
         hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
         hal_console_write("         (El sistema continuara sin red)\n");
@@ -192,6 +163,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 7. Inicializar Scheduler ---- */
     hal_console_write("  [INIT] Scheduler Round-Robin\n");
     scheduler_init();
+
+    /* ---- 7.5 Lanzar Test de Espacio de Usuario ---- */
+    hal_console_write("  [INIT] Lanzando User Mode Test...\n");
+    extern void user_loader_entry(void);
+    task_create("UserLoader", user_loader_entry);
 
     /* ---- 8. Lanzar Entorno de Escritorio (Flux UI) como Tarea Separada ---- */
     hal_console_write("  [INIT] Lanzando Flux UI...\n");

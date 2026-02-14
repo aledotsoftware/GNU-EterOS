@@ -227,7 +227,7 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 - [ ] **Sistema de Commits Atómicos:** Implementación de un flag en el sector de booteo o NVRAM que determine qué partición es la principal.
   - *Archivo:* `kernel/arch/x64/boot/nvram.c`
 - [ ] **Implementación de Build Update (Toolchain):** Script externo que automatiza el empaquetado `.zst`, firma el manifiesto y realiza la carga vía FTP de forma estructurada.
-  - *Archivo:* `tools/updater/build_update.sh`
+  - *Archivo:* `tools/updater/build_update.ps1`
 
 
 
@@ -244,13 +244,14 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 - [ ] **Soporte de señales:** SIGKILL, SIGSEGV, etc.
 - [ ] **Estructura `/dev`, `/proc`:** Nodos de dispositivos virtuales
 
-### Fase 5: Entorno Gráfico (AetherGraphics)
-- [x] **Motor de Dibujo 2D:** Primitivas: píxeles, líneas, rectángulos, fuentes bitmap (`kernel/ui/primitives.c`)
-- [x] **Double Buffering:** Renderizado sin parpadeo (Backbuffer en RAM)
-- [ ] **Event Loop:** Sistema de mensajes (mouse, teclado → ventanas)
-- [x] **Gestor de Ventanas (Compositor):** Superposición de ventanas con foco (Flux UI - `kernel/ui/window.c`)
-- [x] **Primera App:** Flux UI Demo (gui_demo.c) con multitarea visual
-- [ ] **Widgets Basicos:** Botones, Inputs, Labels.
+### Fase 5: Entorno Gráfico (Flux UI & AetherGraphics)
+- [x] **Motor de Dibujo "Omni":** Primitivas 2D (líneas, rectángulos, fuentes) y **Decodificador PNG Nativo** para iconos y assets (`kernel/ui/upng.c`)
+- [x] **Double Buffering Activo:** Renderizado libre de parpadeo con composicion en RAM antes de flush (`kernel/ui/image.c`)
+- [~] **Event Loop Reactivo:** Sistema de despacho de mensajes (Mouse + Teclado) dirigido a la ventana focalizada con soporte para gestos.
+- [x] **Compositor de Ventanas:** Gestión de apilamiento (Z-order) y transparencia alfa básica en el kernel (`kernel/ui/window.c`)
+- [x] **Flux UI Experience:** Entorno táctil/estilizado con animaciones de zoom, tarjetas flotantes y multitarea fluida (`gui_demo.c`).
+- [~] **Flux Widgets Library:** Componentes interactivos implementados: Botones con feedback, Campos de entrada (URL Bar) y Barras de estado reactivas.
+- [x] **Navegador Eter:** Aplicación de red con stack TCP/IP propio para navegación real en Internet.
 
 ### Fase 5.5: Subsistema de Compatibilidad Linux (Aether-Linux-Subsystem)
 *Objetivo: Ejecutar binarios ELF de Linux sin máquinas virtuales.*

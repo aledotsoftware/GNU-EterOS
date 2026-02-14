@@ -1776,7 +1776,18 @@ void gui_demo_run(void) {
     serial_write_string("[GUI] Entering Main Loop...\n");
     
     desktop_running = true;
+    static uint64_t last_frame_ticks = 0;
+
     while (desktop_running) {
+        /* ⚡ BOLT: Intelligent Frame Refresh (Cap at ~100 FPS if resolution is 10ms) */
+        /* This prevents saturated loops that slow down the emulator's drawing pipeline */
+        uint64_t current_ticks = timer_get_ticks();
+        if (current_ticks == last_frame_ticks) {
+            task_sleep(1); /* ⚡ BOLT: Real sleep to cool down the CPU */
+            continue;
+        }
+        last_frame_ticks = current_ticks;
+
         rect_t dirty = {0, 0, 1024, 768};
 
         /* Handle Mouse Click in main thread context */
@@ -1860,18 +1871,11 @@ void gui_demo_run(void) {
         /* Cursor: Neural Orb (Reactive) */
         uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
         
-        /* Glow Effect (Simplified for performance) */
-         /* Only draw glow every other frame or if not moving fast? 
-            Let's keep it but maybe reduce radius if slow */
-            
         /* Glow Effect (Steady, no pulse) */
-        for (int gy = -4; gy <= 4; gy++) {
-            for (int gx = -4; gx <= 4; gx++) {
-                if ((gx*gx) + (gy*gy) < 20) {
-                     framebuffer_putpixel(mouse_x + gx, mouse_y + gy, 0x404040); 
-                }
-            }
-        }
+        /* ⚡ BOLT OPTIMIZATION: Use block rects instead of 81 putpixel calls */
+        framebuffer_rect(mouse_x - 3, mouse_y - 1, 7, 3, 0x303030);
+        framebuffer_rect(mouse_x - 1, mouse_y - 3, 3, 7, 0x303030);
+        framebuffer_rect(mouse_x - 2, mouse_y - 2, 5, 5, 0x404040);
         
         /* Core Orb (Tactile Click Feedback) */
         if (mouse_left_btn) {
