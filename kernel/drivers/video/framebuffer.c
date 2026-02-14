@@ -43,6 +43,27 @@ void framebuffer_flush(void) {
     }
 }
 
+void framebuffer_flush_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
+    if (!back_buffer || !fb_buffer) return;
+
+    /* Clip coords */
+    if (x >= fb_width) return;
+    if (y >= fb_height) return;
+    if (x + w > fb_width) w = fb_width - x;
+    if (y + h > fb_height) h = fb_height - y;
+
+    if (w == 0 || h == 0) return;
+
+    /* Copy row by row to support pitch */
+    for (uint32_t i = 0; i < h; i++) {
+        uint8_t* dest = (uint8_t*)fb_buffer + ((y + i) * fb_pitch) + (x * (fb_bpp / 8));
+        uint8_t* src  = (uint8_t*)back_buffer + ((y + i) * fb_pitch) + (x * (fb_bpp / 8));
+        size_t row_len = w * (fb_bpp / 8);
+        
+        memcpy(dest, src, row_len);
+    }
+}
+
 void framebuffer_putpixel(uint32_t x, uint32_t y, uint32_t color) {
     if (x >= fb_width || y >= fb_height) return;
     

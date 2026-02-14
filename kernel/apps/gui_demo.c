@@ -872,14 +872,32 @@ void gui_draw_boot_logo(void) {
     framebuffer_flush();
     
     /* Fake Progress Animation (approx 2 seconds) */
-    for (int i=0; i<=100; i+=2) {
-        framebuffer_rect(bx, by, (bw * i) / 100, 4, 0x00AAAA);
-        framebuffer_flush();
-        task_sleep(40); /* 50 steps * 40ms = 2000ms */
+    /* Smooth Progress Animation (Time-based ~2 seconds) */
+    uint32_t start_tick = timer_get_ticks();
+    uint32_t duration_ticks = 200; /* 2 seconds @ 100Hz */
+    
+    while (1) {
+        uint32_t current = timer_get_ticks();
+        if (current - start_tick > duration_ticks) break;
+        
+        int progress = ((current - start_tick) * 100) / duration_ticks;
+        int fill_w = (bw * progress) / 100;
+        
+        framebuffer_rect(bx, by, fill_w, 4, 0x00AAAA);
+        
+        /* Partial flush for speed! */
+        framebuffer_flush_rect(bx, by, bw, 4);
+        
+        /* Yield to CPU, but wake up fast */
+        task_sleep(10); 
     }
     
-    /* Final pause (1 second) to complete the 3 seconds */
-    task_sleep(1000); 
+    /* Ensure 100% at end */
+    framebuffer_rect(bx, by, bw, 4, 0x00AAAA);
+    framebuffer_flush_rect(bx, by, bw, 4);
+    
+    /* Final pause (1 second) */
+    task_sleep(100); 
 }
 
 /* ========================================================================= */
@@ -1486,7 +1504,8 @@ void gui_demo_run(void) {
         framebuffer_rect(mouse_x - 3, mouse_y - 1, 6, 2, cursor_col);
         
         framebuffer_flush(); 
-        task_sleep(10); /* Cap FPS to ~100 to avoid CPU saturation */
+        /* Smoother loop: Higher FPS cap (5 ms) */
+        task_sleep(5); 
     }
     
     terminal_initialize(NULL);
