@@ -1,0 +1,113 @@
+[IMG]  Generando imagen de disco...
+dd if=/dev/zero of=build/eteros.img bs=512 count=2880 2>/dev/null
+dd if=build/boot.bin of=build/eteros.img bs=512 conv=notrunc 2>/dev/null
+dd if=build/kernel.bin of=build/eteros.img bs=512 seek=17 conv=notrunc 2>/dev/null
+dd if=build/initrd.img of=build/eteros.img bs=512 seek=273 conv=notrunc 2>/dev/null
+[IMG]  Imagen generada: build/eteros.img (1474560 bytes)
+
+================================================
+  eterOS construido exitosamente! (ARCH=x86_64)
+  Imagen: build/eteros.img
+  Ejecutar: make run
+================================================
+
+[QEMU] Iniciando eterOS (modo texto)...
+qemu-system-x86_64 -drive format=raw,file=build/eteros.img,index=0,if=ide,media=disk \
+        -serial mon:stdio                             \
+        -m 128M                                       \
+        -nographic                                    \
+        -no-reboot                                    \
+        -no-shutdown
+c[?7l[2J[0mSeaBIOS (version 1.16.3-debian-1.16.3-2)
+
+
+iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+06FCAF60+06F0AF60 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...
+
+
+Booting from Hard Disk...
+[eterOS] Bootloader Stage 1
+  Cargando Stage 2... OK
+[eterOS] Stage 2 activo
+  Cargando Kernel...   Long Mode: Soportado
+  Memoria detectada (E820)
+  Cargando Kernel...   Cargando Initrd...   Configurando VBE 1024x768...[01;08H[01;19H[01;31H[GDT] Inicializando GDT y TSS...
+[GDT] GDT cargada. TSS activa.
+[eterOS] IDT cargada (256 vectores).
+[SYSCALL] Initializing MSRs for x86_64...
+[SYSCALL] x86_64 mechanism enabled.
+[eterOS] PIT configurado a ~100 Hz.
+
+[eterOS] HAL Inicializada.
+[UI] Error: Image not found: logo.png
+[PMM] Region: Base=0x0x0000000000000000 Len=0x0x000000000009FC00 Type=1
+[PMM] Region: Base=0x0x000000000009FC00 Len=0x0x0000000000000400 Type=2
+[PMM] Region: Base=0x0x00000000000F0000 Len=0x0x0000000000010000 Type=2
+[PMM] Region: Base=0x0x0000000000100000 Len=0x0x0000000007EE0000 Type=1
+[PMM] Region: Base=0x0x0000000007FE0000 Len=0x0x0000000000020000 Type=2
+[PMM] Region: Base=0x0x00000000FFFC0000 Len=0x0x0000000000040000 Type=2
+[PMM] Region: Base=0x0x000000FD00000000 Len=0x0x0000000300000000 Type=2
+[VMM] Inicializando Gestor de Memoria Virtual...
+[VMM] Usando PML4 del bootloader en 0x70000
+[MM] Heap inicializado dinamicamente.
+     Start: 0x0x0000000000100000
+     Size:  126 MB
+[INITRD] Initialized at 0x0x0000000000040000. Found 4 files.
+[VFS] Initrd mounted at /
+  [VFS] Found file: dev
+  [VFS] Found file: proc
+  [VFS] Found file: README
+  [VFS] Found file: test.elf
+  [VFS] Found file: logo.png
+  [VFS] Found file: hello.txt
+
+  [NET]  Escaneando dispositivos de red...
+[E1000] MMIO Base: 0x0x00000000FEB80000
+  [NET]  Hardware inicializado.
+[NET] Paquete enviado.
+[SCHED] Tarea creada: Network
+
+          _             ___  ____
+     ___ | |_ ___  _ _ / _ \/ ___|
+    / _ \| __/ _ \| '_| | | \___ \
+   |  __/| ||  __/| | | |_| |___) |
+    \___| \__\___||_|  \___/|____/
+
+  ========================================
+    Version 0.1.0 ("Genesis")
+    (c) 2026 Tudex Networks
+  ========================================
+
+[eterOS] Kernel cargado.
+[eterOS] (c) 2026 Tudex Networks
+  [INFO] Arquitectura: x86_64
+  [INFO] Board/Target: Generic
+[MOUSE] Inicializando PS/2 Mouse...
+[MOUSE] Driver inicializado y IRQ12 desenmascarada.
+  [INIT] Scheduler Round-Robin
+[SCHED] Scheduler Round-Robin inicializado
+  [INIT] Lanzando User Mode Test...
+[SCHED] Tarea creada: UserLoader
+  [INIT] Lanzando Flux UI...
+[SCHED] Tarea creada: FluxUI
+[MAIN] GUI Task DEAD or NULL. Exiting loop.
+
+  [INFO] FluxUI finalizado. Retornando a consola...
+
+  Terminal interactiva lista. Escribe help para ver comandos.
+
+eterOS> [USER] Starting User Mode Loader...
+[ELF] Loading file: test.elf
+[USER] ELF Loaded Successfully. Entry: 0x0x0000000200000000
+[USER] Jumping to Ring 3...
+[SYSCALL] ENTRY NR=0x0x0000000000000001
+HHeelllloo  ffrroomm  EELLFF  UUsseerrllaanndd!!
+
+
+  [PANIC] Page Fault (INT 14)
+    RIP: 0x0x0000000000000001  CS: 0x0x0000000000000023  RFLAGS: 0x0x0000000000000206
+    Error Code: 0x0x0000000000000005
+  Sistema detenido.
+[PANIC] Exception INT 14
+RIP: 0x0000000000000001 Error: 0x0000000000000005
+qemu-system-x86_64: terminating on signal 15 from pid 7389 (timeout)

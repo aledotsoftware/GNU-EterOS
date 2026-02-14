@@ -63,6 +63,27 @@ static void network_task(void) {
 }
 
 /* ========================================================================= */
+/* Network Stubs (Legacy Support)                                            */
+/* ========================================================================= */
+/* int network_ready = 1; Defined in net/stack.c */
+
+/* raw_tcp_get might also be in stack.c? Let's check first. */
+int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
+    (void)host;
+    (void)path;
+    (void)max_len;
+
+    const char* stub_response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello from Stub!";
+    size_t len = strlen(stub_response);
+    if (len >= max_len) len = max_len - 1;
+
+    memcpy(response_buf, stub_response, len);
+    response_buf[len] = 0;
+
+    return (int)len;
+}
+
+/* ========================================================================= */
 /* Punto de entrada del kernel                                               */
 /* ========================================================================= */
 

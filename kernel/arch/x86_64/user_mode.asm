@@ -14,16 +14,16 @@ enter_user_mode:
     ; User Data Selector: 0x18 | 3 = 0x1B
     ; User Code Selector: 0x20 | 3 = 0x23
 
+    ; Swap GS MSRs FIRST to save Kernel GS Base into KERNEL_GS_BASE
+    ; Before: GS_BASE = &per_cpu, KERNEL_GS_BASE = 0
+    ; After:  GS_BASE = 0, KERNEL_GS_BASE = &per_cpu
+    swapgs
+
     mov ax, 0x1B    ; User Data Segment (Index 3, RPL 3)
     mov ds, ax
     mov es, ax
     mov fs, ax
-    mov gs, ax      ; Update GS selector
-
-    ; Swap GS MSRs
-    ; Before: GS_BASE = &per_cpu, KERNEL_GS_BASE = 0
-    ; After:  GS_BASE = 0, KERNEL_GS_BASE = &per_cpu
-    swapgs
+    mov gs, ax      ; Update GS selector (Base becomes 0, which matches current GS_BASE)
 
     ; Construct IRETQ Frame
     ; Stack order (pushes): SS, RSP, RFLAGS, CS, RIP
