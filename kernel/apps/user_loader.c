@@ -19,8 +19,8 @@ void user_loader_entry(void) {
         return;
     }
 
-    /* Map it to 0x100000000 (4GB, above bootloader huge pages) */
-    uint64_t user_code_virt = 0x100000000;
+    /* Map it to 0x200000000 (8GB, well above bootloader mapping) */
+    uint64_t user_code_virt = 0x200000000;
     /* PAGE_USER | PAGE_WRITE | PAGE_PRESENT */
     if (vmm_map_page((uint64_t)code_phys, user_code_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER) < 0) {
          serial_write_string("[USER] Failed to map code page\n");
@@ -38,8 +38,8 @@ void user_loader_entry(void) {
         return;
     }
 
-    /* Map it to 0x100002000 (User Virtual Address) */
-    uint64_t user_stack_virt = 0x100002000;
+    /* Map it to 0x200002000 (8GB + 8KB) */
+    uint64_t user_stack_virt = 0x200002000;
     if (vmm_map_page((uint64_t)stack_phys, user_stack_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER) < 0) {
          serial_write_string("[USER] Failed to map stack page\n");
          return;
