@@ -196,7 +196,8 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\apps\santitravel.c",
     "$KERNEL_DIR\apps\sysmon.c",
     "$KERNEL_DIR\apps\gui_demo.c",
-    "$KERNEL_DIR\task.c"
+    "$KERNEL_DIR\task.c",
+    "$KERNEL_DIR\fs\initrd.c"
 )
 
 # Archivos específicos de arquitectura
@@ -244,6 +245,7 @@ function Initialize-BuildDirs {
         "$BUILD_DIR\$KERNEL_DIR\net",
         "$BUILD_DIR\$KERNEL_DIR\mm",
         "$BUILD_DIR\$KERNEL_DIR\apps",
+        "$BUILD_DIR\$KERNEL_DIR\fs",
         "$BUILD_DIR\$KERNEL_DIR\ui"
     )
     foreach ($d in $dirs) {
