@@ -224,23 +224,6 @@ check_long_mode:
 
 ; -----------------------------------------------------------------------------
 ; detect_memory: BIOS INT 0x15, EAX=0xE820
-;   Guarda el mapa de memoria en la dirección 0x5000 (MEM_MAP_ADDR)
-;   Formato:
-;     offset 0: count (uint32) - número de entradas
-;     offset 4: entry 0 (24 bytes)
-;     offset 28: entry 1 ...
-; -----------------------------------------------------------------------------
-KERNEL_START_LBA    equ 1 + STAGE2_SECTORS
-
-load_kernel:
-    mov si, s2_msg_load_kern
-    call print_16
-
-    mov eax, KERNEL_START_LBA
-    mov ecx, KERNEL_SECTORS
-    mov edi, KERNEL_LOAD_ADDR
-    call read_sectors_lba
-    ret
 
 MEM_MAP_ADDR equ 0x5000
 

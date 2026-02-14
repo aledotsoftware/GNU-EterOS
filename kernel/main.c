@@ -43,7 +43,7 @@ static void kernel_print_banner(void);
 static void kernel_print_sysinfo(void);
 static void kernel_halt(void);
 
-static struct netif e1000_netif;
+/* static struct netif e1000_netif;
 
 static void network_task(void) {
     while(1) {
@@ -51,7 +51,7 @@ static void network_task(void) {
         sys_check_timeouts();
         task_yield();
     }
-}
+} */
 
 /* ========================================================================= */
 /* Punto de entrada del kernel                                               */
@@ -112,7 +112,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* For now, assume simple stack usage or static buffers */
     #endif
 
-    /* ---- 4. Inicializar Red (Solo Tier 3+) ---- */
+    /* ---- 4. Inicializar Red (Deshabilitado temporalmente) ---- */
+    #if 0
     #if ETEROS_TIER >= 3
         hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
         /* Attempt to init E1000 (Generic Driver but requires PCI) */
@@ -139,6 +140,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
             hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
             hal_console_write("         (El sistema continuara sin red)\n");
         }
+    #endif
     #endif
 
     /* ---- 5. Mostrar banner de éterOS ---- */

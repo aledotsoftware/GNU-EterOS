@@ -30,7 +30,8 @@
 #include "../include/task.h"
 #include "../include/gui_demo.h"
 #include "../include/rtc.h"
-#include "../include/apps/wget.h"
+#include "../include/rtc.h"
+/* #include "../include/apps/wget.h" */
 
 /* ========================================================================= */
 /* Constantes del sistema                                                    */
@@ -72,7 +73,8 @@ static void cmd_ps(const char* args);
 static void cmd_kill(const char* args);
 static void cmd_demo(const char* args);
 static void cmd_date(const char* args);
-static void cmd_wget(const char* args);
+static void cmd_date(const char* args);
+/* static void cmd_wget(const char* args); */
 
 /* ========================================================================= */
 /* Tabla de comandos (extensible — solo agregar entradas)                    */
@@ -93,7 +95,7 @@ static const shell_command_t commands[] = {
     { "kill",     "Matar tarea (uso: kill <pid>)",                cmd_kill    },
     { "demo",     "Crear tarea de fondo (test scheduler)",        cmd_demo    },
     { "date",     "Muestra fecha y hora (UTC / Argentina)",      cmd_date    },
-    { "wget",     "Descarga archivo HTTP (uso: wget url)",       cmd_wget    },
+   /* { "wget",     "Descarga archivo HTTP (uso: wget url)",       cmd_wget    }, */
     { "reboot",   "Reinicia el sistema",                         cmd_reboot  },
     { "halt",     "Detiene la CPU",                              cmd_halt    },
 };
@@ -453,18 +455,17 @@ static void cmd_date(const char* args) {
     terminal_write_string("\n");
 }
 
-static void cmd_wget(const char* args) {
+/* static void cmd_wget(const char* args) {
     if (!args || *args == '\0') {
         terminal_write_string("Uso: wget <url>\n");
         terminal_write_string("Ejemplo: wget google.com\n");
         return;
     }
 
-    /* Skip spaces */
     while (*args == ' ') args++;
 
     wget_run(args);
-}
+} */
 
 /* ========================================================================= */
 /* Comando `ps` — Listar tareas del scheduler                                */
