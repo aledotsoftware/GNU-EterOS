@@ -1,9 +1,11 @@
 #include <net/defs.h>
+#include <net/socket.h>
 #include <net/e1000.h>
 #include <string.h>
-#include <vga.h>
 #include <timer.h>
 #include <task.h>
+#include <vga.h>
+#include <mm.h>
 
 /* Global Network Info */
 uint32_t my_ip = 0;
@@ -11,6 +13,14 @@ uint32_t gateway_ip = 0;
 uint32_t dns_ip = 0;
 uint8_t gateway_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 int network_ready = 0;
+
+socket_entry_t socket_table[MAX_SOCKETS];
+
+/* Forward Declarations */
+void tcp_input(socket_entry_t* sock, struct tcp_header* tcp, int len, uint32_t src_ip);
+int tcp_connect(socket_entry_t* sock, uint32_t dest_ip, uint16_t dest_port);
+int tcp_send(socket_entry_t* sock, const void* data, int len);
+int tcp_close(socket_entry_t* sock);
 
 /* Checksum helper for IP/TCP */
 uint16_t net_checksum(void* vdata, size_t length) {
@@ -30,8 +40,96 @@ uint16_t net_checksum(void* vdata, size_t length) {
     return (uint16_t)~acc;
 }
 
-/* Very simple ARP lookup */
+int net_init(void) {
+    memset(socket_table, 0, sizeof(socket_table));
+    network_ready = 0;
+    return 0;
+}
+
+static void handle_arp(struct ethernet_header* eth, struct arp_packet* arp) {
+    (void)eth;
+    if (ntohs(arp->op) == 2) { /* Reply */
+        if (arp->src_ip == gateway_ip) {
+            memcpy(gateway_mac, arp->src_mac, 6);
+        }
+    } else if (ntohs(arp->op) == 1) { /* Request */
+        if (arp->dest_ip == my_ip && my_ip != 0) {
+            /* Reply to ARP Request */
+            uint8_t buffer[64];
+            struct ethernet_header* reth = (struct ethernet_header*)buffer;
+            struct arp_packet* rarp = (struct arp_packet*)(buffer + sizeof(struct ethernet_header));
+
+            uint8_t* my_mac = e1000_get_mac();
+
+            memcpy(reth->dest, eth->src, 6);
+            memcpy(reth->src, my_mac, 6);
+            reth->type = htons(ETHERNET_TYPE_ARP);
+
+            rarp->htype = htons(1);
+            rarp->ptype = htons(ETHERNET_TYPE_IP);
+            rarp->hlen = 6;
+            rarp->plen = 4;
+            rarp->op = htons(2); /* Reply */
+
+            memcpy(rarp->src_mac, my_mac, 6);
+            rarp->src_ip = my_ip;
+            memcpy(rarp->dest_mac, arp->src_mac, 6);
+            rarp->dest_ip = arp->src_ip;
+
+            e1000_send_packet(buffer, sizeof(struct ethernet_header) + sizeof(struct arp_packet));
+        }
+    }
+}
+
+void net_poll(void) {
+    uint8_t buffer[1514];
+    int len = e1000_receive(buffer, sizeof(buffer));
+    if (len > 0) {
+        struct ethernet_header* eth = (struct ethernet_header*)buffer;
+        uint16_t type = ntohs(eth->type);
+
+        if (type == ETHERNET_TYPE_ARP) {
+            struct arp_packet* arp = (struct arp_packet*)(buffer + sizeof(struct ethernet_header));
+            handle_arp(eth, arp);
+        } else if (type == ETHERNET_TYPE_IP) {
+            struct ip_header* ip = (struct ip_header*)(buffer + sizeof(struct ethernet_header));
+
+            /* Basic IP Checks */
+            if (ip->dest == my_ip) {
+                if (ip->proto == IP_PROTO_TCP) {
+                    struct tcp_header* tcp = (struct tcp_header*)((uint8_t*)ip + ((ip->ver_ihl & 0xF) * 4));
+                    int ip_hdr_len = (ip->ver_ihl & 0xF) * 4;
+                    int tcp_len = ntohs(ip->len) - ip_hdr_len;
+
+                    /* Find Socket */
+                    for (int i = 0; i < MAX_SOCKETS; i++) {
+                        socket_entry_t* s = &socket_table[i];
+                        if (s->used && s->protocol == IPPROTO_TCP &&
+                            s->local_port == ntohs(tcp->dest_port)) {
+
+                            /* If connected, check remote IP/Port */
+                            if (s->state != SOCKET_STATE_LISTEN) {
+                                if (s->remote_ip != ip->src) {
+                                     /* Allow generic match if waiting for connection or loose check? */
+                                     /* Strict check: */
+                                     if (s->remote_ip != 0 && s->remote_ip != ip->src) continue;
+                                }
+                                /* Check port? */
+                            }
+
+                            tcp_input(s, tcp, tcp_len, ip->src);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ARP Lookup (Blocking with timeout) */
 int net_arp_lookup(uint32_t target_ip) {
+    /* Send ARP Request */
     uint8_t buffer[64];
     memset(buffer, 0, sizeof(buffer));
     
@@ -58,22 +156,94 @@ int net_arp_lookup(uint32_t target_ip) {
     
     e1000_send_packet(buffer, sizeof(struct ethernet_header) + sizeof(struct arp_packet));
     
-    /* Polling for response */
-    uint8_t rx[1514];
+    /* Wait for response via net_poll */
     uint64_t start = timer_get_ticks();
-    while (timer_get_ticks() - start < 100) {
-        int len = e1000_receive(rx, sizeof(rx));
-        if (len >= (int)(sizeof(struct ethernet_header) + sizeof(struct arp_packet))) {
-            struct ethernet_header* reth = (struct ethernet_header*)rx;
-            if (ntohs(reth->type) == ETHERNET_TYPE_ARP) {
-                struct arp_packet* rarp = (struct arp_packet*)(rx + sizeof(struct ethernet_header));
-                if (ntohs(rarp->op) == 2 && rarp->src_ip == target_ip) {
-                    memcpy(gateway_mac, rarp->src_mac, 6);
-                    return 0;
-                }
-            }
-        }
+    while (timer_get_ticks() - start < 100) { /* 1s timeout */
+        net_poll(); /* Process incoming packets */
+        if (target_ip == gateway_ip && gateway_mac[0] != 0xFF) return 0; /* Found! */
         task_yield();
     }
     return -1;
+}
+
+socket_t net_socket(int domain, int type, int protocol) {
+    if (domain != AF_INET || type != SOCK_STREAM || protocol != IPPROTO_TCP) return -1;
+
+    for (int i = 0; i < MAX_SOCKETS; i++) {
+        if (!socket_table[i].used) {
+            socket_table[i].used = 1;
+            socket_table[i].id = i;
+            socket_table[i].state = SOCKET_STATE_CLOSED;
+            socket_table[i].local_port = 0;
+            socket_table[i].rx_head = 0;
+            socket_table[i].rx_tail = 0;
+            socket_table[i].protocol = protocol;
+            return i;
+        }
+    }
+    return -1;
+}
+
+int net_connect(socket_t sock, const struct sockaddr_in* addr, int addrlen) {
+    (void)addrlen;
+    socket_entry_t* s = get_socket(sock);
+    if (!s) return -1;
+
+    /* Resolve Gateway ARP if needed */
+    if (gateway_mac[0] == 0xFF) {
+        if (net_arp_lookup(gateway_ip) != 0) return -2;
+    }
+
+    /* Bind ephemeral port if 0 */
+    if (s->local_port == 0) {
+        s->local_port = 49152 + (timer_get_ticks() % 16384);
+    }
+
+    return tcp_connect(s, addr->sin_addr, ntohs(addr->sin_port));
+}
+
+int net_send(socket_t sock, const void* buf, int len, int flags) {
+    (void)flags;
+    socket_entry_t* s = get_socket(sock);
+    if (!s) return -1;
+    return tcp_send(s, buf, len);
+}
+
+int net_recv(socket_t sock, void* buf, int len, int flags) {
+    socket_entry_t* s = get_socket(sock);
+    if (!s) return -1;
+
+    /* Blocking Read */
+    uint8_t* out = (uint8_t*)buf;
+    int read = 0;
+
+    while (read < len) {
+        /* Check if data available */
+        if (s->rx_head != s->rx_tail) {
+            out[read++] = s->rx_buf[s->rx_tail];
+            s->rx_tail = (s->rx_tail + 1) % RX_BUFFER_SIZE;
+        } else {
+            /* No data */
+            if (s->state == SOCKET_STATE_CLOSED || s->state == SOCKET_STATE_TIME_WAIT || s->state == SOCKET_STATE_CLOSE_WAIT) {
+                if (read > 0) return read;
+                return 0; /* EOF */
+            }
+            if (flags & MSG_DONTWAIT) return (read > 0) ? read : -1;
+
+            /* Wait */
+            net_poll(); /* Ensure we process packets while waiting */
+            task_yield();
+        }
+    }
+    return read;
+}
+
+int net_close(socket_t sock) {
+    socket_entry_t* s = get_socket(sock);
+    if (!s) return -1;
+
+    tcp_close(s);
+
+    /* Allow socket to be reused? Wait for TCP state machine to finish */
+    return 0;
 }
