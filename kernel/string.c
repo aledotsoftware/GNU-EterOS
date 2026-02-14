@@ -159,11 +159,19 @@ int memcmp(const void* s1, const void* s2, size_t n) {
  */
 
 size_t strlen(const char* str) {
-    size_t len = 0;
-    while (str[len]) {
-        len++;
+    const char *s = str;
+    /*
+     * Unroll loop (4x) to reduce branching overhead.
+     * This is faster than byte-by-byte and safer/simpler than word-at-a-time (SWAR)
+     * which requires strict aliasing care.
+     */
+    while (1) {
+        if (!s[0]) return s - str;
+        if (!s[1]) return s - str + 1;
+        if (!s[2]) return s - str + 2;
+        if (!s[3]) return s - str + 3;
+        s += 4;
     }
-    return len;
 }
 
 char* strncpy(char* dest, const char* src, size_t n) {
