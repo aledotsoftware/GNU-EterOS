@@ -167,6 +167,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("  [INIT] Scheduler Round-Robin\n");
     scheduler_init();
 
+    /* ---- 7.5 Lanzar Test de Espacio de Usuario ---- */
+    hal_console_write("  [INIT] Lanzando User Mode Test...\n");
+    extern void user_loader_entry(void);
+    task_create("UserLoader", user_loader_entry);
+
     /* ---- 8. Lanzar Entorno de Escritorio (Flux UI) como Tarea Separada ---- */
     hal_console_write("  [INIT] Lanzando Flux UI...\n");
     
