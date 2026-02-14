@@ -6,6 +6,7 @@
  */
 
 #include "../include/string.h"
+#include "../include/stdlib.h"
 
 /* ========================================================================= */
 /* Funciones de Memoria                                                      */
@@ -227,6 +228,50 @@ int strcmp(const char* s1, const char* s2) {
         s2++;
     }
     return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+}
+
+char* strchr(const char *s, int c) {
+    while (*s != (char)c) {
+        if (!*s++) {
+            return 0;
+        }
+    }
+    return (char *)s;
+}
+
+int strncmp(const char* s1, const char* s2, size_t n) {
+    while (n > 0 && *s1 && (*s1 == *s2)) {
+        s1++;
+        s2++;
+        n--;
+    }
+    if (n == 0) return 0;
+    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+}
+
+/* ========================================================================= */
+/* Funciones de Libreria Estandar (Simuladas)                                */
+/* ========================================================================= */
+
+int atoi(const char* str) {
+    int res = 0;
+    int sign = 1;
+
+    /* Skip whitespace */
+    while (*str == ' ' || (*str >= 9 && *str <= 13)) str++;
+
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    } else if (*str == '+') {
+        str++;
+    }
+
+    while (*str >= '0' && *str <= '9') {
+        res = res * 10 + (*str - '0');
+        str++;
+    }
+    return sign * res;
 }
 
 /* ========================================================================= */

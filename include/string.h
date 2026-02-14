@@ -88,6 +88,16 @@ size_t strlcat(char* dest, const char* src, size_t size);
 int strcmp(const char* s1, const char* s2);
 
 /**
+ * Encuentra la primera ocurrencia de c en s.
+ */
+char* strchr(const char *s, int c);
+
+/**
+ * Compara hasta n caracteres de dos cadenas.
+ */
+int strncmp(const char* s1, const char* s2, size_t n);
+
+/**
  * Convierte un entero a su representación en cadena.
  *
  * @param buffer_size Tamaño del buffer de destino.

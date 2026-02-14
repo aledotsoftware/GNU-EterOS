@@ -24,6 +24,7 @@ INCLUDE_DIR = include
 BUILD_DIR   = build
 
 # ---- Herramientas ----
+QEMU    ?= qemu-system-x86_64
 OBJCOPY ?= objcopy
 
 # ---- Flags de compilación ----
@@ -40,14 +41,55 @@ CFLAGS  = -ffreestanding       \
           -mno-mmx             \
           -Wall                \
           -Wextra              \
-          -O2                  \
-          -I$(INCLUDE_DIR)
+          -Os                  \
+          -I$(INCLUDE_DIR)     \
+          -I$(KERNEL_DIR)/net/lwip/src/include \
+          -I$(KERNEL_DIR)/net/lwip_port
 
 LDFLAGS = -T $(BOOT_DIR)/linker.ld \
           -nostdlib
 
 # ---- Archivos fuente ----
 BOOT_SRC    = $(BOOT_DIR)/boot.asm
+
+# ---- lwIP Sources ----
+LWIP_DIR = $(KERNEL_DIR)/net/lwip
+LWIP_PORT_DIR = $(KERNEL_DIR)/net/lwip_port
+
+LWIP_CORE_SRCS = $(LWIP_DIR)/src/core/init.c \
+                 $(LWIP_DIR)/src/core/def.c \
+                 $(LWIP_DIR)/src/core/dns.c \
+                 $(LWIP_DIR)/src/core/inet_chksum.c \
+                 $(LWIP_DIR)/src/core/ip.c \
+                 $(LWIP_DIR)/src/core/mem.c \
+                 $(LWIP_DIR)/src/core/memp.c \
+                 $(LWIP_DIR)/src/core/netif.c \
+                 $(LWIP_DIR)/src/core/pbuf.c \
+                 $(LWIP_DIR)/src/core/raw.c \
+                 $(LWIP_DIR)/src/core/stats.c \
+                 $(LWIP_DIR)/src/core/sys.c \
+                 $(LWIP_DIR)/src/core/tcp.c \
+                 $(LWIP_DIR)/src/core/tcp_in.c \
+                 $(LWIP_DIR)/src/core/tcp_out.c \
+                 $(LWIP_DIR)/src/core/timeouts.c \
+                 $(LWIP_DIR)/src/core/udp.c
+
+LWIP_IPV4_SRCS = $(LWIP_DIR)/src/core/ipv4/acd.c \
+                 $(LWIP_DIR)/src/core/ipv4/autoip.c \
+                 $(LWIP_DIR)/src/core/ipv4/dhcp.c \
+                 $(LWIP_DIR)/src/core/ipv4/etharp.c \
+                 $(LWIP_DIR)/src/core/ipv4/icmp.c \
+                 $(LWIP_DIR)/src/core/ipv4/igmp.c \
+                 $(LWIP_DIR)/src/core/ipv4/ip4_frag.c \
+                 $(LWIP_DIR)/src/core/ipv4/ip4.c \
+                 $(LWIP_DIR)/src/core/ipv4/ip4_addr.c
+
+LWIP_NETIF_SRCS = $(LWIP_DIR)/src/netif/ethernet.c
+
+LWIP_PORT_SRCS = $(LWIP_PORT_DIR)/ethernetif.c \
+                 $(LWIP_PORT_DIR)/sys_arch.c
+
+LWIP_SRCS = $(LWIP_CORE_SRCS) $(LWIP_IPV4_SRCS) $(LWIP_NETIF_SRCS) $(LWIP_PORT_SRCS)
 
 KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/string.c             \
@@ -69,6 +111,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/fs/initrd.c            \
               $(KERNEL_DIR)/apps/gui_demo.c        \
+              $(KERNEL_DIR)/apps/wget.c            \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/ui/primitives.c        \
               $(KERNEL_DIR)/ui/window.c            \
@@ -77,7 +120,8 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/mm/pmm.c               \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
-              $(KERNEL_DIR)/arch/x86_64/gdt.c
+              $(KERNEL_DIR)/arch/x86_64/gdt.c \
+              $(LWIP_SRCS)
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
@@ -133,6 +177,10 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/apps
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/net
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/core
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/core/ipv4
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/netif
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip_port
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/pci
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/mm
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/fs
