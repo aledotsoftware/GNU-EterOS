@@ -892,9 +892,9 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
     int shift_y = 0;
     
     if (dist_sq < radius_sq) {
-        float strength = 0.12f; 
-        shift_x = (int)(dx * strength);
-        shift_y = (int)(dy * strength);
+        int strength = 120; // 0.12 * 1000
+        shift_x = (dx * strength) / 1000;
+        shift_y = (dy * strength) / 1000;
     }
     
     int draw_x = x + shift_x;
@@ -985,6 +985,7 @@ static void draw_constellation(void) {
     uint32_t screen_w = framebuffer_get_width();
     uint32_t screen_h = framebuffer_get_height();
     if (screen_w == 0) screen_w = 1024;
+    if (screen_h == 0) screen_h = 768;
     
     /* Draw Grid Background (Technical) */
     int grid_size = 40;
@@ -996,9 +997,7 @@ static void draw_constellation(void) {
     }
     
     /* Header (Capa 3) */
-    ui_draw_string(NULL, 50, 50, "CONSTELACION", FLUX_TEXT_SECONDARY, FLUX_VOID);
-    
-    /* Grid de Nodos Centrada */
+    ui_draw_string(NULL, 50, 50, "CONSTELACION", FLUX_TEXT_SECONDARY, 0x000000);
     
     /* Grid de Nodos Centrada */
     int card_w = 200;
@@ -1142,19 +1141,16 @@ static void handle_flux_click(void) {
 }
 
 /* ========================================================================= */
-/* Flux Animation State                                                      */
+/* Flux Animation State (Fixed-Point Math 1000 = 1.0)                        */
 /* ========================================================================= */
-/* ========================================================================= */
-/* Flux Animation State                                                      */
-/* ========================================================================= */
-static float zoom_progress = 0.0f; /* 0.0 (Macro) to 1.0 (Focus) */
+static int zoom_progress = 0; 
 static flux_zoom_level_t target_zoom = FLUX_MACRO;
 static flux_node_id_t zooming_node = NODE_TERMINAL;
 static rect_t source_rect = {0,0,0,0}; /* Constellation rect */
 static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */
 
 /* Physics State */
-static float zoom_velocity = 0.0f;
+static int zoom_velocity = 0;
 
 static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
     target_zoom = level;
@@ -1192,25 +1188,25 @@ static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
 }
 
 static void flux_update_zoom(void) {
-    /* Spring Physics for Organic Zoom */
-    float target = (target_zoom == FLUX_FOCUS) ? 1.0f : 0.0f;
-    float tension = 0.08f;
-    float friction = 0.85f;
+    /* Fixed-Point Spring Physics (1000 = 1.0) */
+    int target = (target_zoom == FLUX_FOCUS) ? 1000 : 0;
+    int tension = 80;
+    int friction = 850;
     
-    float force = (target - zoom_progress) * tension;
+    int force = ((target - zoom_progress) * tension) / 1000;
     zoom_velocity += force;
-    zoom_velocity *= friction;
+    zoom_velocity = (zoom_velocity * friction) / 1000;
     zoom_progress += zoom_velocity;
     
-    /* Snap to target if close enough to stop micro-jitter */
-    if ((zoom_progress - target > -0.001f) && (zoom_progress - target < 0.001f) && (zoom_velocity > -0.001f) && (zoom_velocity < 0.001f)) {
-        zoom_progress = target;
-        zoom_velocity = 0.0f;
+    /* Snap to target */
+    if (zoom_velocity > -2 && zoom_velocity < 2) {
+        if (target == 1000 && zoom_progress > 990) zoom_progress = 1000;
+        if (target == 0 && zoom_progress < 10) zoom_progress = 0;
     }
 
     /* Update State */
-    if (zoom_progress >= 0.99f) current_zoom = FLUX_FOCUS;
-    else if (zoom_progress <= 0.01f) current_zoom = FLUX_MACRO;
+    if (zoom_progress == 1000) current_zoom = FLUX_FOCUS;
+    else if (zoom_progress == 0) current_zoom = FLUX_MACRO;
     else current_zoom = -1; /* Transitioning */
 }
 
@@ -1219,12 +1215,12 @@ static void draw_zoom_transition(void) {
     draw_constellation();
     
     /* Draw Expanding Card */
-    /* Interpolate Rect */
+    /* Interpolate Rect using fixed-point */
     rect_t r;
-    r.x = source_rect.x + (int)((target_rect.x - source_rect.x) * zoom_progress);
-    r.y = source_rect.y + (int)((target_rect.y - source_rect.y) * zoom_progress);
-    r.w = source_rect.w + (int)((target_rect.w - source_rect.w) * zoom_progress);
-    r.h = source_rect.h + (int)((target_rect.h - source_rect.h) * zoom_progress);
+    r.x = source_rect.x + ((target_rect.x - source_rect.x) * zoom_progress) / 1000;
+    r.y = source_rect.y + ((target_rect.y - source_rect.y) * zoom_progress) / 1000;
+    r.w = source_rect.w + ((target_rect.w - source_rect.w) * zoom_progress) / 1000;
+    r.h = source_rect.h + ((target_rect.h - source_rect.h) * zoom_progress) / 1000;
     
     /* Draw Card Content Scaled */
     wm_fill_rect(NULL, r, FLUX_CARD_BG);
@@ -1265,7 +1261,7 @@ void gui_demo_run(void) {
     /* Force State */
     current_zoom = FLUX_MACRO;
     target_zoom = FLUX_MACRO;
-    zoom_progress = 0.0f;
+    zoom_progress = 0;
     
     desktop_running = true;
     while (desktop_running) {
