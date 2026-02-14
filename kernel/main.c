@@ -24,14 +24,16 @@
 #include <task.h>
 #include <net/socket.h>
 
+/* lwIP Headers disabled - Library not present 
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/dhcp.h"
 #include "lwip/timeouts.h"
 #include "lwip/ip_addr.h"
 #include "netif/ethernet.h"
-#include <net/e1000.h>
 #include "ethernetif.h"
+*/
+#include <net/e1000.h>
 
 
 /* Forward declarations for non-HAL kernel services */
