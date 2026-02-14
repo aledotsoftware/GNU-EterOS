@@ -82,7 +82,10 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
     if (server_seq == 0) return -2; /* Timeout SYN/ACK */
     
     /* 4. SEND ACK + HTTP GET */
-    const char* get_req = "GET /ads.txt HTTP/1.0\r\nHost: tudexgames.com\r\n\r\n";
+    char get_req[256];
+    strlcpy(get_req, "GET ", 256);
+    strlcat(get_req, path, 256);
+    strlcat(get_req, " HTTP/1.0\r\nHost: tudexgames.com\r\nConnection: close\r\n\r\n", 256);
     size_t get_len = strlen(get_req);
     
     ip->len = htons(sizeof(struct ip_header) + sizeof(struct tcp_header) + get_len);
@@ -95,13 +98,31 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
     tcp->checksum = 0;
     
     memcpy(buffer + 14 + 20 + 20, get_req, get_len);
-    tcp->checksum = net_checksum(tcp, sizeof(struct tcp_header) + get_len);
+    
+    /* Correct TCP Checksum with Pseudo-header */
+    struct {
+        uint32_t src;
+        uint32_t dest;
+        uint8_t zero;
+        uint8_t proto;
+        uint16_t len;
+    } __attribute__((packed)) pseudo;
+    pseudo.src = my_ip;
+    pseudo.dest = TUDEX_IP;
+    pseudo.zero = 0;
+    pseudo.proto = IP_PROTO_TCP;
+    pseudo.len = htons(sizeof(struct tcp_header) + get_len);
+    
+    uint8_t chk_buf[512];
+    memcpy(chk_buf, &pseudo, 12);
+    memcpy(chk_buf + 12, tcp, sizeof(struct tcp_header) + get_len);
+    tcp->checksum = net_checksum(chk_buf, 12 + sizeof(struct tcp_header) + get_len);
     
     e1000_send_packet(buffer, 14 + 20 + 20 + get_len);
     
     /* 5. RECEIVE DATA */
     start = timer_get_ticks();
-    while (timer_get_ticks() - start < 2000) { /* 2s for response */
+    while (timer_get_ticks() - start < 3000) { /* 3s for response */
         int rlen = e1000_receive(rx, sizeof(rx));
         if (rlen > 40) {
             struct ip_header* rip = (struct ip_header*)(rx + 14);
@@ -116,6 +137,8 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
                     response_buf[copy_len] = 0;
                     return (int)copy_len;
                 }
+                /* Also check for FIN */
+                if (ntohs(rtcp->flags) & 0x0001) break;
             }
         }
         task_yield();

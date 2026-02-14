@@ -802,11 +802,35 @@ size_t net_protocol_recv(char* buf, size_t max_len) {
 /* ========================================================================= */
 
 
+static bool browser_url_active = false;
+
+/* Simple strstr since it's missing from string.h */
+static char* flux_strstr(const char* haystack, const char* needle) {
+    if (!*needle) return (char*)haystack;
+    for (; *haystack; haystack++) {
+        if (*haystack == *needle) {
+            const char *h = haystack, *n = needle;
+            while (*h && *n && *h == *n) { h++; n++; }
+            if (!*n) return (char*)haystack;
+        }
+    }
+    return NULL;
+}
+
+/* Helper to parse path from URL (naive) */
+static const char* parse_url_path(const char* url) {
+    const char* start = flux_strstr(url, ".com");
+    if (start) {
+        start = strchr(start, '/');
+        if (start) return start;
+    }
+    return "/";
+}
+
 static void system_net_dispatcher_task(void) {
     strlcpy(browser_status_text, "Network: Iniciando DHCP...", 64);
     
     extern int network_ready;
-    extern uint32_t my_ip;
     
     int timeout = 50;
     while (!network_ready && timeout-- > 0) {
@@ -820,13 +844,14 @@ static void system_net_dispatcher_task(void) {
         task_exit();
     }
     
-    strlcpy(browser_status_text, "DNS: Resolviendo tudexgames.com...", 64);
+    strlcpy(browser_status_text, "DNS: Resolviendo host...", 64);
     task_sleep(400);
     
-    strlcpy(browser_status_text, "TCP: Conectando a 172.67.140.40...", 64);
+    strlcpy(browser_status_text, "TCP: Conectando...", 64);
     
     extern int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len);
-    int res = raw_tcp_get("tudexgames.com", "/ads.txt", proto_buffer, sizeof(proto_buffer));
+    const char* path = parse_url_path(browser_url);
+    int res = raw_tcp_get("tudexgames.com", path, proto_buffer, sizeof(proto_buffer));
     
     if (res > 0) {
         strlcpy(browser_content, proto_buffer, sizeof(browser_content));
@@ -850,6 +875,23 @@ static void sys_net_fetch(const char* url) {
     task_create("net_dispatcher", system_net_dispatcher_task);
 }
 
+static void handle_browser_click(int x, int y) {
+    if (!win_browser) return;
+    int w = win_browser->bounds.w;
+    
+    /* Address bar hit test (Line 862 reference) */
+    if (x >= 10 && x <= w - 10 && y >= 10 && y <= 40) {
+        browser_url_active = true;
+        strlcpy(browser_status_text, "Editando URL...", 64);
+    } else {
+        browser_url_active = false;
+        /* Content area click to reload */
+        if (y > 50 && !browser_loading) {
+            sys_net_fetch(browser_url);
+        }
+    }
+}
+
 static void draw_browser_content(void) {
     if (!win_browser) return;
     int w = win_browser->bounds.w;
@@ -860,6 +902,9 @@ static void draw_browser_content(void) {
     
     /* Address Bar */
     wm_fill_rect(win_browser, (rect_t){10, 10, w - 20, 30}, 0xFFFFFF);
+    if (browser_url_active) {
+        wm_fill_rect(win_browser, (rect_t){10, 38, w - 20, 2}, FLUX_ACCENT_CYAN);
+    }
     win_browser->fg_color = 0x333333;
     win_browser->bg_color = 0xFFFFFF;
     wm_print_at(win_browser, 20, 18, browser_url);
@@ -1325,19 +1370,38 @@ static void flux_launch_space(flux_node_id_t node) {
     }
 }
 
+/* Performance optimization: Memoized star field */
+typedef struct {
+    int x, y;
+    uint32_t col;
+} flux_star_t;
+
+static flux_star_t constellation_stars[64];
+static bool stars_initialized = false;
+
+static void init_constellation(void) {
+    uint32_t screen_w = 1024;
+    uint32_t screen_h = 768;
+    for (int i = 0; i < 64; i++) {
+        constellation_stars[i].x = (i * 12345) % screen_w;
+        constellation_stars[i].y = (i * 6789) % screen_h;
+        constellation_stars[i].col = (i % 3 == 0) ? 0x333333 : 0x111111;
+    }
+    stars_initialized = true;
+}
+
 static void draw_constellation(void) {
     uint32_t screen_w = framebuffer_get_width();
     uint32_t screen_h = framebuffer_get_height();
     if (screen_w == 0) screen_w = 1024;
     if (screen_h == 0) screen_h = 768;
     
+    if (!stars_initialized) init_constellation();
+
     /* Capa 0: Neural Ambient (Stars) */
-    /* Use fixed coordinates based on screen, dithered for depth */
-    for (int i = 0; i < 50; i++) {
-        int sx = (i * 12345) % screen_w;
-        int sy = (i * 6789) % screen_h;
-        uint32_t s_col = (i % 3 == 0) ? 0x333333 : 0x111111;
-        framebuffer_putpixel(sx, sy, s_col);
+    /* ⚡ BOLT OPTIMIZATION: Use pre-calculated positions */
+    for (int i = 0; i < 64; i++) {
+        framebuffer_putpixel(constellation_stars[i].x, constellation_stars[i].y, constellation_stars[i].col);
     }
 
     /* Draw Grid Background (Technical) - Very subtle */
@@ -1492,6 +1556,8 @@ static void handle_flux_click(void) {
                  handle_files_click(lx, ly - TITLE_BAR_HEIGHT);
              } else if (focused_space == win_santitravel) {
                  handle_santitravel_click(lx, ly - TITLE_BAR_HEIGHT);
+             } else if (focused_space == win_browser) {
+                 handle_browser_click(lx, ly - TITLE_BAR_HEIGHT);
              }
         }
     }
@@ -1770,7 +1836,7 @@ void gui_demo_run(void) {
         
         /* Capa 0: Deep Void (Premium Dark) */
         
-        if (current_zoom == -1) {
+        if ((int)current_zoom == -1) {
              /* Transitioning: Clearing is handled inside draw_zoom_transition (localized) */
         } else {
              framebuffer_clear(0x000000);
@@ -1817,7 +1883,7 @@ void gui_demo_run(void) {
         }
         
         /* Optimization: Flush only dirty regions during transition */
-        if (current_zoom == -1) {
+        if ((int)current_zoom == -1) {
             /* 1. Flush Animation Area */
             framebuffer_flush_rect(dirty.x, dirty.y, dirty.w, dirty.h);
             
@@ -1832,6 +1898,29 @@ void gui_demo_run(void) {
         } else {
             framebuffer_flush(); 
         } 
+        /* Layer 4: Keyboard Input Dispatching */
+        extern bool keyboard_has_input(void);
+        extern char keyboard_getchar(void);
+        while (keyboard_has_input()) {
+            char c = keyboard_getchar();
+            if (current_zoom == FLUX_FOCUS && focused_space == win_browser && browser_url_active) {
+                if (c == '\n') {
+                    browser_url_active = false;
+                    sys_net_fetch(browser_url);
+                } else if (c == '\b') {
+                    int len = strlen(browser_url);
+                    if (len > 0) browser_url[len-1] = 0;
+                } else {
+                    int len = strlen(browser_url);
+                    if (len < (int)sizeof(browser_url)-1) {
+                        browser_url[len] = c;
+                        browser_url[len+1] = 0;
+                    }
+                }
+            } else if (current_zoom == FLUX_MACRO && c == 27) { /* ESC to reload shell? No, keep focus context */
+            }
+        }
+
         /* Smoother loop: Unlocked framerate (Yield to scheduler) */
         task_yield(); 
     }
