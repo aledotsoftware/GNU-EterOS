@@ -22,6 +22,10 @@ void framebuffer_init(boot_info_t* info) {
     fb_size_bytes = fb_height * fb_pitch;
 }
 
+uint32_t framebuffer_get_width(void) { return fb_width; }
+uint32_t framebuffer_get_height(void) { return fb_height; }
+
+
 void framebuffer_enable_double_buffer(void) {
     if (back_buffer) return;
     

@@ -19,6 +19,9 @@ void framebuffer_enable_double_buffer(void);
 /* Dibuja un rectángulo */
 void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color);
 
+uint32_t framebuffer_get_width(void);
+uint32_t framebuffer_get_height(void);
+
 /* Dibuja un caracter (usando fuente interna) */
 void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t bg);
 

@@ -69,6 +69,7 @@ typedef enum {
 /* Forward declarations */
 static void flux_notify(const char* title, const char* message, uint32_t accent);
 static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node);
+static void flux_launch_space(flux_node_id_t node);
 
 /* Animation State Forward Decl (needed for input handling) */
 static flux_zoom_level_t target_zoom; 
@@ -638,27 +639,56 @@ static void draw_settings_preview(int x, int y, int w, int h) {
 /* ========================================================================= */
 
 static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
-    /* Capa 1: Contenedor */
-    framebuffer_rect(x, y, w, h, FLUX_CARD_BG);
+    /* Physics: Magnetic Influence Field */
+    int center_x = x + (w / 2);
+    int center_y = y + (h / 2);
+    int dx = mouse_x - center_x;
+    int dy = mouse_y - center_y;
+    int dist_sq = (dx*dx) + (dy*dy);
+    int radius = 160; 
+    int radius_sq = radius * radius;
     
-    /* Header (Simple text, no block) */
-    ui_draw_string(NULL, x + 10, y + 10, title, FLUX_TEXT_PRIMARY, FLUX_CARD_BG);
-    framebuffer_rect(x + 10, y + 26, w - 20, 1, 0x303030); /* Separator */
+    int shift_x = 0;
+    int shift_y = 0;
     
-    /* Live Content */
-    if (node == NODE_TERMINAL) {
-        if (!terminals[0].used) term_create();
-        draw_term_preview(x, y, w, h, &terminals[0]);
-    } else if (node == NODE_SYSMON) {
-        draw_sysmon_preview(x, y, w, h);
-    } else if (node == NODE_MATRIX) {
-        draw_matrix_preview(x, y, w, h);
-    } else if (node == NODE_SETTINGS) {
-        draw_settings_preview(x, y, w, h);
+    if (dist_sq < radius_sq) {
+        float strength = 0.15f; 
+        shift_x = (int)(dx * strength);
+        shift_y = (int)(dy * strength);
     }
     
-    /* Active Border on Hover check handled by caller or simpler: just accent line */
-    framebuffer_rect(x, y + h - 1, w, 1, accent);
+    int draw_x = x + shift_x;
+    int draw_y = y + shift_y;
+
+    /* Capa 1: Contenedor (Using lighter color for visibility) */
+    framebuffer_rect(draw_x, draw_y, w, h, 0x1A1A1A); 
+    
+    /* Header */
+    ui_draw_string(NULL, draw_x + 10, draw_y + 10, title, FLUX_TEXT_PRIMARY, 0x1A1A1A);
+    framebuffer_rect(draw_x + 10, draw_y + 26, w - 20, 1, 0x505050);
+    
+    /* Live Content / Icon Placeholder */
+    int icon_cx = draw_x + (w/2);
+    int icon_cy = draw_y + (h/2);
+    
+    if (node == NODE_TERMINAL) {
+        if (!terminals[0].used) term_create();
+        draw_term_preview(draw_x, draw_y, w, h, &terminals[0]);
+        /* Overlay Icon */
+        wm_fill_rect(NULL, (rect_t){icon_cx - 40, icon_cy - 30, 80, 60}, 0x000000);
+        framebuffer_rect(icon_cx - 40, icon_cy - 30, 80, 60, FLUX_ACCENT_CYAN);
+        ui_draw_string(NULL, icon_cx - 30, icon_cy - 10, ">_", FLUX_ACCENT_CYAN, 0x000000);
+    } else if (node == NODE_SYSMON) {
+        draw_sysmon_preview(draw_x, draw_y, w, h);
+    } else if (node == NODE_MATRIX) {
+        draw_matrix_preview(draw_x, draw_y, w, h);
+    } else if (node == NODE_SETTINGS) {
+        draw_settings_preview(draw_x, draw_y, w, h);
+    }
+    
+    /* Active Border */
+    /* Active Border */
+    framebuffer_rect(draw_x, draw_y + h - 1, w, 2, accent);
 }
 
 /* ========================================================================= */
@@ -698,29 +728,47 @@ static void flux_launch_space(flux_node_id_t node) {
     }
 }
 
-
 static void draw_constellation(void) {
+    uint32_t screen_w = framebuffer_get_width();
+    uint32_t screen_h = framebuffer_get_height();
+    if (screen_w == 0) screen_w = 1024; /* Fallback */
+    
     /* Header (Capa 3) */
     ui_draw_string(NULL, 50, 50, "CONSTELACION", FLUX_TEXT_SECONDARY, FLUX_VOID);
     
+    /* Debug Resolution */
+    char res_buf[32];
+    itoa_s(screen_w, res_buf, 10, 10);
+    strlcpy(res_buf + strlen(res_buf), "x", 32);
+    char h_buf[10];
+    itoa_s(screen_h, h_buf, 10, 10);
+    strlcpy(res_buf + strlen(res_buf), h_buf, 32);
+    ui_draw_string(NULL, 10, 10, res_buf, 0xFF00FF, 0x000000); 
+
     /* Clock */
     uint32_t now = timer_get_uptime_seconds();
     int h = (now / 3600) % 24;
     int m = (now / 60) % 60;
     char timebox[16];
     char buf[4];
-    
     itoa_s(h, buf, 4, 10); strlcpy(timebox, (h<10?"0":""), 16); strlcpy(timebox+strlen(timebox), buf, 16);
     strlcpy(timebox+strlen(timebox), ":", 16);
     itoa_s(m, buf, 4, 10); strlcpy(timebox+strlen(timebox), (m<10?"0":""), 16); strlcpy(timebox+strlen(timebox), buf, 16);
-    ui_draw_string(NULL, 900, 50, timebox, FLUX_TEXT_PRIMARY, FLUX_VOID);
+    ui_draw_string(NULL, screen_w - 120, 50, timebox, FLUX_TEXT_PRIMARY, FLUX_VOID);
 
-    /* Grid de Nodos */
+    /* Grid de Nodos Centrada */
     int card_w = 200;
     int card_h = 240;
     int gap = 40;
-    int start_x = (1024 - ((card_w * 2) + gap)) / 2;
+    
+    /* Calculate dynamic center with Underflow Protection */
+    int total_w = (card_w * 2) + gap;
+    int start_x = (int)screen_w - total_w; 
+    start_x /= 2;
+    if (start_x < 20) start_x = 20; /* Margin clamp */
+    
     int start_y = 200;
+    if (screen_h < 600) start_y = 100; /* Compact vertical */
     
     flux_draw_card(start_x, start_y, card_w, card_h, "TERMINAL", FLUX_ACCENT_CYAN, NODE_TERMINAL);
     flux_draw_card(start_x + card_w + gap, start_y, card_w, card_h, "SYSTEM", FLUX_ACCENT_AMBER, NODE_SYSMON);
@@ -776,13 +824,25 @@ static void draw_focus_mode(void) {
 
 /* Input Handling for Flux */
 static void handle_flux_click(void) {
+    uint32_t screen_w = framebuffer_get_width();
+    uint32_t screen_h = framebuffer_get_height();
+    if (screen_w == 0) screen_w = 1024;
+    if (screen_h == 0) screen_h = 768;
+
     if (current_zoom == FLUX_MACRO) {
         /* Hit testing Constellation Cards */
         int card_w = 200;
         int card_h = 240;
         int gap = 40;
-        int start_x = (1024 - ((card_w * 2) + gap)) / 2;
+        
+        int total_w = (card_w * 2) + gap;
+        int start_x = (int)screen_w - total_w; 
+        start_x /= 2;
+        if (start_x < 20) start_x = 20; 
+        
         int start_y = 200;
+        if (screen_h < 600) start_y = 100; 
+
         int row2_y = start_y + card_h + gap;
 
         #define HIT_CARD(x, y, wa, ha, node) \
@@ -795,12 +855,25 @@ static void handle_flux_click(void) {
         HIT_CARD(start_x, row2_y, card_w, card_h, NODE_MATRIX);
         HIT_CARD(start_x + card_w + gap, row2_y, card_w, card_h, NODE_SETTINGS);
         
-        /* Focus Mode Input */
-        /* Check Bottom Home gesture */
-        if (mouse_y > 720) {
+        /* Focus Mode Input (Not applicable in MACRO, but logic flow check) */
+    } else if (current_zoom == FLUX_FOCUS) {
+        /* Check Bottom Home gesture (Bottom 10% of screen) */
+        int gesture_zone = screen_h - 48;
+        if (mouse_y > gesture_zone) {
             target_zoom = FLUX_MACRO;
             return;
         }
+        
+        /* Pass clicks to active window if inside bounds */
+        /* TODO: Implement proper window hit testing if we have multiple windows */
+        if (focused_space && focused_space == win_settings) {
+             /* Handle Settings Click (which assumes 800x600 relative coords currently) */
+             /* Transform mouse to window local coords */
+             /* For now, just pass raw if window is fullscreen-ish */
+             handle_settings_click(mouse_x - focused_space->bounds.x, mouse_y - focused_space->bounds.y);
+        }
+    }
+}
         
         /* Pass input to active app controls */
         if (focused_space == win_settings) {
@@ -815,11 +888,17 @@ static void handle_flux_click(void) {
 /* ========================================================================= */
 /* Flux Animation State                                                      */
 /* ========================================================================= */
+/* ========================================================================= */
+/* Flux Animation State                                                      */
+/* ========================================================================= */
 static float zoom_progress = 0.0f; /* 0.0 (Macro) to 1.0 (Focus) */
 static flux_zoom_level_t target_zoom = FLUX_MACRO;
 static flux_node_id_t zooming_node = NODE_TERMINAL;
 static rect_t source_rect = {0,0,0,0}; /* Constellation rect */
 static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */
+
+/* Physics State */
+static float zoom_velocity = 0.0f;
 
 static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
     target_zoom = level;
@@ -845,19 +924,25 @@ static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
 }
 
 static void flux_update_zoom(void) {
-    /* Simple Linear Interpolation for smoothness */
-    float speed = 0.15f; 
-    if (target_zoom == FLUX_FOCUS) {
-        if (zoom_progress < 1.0f) zoom_progress += speed;
-        if (zoom_progress > 1.0f) zoom_progress = 1.0f;
-    } else {
-        if (zoom_progress > 0.0f) zoom_progress -= speed;
-        if (zoom_progress < 0.0f) zoom_progress = 0.0f;
-    }
+    /* Spring Physics for Organic Zoom */
+    float target = (target_zoom == FLUX_FOCUS) ? 1.0f : 0.0f;
+    float tension = 0.08f;
+    float friction = 0.85f;
     
-    /* Auto-switch states when transition complete */
-    if (zoom_progress >= 1.0f) current_zoom = FLUX_FOCUS;
-    else if (zoom_progress <= 0.0f) current_zoom = FLUX_MACRO;
+    float force = (target - zoom_progress) * tension;
+    zoom_velocity += force;
+    zoom_velocity *= friction;
+    zoom_progress += zoom_velocity;
+    
+    /* Snap to target if close enough to stop micro-jitter */
+    if ((zoom_progress - target > -0.001f) && (zoom_progress - target < 0.001f) && (zoom_velocity > -0.001f) && (zoom_velocity < 0.001f)) {
+        zoom_progress = target;
+        zoom_velocity = 0.0f;
+    }
+
+    /* Update State */
+    if (zoom_progress >= 0.99f) current_zoom = FLUX_FOCUS;
+    else if (zoom_progress <= 0.01f) current_zoom = FLUX_MACRO;
     else current_zoom = -1; /* Transitioning */
 }
 
@@ -873,12 +958,10 @@ static void draw_zoom_transition(void) {
     r.w = source_rect.w + (int)((target_rect.w - source_rect.w) * zoom_progress);
     r.h = source_rect.h + (int)((target_rect.h - source_rect.h) * zoom_progress);
     
-    /* Draw Card Content Scaled (Approximated by clipping/centering) */
-    /* For now, just a solid filled rect with the node's preview */
+    /* Draw Card Content Scaled */
     wm_fill_rect(NULL, r, FLUX_CARD_BG);
     framebuffer_rect(r.x, r.y, r.w, 4, FLUX_ACCENT_CYAN); /* Top bar */
     
-    /* Draw content based on zooming_node */
     ui_draw_string(NULL, r.x + 20, r.y + 20, "Materializing...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
 }
 
@@ -899,7 +982,7 @@ static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
 
 void gui_demo_run(void) {
     wm_init();
-    framebuffer_enable_double_buffer();
+    /* framebuffer_enable_double_buffer(); */ /* DEBUG: Disable DB to test direct VRAM write */
     mouse_set_callback(on_mouse_event);
     
     /* Init Apps */
@@ -907,16 +990,17 @@ void gui_demo_run(void) {
     
     desktop_running = true;
     while (desktop_running) {
+        /* ... keyboard input ... */
         if (keyboard_has_input()) {
              char c = keyboard_getchar();
              /* Infinite Zoom Controls */
-             if (c == 72) { /* UP Arrow (Simulate Wheel Up / Zoom In) */
+             if (c == 72) { /* UP Arrow */
                  if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
                      flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL); 
                      flux_launch_space(NODE_TERMINAL); 
                  }
              }
-             else if (c == 80) { /* DOWN Arrow (Simulate Wheel Down / Zoom Out) */
+             else if (c == 80) { /* DOWN Arrow */
                  if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
                      target_zoom = FLUX_MACRO;
                  }
@@ -935,11 +1019,29 @@ void gui_demo_run(void) {
         
         flux_update_zoom();
         
-        /* Capa 0: Deep Void */
-        framebuffer_clear(FLUX_VOID);
+        /* Capa 0: Deep Void (Premium Dark) */
+        framebuffer_clear(0x111111);
         
         if (current_zoom == FLUX_MACRO) {
             draw_constellation();
+            
+            /* 9.1 Modelo Cognitivo: Ghost Onboarding */
+            /* If idle for > 3 seconds, show ghost guidance */
+            if (timer_get_ticks() > 300 && current_zoom == FLUX_MACRO) {
+                 /* Simple orbital animation without floats/sin/cos */
+                 int tick = timer_get_ticks();
+                 int ghost_x = 512 + ((tick / 2) % 200) - 100;
+                 int ghost_y = 384 + ((tick / 3) % 100) - 50;
+                 
+                 /* Ghost Cursor (Translucent White Circle equivalent) */
+                 /* Dithered pattern to simulate transparency */
+                 for(int gy=-5; gy<5; gy++) {
+                     for(int gx=-5; gx<5; gx++) {
+                         if ((gx+gy)%2 == 0) framebuffer_putpixel(ghost_x+gx, ghost_y+gy, 0x505050);
+                     }
+                 }
+                 ui_draw_string(NULL, ghost_x + 10, ghost_y, "Explora...", 0x808080, 0x111111);
+            }
         } else if (current_zoom == FLUX_FOCUS) {
             draw_focus_mode();
         } else {
@@ -950,13 +1052,13 @@ void gui_demo_run(void) {
         /* Layer 3: System Notifications (Always on top) */
         draw_notifications();
         
-        /* Cursor */
+        /* Cursor (Light Orb) */
         uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
+        /* Draw a small crosshair for now, imagining it as an Orb */
         framebuffer_rect(mouse_x - 4, mouse_y, 9, 1, cursor_col); 
         framebuffer_rect(mouse_x, mouse_y - 4, 1, 9, cursor_col); 
-        framebuffer_rect(mouse_x, mouse_y, 1, 1, 0xFF0000);
         
-        framebuffer_flush();
+        /* framebuffer_flush(); */ /* Direct Draw Mode */
         for (volatile int i = 0; i < 50000; i++); 
         task_yield();
     }
