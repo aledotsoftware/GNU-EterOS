@@ -1,106 +1,74 @@
-; =============================================================================
-; éterOS - Syscall Entry Point (x86_64)
-; =============================================================================
-
-[bits 64]
-
+[BITS 64]
 global syscall_entry
 extern syscall_handler
-extern kernel_stack_top
 
-section .bss
-align 16
-user_rsp_scratch: resq 1
+; Struct offsets in per_cpu_t (include/cpu.h)
+; uint64_t kernel_stack; // offset 0
+; uint64_t user_stack;   // offset 8
 
 section .text
-
-; -----------------------------------------------------------------------------
-; syscall_entry
-; -----------------------------------------------------------------------------
-; Entry point for SYSCALL instruction.
-; Hardware state on entry:
-;   RIP = loaded from MSR_LSTAR (this address)
-;   CS  = loaded from MSR_STAR 47:32 (0x08)
-;   SS  = loaded from MSR_STAR 47:32 + 8 (0x10)
-;   RCX = Saved User RIP
-;   R11 = Saved User RFLAGS
-;   RSP = Unchanged (User Stack)
-;   Interrupts disabled (IF=0) due to MSR_SFMASK
-; -----------------------------------------------------------------------------
 syscall_entry:
-    ; 1. Save User RSP to scratch variable (safe because IF=0)
-    mov [rel user_rsp_scratch], rsp
+    ; 1. Swap GS to get access to per-cpu data (stored in KERNEL_GS_BASE)
+    swapgs
 
-    ; 2. Load Kernel RSP
-    mov rsp, [rel kernel_stack_top]
+    ; 2. Save User Stack Pointer temporarily in per-cpu struct
+    ; GS:[8] = user_stack
+    mov [gs:8], rsp
 
-    ; 3. Push User RSP to Kernel Stack (to restore later)
-    push qword [rel user_rsp_scratch]
+    ; 3. Load Kernel Stack Pointer from per-cpu struct
+    ; RSP = GS:[0]
+    mov rsp, [gs:0]
 
-    ; 4. Push registers to match struct syscall_regs layout
-    ; struct syscall_regs {
-    ;     uint64_t r11;    /* Offset 0 */
-    ;     uint64_t rcx;    /* Offset 8 */
-    ;     uint64_t rbp;    /* Offset 16 */
-    ;     uint64_t rdi;    /* Offset 24 */
-    ;     uint64_t rsi;    /* Offset 32 */
-    ;     uint64_t rdx;    /* Offset 40 */
-    ;     uint64_t r10;    /* Offset 48 */
-    ;     uint64_t r8;     /* Offset 56 */
-    ;     uint64_t r9;     /* Offset 64 */
-    ;     uint64_t rax;    /* Offset 72 */
-    ; };
+    ; 4. Save Registers (System V AMD64 ABI + Caller Saved)
+    ; RCX = Return RIP (saved by syscall)
+    ; R11 = Return RFLAGS (saved by syscall)
 
-    push rax    ; Offset 72
-    push r9     ; Offset 64
-    push r8     ; Offset 56
-    push r10    ; Offset 48
-    push rdx    ; Offset 40
-    push rsi    ; Offset 32
-    push rdi    ; Offset 24
-    push rbp    ; Offset 16
-    push rcx    ; Offset 8  (Saved RIP)
-    push r11    ; Offset 0  (Saved RFLAGS)
+    push rcx    ; Save User RIP
+    push r11    ; Save User RFLAGS
+    push rbp    ; Save Base Pointer
+    push rbx    ; Save Callee-saved
+    push r12
+    push r13
+    push r14
+    push r15
 
-    ; 5. Prepare argument for handler (struct pointer)
-    mov rdi, rsp
+    ; 5. Call Handler
+    ; Handler signature: void syscall_handler(uint64_t syscall_number, args...)
+    ; C Args: RDI, RSI, RDX, RCX, R8, R9
+    ; Syscall Args (Linux/standard): RAX (num), RDI, RSI, RDX, R10, R8, R9
 
-    ; 6. Align stack if necessary (RSP should be 16-byte aligned before call)
-    ; We pushed 1 (user rsp) + 10 (regs) = 11 qwords.
-    ; If kernel_stack_top was 16-byte aligned, RSP is now (11*8) = 88 bytes off.
-    ; 88 is divisible by 8 but not 16. So we are NOT aligned.
-    ; We need to push one more dummy value or adjust.
-    ; Let's push a dummy qword to align.
+    ; Mapping:
+    ; Handler Arg 1 (RDI) = RAX (Syscall Num)
+    ; Handler Arg 2 (RSI) = RDI (Arg 1)
+    ; Handler Arg 3 (RDX) = RSI (Arg 2)
+    ; Handler Arg 4 (RCX) = RDX (Arg 3)
 
-    sub rsp, 8  ; Alignment padding
+    mov rcx, rdx ; 4th arg
+    mov rdx, rsi ; 3rd arg
+    mov rsi, rdi ; 2nd arg
+    mov rdi, rax ; 1st arg
 
-    ; 7. Enable interrupts (standard syscall behavior)
-    sti
+    ; Align stack if necessary (RSP should be 16-byte aligned before call)
+    ; Pushed 8 regs (8*8=64 bytes). If we started aligned, we are aligned.
 
-    ; 8. Call C Handler
+    cld         ; Clear direction flag (C ABI requirement)
     call syscall_handler
 
-    ; 9. Disable interrupts
-    cli
-
-    add rsp, 8  ; Remove alignment padding
-
-    ; 10. Restore registers
-    pop r11
-    pop rcx
+    ; 6. Restore Registers
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
     pop rbp
-    pop rdi
-    pop rsi
-    pop rdx
-    pop r10
-    pop r8
-    pop r9
-    pop rax
+    pop r11     ; Restore RFLAGS to R11
+    pop rcx     ; Restore RIP to RCX
 
-    ; 11. Restore User RSP
-    pop rsp
+    ; 7. Restore User Stack
+    mov rsp, [gs:8]
 
-    ; 12. Return to User Mode
-    ; RCX = User RIP
-    ; R11 = User RFLAGS
-    o64 sysret
+    ; 8. Swap GS back
+    swapgs
+
+    ; 9. Return to Ring 3
+    sysretq

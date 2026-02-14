@@ -178,12 +178,12 @@ boot_drive:      db 0
 times 446 - ($ - $$) db 0
 
 ; Entrada 1: Partición Activa (Bootable), Tipo 0x83 (Linux), LBA Start 1, Size grande
-db 0x80         ; Status: Active
-db 0x00, 0x01, 0x00 ; CHS Start (Head 0, Sector 1, Cylinder 0) - Falso pero sirve
-db 0x83         ; Type: Linux
+db 0x80             ; Status: Active
+db 0x00, 0x02, 0x00 ; CHS Start (Head 0, Sector 2, Cylinder 0) - LBA 1
+db 0x83             ; Type: Linux
 db 0xFE, 0x3F, 0xFF ; CHS End (Head 254, Sector 63, Cylinder 1023) - Falso
-dd 0x00000001   ; LBA Start: Sector 1 (justo despues del MBR)
-dd 0x00010000   ; LBA Size: 65536 sectores (32MB aprox)
+dd 0x00000001       ; LBA Start: Sector 1 (justo despues del MBR)
+dd 0x00010000       ; LBA Size: 65536 sectores (32MB aprox)
 
 ; Entradas 2, 3, 4: Vacías
 times 16 * 3 db 0
@@ -751,6 +751,7 @@ long_mode_start:
     jmp .halt
 
 ; =============================================================================
-; Rellenar Stage 2 hasta completar STAGE2_SECTORS sectores (4 KB)
+; Rellenar Stage 2 hasta completar el tamaño total esperado (MBR + Stage 2)
+; Total = 512 (MBR) + 16 * 512 (Stage 2) = 8704 bytes
 ; =============================================================================
-times (STAGE2_SECTORS * 512) - ($ - stage2_start) db 0
+times 8704 - ($ - $$) db 0

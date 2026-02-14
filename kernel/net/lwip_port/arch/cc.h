@@ -53,6 +53,7 @@ typedef u32_t       sys_prot_t;
 #define LWIP_PLATFORM_ASSERT(x) do { serial_write_string("[LWIP] ASSERT: "); serial_write_string(x); serial_write_string("\n"); } while(0)
 
 /* Random (Simulated) */
+extern u32_t sys_now(void);
 #define LWIP_RAND() ((u32_t)sys_now())
 
 /* Packed structs */

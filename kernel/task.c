@@ -19,6 +19,7 @@
 #include "../include/vga.h"
 #include "../include/timer.h"
 #include "../include/gdt.h"
+#include "../include/cpu.h"
 
 /* ========================================================================= */
 /* Estado Global del Scheduler                                               */
@@ -80,6 +81,13 @@ void scheduler_init(void) {
     tasks[0].state = TASK_RUNNING;
     tasks[0].stack_base = NULL;  /* El kernel ya tiene su stack */
     tasks[0].rsp = 0;            /* Se llenará en el primer context_switch */
+
+    /* Inicializar CR3 del kernel */
+    uint64_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    tasks[0].cr3 = cr3;
+    tasks[0].kernel_stack = 0;   /* No necesario para tarea kernel pura */
+
     strlcpy(tasks[0].name, "kernel", sizeof(tasks[0].name));
 
     task_count = 1;
@@ -121,6 +129,15 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].id = next_id++;
     tasks[slot].state = TASK_READY;
     tasks[slot].stack_base = stack;
+
+    /* Configurar stack de kernel y CR3 */
+    tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
+
+    /* Heredar CR3 del kernel (por ahora, luego cada proceso tendrá su PML4) */
+    uint64_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    tasks[slot].cr3 = cr3;
+
     strlcpy(tasks[slot].name, name, sizeof(tasks[slot].name));
 
     /*
@@ -208,16 +225,10 @@ void schedule(void) {
     tasks[next].state = TASK_RUNNING;
     current_task = next;
 
-    /* Actualizar stack del kernel para TSS y Syscalls */
-    if (tasks[next].stack_base) {
-        uint64_t kstack = (uint64_t)tasks[next].stack_base + TASK_STACK_SIZE;
-        tss_set_rsp0(kstack);
-        kernel_stack_top = kstack;
-    } else {
-        /* Task 0 (Kernel/Boot Stack) */
-        /* Asumimos que Task 0 siempre usa el stack de boot en 0x90000 */
-        tss_set_rsp0(0x90000);
-        kernel_stack_top = 0x90000;
+    /* Actualizar TSS RSP0 y Per-CPU Kernel Stack para Syscalls */
+    if (tasks[next].kernel_stack != 0) {
+        tss_set_rsp0(tasks[next].kernel_stack);
+        per_cpu_data.kernel_stack = tasks[next].kernel_stack;
     }
 
     /* Context switch: guardar RSP actual en tasks[old], cargar de tasks[next] */
