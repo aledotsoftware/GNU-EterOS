@@ -16,6 +16,8 @@ typedef struct {
     uint32_t fb_height;
     uint32_t fb_pitch;        /* Bytes por línea */
     uint32_t fb_bpp;          /* Bits por pixel */
+    uint64_t initrd_addr;     /* Dirección física del Initrd */
+    uint32_t initrd_size;     /* Tamaño en bytes */
 } __attribute__((packed)) boot_info_t;
 
 /* Función helper para obtener la info */
