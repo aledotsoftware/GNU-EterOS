@@ -353,7 +353,13 @@ static void cmd_dhcp(const char* args) {
     (void)args;
     terminal_write_string("\n");
     terminal_write_colored("  [DHCP Client]\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    dhcp_discover();
+
+    extern int network_ready;
+    if (network_ready) {
+        terminal_write_string("  Status: Connected (lwIP)\n");
+    } else {
+        terminal_write_string("  Status: In Progress...\n");
+    }
     terminal_write_string("\n");
 }
 

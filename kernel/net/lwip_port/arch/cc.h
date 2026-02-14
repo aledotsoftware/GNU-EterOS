@@ -3,6 +3,14 @@
 
 #include <types.h>
 #include <net/defs.h>
+
+/* Undefine conflicts with lwIP */
+#undef TCP_FIN
+#undef TCP_SYN
+#undef TCP_RST
+#undef TCP_PSH
+#undef TCP_ACK
+
 #include <serial.h>
 #include <string.h>
 #include <hal.h>

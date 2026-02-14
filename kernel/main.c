@@ -24,7 +24,6 @@
 #include <task.h>
 #include <net/socket.h>
 
-/* lwIP Headers disabled - Library not present
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/dhcp.h"
@@ -33,7 +32,6 @@
 #include "netif/ethernet.h"
 #include <net/e1000.h>
 #include "ethernetif.h"
-*/
 
 
 /* Forward declarations for non-HAL kernel services */
@@ -134,10 +132,9 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* For now, assume simple stack usage or static buffers */
     #endif
 
-    /* ---- 4. Inicializar Red (Disabled) ---- */
+    /* ---- 4. Inicializar Red ---- */
     hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
     /* Attempt to init E1000 (Generic Driver but requires PCI) */
-    extern int e1000_init(void*);
     if (e1000_init(NULL) == 0) {
         hal_console_write("  [NET]  Hardware inicializado.\n");
         net_init();

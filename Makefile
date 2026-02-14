@@ -121,6 +121,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/ui/primitives.c        \
               $(KERNEL_DIR)/ui/window.c            \
               $(KERNEL_DIR)/ui/image.c             \
+              $(KERNEL_DIR)/ui/upng.c              \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
               $(KERNEL_DIR)/mm/pmm.c               \
@@ -205,7 +206,7 @@ boot: dirs $(BOOT_BIN)
 $(BOOT_BIN): $(BOOT_SRC)
 ifeq ($(ARCH), x86_64)
 	@echo "[ASM]  $<"
-	nasm -f bin $< -o $@
+	$(AS) -f bin $< -o $@
 else
 	@echo "[SKIP] Bootloader no necesario para $(ARCH) (o no implementado)"
 endif
@@ -221,7 +222,7 @@ $(BUILD_DIR)/%.o: %.c
 # Compilar archivos .asm a .o (Kernel)
 $(BUILD_DIR)/%.o: %.asm
 	@echo "[ASM]  $<"
-	nasm -f elf64 $< -o $@
+	$(AS) -f elf64 $< -o $@
 
 # Enlazar objetos en un ELF, luego extraer binario plano
 $(KERNEL_BIN): $(KERNEL_OBJS)
