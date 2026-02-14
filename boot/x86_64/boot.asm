@@ -63,26 +63,6 @@ stage1_start:
     int 0x13
     jc s1_disk_error
 
-    ; ---- Cargar Kernel desde disco ----
-    mov si, msg_loading_kern
-    call print_16
-
-    ; Cargar en segmento 0x1000:0x0000 = dirección lineal 0x10000
-    push es
-    mov ax, 0x1000
-    mov es, ax
-    xor bx, bx                          ; ES:BX = 0x1000:0x0000 = 0x10000
-
-    mov ah, 0x02                        ; BIOS: Lectura de sectores
-    mov al, KERNEL_SECTORS              ; Número de sectores
-    mov ch, 0                           ; Cilindro 0
-    mov cl, 2 + STAGE2_SECTORS          ; Sector después de Stage 2
-    mov dh, 0                           ; Cabeza 0
-    mov dl, [boot_drive]
-    int 0x13
-    pop es
-    jc s1_disk_error
-
     mov si, msg_ok
     call print_16
 
@@ -156,6 +136,9 @@ stage2_start:
     mov si, s2_msg_start
     call print_16
 
+    ; ---- Cargar Kernel ----
+    call load_kernel
+
     ; ---- Verificar soporte para Long Mode ----
     call check_long_mode
 
@@ -221,6 +204,18 @@ check_long_mode:
 ;     offset 4: entry 0 (24 bytes)
 ;     offset 28: entry 1 ...
 ; -----------------------------------------------------------------------------
+KERNEL_START_LBA    equ 1 + STAGE2_SECTORS
+
+load_kernel:
+    mov si, s2_msg_load_kern
+    call print_16
+
+    mov eax, KERNEL_START_LBA
+    mov ecx, KERNEL_SECTORS
+    mov edi, KERNEL_LOAD_ADDR
+    call read_sectors_lba
+    ret
+
 MEM_MAP_ADDR equ 0x5000
 
 detect_memory:
@@ -451,6 +446,7 @@ setup_vbe:
 
 ; ---- Mensajes de Stage 2 (16-bit) ----
 s2_msg_start:   db '[eterOS] Stage 2 activo', 13, 10, 0
+s2_msg_load_kern: db '  Cargando Kernel...', 13, 10, 0
 s2_msg_lm_ok:   db '  Long Mode: Soportado', 13, 10, 0
 s2_msg_no_lm:   db '  ERROR: CPU sin Long Mode!', 13, 10, 0
 s2_msg_pmode:   db '  Entrando en Modo Protegido...', 13, 10, 0

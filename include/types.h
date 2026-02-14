@@ -47,9 +47,11 @@ typedef signed long long    int64_t;
 #define UINT64_MAX 18446744073709551615ULL
 
 #ifdef __x86_64__
-#define SIZE_MAX UINT64_MAX
+#define SIZE_MAX  UINT64_MAX
+#define SSIZE_MAX INT64_MAX
 #else
-#define SIZE_MAX UINT32_MAX
+#define SIZE_MAX  UINT32_MAX
+#define SSIZE_MAX INT32_MAX
 #endif
 
 /* ========================================================================= */
