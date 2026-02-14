@@ -108,6 +108,8 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/net/e1000.c    \
               $(KERNEL_DIR)/net/dhcp.c             \
               $(KERNEL_DIR)/net/dhcp_parser.c      \
+              $(KERNEL_DIR)/net/stack.c            \
+              $(KERNEL_DIR)/net/tcp.c              \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/fs/initrd.c            \
               $(KERNEL_DIR)/fs/vfs.c               \
