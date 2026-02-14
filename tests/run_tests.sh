@@ -24,5 +24,12 @@ gcc -D__ETEROS_HOST_TEST__ tests/test_kcalloc.c -o tests/test_kcalloc
 ./tests/test_kcalloc
 rm tests/test_kcalloc
 
+# Test RTC
+echo "---------------------------------------------------"
+echo "Running test_rtc..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_rtc.c kernel/string.c -o tests/test_rtc
+./tests/test_rtc
+rm tests/test_rtc
+
 echo "---------------------------------------------------"
 echo "All tests passed!"

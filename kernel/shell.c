@@ -29,6 +29,7 @@
 #include "../include/net/dhcp.h"
 #include "../include/task.h"
 #include "../include/gui_demo.h"
+#include "../include/rtc.h"
 
 /* ========================================================================= */
 /* Constantes del sistema                                                    */
@@ -69,6 +70,7 @@ static void cmd_uptime(const char* args);
 static void cmd_ps(const char* args);
 static void cmd_kill(const char* args);
 static void cmd_demo(const char* args);
+static void cmd_date(const char* args);
 
 /* ========================================================================= */
 /* Tabla de comandos (extensible — solo agregar entradas)                    */
@@ -88,6 +90,7 @@ static const shell_command_t commands[] = {
     { "ps",       "Lista tareas activas",                         cmd_ps      },
     { "kill",     "Matar tarea (uso: kill <pid>)",                cmd_kill    },
     { "demo",     "Crear tarea de fondo (test scheduler)",        cmd_demo    },
+    { "date",     "Muestra fecha y hora (UTC / Argentina)",      cmd_date    },
     { "reboot",   "Reinicia el sistema",                         cmd_reboot  },
     { "halt",     "Detiene la CPU",                              cmd_halt    },
 };
@@ -396,6 +399,57 @@ static void cmd_uptime(const char* args) {
     terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     terminal_write_string("s\n\n");
 }
+static void print_time(rtc_time_t* t, const char* label) {
+    char buf[16];
+    terminal_write_string(label);
+
+    // YYYY-MM-DD
+    itoa_s(t->year, buf, sizeof(buf), 10);
+    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_write_string("-");
+
+    if (t->month < 10) terminal_write_string("0");
+    itoa_s(t->month, buf, sizeof(buf), 10);
+    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_write_string("-");
+
+    if (t->day < 10) terminal_write_string("0");
+    itoa_s(t->day, buf, sizeof(buf), 10);
+    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+
+    terminal_write_string(" ");
+
+    // HH:MM:SS
+    if (t->hours < 10) terminal_write_string("0");
+    itoa_s(t->hours, buf, sizeof(buf), 10);
+    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_write_string(":");
+
+    if (t->minutes < 10) terminal_write_string("0");
+    itoa_s(t->minutes, buf, sizeof(buf), 10);
+    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_write_string(":");
+
+    if (t->seconds < 10) terminal_write_string("0");
+    itoa_s(t->seconds, buf, sizeof(buf), 10);
+    terminal_write_colored(buf, VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+
+    terminal_write_string("\n");
+}
+
+static void cmd_date(const char* args) {
+    (void)args;
+    rtc_time_t utc, local;
+
+    rtc_get_time(&utc);
+    rtc_to_argentina(&utc, &local);
+
+    terminal_write_string("\n");
+    print_time(&utc,   "  UTC:       ");
+    print_time(&local, "  Argentina: ");
+    terminal_write_string("\n");
+}
+
 /* ========================================================================= */
 /* Comando `ps` — Listar tareas del scheduler                                */
 /* ========================================================================= */

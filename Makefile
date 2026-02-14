@@ -54,6 +54,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/arch/x86_64/idt.c    \
               $(KERNEL_DIR)/arch/x86_64/pic.c     \
               $(KERNEL_DIR)/drivers/timer/pit.c    \
+              $(KERNEL_DIR)/drivers/rtc/rtc.c      \
               $(KERNEL_DIR)/mm/heap.c             \
               $(KERNEL_DIR)/apps/santitravel.c     \
               $(KERNEL_DIR)/apps/sysmon.c          \
@@ -105,6 +106,7 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/xtensa
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/timer
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/rtc
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/mm
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/apps
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/net
