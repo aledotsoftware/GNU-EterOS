@@ -215,6 +215,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\apps\gui_demo.c",
     "$KERNEL_DIR\task.c",
     "$KERNEL_DIR\fs\initrd.c",
+    "$KERNEL_DIR\fs\vfs.c",
     "$KERNEL_DIR\ui\image.c"
 )
 
@@ -224,6 +225,7 @@ if ($Arch -eq "x86_64") {
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\pic.c"
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\gdt.c"
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\hal_impl.c"
+    $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\syscall.c"
 }
 elseif ($Arch -eq "aarch64") {
     $KERNEL_SRCS += "$KERNEL_DIR\arch\aarch64\hal_impl.c"
