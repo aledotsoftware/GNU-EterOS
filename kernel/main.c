@@ -22,6 +22,7 @@
 #include <fs/vfs.h>
 #include <vga.h>
 #include <task.h>
+#include <net/socket.h>
 
 /* lwIP Headers disabled - Library not present
 #include "lwip/init.h"
@@ -54,15 +55,12 @@ static void kernel_print_banner(void);
 static void kernel_print_sysinfo(void);
 static void kernel_halt(void);
 
-/* static struct netif e1000_netif;
-
 static void network_task(void) {
     while(1) {
-        // ethernetif_poll(&e1000_netif);
-        // sys_check_timeouts();
+        net_poll();
         task_yield();
     }
-} */
+}
 
 /* ========================================================================= */
 /* Punto de entrada del kernel                                               */
@@ -142,8 +140,10 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     extern int e1000_init(void*);
     if (e1000_init(NULL) == 0) {
         hal_console_write("  [NET]  Hardware inicializado.\n");
+        net_init();
         extern void dhcp_discover(void);
         dhcp_discover();
+        task_create("Network", network_task);
     } else {
         hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
         hal_console_write("         (El sistema continuara sin red)\n");
