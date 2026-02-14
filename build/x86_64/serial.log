@@ -1,7 +1,3 @@
-[GDT] Inicializando GDT y TSS...
-[GDT] GDT cargada. TSS activa.
-[eterOS] IDT cargada (256 vectores).
-[eterOS] PIT configurado a ~100 Hz.
 
 [eterOS] HAL Inicializada.
 [PMM] Region: Base=0x0x0000000000000000 Len=0x0x000000000009FC00 Type=1
@@ -12,9 +8,6 @@
 [PMM] Region: Base=0x0x00000000FEC00000 Len=0x0x0000000000001000 Type=2
 [PMM] Region: Base=0x0x00000000FEE00000 Len=0x0x0000000000001000 Type=2
 [PMM] Region: Base=0x0x00000000FFFC0000 Len=0x0x0000000000040000 Type=2
-[VMM] Inicializando Gestor de Memoria Virtual...
-[VMM] Usando PML4 del bootloader en 0x70000
-[MM] Heap inicializado dinamicamente.
      Start: 0x0x0000000000100000
      Size:  126 MB
 
@@ -36,11 +29,6 @@
 [eterOS] (c) 2026 Tudex Networks
   [INFO] Arquitectura: x86_64
   [INFO] Board/Target: Generic
-[MOUSE] Inicializando PS/2 Mouse...
-[MOUSE] Driver inicializado y IRQ12 desenmascarada.
   [INIT] Scheduler Round-Robin
-[SCHED] Scheduler Round-Robin inicializado
   [INIT] Lanzando Flux UI...
 [SCHED] Tarea creada: matrix_rain
-[eterOS] Ejecutando app: etermon
-[eterOS] Ejecutando app: etermon

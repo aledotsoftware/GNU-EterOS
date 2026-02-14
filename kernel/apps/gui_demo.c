@@ -36,13 +36,43 @@ static int32_t mouse_x = 512;
 static int32_t mouse_y = 384;
 static bool    mouse_left_btn = false;
 
-/* Drag & Drop */
-static window_t* win_drag = NULL;
-static int32_t drag_offset_x = 0;
-static int32_t drag_offset_y = 0;
 
-/* Estado Menu */
-static bool menu_open = false;
+
+/* ========================================================================= */
+/* Flux UI - The Ontology of the System                                      */
+/* ========================================================================= */
+
+/* Ontología del Sistema: Colores y Materiales */
+#define FLUX_VOID           0x050505  /* Deep Void (Capa 0) */
+#define FLUX_ACCENT_CYAN    0x00FFFF  /* Flujo Activo */
+#define FLUX_ACCENT_VIOLET  0x9D00FF  /* Profundidad */
+#define FLUX_ACCENT_AMBER   0xFFBF00  /* Alerta / Foco */
+#define FLUX_CARD_BG        0x101010  /* Espacios (Capa 1) */
+#define FLUX_TEXT_PRIMARY   0xFFFFFF
+#define FLUX_TEXT_SECONDARY 0x888888
+
+typedef enum {
+    FLUX_MACRO = 0,   /* Constellation (Overview) */
+    FLUX_FOCUS = 1    /* Detail (Active App) */
+} flux_zoom_level_t;
+
+/* Constellation Nodes (Apps disponibles) */
+typedef enum {
+    NODE_TERMINAL = 0,
+    NODE_SYSMON,
+    NODE_MATRIX,
+    NODE_SETTINGS,
+    NODE_COUNT
+} flux_node_id_t;
+
+
+/* Forward declarations */
+static void flux_notify(const char* title, const char* message, uint32_t accent);
+static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node);
+
+/* Animation State Forward Decl (needed for input handling) */
+static flux_zoom_level_t target_zoom; 
+
 
 /* ========================================================================= */
 /* Terminal App Logica Multi-instancia con Scroll                            */
@@ -342,129 +372,139 @@ void task_matrix_rain(void) {
 /* ========================================================================= */
 
 typedef enum {
+    TAB_HUB = -1,
     TAB_DISPLAY = 0,
     TAB_NETWORK,
     TAB_REGION
 } settings_tab_t;
 
 static window_t* win_settings = NULL;
-static settings_tab_t settings_tab = TAB_DISPLAY;
+static settings_tab_t settings_tab = TAB_HUB; /* Default to Hub */
 static int settings_lang = 0; /* 0=Español, 1=English */
 
 static void draw_settings_content(void) {
     if (!win_settings) return;
     
-    /* Layout: Sidebar (100px) + Content (Resto) */
-    int side_w = 110;
-    int win_h = win_settings->bounds.h - TITLE_BAR_HEIGHT; /* Altura area cliente */
+    int w = win_settings->bounds.w;
+    int h = win_settings->bounds.h;
     
-    /* Sidebar Background */
-    wm_fill_rect(win_settings, (rect_t){0, 0, side_w, win_h}, 0x2A2A2A);
-    wm_fill_rect(win_settings, (rect_t){side_w, 0, 1, win_h}, 0x404040); /* Separator */
+    /* Background: Flux Dark */
+    wm_fill_rect(win_settings, (rect_t){0, 0, w, h}, 0x151515);
     
-    /* Sidebar Items */
-    const char* items[] = {"Pantalla", "Internet", "Idioma"};
-    int item_h = 40;
-    
-    for (int i = 0; i < 3; i++) {
-        uint32_t bg = (i == settings_tab) ? 0x004080 : 0x2A2A2A;
-        uint32_t fg = (i == settings_tab) ? 0xFFFFFF : 0xA0A0A0;
+    if (settings_tab == TAB_HUB) {
+        /* == HUB MODE: Grid of Access == */
+        ui_draw_string(NULL, w/2 - 40, 40, "AJUSTES", FLUX_TEXT_PRIMARY, 0x151515);
         
-        wm_fill_rect(win_settings, (rect_t){0, i*item_h, side_w, item_h}, bg);
-        wm_print_at(win_settings, 10, i*item_h + 12, items[i]);
-    }
+        int btn_w = 140;
+        int btn_h = 100;
+        int gap = 20;
+        int start_x = (w - (btn_w * 3 + gap * 2)) / 2;
+        int start_y = 150;
+        
+        /* Node 1: Display */
+        wm_fill_rect(win_settings, (rect_t){start_x, start_y, btn_w, btn_h}, 0x2A2A2A);
+        wm_print_at(win_settings, start_x + 35, start_y + 40, "Pantalla");
+        /* Accent line */
+        wm_fill_rect(win_settings, (rect_t){start_x, start_y + btn_h - 2, btn_w, 2}, 0xFFFFFF);
 
-    /* Content Area Background */
-    wm_fill_rect(win_settings, (rect_t){side_w + 1, 0, win_settings->bounds.w - side_w - 1, win_h}, 0x1A1A1A);
-    
-    int cx = side_w + 20;
-    int cy = 20;
-    
-    if (settings_tab == TAB_DISPLAY) {
-        wm_print_at(win_settings, cx, cy, "Resolucion de Pantalla");
-        cy += 30;
+        /* Node 2: Network */
+        wm_fill_rect(win_settings, (rect_t){start_x + btn_w + gap, start_y, btn_w, btn_h}, 0x2A2A2A);
+        wm_print_at(win_settings, start_x + btn_w + gap + 35, start_y + 40, "Internet");
+        wm_fill_rect(win_settings, (rect_t){start_x + btn_w + gap, start_y + btn_h - 2, btn_w, 2}, FLUX_ACCENT_CYAN);
+
+        /* Node 3: Region */
+        wm_fill_rect(win_settings, (rect_t){start_x + (btn_w + gap) * 2, start_y, btn_w, btn_h}, 0x2A2A2A);
+        wm_print_at(win_settings, start_x + (btn_w + gap) * 2 + 35, start_y + 40, "Idioma");
+        wm_fill_rect(win_settings, (rect_t){start_x + (btn_w + gap) * 2, start_y + btn_h - 2, btn_w, 2}, FLUX_ACCENT_AMBER);
         
-        /* Mock Dropdown box */
-        wm_fill_rect(win_settings, (rect_t){cx, cy, 150, 24}, 0x303030);
-        wm_print_at(win_settings, cx + 5, cy + 5, "1024 x 768 (32 bit)");
-        wm_fill_rect(win_settings, (rect_t){cx + 130, cy, 20, 24}, 0x505050); /* Arrow bg */
-        // draw arrow down?
-        cy += 40;
-        wm_print_at(win_settings, cx, cy, "Escala (DPI): 100%");
+    } else {
+        /* == DETAIL MODE: Expanded Node == */
         
-    } else if (settings_tab == TAB_NETWORK) {
-        wm_print_at(win_settings, cx, cy, "Conexiones de Red");
-        cy += 30;
+        /* Navigation / Breadcrumb */
+        wm_fill_rect(win_settings, (rect_t){0, 0, w, 40}, 0x202020);
+        wm_print_at(win_settings, 20, 12, "< Volver");
         
-        wm_print_at(win_settings, cx, cy, "Adaptador: Intel E1000");
-        cy += 20;
-        wm_print_at(win_settings, cx, cy, "Estado: Conectado (Simulado)");
-        cy += 20;
-        wm_print_at(win_settings, cx, cy, "Direccion IP: 192.168.1.105");
+        int cx = 40;
+        int cy = 70;
         
-        cy += 30;
-        /* Button */
-        wm_fill_rect(win_settings, (rect_t){cx, cy, 120, 24}, 0x006000);
-        wm_print_at(win_settings, cx + 15, cy + 5, "Renovar IP");
-        
-    } else if (settings_tab == TAB_REGION) {
-        wm_print_at(win_settings, cx, cy, "Configuracion Regional");
-        cy += 30;
-        wm_print_at(win_settings, cx, cy, "Seleccionar Idioma:");
-        cy += 30;
-        
-        /* Radio Buttons Mockup */
-        /* Español */
-        uint32_t c1 = (settings_lang == 0) ? UI_COLOR_GREEN : 0x505050;
-        wm_fill_rect(win_settings, (rect_t){cx, cy, 12, 12}, c1);
-        wm_print_at(win_settings, cx + 20, cy - 2, "Espanol (AR)");
-        
-        cy += 25;
-        /* English */
-        uint32_t c2 = (settings_lang == 1) ? UI_COLOR_GREEN : 0x505050;
-        wm_fill_rect(win_settings, (rect_t){cx, cy, 12, 12}, c2);
-        wm_print_at(win_settings, cx + 20, cy - 2, "English (US)");
-        
-        /* Note: This variable 'settings_lang' currently only affects this radio button visual */
+        if (settings_tab == TAB_DISPLAY) {
+            wm_print_at(win_settings, cx, cy, "Resolucion");
+            cy += 40;
+            wm_fill_rect(win_settings, (rect_t){cx, cy, 200, 30}, 0x303030);
+            wm_print_at(win_settings, cx + 10, cy + 8, "1024 x 768");
+            
+        } else if (settings_tab == TAB_NETWORK) {
+            wm_print_at(win_settings, cx, cy, "Estado de Red");
+            cy += 40;
+            wm_print_at(win_settings, cx, cy, "IP: 192.168.1.105");
+            
+            cy += 40;
+            wm_fill_rect(win_settings, (rect_t){cx, cy, 140, 30}, 0x006000);
+            wm_print_at(win_settings, cx + 20, cy + 8, "Renovar DHCP");
+            
+        } else if (settings_tab == TAB_REGION) {
+            wm_print_at(win_settings, cx, cy, "Idioma del Sistema");
+            cy += 40;
+            
+            uint32_t c1 = (settings_lang == 0) ? FLUX_ACCENT_AMBER : 0x404040;
+            wm_fill_rect(win_settings, (rect_t){cx, cy, 16, 16}, c1);
+            wm_print_at(win_settings, cx + 25, cy, "Espanol");
+            
+            cy += 30;
+            uint32_t c2 = (settings_lang == 1) ? FLUX_ACCENT_AMBER : 0x404040;
+            wm_fill_rect(win_settings, (rect_t){cx, cy, 16, 16}, c2);
+            wm_print_at(win_settings, cx + 25, cy, "English");
+        }
     }
 }
 
 static void handle_settings_click(int win_local_x, int win_local_y) {
-    if (win_local_x < 110) {
-        /* Sidebar click */
-        int item_h = 40;
-        int idx = win_local_y / item_h;
-        if (idx >= 0 && idx <= 2) {
-            settings_tab = (settings_tab_t)idx;
+    /* Hub Navigation */
+    if (settings_tab == TAB_HUB) {
+        int w = 800; /* Assuming fixed size for now or pass win bounds */
+        int btn_w = 140;
+        int btn_h = 100;
+        int gap = 20;
+        int start_x = (w - (btn_w * 3 + gap * 2)) / 2;
+        int start_y = 150;
+        
+        /* Hit Test Nodes */
+        if (win_local_y >= start_y && win_local_y <= start_y + btn_h) {
+            if (win_local_x >= start_x && win_local_x <= start_x + btn_w) {
+                settings_tab = TAB_DISPLAY;
+            } else if (win_local_x >= start_x + btn_w + gap && win_local_x <= start_x + 2*btn_w + gap) {
+                settings_tab = TAB_NETWORK;
+            } else if (win_local_x >= start_x + 2*(btn_w + gap) && win_local_x <= start_x + 3*btn_w + 2*gap) {
+                settings_tab = TAB_REGION;
+            }
         }
     } else {
-        /* Content area click */
-        int cx = 130;  /* side_w (110) + margin (20) */
-        int cy = 20;
-        
-        if (settings_tab == TAB_REGION) {
-            /* Check Language Radio buttons positions from draw_settings_content */
-            /* "Seleccionar Idioma" is at cy+30 (50). Radio 1 at 50+30=80. Radio 2 at 80+25=105 */
-            int r1_y = 80;
-            int r2_y = 105;
-            
-            if (win_local_y >= r1_y - 5 && win_local_y <= r1_y + 15) {
-                settings_lang = 0;
-            }
-            if (win_local_y >= r2_y - 5 && win_local_y <= r2_y + 15) {
-                settings_lang = 1;
-            }
+        /* Detail Mode */
+        /* Back Button */
+        if (win_local_y < 40 && win_local_x < 100) {
+            settings_tab = TAB_HUB;
+            return;
         }
-        else if (settings_tab == TAB_NETWORK) {
-            /* Check for "Renovar IP" button */
-            /* Starts at cy=20. +30+20+20+20+30 = 120 approx */
-            int btn_y = 120;
-            if (win_local_y >= btn_y && win_local_y <= btn_y + 24 && win_local_x >= cx && win_local_x <= cx + 120) {
-                /* Todo: Trigger DHCP discover */
+        
+        /* Specific Controls */
+        int cx = 40;
+        int cy = 70; 
+        
+        if (settings_tab == TAB_NETWORK) {
+            int btn_y = cy + 40 + 40; /* 150 approx */
+            if (win_local_y >= btn_y && win_local_y <= btn_y + 30 && win_local_x >= cx && win_local_x <= cx + 140) {
+                 flux_notify("Network", "Solicitando DHCP...", FLUX_ACCENT_CYAN);
             }
+        } else if (settings_tab == TAB_REGION) {
+             /* Check Radio buttons */
+             int r1_y = cy + 40;
+             int r2_y = cy + 40 + 30;
+             if (win_local_y >= r1_y && win_local_y <= r1_y + 16) settings_lang = 0;
+             if (win_local_y >= r2_y && win_local_y <= r2_y + 16) settings_lang = 1;
         }
     }
 }
+
 
 /* ========================================================================= */
 /* Lógica UI, Touch y Desktop                                                */
@@ -474,78 +514,175 @@ static void handle_settings_click(int win_local_x, int win_local_y) {
 /* Flux UI - The Ontology of the System                                      */
 /* ========================================================================= */
 
-/* Ontología del Sistema: Colores y Materiales */
-#define FLUX_VOID           0x050505  /* Deep Void (Capa 0) */
-#define FLUX_ACCENT_CYAN    0x00FFFF  /* Flujo Activo */
-#define FLUX_ACCENT_VIOLET  0x9D00FF  /* Profundidad */
-#define FLUX_ACCENT_AMBER   0xFFBF00  /* Alerta / Foco */
-#define FLUX_CARD_BG        0x101010  /* Espacios (Capa 1) */
-#define FLUX_TEXT_PRIMARY   0xFFFFFF
-#define FLUX_TEXT_SECONDARY 0x888888
+/* Ontología del Sistema: Colores y Materiales (Defined at top) */
 
-typedef enum {
-    FLUX_MACRO = 0,   /* Constellation (Overview) */
-    FLUX_FOCUS = 1    /* Detail (Active App) */
-} flux_zoom_level_t;
+
+
+
 
 static flux_zoom_level_t current_zoom = FLUX_MACRO;
 static window_t* focused_space = NULL; /* The active "Space" */
+
+/* Capa 3: Sistema (Notificaciones) */
+typedef struct {
+    char title[32];
+    char message[64];
+    uint32_t accent;
+    int tick_start;
+    int duration;
+    bool active;
+} flux_notification_t;
+
+static flux_notification_t active_notif = {0};
+
+static void flux_notify(const char* title, const char* message, uint32_t accent) {
+    strlcpy(active_notif.title, title, 32);
+    strlcpy(active_notif.message, message, 64);
+    active_notif.accent = accent;
+    active_notif.tick_start = timer_get_ticks();
+    active_notif.duration = 300; /* ~3 seconds @ 100Hz */
+    active_notif.active = true;
+}
+
+static void draw_notifications(void) {
+    if (!active_notif.active) return;
+    
+    int current_tick = timer_get_ticks();
+    if (current_tick - active_notif.tick_start > active_notif.duration) {
+        active_notif.active = false;
+        return;
+    }
+    
+    /* Toast Top Center */
+    int w = 300;
+    int h = 60;
+    int x = (1024 - w) / 2;
+    int y = 40; /* Top margin */
+    
+    /* Background & Shadow effect */
+    framebuffer_rect(x, y, w, h, 0x202020);
+    framebuffer_rect(x, y + h, w, 2, 0x000000); /* Shadow */
+    
+    /* Accent Strip */
+    framebuffer_rect(x, y, 4, h, active_notif.accent);
+    
+    /* Content */
+    ui_draw_string(NULL, x + 15, y + 15, active_notif.title, FLUX_TEXT_PRIMARY, 0x202020);
+    ui_draw_string(NULL, x + 15, y + 35, active_notif.message, FLUX_TEXT_SECONDARY, 0x202020);
+}
+
+/* ========================================================================= */
+/* Flux Live Previews                                                        */
+/* ========================================================================= */
+
+static void draw_term_preview(int x, int y, int w, int h, term_instance_t* term) {
+    (void)w;
+    if (!term) return;
+    int line_h = 14;
+    int max_lines = (h - 60) / line_h;
+    int start_y = y + 50;
+    
+    /* Show last few lines of buffer */
+    int buf_start = term->cursor_y - max_lines;
+    if (buf_start < 0) buf_start = 0;
+    
+    for (int i = 0; i < max_lines; i++) {
+        int idx = buf_start + i;
+        if (idx < TERM_BUFFER_LINES && term->buffer[idx][0]) {
+             char line_preview[21];
+             strlcpy(line_preview, term->buffer[idx], 20);
+             ui_draw_string(NULL, x + 10, start_y + (i * line_h), line_preview, FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+        }
+    }
+    ui_draw_string(NULL, x + 10, start_y + (max_lines * line_h), "> _", FLUX_ACCENT_CYAN, FLUX_CARD_BG);
+}
+
+static void draw_sysmon_preview(int x, int y, int w, int h) {
+    (void)h;
+    uint64_t total = pmm_get_total_ram();
+    uint64_t free  = pmm_get_free_ram();
+    uint64_t used  = total - free;
+    float ram_pct = (float)used / (float)total;
+    
+    int bar_y = y + 60;
+    ui_draw_string(NULL, x + 10, bar_y - 15, "RAM Usage", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    draw_progress_bar(NULL, x + 10, bar_y, w - 20, 8, ram_pct, (ram_pct > 0.8) ? UI_COLOR_RED : FLUX_ACCENT_AMBER);
+    
+    int wave_y = y + 100;
+    ui_draw_string(NULL, x + 10, wave_y - 15, "CPU Activity", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    framebuffer_rect(x + 10, wave_y, w - 20, 1, 0x404040);
+    int tick = (timer_get_ticks() / 10) % 20;
+    framebuffer_rect(x + 10 + (tick * 5), wave_y - 5, 4, 10, FLUX_ACCENT_AMBER);
+}
+
+static void draw_matrix_preview(int x, int y, int w, int h) {
+    (void)w; (void)h;
+    int start_y = y + 50;
+    for (int i=0; i<5; i++) {
+        int col = (x + 20) + (i * 30);
+        int drop = (timer_get_ticks() / 5 + i * 3) % 10;
+        ui_draw_string(NULL, col, start_y + (drop * 10), "0", FLUX_ACCENT_VIOLET, FLUX_CARD_BG);
+    }
+}
+
+static void draw_settings_preview(int x, int y, int w, int h) {
+    (void)w; (void)h;
+    int start_y = y + 60;
+    ui_draw_string(NULL, x + 20, start_y, "Display: 1024x768", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    ui_draw_string(NULL, x + 20, start_y + 20, "Network: Online", FLUX_ACCENT_CYAN, FLUX_CARD_BG);
+    ui_draw_string(NULL, x + 20, start_y + 40, "Lang: ES/EN", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+}
 
 /* ========================================================================= */
 /* Flux Rendering Primitives                                                 */
 /* ========================================================================= */
 
-static void flux_draw_card_preview(int x, int y, int w, int h, const char* title, const char* subtitle, uint32_t accent) {
+static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
     /* Capa 1: Contenedor */
     framebuffer_rect(x, y, w, h, FLUX_CARD_BG);
     
-    /* Glow / Borde Activo (Simulado) */
-    //framebuffer_rect(x, y + h - 2, w, 2, accent);
+    /* Header (Simple text, no block) */
+    ui_draw_string(NULL, x + 10, y + 10, title, FLUX_TEXT_PRIMARY, FLUX_CARD_BG);
+    framebuffer_rect(x + 10, y + 26, w - 20, 1, 0x303030); /* Separator */
     
-    /* Icono / Miniatura (Placeholder abstracto) */
-    int icon_size = 40;
-    int icon_x = x + (w - icon_size) / 2;
-    int icon_y = y + 40;
-    framebuffer_rect(icon_x, icon_y, icon_size, icon_size, 0x202020);
-    framebuffer_rect(icon_x + 10, icon_y + 10, icon_size - 20, icon_size - 20, accent);
+    /* Live Content */
+    if (node == NODE_TERMINAL) {
+        if (!terminals[0].used) term_create();
+        draw_term_preview(x, y, w, h, &terminals[0]);
+    } else if (node == NODE_SYSMON) {
+        draw_sysmon_preview(x, y, w, h);
+    } else if (node == NODE_MATRIX) {
+        draw_matrix_preview(x, y, w, h);
+    } else if (node == NODE_SETTINGS) {
+        draw_settings_preview(x, y, w, h);
+    }
     
-    /* Texto */
-    int text_len = strlen(title) * 8;
-    int text_x = x + (w - text_len) / 2;
-    ui_draw_string(NULL, text_x, y + 100, title, FLUX_TEXT_PRIMARY, FLUX_CARD_BG);
-
-    text_len = strlen(subtitle) * 8;
-    text_x = x + (w - text_len) / 2;
-    ui_draw_string(NULL, text_x, y + 120, subtitle, FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    /* Active Border on Hover check handled by caller or simpler: just accent line */
+    framebuffer_rect(x, y + h - 1, w, 1, accent);
 }
 
 /* ========================================================================= */
 /* Flux Navigation & Input                                                   */
 /* ========================================================================= */
 
-/* Constellation Nodes (Apps disponibles) */
-typedef enum {
-    NODE_TERMINAL = 0,
-    NODE_SYSMON,
-    NODE_MATRIX,
-    NODE_SETTINGS,
-    NODE_COUNT
-} flux_node_id_t;
-
 static void flux_launch_space(flux_node_id_t node) {
-    /* Transición a Focus */
-    current_zoom = FLUX_FOCUS;
+    /* Trigger Animation */
+    flux_set_zoom(FLUX_FOCUS, node);
+    // current_zoom = FLUX_FOCUS; /* Removed to allow animation to finish */
     
+    /* Trigger Contextual Notification */
     if (node == NODE_TERMINAL) {
-        /* Ensure a terminal is ready */
+        flux_notify("Terminal Core", "Sistema listo para comandos.", FLUX_ACCENT_CYAN);
         if (!terminals[0].used) { term_create(); }
         focused_space = terminals[0].win;
         focused_term = &terminals[0];
     } else if (node == NODE_SYSMON) {
-        if (!win_sysinfo) win_sysinfo = wm_create_window(0, 0, 800, 600, "System Info"); // Bounds ignored in Focus mode
+        flux_notify("System Monitor", "Analizando hardware...", FLUX_ACCENT_AMBER);
+        if (!win_sysinfo) win_sysinfo = wm_create_window(0, 0, 800, 600, "System Info"); 
         win_sysinfo->active = true;
         focused_space = win_sysinfo;
     } else if (node == NODE_MATRIX) {
+        flux_notify("Matrix", "Entering the simulation...", FLUX_ACCENT_VIOLET);
         if (!win_matrix) {
              win_matrix = wm_create_window(0, 0, 800, 600, "Matrix");
              win_matrix->bg_color = UI_COLOR_BLACK; 
@@ -554,90 +691,87 @@ static void flux_launch_space(flux_node_id_t node) {
         win_matrix->active = true;
         focused_space = win_matrix;
     } else if (node == NODE_SETTINGS) {
+         flux_notify("Settings", "Configuracion de usuario cargada.", 0xFFFFFF);
          if (!win_settings) win_settings = wm_create_window(0, 0, 800, 600, "Configuracion");
          win_settings->active = true;
          focused_space = win_settings;
     }
 }
 
+
 static void draw_constellation(void) {
-    /* Capa 0: Void is already cleared */
-    
     /* Header (Capa 3) */
     ui_draw_string(NULL, 50, 50, "CONSTELACION", FLUX_TEXT_SECONDARY, FLUX_VOID);
-    ui_draw_string(NULL, 900, 50, "12:00", FLUX_TEXT_PRIMARY, FLUX_VOID);
+    
+    /* Clock */
+    uint32_t now = timer_get_uptime_seconds();
+    int h = (now / 3600) % 24;
+    int m = (now / 60) % 60;
+    char timebox[16];
+    char buf[4];
+    
+    itoa_s(h, buf, 4, 10); strlcpy(timebox, (h<10?"0":""), 16); strlcpy(timebox+strlen(timebox), buf, 16);
+    strlcpy(timebox+strlen(timebox), ":", 16);
+    itoa_s(m, buf, 4, 10); strlcpy(timebox+strlen(timebox), (m<10?"0":""), 16); strlcpy(timebox+strlen(timebox), buf, 16);
+    ui_draw_string(NULL, 900, 50, timebox, FLUX_TEXT_PRIMARY, FLUX_VOID);
 
-    /* Grid de Nodos (Centrado) */
+    /* Grid de Nodos */
     int card_w = 200;
     int card_h = 240;
     int gap = 40;
     int start_x = (1024 - ((card_w * 2) + gap)) / 2;
     int start_y = 200;
     
-    /* Nodo 1: Terminal */
-    flux_draw_card_preview(start_x, start_y, card_w, card_h, "Terminal Core", "Acceso Directo", FLUX_ACCENT_CYAN);
+    flux_draw_card(start_x, start_y, card_w, card_h, "TERMINAL", FLUX_ACCENT_CYAN, NODE_TERMINAL);
+    flux_draw_card(start_x + card_w + gap, start_y, card_w, card_h, "SYSTEM", FLUX_ACCENT_AMBER, NODE_SYSMON);
     
-    /* Nodo 2: System */
-    flux_draw_card_preview(start_x + card_w + gap, start_y, card_w, card_h, "System Health", "Monitor de Recursos", FLUX_ACCENT_AMBER);
-    
-    /* Fila 2 */
     int row2_y = start_y + card_h + gap;
-    
-    /* Nodo 3: Matrix */
-    flux_draw_card_preview(start_x, row2_y, card_w, card_h, "Matrix Stream", "Visualizacion", FLUX_ACCENT_VIOLET);
-
-    /* Nodo 4: Settings */
-    flux_draw_card_preview(start_x + card_w + gap, row2_y, card_w, card_h, "Ajustes", "Configuracion", 0xFFFFFF);
+    flux_draw_card(start_x, row2_y, card_w, card_h, "MATRIX", FLUX_ACCENT_VIOLET, NODE_MATRIX);
+    flux_draw_card(start_x + card_w + gap, row2_y, card_w, card_h, "SETTINGS", 0xFFFFFF, NODE_SETTINGS);
 }
 
 static void draw_focus_mode(void) {
     if (!focused_space || !focused_space->active) {
-        current_zoom = FLUX_MACRO; /* Fallback if active app died */
+        current_zoom = FLUX_MACRO;
         return;
     }
 
-    /* En Focus Mode, el espacio activo ocupa casi toda la pantalla (con márgenes estéticos) */
-    /* Update bounds logic usually happens here or guarantees bounds in draw */
-    /* Forcing bounds for "Immersion" */
-    int margin = 40; // Margen para "Respirar"
+    int margin = 40; 
     focused_space->bounds.x = margin;
     focused_space->bounds.y = margin;
     focused_space->bounds.w = 1024 - (margin * 2);
     focused_space->bounds.h = 768 - (margin * 2);
     
-    /* Draw the content of the active space */
-    /* HACK: We call specialized draw functions because generic wm_draw_window draws a titlebar we don't want */
-    
-    /* Shadow/Glow behind content */
+    /* Shadow/Glow */
     framebuffer_rect(focused_space->bounds.x - 2, focused_space->bounds.y - 2, 
-                     focused_space->bounds.w + 4, focused_space->bounds.h + 4, FLUX_ACCENT_CYAN); // Active Glow
+                     focused_space->bounds.w + 4, focused_space->bounds.h + 4, FLUX_ACCENT_CYAN); 
                      
     if (focused_space == win_sysinfo) {
-        draw_sysinfo_content(); // Rellena el buffer interno
-        /* Draw manually without title bar */
-        // wm_draw_window(focused_space); 
-        /* Actually sysinfo helper uses wm_print_at which relies on window bounds. 
-           In Flux, we want borderless. */
          wm_fill_rect(focused_space, (rect_t){0,0,focused_space->bounds.w, focused_space->bounds.h}, FLUX_CARD_BG);
-         draw_sysinfo_content(); // Re-draw content on top of BG
+         draw_sysinfo_content(); 
     } 
     else if (focused_space == win_settings) {
          draw_settings_content();
     }
     else if (focused_space == win_matrix) {
-        // Matrix draws itself in its task loop, just needs bounds update
+        /* Matrix is auto-drawn */
     }
     else {
-        /* Assume Terminal */
          draw_terminal_content(focused_term); 
     }
     
-    /* Capa 2: Controles de Navegación (Bottom Bar simplificada) */
-    int bar_h = 6;
-    int bar_w = 200;
+    /* Capa 2: Controles de Navegación (Reactive Bottom Bar) */
+    /* Check Hover */
+    bool hover_bottom = (mouse_y > 720);
+    
+    int bar_h = hover_bottom ? 8 : 4;
+    int bar_w = hover_bottom ? 240 : 180; /* Expands on hover */
+    uint32_t bar_col = hover_bottom ? FLUX_ACCENT_CYAN : 0x404040;
+    
     int bar_x = (1024 - bar_w) / 2;
-    int bar_y = 768 - 20;
-    framebuffer_rect(bar_x, bar_y, bar_w, bar_h, 0x404040); // Home Indicator "Pill"
+    int bar_y = 768 - 15;
+    
+    framebuffer_rect(bar_x, bar_y, bar_w, bar_h, bar_col);
 }
 
 /* Input Handling for Flux */
@@ -661,26 +795,91 @@ static void handle_flux_click(void) {
         HIT_CARD(start_x, row2_y, card_w, card_h, NODE_MATRIX);
         HIT_CARD(start_x + card_w + gap, row2_y, card_w, card_h, NODE_SETTINGS);
         
-    } else {
         /* Focus Mode Input */
         /* Check Bottom Home gesture */
-        if (mouse_y > 740) {
-            /* Swipe up / Click bottom area -> Go back to Macro */
-            current_zoom = FLUX_MACRO;
+        if (mouse_y > 720) {
+            target_zoom = FLUX_MACRO;
             return;
         }
         
         /* Pass input to active app controls */
         if (focused_space == win_settings) {
-             /* Adjust mouse coordinates to be relative to the window, which is now at (margin, margin) */
-             /* The handle_settings_click expects local coordinates but assumes titlebar offset. 
-                Flux has NO titlebar. */
-             handle_settings_click(mouse_x - focused_space->bounds.x, mouse_y - focused_space->bounds.y + TITLE_BAR_HEIGHT); 
-             /* We add TITLE_BAR_HEIGHT to y to fake it because handle_settings_click subtracts it?? 
-                No, handle_settings_click subtracts it in the CALLER. */
-             /* Let's fix handle_settings_click to accept absolute and calc local? No. */
+             /* wm_ library usually offsets drawing by TITLE_BAR_HEIGHT (20px).
+                So visual content starts at win->y + 20.
+                Click Y (content relative) = Mouse Y - (win->y + 20). */
+             handle_settings_click(mouse_x - focused_space->bounds.x, mouse_y - focused_space->bounds.y - TITLE_BAR_HEIGHT); 
         }
     }
+}
+
+/* ========================================================================= */
+/* Flux Animation State                                                      */
+/* ========================================================================= */
+static float zoom_progress = 0.0f; /* 0.0 (Macro) to 1.0 (Focus) */
+static flux_zoom_level_t target_zoom = FLUX_MACRO;
+static flux_node_id_t zooming_node = NODE_TERMINAL;
+static rect_t source_rect = {0,0,0,0}; /* Constellation rect */
+static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */
+
+static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
+    target_zoom = level;
+    if (level == FLUX_FOCUS) {
+        zooming_node = node;
+        /* Calculate source rect for the node */
+        int card_w = 200;
+        int card_h = 240;
+        int gap = 40;
+        int start_x = (1024 - ((card_w * 2) + gap)) / 2;
+        int start_y = 200;
+        int row2_y = start_y + card_h + gap;
+        
+        int x = start_x;
+        int y = start_y;
+        
+        if (node == NODE_SYSMON) { x += card_w + gap; }
+        else if (node == NODE_MATRIX) { y = row2_y; }
+        else if (node == NODE_SETTINGS) { x += card_w + gap; y = row2_y; }
+        
+        source_rect = (rect_t){x, y, card_w, card_h};
+    }
+}
+
+static void flux_update_zoom(void) {
+    /* Simple Linear Interpolation for smoothness */
+    float speed = 0.15f; 
+    if (target_zoom == FLUX_FOCUS) {
+        if (zoom_progress < 1.0f) zoom_progress += speed;
+        if (zoom_progress > 1.0f) zoom_progress = 1.0f;
+    } else {
+        if (zoom_progress > 0.0f) zoom_progress -= speed;
+        if (zoom_progress < 0.0f) zoom_progress = 0.0f;
+    }
+    
+    /* Auto-switch states when transition complete */
+    if (zoom_progress >= 1.0f) current_zoom = FLUX_FOCUS;
+    else if (zoom_progress <= 0.0f) current_zoom = FLUX_MACRO;
+    else current_zoom = -1; /* Transitioning */
+}
+
+static void draw_zoom_transition(void) {
+    /* Draw Constellation Background */
+    draw_constellation();
+    
+    /* Draw Expanding Card */
+    /* Interpolate Rect */
+    rect_t r;
+    r.x = source_rect.x + (int)((target_rect.x - source_rect.x) * zoom_progress);
+    r.y = source_rect.y + (int)((target_rect.y - source_rect.y) * zoom_progress);
+    r.w = source_rect.w + (int)((target_rect.w - source_rect.w) * zoom_progress);
+    r.h = source_rect.h + (int)((target_rect.h - source_rect.h) * zoom_progress);
+    
+    /* Draw Card Content Scaled (Approximated by clipping/centering) */
+    /* For now, just a solid filled rect with the node's preview */
+    wm_fill_rect(NULL, r, FLUX_CARD_BG);
+    framebuffer_rect(r.x, r.y, r.w, 4, FLUX_ACCENT_CYAN); /* Top bar */
+    
+    /* Draw content based on zooming_node */
+    ui_draw_string(NULL, r.x + 20, r.y + 20, "Materializing...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
 }
 
 static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
@@ -710,28 +909,52 @@ void gui_demo_run(void) {
     while (desktop_running) {
         if (keyboard_has_input()) {
              char c = keyboard_getchar();
-             if (c == 27) current_zoom = FLUX_MACRO; /* ESC returns to Constellation */
-             else if (current_zoom == FLUX_FOCUS && focused_term && focused_term == (term_instance_t*)focused_term) {
-                 /* Hack: check if active space is terminal */
+             /* Infinite Zoom Controls */
+             if (c == 72) { /* UP Arrow (Simulate Wheel Up / Zoom In) */
+                 if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
+                     flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL); 
+                     flux_launch_space(NODE_TERMINAL); 
+                 }
+             }
+             else if (c == 80) { /* DOWN Arrow (Simulate Wheel Down / Zoom Out) */
+                 if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
+                     target_zoom = FLUX_MACRO;
+                 }
+                 /* Also handle ESC within this logic for now */
+             }
+             
+             if (c == 27) target_zoom = FLUX_MACRO;
+             
+             /* Pass input to terminal if focused */
+             if (current_zoom == FLUX_FOCUS && focused_term && focused_term == (term_instance_t*)focused_term) {
                  if (focused_space == terminals[0].win) {
                      term_handle_key(focused_term, c);
                  }
              }
         }
         
+        flux_update_zoom();
+        
         /* Capa 0: Deep Void */
         framebuffer_clear(FLUX_VOID);
         
         if (current_zoom == FLUX_MACRO) {
             draw_constellation();
-        } else {
+        } else if (current_zoom == FLUX_FOCUS) {
             draw_focus_mode();
+        } else {
+             /* Transitioning */
+             draw_zoom_transition();
         }
         
-        /* Capa mouse (siempre arriba) */
-        /* Custom cursor for Flux: A small dot or crosshair */
+        /* Layer 3: System Notifications (Always on top) */
+        draw_notifications();
+        
+        /* Cursor */
         uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
-        framebuffer_rect(mouse_x - 1, mouse_y - 1, 3, 3, cursor_col);
+        framebuffer_rect(mouse_x - 4, mouse_y, 9, 1, cursor_col); 
+        framebuffer_rect(mouse_x, mouse_y - 4, 1, 9, cursor_col); 
+        framebuffer_rect(mouse_x, mouse_y, 1, 1, 0xFF0000);
         
         framebuffer_flush();
         for (volatile int i = 0; i < 50000; i++); 
