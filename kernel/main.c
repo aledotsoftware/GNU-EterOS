@@ -22,11 +22,19 @@
 #include <vga.h>
 #include <task.h>
 
+/* lwIP Headers */
+#include "lwip/init.h"
+#include "lwip/netif.h"
+#include "lwip/dhcp.h"
+#include "lwip/timeouts.h"
+#include "lwip/ip_addr.h"
+#include "netif/ethernet.h"
+#include <net/e1000.h>
+#include "ethernetif.h"
+
 /* Forward declarations for non-HAL kernel services */
 void pmm_init(void);
 void vmm_init(void);
-int e1000_init(void* pci_dev);
-void scheduler_init(void);
 
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */
@@ -43,7 +51,7 @@ static void kernel_print_banner(void);
 static void kernel_print_sysinfo(void);
 static void kernel_halt(void);
 
-/* static struct netif e1000_netif;
+static struct netif e1000_netif;
 
 static void network_task(void) {
     while(1) {
@@ -51,7 +59,7 @@ static void network_task(void) {
         sys_check_timeouts();
         task_yield();
     }
-} */
+}
 
 /* ========================================================================= */
 /* Punto de entrada del kernel                                               */
@@ -112,8 +120,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* For now, assume simple stack usage or static buffers */
     #endif
 
-    /* ---- 4. Inicializar Red (Deshabilitado temporalmente) ---- */
-    #if 0
+    /* ---- 4. Inicializar Red ---- */
     #if ETEROS_TIER >= 3
         hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
         /* Attempt to init E1000 (Generic Driver but requires PCI) */
@@ -140,7 +147,6 @@ void __attribute__((section(".text.boot"))) kmain(void) {
             hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
             hal_console_write("         (El sistema continuara sin red)\n");
         }
-    #endif
     #endif
 
     /* ---- 5. Mostrar banner de éterOS ---- */

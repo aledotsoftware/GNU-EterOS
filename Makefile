@@ -115,6 +115,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/ui/primitives.c        \
               $(KERNEL_DIR)/ui/window.c            \
+              $(KERNEL_DIR)/ui/image.c             \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
               $(KERNEL_DIR)/mm/pmm.c               \
