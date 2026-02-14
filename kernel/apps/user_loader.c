@@ -19,8 +19,8 @@ void user_loader_entry(void) {
         return;
     }
 
-    /* Map it to 0x400000 (User Virtual Address) */
-    uint64_t user_code_virt = 0x400000;
+    /* Map it to 0x100000000 (4GB, above bootloader huge pages) */
+    uint64_t user_code_virt = 0x100000000;
     /* PAGE_USER | PAGE_WRITE | PAGE_PRESENT */
     if (vmm_map_page((uint64_t)code_phys, user_code_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER) < 0) {
          serial_write_string("[USER] Failed to map code page\n");
@@ -31,8 +31,6 @@ void user_loader_entry(void) {
     uint64_t payload_size = (uint64_t)(user_payload_end - user_payload_start);
     memcpy((void*)user_code_virt, user_payload_start, payload_size);
 
-    /* Ideally map it as Read-Only / Executable now, but let's keep RW for simplicity */
-
     /* Allocate User Stack Page */
     void* stack_phys = pmm_alloc_page();
     if (!stack_phys) {
@@ -40,8 +38,8 @@ void user_loader_entry(void) {
         return;
     }
 
-    /* Map it to 0x800000 (User Virtual Address) */
-    uint64_t user_stack_virt = 0x800000;
+    /* Map it to 0x100002000 (User Virtual Address) */
+    uint64_t user_stack_virt = 0x100002000;
     if (vmm_map_page((uint64_t)stack_phys, user_stack_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER) < 0) {
          serial_write_string("[USER] Failed to map stack page\n");
          return;
