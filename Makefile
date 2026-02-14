@@ -132,7 +132,8 @@ KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
                   $(KERNEL_DIR)/arch/x86_64/interrupts.asm \
                   $(KERNEL_DIR)/arch/x86_64/syscall_entry.asm \
-                  $(KERNEL_DIR)/arch/x86_64/user_mode.asm
+                  $(KERNEL_DIR)/arch/x86_64/user_mode.asm \
+                  $(KERNEL_DIR)/arch/x86_64/user_payload.asm
 
 # ---- Archivos objeto ----
 # Mapear .c -> .o en el directorio de build
