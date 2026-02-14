@@ -90,6 +90,12 @@ void scheduler_init(void) {
 
     strlcpy(tasks[0].name, "kernel", sizeof(tasks[0].name));
 
+    /* POSIX Init for Kernel Task */
+    memset(tasks[0].fd_table, 0, sizeof(tasks[0].fd_table));
+    tasks[0].signal_mask = 0;
+    tasks[0].signal_pending = 0;
+    memset(tasks[0].signal_handlers, 0, sizeof(tasks[0].signal_handlers));
+
     task_count = 1;
     current_task = 0;
     scheduler_active = true;
@@ -139,6 +145,12 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].cr3 = cr3;
 
     strlcpy(tasks[slot].name, name, sizeof(tasks[slot].name));
+
+    /* POSIX Init for New Task */
+    memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
+    tasks[slot].signal_mask = 0;
+    tasks[slot].signal_pending = 0;
+    memset(tasks[slot].signal_handlers, 0, sizeof(tasks[slot].signal_handlers));
 
     /*
      * Preparar el stack para que context_switch pueda "entrar" por primera vez.
