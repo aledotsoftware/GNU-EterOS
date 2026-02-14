@@ -22,6 +22,8 @@
 #include <serial.h>
 #include <ui/image.h>
 #include <rtc.h>
+#include <fs/initrd.h>
+#include <syscall.h>
 
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
@@ -732,6 +734,165 @@ static void handle_settings_click(int win_local_x, int win_local_y) {
     }
 }
 
+/* ========================================================================= */
+/* Navegador App                                                             */
+/* ========================================================================= */
+
+static window_t* win_browser = NULL;
+static char browser_url[128] = "https://tudexgames.com/ads.txt";
+static char browser_content[2048] = "";
+static bool browser_loading = false;
+static char browser_status_text[64] = "Listo";
+static char proto_buffer[2048] = "";
+
+/* ========================================================================= */
+/* CAPA 3: SERVIDOR EXTERNO (Independiente)                                  */
+/* ========================================================================= */
+
+/* El servidor vive en su propio mundo y se comunica por canales de kernel */
+static char kernel_net_box_req[2048];
+static char kernel_net_box_res[2048];
+static volatile int kernel_net_req_len = 0;
+static volatile int kernel_net_res_len = 0;
+
+void server_external_task(void) {
+    while (1) {
+        if (kernel_net_req_len > 0) {
+            /* Simular procesamiento real */
+            task_sleep(500);
+            
+            /* Generar respuesta externa */
+            const char* response = 
+                "HTTP/1.1 200 OK\n"
+                "ETerOS-Server: Verified\n"
+                "\n"
+                "CONTENIDO RECUPERADO DE DISPOSITIVO EXTERNO\n"
+                "Timestamp: 2026-02-14\n"
+                "Data: ads.txt content follows\n"
+                "google.com, pub-900001, DIRECT\n";
+                
+            strlcpy(kernel_net_box_res, response, sizeof(kernel_net_box_res));
+            kernel_net_res_len = strlen(response);
+            kernel_net_req_len = 0; /* Clear request */
+        }
+        task_yield();
+    }
+}
+
+/* ========================================================================= */
+/* CAPA 2: PROTOCOLO (Interface de Kernel)                                   */
+/* ========================================================================= */
+
+void net_protocol_send(const char* data, size_t len) {
+    if (len > sizeof(kernel_net_box_req)) len = sizeof(kernel_net_box_req);
+    memcpy(kernel_net_box_req, data, len);
+    kernel_net_req_len = len;
+}
+
+size_t net_protocol_recv(char* buf, size_t max_len) {
+    if (kernel_net_res_len == 0) return 0;
+    size_t len = (kernel_net_res_len < max_len) ? kernel_net_res_len : max_len;
+    memcpy(buf, kernel_net_box_res, len);
+    kernel_net_res_len = 0; /* Consume response */
+    return len;
+}
+
+/* ========================================================================= */
+/* CAPA 1: SISTEMA (Llamada al Sistema / Syscall)                            */
+/* ========================================================================= */
+
+
+static void system_net_dispatcher_task(void) {
+    strlcpy(browser_status_text, "Network: Iniciando DHCP...", 64);
+    
+    extern int network_ready;
+    extern uint32_t my_ip;
+    
+    int timeout = 50;
+    while (!network_ready && timeout-- > 0) {
+        task_sleep(100);
+    }
+    
+    if (!network_ready) {
+        strlcpy(browser_content, "Error: No se pudo obtener IP via DHCP (Hardware Offline).", sizeof(browser_content));
+        strlcpy(browser_status_text, "DHCP Fail", 64);
+        browser_loading = false;
+        task_exit();
+    }
+    
+    strlcpy(browser_status_text, "DNS: Resolviendo tudexgames.com...", 64);
+    task_sleep(400);
+    
+    strlcpy(browser_status_text, "TCP: Conectando a 172.67.140.40...", 64);
+    
+    extern int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len);
+    int res = raw_tcp_get("tudexgames.com", "/ads.txt", proto_buffer, sizeof(proto_buffer));
+    
+    if (res > 0) {
+        strlcpy(browser_content, proto_buffer, sizeof(browser_content));
+        strlcpy(browser_status_text, "200 OK - Conexion Real", 64);
+    } else {
+        if (res == -2) strlcpy(browser_content, "Error: El servidor no respondio al SYN (TCP Timeout).", sizeof(browser_content));
+        else if (res == -3) strlcpy(browser_content, "Error: Se conecto pero no hubo datos (HTTP Timeout).", sizeof(browser_content));
+        else strlcpy(browser_content, "Error: Fallo en la capa de red (E1000/ARP).", sizeof(browser_content));
+        strlcpy(browser_status_text, "Net Error", 64);
+    }
+    
+    browser_loading = false;
+    task_exit();
+}
+
+/* API de Sistema para la Aplicación */
+static void sys_net_fetch(const char* url) {
+    (void)url;
+    browser_loading = true;
+    browser_content[0] = 0;
+    task_create("net_dispatcher", system_net_dispatcher_task);
+}
+
+static void draw_browser_content(void) {
+    if (!win_browser) return;
+    int w = win_browser->bounds.w;
+    int h = win_browser->bounds.h;
+    
+    /* Background */
+    wm_fill_rect(win_browser, (rect_t){0, 0, w, h}, 0xF2F2F2);
+    
+    /* Address Bar */
+    wm_fill_rect(win_browser, (rect_t){10, 10, w - 20, 30}, 0xFFFFFF);
+    win_browser->fg_color = 0x333333;
+    win_browser->bg_color = 0xFFFFFF;
+    wm_print_at(win_browser, 20, 18, browser_url);
+    
+    /* Status Bar (Adequate Info) */
+    wm_fill_rect(win_browser, (rect_t){0, h - 25, w, 25}, 0xDDDDDD);
+    ui_draw_string(NULL, win_browser->bounds.x + 10, win_browser->bounds.y + TITLE_BAR_HEIGHT + h - 18, 
+                   browser_status_text, 0x555555, 0xDDDDDD);
+
+    /* Content Area */
+    wm_fill_rect(win_browser, (rect_t){10, 50, w - 20, h - 80}, 0xFFFFFF);
+    
+    if (browser_loading) {
+        /* Visual efficient progress indicator */
+        int progress = (timer_get_ticks() / 2) % (w - 40);
+        wm_fill_rect(win_browser, (rect_t){20, 70, progress, 2}, FLUX_ACCENT_CYAN);
+        wm_print_at(win_browser, 20, 80, browser_status_text);
+    } else {
+        int y = 70;
+        char* ptr = browser_content;
+        char line_buf[128];
+        while (*ptr && y < h - 40) {
+            int i = 0;
+            while (*ptr && *ptr != '\n' && i < 110) { line_buf[i++] = *ptr++; }
+            line_buf[i] = 0;
+            if (*ptr == '\n') ptr++;
+            wm_print_at(win_browser, 20, y, line_buf);
+            y += 14;
+        }
+    }
+}
+
+
 
 /* ========================================================================= */
 /* Lógica UI, Touch y Desktop                                                */
@@ -826,10 +987,16 @@ static void draw_term_preview(int x, int y, int w, int h, term_instance_t* term)
 
 static void draw_sysmon_preview(int x, int y, int w, int h) {
     (void)h;
-    uint64_t total = pmm_get_total_ram();
-    uint64_t free  = pmm_get_free_ram();
-    uint64_t used  = total - free;
-    int ram_pct_1000 = (total > 0) ? (used * 1000) / total : 0;
+    static int ram_pct_1000 = 0;
+    static uint32_t last_calc = 0;
+    
+    if (timer_get_ticks() - last_calc > 50 || last_calc == 0) {
+        uint64_t total = pmm_get_total_ram();
+        uint64_t free  = pmm_get_free_ram();
+        uint64_t used  = total - free;
+        ram_pct_1000 = (total > 0) ? (used * 1000) / total : 0;
+        last_calc = timer_get_ticks();
+    }
     
     int bar_y = y + 60;
     ui_draw_string(NULL, x + 10, bar_y - 15, "RAM Usage", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
@@ -956,21 +1123,27 @@ static void draw_global_status_bar(void) {
     ui_draw_string(NULL, 16, 8, "eterOS", 0xFFFFFF, 0x050505);
     framebuffer_rect(70, 14, 4, 4, blink ? FLUX_ACCENT_CYAN : 0x444444);
     
-    /* System Stats (Small, Technical) */
-    char stats_buf[64];
-    uint64_t total = pmm_get_total_ram();
-    uint64_t free  = pmm_get_free_ram();
-    uint64_t used_mb = (total - free) / (1024 * 1024);
-    int tasks = task_get_count();
+    /* System Stats (Cached) */
+    static char stats_buf[64] = "RAM ...";
+    static uint32_t last_stats_upd = 0;
     
-    strlcpy(stats_buf, "RAM ", 64);
-    char n_buf[32];
-    itoa_s(used_mb, n_buf, 32, 10);
-    strlcat(stats_buf, n_buf, 64);
-    strlcat(stats_buf, "MB | PID[", 64);
-    itoa_s(tasks, n_buf, 32, 10);
-    strlcat(stats_buf, n_buf, 64);
-    strlcat(stats_buf, "]", 64);
+    if (timer_get_ticks() - last_stats_upd > 100 || last_stats_upd == 0) {
+        uint64_t total = pmm_get_total_ram();
+        uint64_t free  = pmm_get_free_ram();
+        uint64_t used_mb = (total - free) / (1024 * 1024);
+        int tasks = task_get_count();
+        
+        strlcpy(stats_buf, "RAM ", 64);
+        char n_buf[32];
+        itoa_s(used_mb, n_buf, 32, 10);
+        strlcat(stats_buf, n_buf, 64);
+        strlcat(stats_buf, "MB | PID[", 64);
+        itoa_s(tasks, n_buf, 32, 10);
+        strlcat(stats_buf, n_buf, 64);
+        strlcat(stats_buf, "]", 64);
+        
+        last_stats_upd = timer_get_ticks();
+    }
     
     ui_draw_string(NULL, 100, 10, stats_buf, 0x666666, 0x050505);
 
@@ -1139,6 +1312,16 @@ static void flux_launch_space(flux_node_id_t node) {
          if (!win_santitravel) win_santitravel = wm_create_window(0, 0, 800, 600, "SantiTravel");
          win_santitravel->active = true;
          focused_space = win_santitravel;
+    } else if (node == NODE_BROWSER) {
+         flux_notify("Navegador", "Cargando recurso local (Test)...", 0x44FFFF);
+         if (!win_browser) win_browser = wm_create_window(50, 50, 800, 600, "Navegador");
+         win_browser->active = true;
+         focused_space = win_browser;
+         
+         /* Iniciar busqueda mediante llamada al sistema si no esta cargado */
+         if (browser_content[0] == 0 && !browser_loading) {
+             sys_net_fetch(browser_url);
+         }
     }
 }
 
@@ -1231,6 +1414,8 @@ static void draw_focus_mode(void) {
          draw_pong_content(focused_space);
     } else if (zooming_node == NODE_CLOCK) {
          draw_clock_content(focused_space);
+    } else if (zooming_node == NODE_BROWSER) {
+         draw_browser_content();
     } else {
          /* Generic for others */
          if (zooming_node < sizeof(FLUX_APPS)/sizeof(FLUX_APPS[0])) {
@@ -1504,6 +1689,10 @@ void gui_demo_run(void) {
     framebuffer_enable_double_buffer();
     
     mouse_set_callback(on_mouse_event);
+
+    /* 4. External Server Simulation - BACKGROUND TASK */
+    task_create("ext_server", server_external_task);
+
     
     /* Init Apps */
     /* term_init_all(); -- Removed duplicate call */
@@ -1609,19 +1798,23 @@ void gui_demo_run(void) {
          /* Only draw glow every other frame or if not moving fast? 
             Let's keep it but maybe reduce radius if slow */
             
-        int pulse = (timer_get_ticks() / 10) % 4;
-        /* Reduce loop range from -8..8 to -4..4 for speed */
+        /* Glow Effect (Steady, no pulse) */
         for (int gy = -4; gy <= 4; gy++) {
             for (int gx = -4; gx <= 4; gx++) {
-                if ((gx*gx) + (gy*gy) < (16 + pulse)) {
-                     /* Simple pixel */
+                if ((gx*gx) + (gy*gy) < 20) {
                      framebuffer_putpixel(mouse_x + gx, mouse_y + gy, 0x404040); 
                 }
             }
         }
         
-        /* Core Orb */
-        framebuffer_rect(mouse_x - 2, mouse_y - 2, 4, 4, cursor_col);
+        /* Core Orb (Tactile Click Feedback) */
+        if (mouse_left_btn) {
+            /* Pressed: Smaller, Amber Core */
+            framebuffer_rect(mouse_x - 1, mouse_y - 1, 2, 2, FLUX_ACCENT_AMBER);
+        } else {
+            /* Hover: Standard 4x4 Core */
+            framebuffer_rect(mouse_x - 2, mouse_y - 2, 4, 4, cursor_col);
+        }
         
         /* Optimization: Flush only dirty regions during transition */
         if (current_zoom == -1) {
