@@ -819,6 +819,54 @@ static void draw_santitravel_preview(int x, int y, int w, int h) {
     ui_draw_string(NULL, x + 20 + tick, start_y + 30, ">-o-o", 0xFFFFFF, FLUX_CARD_BG);
 }
 
+void gui_draw_boot_logo(void) {
+    uint32_t sw = framebuffer_get_width();
+    uint32_t sh = framebuffer_get_height();
+    if (sw == 0) sw = 1024;
+    if (sh == 0) sh = 768;
+
+    framebuffer_clear(0x000000);
+
+    /* Draw Logo (ASCII Art styled for professional look) */
+    const char* lines[] = {
+        " _____ _             _____ _____ ",
+        "|   __| |_ ___ ___  |     |   __|",
+        "|   __|  _| -_|  _| |  |  |__   |",
+        "|_____|_| |___|_|   |_____|_____|"
+    };
+    
+    int lx = (sw - (33 * 8)) / 2;
+    int ly = sh / 2 - 60;
+    
+    uint32_t colors[] = {0x00FFFF, 0x00E0E0, 0x00D0D0, 0x00B0B0};
+
+    for (int i=0; i<4; i++) {
+        ui_draw_string(NULL, lx, ly + (i * 16), lines[i], colors[i], 0x000000);
+    }
+    
+    ui_draw_string(NULL, (sw - (14 * 8)) / 2, ly + 80, "eterOS Genesis", 0xFFFFFF, 0x000000);
+    ui_draw_string(NULL, (sw - (24 * 8)) / 2, ly + 100, "Cargando subsistemas...", 0x888888, 0x000000);
+    
+    /* Progress bar */
+    int bw = 300;
+    int bx = (sw - bw) / 2;
+    int by = ly + 130;
+    framebuffer_rect(bx, by, bw, 4, 0x222222);
+    
+    framebuffer_flush();
+    
+    /* Fake Progress Animation */
+    for (int i=0; i<=100; i+=2) {
+        framebuffer_rect(bx, by, (bw * i) / 100, 4, 0x00FFFF);
+        framebuffer_flush();
+        /* Wait a bit manually */
+        for (volatile int j=0; j<1000000; j++); 
+    }
+    
+    /* Final pause */
+    for (volatile int j=0; j<5000000; j++); 
+}
+
 /* ========================================================================= */
 /* Flux Status Bar                                                           */
 /* ========================================================================= */
