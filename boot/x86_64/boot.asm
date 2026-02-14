@@ -18,18 +18,49 @@
 ; STAGE 1 - Master Boot Record (512 bytes)
 ; #############################################################################
 [bits 16]
+[bits 16]
 [org 0x7C00]
 
-; ---- Constantes ----
-STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
+; ---- Constantes Globales ----
 STAGE2_SECTORS      equ 16             ; Sectores de Stage 2 (8 KB)
-KERNEL_LOAD_ADDR    equ 0x10000         ; Dirección donde se carga el kernel
 KERNEL_SECTORS      equ 256            ; Sectores del kernel (128 KB)
+STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
+KERNEL_LOAD_ADDR    equ 0x10000         ; Dirección donde se carga el kernel
 STACK_TOP           equ 0x7C00          ; El stack crece hacia abajo
 
 ; =============================================================================
 ; Punto de entrada - Stage 1
 ; =============================================================================
+start:
+    jmp short stage1_start  ; (2 bytes) EB xx
+    nop                     ; (1 byte)  90
+
+; =============================================================================
+; BPB (BIOS Parameter Block) - Fake FAT12 Header for Compatibility
+; Some BIOSes check this to validate USB boot media.
+; =============================================================================
+bpb_oem_name:           db 'MSWIN4.1'   ; 8 bytes
+bpb_bytes_per_sec:      dw 512
+bpb_sec_per_clus:       db 1
+bpb_reserved_sec:       dw 1
+bpb_num_fats:           db 2
+bpb_root_ent:           dw 224
+bpb_tot_sec_16:         dw 0            ; 0 for large disks (using tot_sec_32)
+bpb_media_desc:         db 0xF8         ; HDD
+bpb_sec_per_fat:        dw 9
+bpb_sec_per_trk:        dw 63           ; Standard logic geometry
+bpb_num_heads:          dw 255          ; Standard logic geometry
+bpb_hidden_sec:         dd 0
+bpb_tot_sec_32:         dd 0            ; Filled by formatting tools if needed
+
+; Extended BPB (FAT12/16)
+bpb_drive_num:          db 0x80         ; Physical drive number (0x80 = HDD 0)
+bpb_reserved:           db 0
+bpb_boot_sig:           db 0x29         ; Extended boot sig
+bpb_vol_id:             dd 0x12345678
+bpb_vol_label:          db 'ETEROS BOOT ' ; 11 bytes
+bpb_fs_type:            db 'FAT12   '     ; 8 bytes
+
 stage1_start:
     ; Configurar segmentos y stack
     cli
@@ -141,9 +172,25 @@ msg_pxe_reloc:   db ' [PXE Reloc] ', 0
 boot_drive:      db 0
 
 ; =============================================================================
+; Tabla de Particiones MBR (Simulada para USB Boot)
+; Offset 446 (0x1BE) - 16 bytes por entrada, 4 entradas.
+; =============================================================================
+times 446 - ($ - $$) db 0
+
+; Entrada 1: Partición Activa (Bootable), Tipo 0x83 (Linux), LBA Start 1, Size grande
+db 0x80         ; Status: Active
+db 0x00, 0x01, 0x00 ; CHS Start (Head 0, Sector 1, Cylinder 0) - Falso pero sirve
+db 0x83         ; Type: Linux
+db 0xFE, 0x3F, 0xFF ; CHS End (Head 254, Sector 63, Cylinder 1023) - Falso
+dd 0x00000001   ; LBA Start: Sector 1 (justo despues del MBR)
+dd 0x00010000   ; LBA Size: 65536 sectores (32MB aprox)
+
+; Entradas 2, 3, 4: Vacías
+times 16 * 3 db 0
+
+; =============================================================================
 ; Firma del MBR
 ; =============================================================================
-times 510 - ($ - $$) db 0
 dw 0xAA55
 
 ; #############################################################################

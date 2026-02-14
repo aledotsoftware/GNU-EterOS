@@ -22,7 +22,7 @@
 # =============================================================================
 
 param(
-    [ValidateSet("all", "boot", "kernel", "image", "vdi", "vbox", "run", "run-nographic", "debug", "clean", "info", "pxe")]
+    [ValidateSet("all", "boot", "kernel", "image", "vdi", "vbox", "run", "run-nographic", "debug", "clean", "info", "pxe", "usb")]
     [string]$Target = "all",
 
     [ValidateSet("x86_64", "i386", "aarch64")]
@@ -479,11 +479,47 @@ function Invoke-PxeBuild {
     $actualSize = (1 + 16 + 256 + 64) * 512 # MBR + S2 + KERN + INITRD_MAX
     $pxeData = New-Object byte[] $actualSize
     [System.Array]::Copy($imageData, 0, $pxeData, 0, $actualSize)
-    [System.Array]::Copy($imageData, 0, $pxeData, 0, $actualSize)
     
     [System.IO.File]::WriteAllBytes($pxePath, $pxeData)
     Write-Step "OK" "PXE Image: $pxePath ($actualSize bytes)"
     Write-Host "  Uso: Configura tu servidor DHCP/TFTP para servir este archivo." -ForegroundColor Gray
+}
+
+function Invoke-UsbBuild {
+    Write-Step "IMG" "Generando imagen USB HDD (32MB)..."
+    Invoke-BootBuild
+    Invoke-KernelBuild
+    Invoke-InitrdBuild
+    
+    # Tamaño fijo de 32MB para asegurar compatibilidad con Etcher/BIOS
+    $imagePath = "$BUILD_DIR\eteros_usb.img"
+    $imageSize = 32 * 1024 * 1024 
+    $imageData = New-Object byte[] $imageSize
+    
+    # 1. Bootloader (MBR + Stage 1) con Partition Table simulada
+    $bootData = [System.IO.File]::ReadAllBytes($BOOT_BIN)
+    [System.Array]::Copy($bootData, 0, $imageData, 0, 512)
+    
+    # 2. Bootloader Stage 2 (Sectores 2-17)
+    # Nota: boot.asm asume que Stage 2 empieza en sector 2.
+    [System.Array]::Copy($bootData, 512, $imageData, 512, $bootData.Length - 512)
+    
+    # 3. Kernel (Sector 18)
+    $kernelPath = $KERNEL_BIN
+    $kernelData = [System.IO.File]::ReadAllBytes($kernelPath)
+    [System.Array]::Copy($kernelData, 0, $imageData, 17 * 512, $kernelData.Length)
+    
+    # 4. Initrd 
+    $initrdPath = "$BUILD_DIR\initrd.bin"
+    if (Test-Path $initrdPath) {
+        $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
+        $initrdOffset = (1 + 16 + 256) * 512
+        [System.Array]::Copy($initrdData, 0, $imageData, $initrdOffset, $initrdData.Length)
+    }
+    
+    [System.IO.File]::WriteAllBytes($imagePath, $imageData)
+    Write-Step "OK" "USB Image: $imagePath ($imageSize bytes)"
+    Write-Host "  Uso: Graba este archivo con Balena Etcher en tu pendrive." -ForegroundColor Gray
 }
 
 function Invoke-VBoxRun {
@@ -685,6 +721,10 @@ switch ($Target) {
     "pxe" {
         Initialize-BuildDirs
         Invoke-PxeBuild
+    }
+    "usb" {
+        Initialize-BuildDirs
+        Invoke-UsbBuild
     }
     "boot" {
         Initialize-BuildDirs
