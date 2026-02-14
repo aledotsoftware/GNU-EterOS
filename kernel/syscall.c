@@ -138,6 +138,23 @@ void syscall_handler(struct syscall_regs* regs) {
             ret = 0;
             break;
 
+        case SYS_sendto:
+            /* sys_sendto(fd, buf, len, flags, addr, addrlen) */
+            {
+                extern void net_protocol_send(const char* data, size_t len);
+                net_protocol_send((const char*)regs->rsi, (size_t)regs->rdx);
+                ret = regs->rdx;
+            }
+            break;
+
+        case SYS_recvfrom:
+            /* sys_recvfrom(fd, buf, len, flags, addr, addrlen) */
+            {
+                extern size_t net_protocol_recv(char* buf, size_t max_len);
+                ret = net_protocol_recv((char*)regs->rsi, (size_t)regs->rdx);
+            }
+            break;
+
         default:
             serial_write_string("[SYSCALL] Unknown syscall NR=");
             char buf[32];
