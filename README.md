@@ -139,7 +139,8 @@ Dirección       | Contenido
 0x70000-0x76FFF | Tablas de paginación bootloader (28 KB)
 0x90000         | Tope del Stack
 0xB8000-0xBFFFF | Buffer de video VGA
-0x00400000      | Heap del kernel (8 MB, identity-mapped)
+0x100000        | Kernel Heap Start (Identity Mapped)
+0x4000000       | Mapped Initrd (Image/Assets)
 ```
 
 ## 🚀 Hoja de Ruta (Roadmap hacia la GUI)
@@ -162,14 +163,19 @@ Dirección       | Contenido
 - [x] **Driver NIC (e1000):** Intel PRO/1000 con dirección MAC y escaneo PCI
 - [x] **Cliente DHCP:** Discover/Offer básico para obtener IP
 - [x] **Driver de Video VBE/GOP:** Framebuffer de alta resolución (Linear Framebuffer)
-- [ ] **Terminal Gráfica:** Logger en pantalla usando Framebuffer
-- [ ] **Mouse PS/2:** Soporte para puntero en pantalla
+- [x] **Terminal Gráfica:** Logger en pantalla usando Framebuffer (sysmon, panics)
+- [x] **Mouse PS/2:** Soporte básico para puntero en pantalla (drivers/input/mouse.c)
+
+### Fase 2.5: Compatibilidad de Arranque (Boot Compatibility) ✅
+- [x] **PXE Boot (Network):** Soporte para arranque sin disco via TFTP (SiS191/Universal PXE)
+- [x] **USB Legacy Boot:** Soporte para BIOS antiguos con emulación HDD (Fake BPB, MBR Patch)
+- [x] **Initrd (Initial Ramdisk):** Sistema de archivos en memoria para assets (Logos, Configs)
 
 ### Fase 3: Kernel Moderno y Multitarea
 - [x] **Heap Manager:** `kmalloc()`, `kfree()`, `kcalloc()` para el kernel (completado en Fase 1)
 - [x] **Scheduler Round-Robin:** Multitarea preemptiva (comandos `ps`, `kill`, `demo`) - `kernel/task.c`
 - [ ] **VFS (Virtual File System):** Abstracción de sistemas de archivos
-- [ ] **Initrd:** Sistema de archivos en RAM (sin drivers de disco complejos)
+- [x] **Initrd:** Carga de módulos y assets (Completado en Fase 2.5)
 
 ### Fase 3.5: Networking & Storage
 - [x] **Driver NIC:** Intel PRO/1000 (e1000) con detección PCI y MAC

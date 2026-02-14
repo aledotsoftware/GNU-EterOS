@@ -110,23 +110,25 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/net/dhcp_parser.c      \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/fs/initrd.c            \
-              $(KERNEL_DIR)/fs/fat32.c             \
+              $(KERNEL_DIR)/fs/vfs.c               \
               $(KERNEL_DIR)/apps/gui_demo.c        \
-              $(KERNEL_DIR)/apps/wget.c            \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/ui/primitives.c        \
               $(KERNEL_DIR)/ui/window.c            \
+              $(KERNEL_DIR)/ui/image.c             \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
               $(KERNEL_DIR)/mm/pmm.c               \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
               $(KERNEL_DIR)/arch/x86_64/gdt.c \
-              $(LWIP_SRCS)
+              $(KERNEL_DIR)/arch/x86_64/syscall.c
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
-                  $(KERNEL_DIR)/arch/x86_64/interrupts.asm
+                  $(KERNEL_DIR)/arch/x86_64/interrupts.asm \
+                  $(KERNEL_DIR)/arch/x86_64/syscall_entry.asm \
+                  $(KERNEL_DIR)/arch/x86_64/user_mode.asm
 
 # ---- Archivos objeto ----
 # Mapear .c -> .o en el directorio de build
