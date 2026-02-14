@@ -22,7 +22,7 @@
 # =============================================================================
 
 param(
-    [ValidateSet("all", "boot", "kernel", "image", "vdi", "vbox", "run", "run-nographic", "debug", "clean", "info")]
+    [ValidateSet("all", "boot", "kernel", "image", "vdi", "vbox", "run", "run-nographic", "debug", "clean", "info", "pxe")]
     [string]$Target = "all",
 
     [ValidateSet("x86_64", "i386", "aarch64")]
@@ -444,6 +444,48 @@ function Invoke-VdiBuild {
     Write-Step "OK" "VDI: $vdiPath ($vdiSize bytes)"
 }
 
+function Invoke-PxeBuild {
+    Write-Step "PXE" "Generando imagen PXE (Monolitica)..."
+    
+    # 1. Compilar Bootloader con flag PXE
+    Write-Step "ASM" "boot.asm (MODO PXE)"
+    & $AS -f bin $BOOT_SRC -dPXE -o "$BUILD_DIR\boot_pxe.bin"
+    
+    # 2. Asegurar que tenemos Kernel e Initrd construidos
+    Invoke-KernelBuild
+    Invoke-InitrdBuild
+    
+    # 3. Ensamblar la imagen monolitica (igual que Invoke-ImageBuild)
+    $pxePath = "$BUILD_DIR\eteros.pxe"
+    $imageSize = 2880 * 512
+    $imageData = New-Object byte[] $imageSize
+    
+    # Mover bootloader PXE
+    $bootData = [System.IO.File]::ReadAllBytes("$BUILD_DIR\boot_pxe.bin")
+    [System.Array]::Copy($bootData, 0, $imageData, 0, $bootData.Length)
+    
+    # Mover kernel
+    $kernelData = [System.IO.File]::ReadAllBytes($KERNEL_BIN)
+    [System.Array]::Copy($kernelData, 0, $imageData, 17 * 512, $kernelData.Length)
+    
+    # Mover initrd
+    $initrdPath = "$BUILD_DIR\initrd.bin"
+    if (Test-Path $initrdPath) {
+        $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
+        [System.Array]::Copy($initrdData, 0, $imageData, (1 + 16 + 256) * 512, $initrdData.Length)
+    }
+    
+    # Escribir el archivo final (truncado al tamaño real ocupado para ahorrar TFTP bandwidth)
+    $actualSize = (1 + 16 + 256 + 64) * 512 # MBR + S2 + KERN + INITRD_MAX
+    $pxeData = New-Object byte[] $actualSize
+    [System.Array]::Copy($imageData, 0, $pxeData, 0, $actualSize)
+    [System.Array]::Copy($imageData, 0, $pxeData, 0, $actualSize)
+    
+    [System.IO.File]::WriteAllBytes($pxePath, $pxeData)
+    Write-Step "OK" "PXE Image: $pxePath ($actualSize bytes)"
+    Write-Host "  Uso: Configura tu servidor DHCP/TFTP para servir este archivo." -ForegroundColor Gray
+}
+
 function Invoke-VBoxRun {
     if (!$VBOXMANAGE) {
         Write-Step "ERR" "VBoxManage no encontrado. Instalar VirtualBox."
@@ -639,6 +681,10 @@ switch ($Target) {
         Write-Host "    Ejecutar: .\build.ps1 -Target run" -ForegroundColor White
         Write-Host "  ================================================" -ForegroundColor Green
         Write-Host ""
+    }
+    "pxe" {
+        Initialize-BuildDirs
+        Invoke-PxeBuild
     }
     "boot" {
         Initialize-BuildDirs

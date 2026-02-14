@@ -10,6 +10,7 @@
 ;   0x10000 - ...    : Kernel de éterOS
 ;
 ; Stage 1 carga Stage 2 + Kernel desde disco, luego salta a Stage 2.
+; Si se compila con -dPXE, asume que todo el archivo ya está en memoria (ej. SiS191).
 ; Stage 2 configura la GDT, paginación, Long Mode, y salta al kernel.
 ; =============================================================================
 
@@ -49,6 +50,25 @@ stage1_start:
     ; ---- Habilitar Línea A20 ----
     call enable_a20
 
+%ifdef PXE
+    mov si, msg_pxe_reloc
+    call print_16
+
+    ; En PXE, el archivo está completo desde 0x7C00.
+    ; Relocalizar Kernel: 0x9E00 -> 0x10000 (overlap, copy end-to-start)
+    mov cx, KERNEL_SECTORS * 128 ; 512 / 4 = 128 dwords por sector
+    std
+    mov esi, 0x9E00 + (KERNEL_SECTORS * 512) - 4
+    mov edi, 0x10000 + (KERNEL_SECTORS * 512) - 4
+    rep movsd
+    cld
+
+    ; Relocalizar Initrd: 0x29E00 -> 0x40000 (32 KB fijo o dinámico)
+    mov cx, (64 * 512) / 4 ; 64 sectores
+    mov esi, 0x29E00
+    mov edi, 0x40000
+    rep movsd
+%else
     ; ---- Cargar Stage 2 desde disco ----
     mov si, msg_loading_s2
     call print_16
@@ -57,11 +77,12 @@ stage1_start:
     mov al, STAGE2_SECTORS              ; Número de sectores
     mov ch, 0                           ; Cilindro 0
     mov cl, 2                           ; Sector 2 (Stage 2 está después del MBR)
-    mov dh, 0                           ; Cabeza 0
+    mov dh, 0                           ; Cabeza  head 0
     mov dl, [boot_drive]                ; Unidad de arranque
     mov bx, STAGE2_LOAD_ADDR            ; Buffer de destino
     int 0x13
     jc s1_disk_error
+%endif
 
     mov si, msg_ok
     call print_16
@@ -116,6 +137,7 @@ msg_stage1:      db '[eterOS] Bootloader Stage 1', 13, 10, 0
 msg_loading_s2:  db '  Cargando Stage 2... ', 0
 msg_ok:          db 'OK', 13, 10, 0
 msg_disk_err:    db 'ERROR DISCO!', 13, 10, 0
+msg_pxe_reloc:   db ' [PXE Reloc] ', 0
 boot_drive:      db 0
 
 ; =============================================================================
@@ -141,11 +163,13 @@ stage2_start:
     ; ---- Detectar Mapa de Memoria (E820) ----
     call detect_memory
 
+%ifndef PXE
     ; ---- Cargar Kernel ----
     call load_kernel
 
     ; ---- Cargar Initrd ----
     call load_initrd
+%endif
 
     ; ---- Configurar Video (VBE) ----
     call setup_vbe
