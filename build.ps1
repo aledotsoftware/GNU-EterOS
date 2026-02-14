@@ -206,6 +206,8 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\drivers\net\e1000.c",
     "$KERNEL_DIR\net\dhcp.c",
     "$KERNEL_DIR\net\dhcp_parser.c",
+    "$KERNEL_DIR\net\stack.c",
+    "$KERNEL_DIR\net\raw_tcp.c",
     "$KERNEL_DIR\mm\heap.c",
     "$KERNEL_DIR\mm\pmm.c",
     "$KERNEL_DIR\mm\vmm.c",
