@@ -912,10 +912,10 @@ static void draw_constellation(void) {
     uint32_t screen_h = framebuffer_get_height();
     if (screen_w == 0) screen_w = 1024;
     
-    /* Draw Grid Background (High Contrast for Debug) */
+    /* Draw Grid Background (Technical) */
     int grid_size = 40;
     for (uint32_t x = 0; x < screen_w; x += grid_size) {
-        framebuffer_rect(x, 0, 1, screen_h, 0x404040);
+        framebuffer_rect(x, 0, 1, screen_h, 0x333333);
     }
     for (uint32_t y = 0; y < screen_h; y += grid_size) {
         framebuffer_rect(0, y, screen_w, 1, 0x404040);
