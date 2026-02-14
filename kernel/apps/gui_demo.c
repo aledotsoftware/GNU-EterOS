@@ -752,8 +752,8 @@ static char proto_buffer[2048] = "";
 /* El servidor vive en su propio mundo y se comunica por canales de kernel */
 static char kernel_net_box_req[2048];
 static char kernel_net_box_res[2048];
-static volatile int kernel_net_req_len = 0;
-static volatile int kernel_net_res_len = 0;
+static volatile size_t kernel_net_req_len = 0;
+static volatile size_t kernel_net_res_len = 0;
 
 void server_external_task(void) {
     while (1) {
