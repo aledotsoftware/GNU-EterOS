@@ -36,6 +36,8 @@ typedef enum {
 typedef struct task {
     uint64_t       rsp;                     /* Stack pointer guardado */
     uint8_t*       stack_base;              /* Base del stack alocado */
+    uint64_t       kernel_stack;            /* Tope del stack de kernel (para TSS RSP0) */
+    uint64_t       cr3;                     /* Directorio de páginas (PML4) */
     uint32_t       id;                      /* Task ID único */
     task_state_t   state;                   /* Estado actual */
     uint64_t       wake_tick;               /* Tick para despertar si duerme */

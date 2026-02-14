@@ -111,7 +111,6 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/fs/initrd.c            \
               $(KERNEL_DIR)/apps/gui_demo.c        \
-              $(KERNEL_DIR)/apps/wget.c            \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/ui/primitives.c        \
               $(KERNEL_DIR)/ui/window.c            \
@@ -122,11 +121,13 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
               $(KERNEL_DIR)/arch/x86_64/gdt.c \
-              $(LWIP_SRCS)
+              $(KERNEL_DIR)/arch/x86_64/syscall.c
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
-                  $(KERNEL_DIR)/arch/x86_64/interrupts.asm
+                  $(KERNEL_DIR)/arch/x86_64/interrupts.asm \
+                  $(KERNEL_DIR)/arch/x86_64/syscall_entry.asm \
+                  $(KERNEL_DIR)/arch/x86_64/user_mode.asm
 
 # ---- Archivos objeto ----
 # Mapear .c -> .o en el directorio de build

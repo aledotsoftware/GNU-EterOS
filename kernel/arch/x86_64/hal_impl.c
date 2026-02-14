@@ -18,6 +18,7 @@
 #include <io.h>
 #include <vmm.h>
 #include <boot.h>
+#include <syscall.h>
 
 /* ========================================================================= */
 /* HAL Implementation                                                        */
@@ -37,7 +38,10 @@ void hal_init(void) {
     /* 4. Initialize IDT */
     idt_init();
 
-    /* 5. Initialize Input (Keyboard) */
+    /* 5. Initialize Syscalls (MSRs) */
+    syscall_init();
+
+    /* 6. Initialize Input (Keyboard) */
     hal_input_init();
 
     /* 6. Initialize Timer (PIT) */
