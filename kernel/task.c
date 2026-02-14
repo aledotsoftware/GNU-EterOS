@@ -18,6 +18,7 @@
 #include "../include/serial.h"
 #include "../include/vga.h"
 #include "../include/timer.h"
+#include "../include/gdt.h"
 
 /* ========================================================================= */
 /* Estado Global del Scheduler                                               */
@@ -29,6 +30,9 @@ static int      task_count    = 0;    /* Número total de tareas */
 static uint32_t next_id       = 0;    /* Generador de IDs */
 static uint32_t sched_ticks   = 0;    /* Contador para decidir cuándo switchear */
 static bool     scheduler_active = false; /* El scheduler está inicializado? */
+
+/* Variable global para el stack del kernel (usada por syscall_entry) */
+uint64_t kernel_stack_top = 0;
 
 /* ========================================================================= */
 /* Task Entry Wrapper                                                        */
@@ -81,6 +85,10 @@ void scheduler_init(void) {
     task_count = 1;
     current_task = 0;
     scheduler_active = true;
+
+    /* Configurar stack inicial para Task 0 (Boot Stack en 0x90000) */
+    kernel_stack_top = 0x90000;
+    tss_set_rsp0(kernel_stack_top);
 
     serial_write_string("[SCHED] Scheduler Round-Robin inicializado\n");
 }
@@ -199,6 +207,18 @@ void schedule(void) {
     
     tasks[next].state = TASK_RUNNING;
     current_task = next;
+
+    /* Actualizar stack del kernel para TSS y Syscalls */
+    if (tasks[next].stack_base) {
+        uint64_t kstack = (uint64_t)tasks[next].stack_base + TASK_STACK_SIZE;
+        tss_set_rsp0(kstack);
+        kernel_stack_top = kstack;
+    } else {
+        /* Task 0 (Kernel/Boot Stack) */
+        /* Asumimos que Task 0 siempre usa el stack de boot en 0x90000 */
+        tss_set_rsp0(0x90000);
+        kernel_stack_top = 0x90000;
+    }
 
     /* Context switch: guardar RSP actual en tasks[old], cargar de tasks[next] */
     context_switch(&tasks[old].rsp, tasks[next].rsp);

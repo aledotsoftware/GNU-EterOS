@@ -121,11 +121,13 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
               $(KERNEL_DIR)/arch/x86_64/gdt.c \
+              $(KERNEL_DIR)/syscall.c \
               $(LWIP_SRCS)
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
-                  $(KERNEL_DIR)/arch/x86_64/interrupts.asm
+                  $(KERNEL_DIR)/arch/x86_64/interrupts.asm \
+                  $(KERNEL_DIR)/arch/x86_64/syscall_entry.asm
 
 # ---- Archivos objeto ----
 # Mapear .c -> .o en el directorio de build
