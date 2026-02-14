@@ -1217,24 +1217,66 @@ static void draw_global_status_bar(void) {
     /* Clock (Real-Time - Argentina) */
     static char clock_buf[16] = "--:--";
     static uint32_t last_clock_upd = 0;
+    static rtc_time_t local_date_cache;
     
     if (timer_get_ticks() - last_clock_upd > 50 || last_clock_upd == 0) {
-        rtc_time_t utc, local;
+        rtc_time_t utc;
         rtc_get_time(&utc);
-        rtc_to_argentina(&utc, &local);
+        rtc_to_argentina(&utc, &local_date_cache);
         
-        clock_buf[0] = '0' + (local.hours / 10);
-        clock_buf[1] = '0' + (local.hours % 10);
+        clock_buf[0] = '0' + (local_date_cache.hours / 10);
+        clock_buf[1] = '0' + (local_date_cache.hours % 10);
         clock_buf[2] = ':';
-        clock_buf[3] = '0' + (local.minutes / 10);
-        clock_buf[4] = '0' + (local.minutes % 10);
+        clock_buf[3] = '0' + (local_date_cache.minutes / 10);
+        clock_buf[4] = '0' + (local_date_cache.minutes % 10);
         clock_buf[5] = 0;
         
         last_clock_upd = timer_get_ticks();
     }
     
     int clock_w = 5 * 8;
-    ui_draw_string(NULL, right_margin - clock_w, 8, clock_buf, 0xAAAAAA, 0x050505);
+    int clock_x = right_margin - clock_w;
+    ui_draw_string(NULL, clock_x, 8, clock_buf, 0xAAAAAA, 0x050505);
+
+    /* Tooltip: Date on Hover */
+    if (mouse_x >= clock_x - 5 && mouse_x <= clock_x + clock_w + 5 && mouse_y <= 32) {
+        char date_buf[16];
+        char num[8];
+
+        /* DD */
+        date_buf[0] = (local_date_cache.day / 10) + '0';
+        date_buf[1] = (local_date_cache.day % 10) + '0';
+        date_buf[2] = '/';
+
+        /* MM */
+        date_buf[3] = (local_date_cache.month / 10) + '0';
+        date_buf[4] = (local_date_cache.month % 10) + '0';
+        date_buf[5] = '/';
+        date_buf[6] = 0;
+
+        /* YYYY */
+        itoa_s(local_date_cache.year, num, 8, 10);
+        strlcat(date_buf, num, 16);
+
+        int tip_w = strlen(date_buf) * 8 + 10;
+        int tip_h = 20;
+        int tip_x = clock_x + (clock_w - tip_w) / 2; /* Center below clock */
+        if (tip_x + tip_w > (int)screen_w) tip_x = screen_w - tip_w - 2; /* Clamp right */
+        int tip_y = 36; /* Below bar */
+
+        /* Shadow */
+        framebuffer_rect(tip_x + 2, tip_y + 2, tip_w, tip_h, 0x000000);
+        /* Bg */
+        framebuffer_rect(tip_x, tip_y, tip_w, tip_h, 0x252525);
+        /* Border */
+        framebuffer_rect(tip_x, tip_y, tip_w, 1, 0x555555);
+        framebuffer_rect(tip_x, tip_y + tip_h - 1, tip_w, 1, 0x555555);
+        framebuffer_rect(tip_x, tip_y, 1, tip_h, 0x555555);
+        framebuffer_rect(tip_x + tip_w - 1, tip_y, 1, tip_h, 0x555555);
+
+        /* Text */
+        ui_draw_string(NULL, tip_x + 5, tip_y + 4, date_buf, 0xFFFFFF, 0x252525);
+    }
 }
 
 static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
