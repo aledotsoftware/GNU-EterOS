@@ -11,6 +11,7 @@
 #define ETEROS_TASK_H
 
 #include "types.h"
+#include <fs/vfs.h>
 
 /* ========================================================================= */
 /* Configuración                                                             */
@@ -18,6 +19,13 @@
 #define MAX_TASKS       32
 #define TASK_STACK_SIZE  32768   /* 32 KB por tarea (GUI requires more) */
 #define SCHEDULER_HZ     10    /* Switch cada 10 ticks (100ms a 100Hz PIT) */
+#define MAX_FD           16    /* Máximo de descriptores de archivo por tarea */
+
+typedef struct file_descriptor {
+    struct fs_node* node;
+    uint32_t offset;
+    int flags;
+} file_descriptor_t;
 
 /* ========================================================================= */
 /* Estados de Tarea                                                          */
@@ -42,6 +50,12 @@ typedef struct task {
     task_state_t   state;                   /* Estado actual */
     uint64_t       wake_tick;               /* Tick para despertar si duerme */
     char           name[32];                /* Nombre descriptivo */
+
+    /* POSIX Compatibility */
+    file_descriptor_t fd_table[MAX_FD];     /* File Descriptor Table */
+    uint32_t       signal_mask;             /* Mask of blocked signals */
+    uint32_t       signal_pending;          /* Bitmap of pending signals */
+    void           (*signal_handlers[32])(int); /* Signal Handlers */
 } task_t;
 
 /* ========================================================================= */

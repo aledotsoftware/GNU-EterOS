@@ -102,15 +102,20 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/arch/x86_64/pic.c     \
               $(KERNEL_DIR)/drivers/timer/pit.c    \
               $(KERNEL_DIR)/drivers/rtc/rtc.c      \
+              $(KERNEL_DIR)/arch/x86_64/boot/nvram.c \
               $(KERNEL_DIR)/mm/heap.c             \
               $(KERNEL_DIR)/apps/santitravel.c     \
               $(KERNEL_DIR)/apps/sysmon.c          \
               $(KERNEL_DIR)/drivers/net/e1000.c    \
               $(KERNEL_DIR)/net/dhcp.c             \
               $(KERNEL_DIR)/net/dhcp_parser.c      \
+              $(KERNEL_DIR)/net/stack.c            \
+              $(KERNEL_DIR)/net/tcp.c              \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/fs/initrd.c            \
               $(KERNEL_DIR)/fs/vfs.c               \
+              $(KERNEL_DIR)/fs/devfs.c             \
+              $(KERNEL_DIR)/fs/procfs.c            \
               $(KERNEL_DIR)/apps/gui_demo.c        \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/ui/primitives.c        \
@@ -122,13 +127,15 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
               $(KERNEL_DIR)/arch/x86_64/gdt.c \
-              $(KERNEL_DIR)/arch/x86_64/syscall.c
+              $(KERNEL_DIR)/arch/x86_64/syscall.c \
+              $(KERNEL_DIR)/drivers/disk/partition.c
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
                   $(KERNEL_DIR)/arch/x86_64/interrupts.asm \
                   $(KERNEL_DIR)/arch/x86_64/syscall_entry.asm \
-                  $(KERNEL_DIR)/arch/x86_64/user_mode.asm
+                  $(KERNEL_DIR)/arch/x86_64/user_mode.asm \
+                  $(KERNEL_DIR)/arch/x86_64/user_payload.asm
 
 # ---- Archivos objeto ----
 # Mapear .c -> .o en el directorio de build
@@ -173,6 +180,7 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/serial
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/input
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64/boot
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/xtensa
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/timer
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/rtc
@@ -185,9 +193,11 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/netif
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip_port
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/pci
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/disk
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/mm
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/fs
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/ui
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/crypto
 
 # ---- Bootloader (Solo x86_64) ----
 boot: dirs $(BOOT_BIN)

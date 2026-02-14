@@ -1,5 +1,7 @@
 #include <fs/initrd.h>
 #include <fs/vfs.h>
+#include <fs/devfs.h>
+#include <fs/procfs.h>
 #include <string.h>
 #include <hal.h>
 #include <mm.h>
@@ -16,6 +18,9 @@ static uint8_t* initrd_start = NULL;
 static uint32_t file_count = 0;
 static initrd_file_header_t* file_headers = NULL;
 static fs_node_t *initrd_root = NULL;             /* The root directory node */
+
+static fs_node_t *devfs_root_node = NULL;
+static fs_node_t *procfs_root_node = NULL;
 
 static struct dirent dirent; /* Static dirent for readdir */
 
@@ -34,17 +39,50 @@ struct dirent *initrd_readdir(fs_node_t *node, uint32_t index) {
     if (node != initrd_root)
         return 0;
 
-    if (index >= file_count)
+    /* Virtual entries */
+    if (index == 0) {
+        strlcpy(dirent.name, "dev", sizeof(dirent.name));
+        dirent.inode = 0;
+        return &dirent;
+    }
+    if (index == 1) {
+        strlcpy(dirent.name, "proc", sizeof(dirent.name));
+        dirent.inode = 0;
+        return &dirent;
+    }
+
+    /* Initrd files (offset by 2) */
+    uint32_t file_index = index - 2;
+
+    if (file_index >= file_count)
         return 0;
 
-    strlcpy(dirent.name, file_headers[index].name, sizeof(dirent.name));
-    dirent.inode = index;
+    strlcpy(dirent.name, file_headers[file_index].name, sizeof(dirent.name));
+    dirent.inode = file_index;
     return &dirent;
 }
 
 fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
     if (node != initrd_root)
         return 0;
+
+    /* Check for virtual directories */
+    if (strcmp(name, "dev") == 0) {
+        if (devfs_root_node) {
+            fs_node_t* copy = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+            if (copy) memcpy(copy, devfs_root_node, sizeof(fs_node_t));
+            return copy;
+        }
+        return 0;
+    }
+    if (strcmp(name, "proc") == 0) {
+        if (procfs_root_node) {
+            fs_node_t* copy = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+            if (copy) memcpy(copy, procfs_root_node, sizeof(fs_node_t));
+            return copy;
+        }
+        return 0;
+    }
 
     for (uint32_t i = 0; i < file_count; i++) {
         if (strcmp(name, file_headers[i].name) == 0) {
@@ -96,6 +134,10 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     itoa_s(file_count, count_buf, sizeof(count_buf), 10);
     hal_console_write(count_buf);
     hal_console_write(" files.\n");
+
+    /* Initialize Virtual Filesystems */
+    devfs_root_node = devfs_init();
+    procfs_root_node = procfs_init();
 
     initrd_root = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!initrd_root) {
