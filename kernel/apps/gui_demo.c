@@ -1047,7 +1047,10 @@ static void draw_browser_content(void) {
         char line_buf[128];
         while (*ptr && y < h - 40) {
             int i = 0;
-            while (*ptr && *ptr != '\n' && i < 110) { line_buf[i++] = *ptr++; }
+            while (*ptr && *ptr != '\n' && i < 110) { 
+                char c = *ptr++;
+                if (c >= 32 && c <= 126) line_buf[i++] = c;
+            }
             line_buf[i] = 0;
             if (*ptr == '\n') ptr++;
             wm_print_at(win_browser, 20, y, line_buf);
