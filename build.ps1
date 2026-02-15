@@ -449,11 +449,11 @@ function Invoke-ImageBuild {
     [System.Array]::Copy($kernelData, 0, $imageData, $kernelOffset, $kernelData.Length)
 
     # Leer el Initrd y copiarlo después del kernel
-    # El bootloader espera el initrd en el sector después del kernel (Sector 1 + 16 + 256 = 273)
+    # El bootloader espera el initrd en el sector después del kernel (Sector 1 + 16 + 512 = 529)
     $initrdPath = "$BUILD_DIR\initrd.bin"
     if (Test-Path $initrdPath) {
         $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
-        $initrdOffset = (1 + 16 + 256) * 512
+        $initrdOffset = (1 + 16 + 512) * 512
         if ($initrdOffset + $initrdData.Length -le $imageSize) {
             [System.Array]::Copy($initrdData, 0, $imageData, $initrdOffset, $initrdData.Length)
             Write-Step "OK" "Initrd inyectado en la imagen."
@@ -542,11 +542,11 @@ function Invoke-PxeBuild {
     $initrdPath = "$BUILD_DIR\initrd.bin"
     if (Test-Path $initrdPath) {
         $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
-        [System.Array]::Copy($initrdData, 0, $imageData, (1 + 16 + 256) * 512, $initrdData.Length)
+        [System.Array]::Copy($initrdData, 0, $imageData, (1 + 16 + 512) * 512, $initrdData.Length)
     }
     
     # Escribir el archivo final (truncado al tamaño real ocupado para ahorrar TFTP bandwidth)
-    $actualSize = (1 + 16 + 256 + 64) * 512 # MBR + S2 + KERN + INITRD_MAX
+    $actualSize = (1 + 16 + 512 + 64) * 512 # MBR + S2 + KERN + INITRD_MAX
     $pxeData = New-Object byte[] $actualSize
     [System.Array]::Copy($imageData, 0, $pxeData, 0, $actualSize)
     
@@ -583,7 +583,7 @@ function Invoke-UsbBuild {
     $initrdPath = "$BUILD_DIR\initrd.bin"
     if (Test-Path $initrdPath) {
         $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
-        $initrdOffset = (1 + 16 + 256) * 512
+        $initrdOffset = (1 + 16 + 512) * 512
         [System.Array]::Copy($initrdData, 0, $imageData, $initrdOffset, $initrdData.Length)
     }
     
