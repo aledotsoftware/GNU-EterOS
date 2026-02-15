@@ -61,4 +61,9 @@ void vmm_unmap_page(uint64_t virt_addr);
  */
 uint64_t vmm_virt_to_phys(uint64_t virt_addr);
 
+/**
+ * Obtiene la dirección del PML4 actual (CR3).
+ */
+uint64_t vmm_get_pml4(void);
+
 #endif /* ETEROS_VMM_H */
