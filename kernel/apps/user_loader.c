@@ -1,5 +1,5 @@
 #include "../../include/types.h"
-#include "../../include/vmm.h"
+#include "../../include/hal.h"
 #include "../../include/pmm.h"
 #include "../../include/string.h"
 #include "../../include/serial.h"
@@ -50,8 +50,8 @@ void user_loader_entry(void) {
 
         /* Map it to 0x200000000 (8GB, well above bootloader mapping) */
         uint64_t user_code_virt = 0x200000000;
-        /* PAGE_USER | PAGE_WRITE | PAGE_PRESENT */
-        if (vmm_map_page((uint64_t)code_phys, user_code_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER) < 0) {
+        /* USER | WRITE | READ | EXEC */
+        if (hal_mem_map((uint64_t)code_phys, user_code_virt, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER | HAL_MEM_EXEC) < 0) {
              serial_write_string("[USER] Failed to map code page\n");
              return;
         }
@@ -73,7 +73,8 @@ void user_loader_entry(void) {
             serial_write_string("[USER] Failed to allocate stack page\n");
             return;
         }
-        if (vmm_map_page((uint64_t)stack_phys, user_stack_virt - (i * PAGE_SIZE), PAGE_PRESENT | PAGE_WRITE | PAGE_USER) < 0) {
+        /* Stack: READ | WRITE | USER (No Exec) */
+        if (hal_mem_map((uint64_t)stack_phys, user_stack_virt - (i * PAGE_SIZE), HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER) < 0) {
              serial_write_string("[USER] Failed to map stack page\n");
              return;
         }

@@ -211,12 +211,7 @@ uint64_t hal_timer_ticks(void);
 
 /* ---- Memoria (solo Tier 2+) ---- */
 
-#if ETEROS_HAS_MMU
-/**
- * Configura la tabla de páginas inicial.
- */
-void hal_mmu_init(void);
-#endif
+#include "hal/mm.h"
 
 /* ---- Debug / Diagnóstico ---- */
 

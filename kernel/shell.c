@@ -33,8 +33,7 @@
 #include "../include/rtc.h"
 #include "../include/user_mode.h"
 #include "../include/pmm.h"
-#include "../include/vmm.h"
-#include "../include/vmm.h"
+#include "../include/hal.h"
 
 /* ========================================================================= */
 /* Constantes del sistema                                                    */
@@ -489,8 +488,10 @@ static void cmd_usermode(const char* args) {
     uint64_t stack_virt = (uint64_t)stack_page;
 
     /* Ensure pages are mapped with USER flag */
-    vmm_map_page((uint64_t)code_page, code_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
-    vmm_map_page((uint64_t)stack_page, stack_virt, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+    /* Code page: READ | WRITE | EXEC | USER */
+    hal_mem_map((uint64_t)code_page, code_virt, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER | HAL_MEM_EXEC);
+    /* Stack page: READ | WRITE | USER (No Exec) */
+    hal_mem_map((uint64_t)stack_page, stack_virt, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER);
 
     /* 4. Write User Code */
     /* Payload:

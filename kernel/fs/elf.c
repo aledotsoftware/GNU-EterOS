@@ -1,7 +1,7 @@
 #include <types.h>
 #include <elf.h>
 #include <fs/vfs.h>
-#include <vmm.h>
+#include <hal.h>
 #include <pmm.h>
 #include <string.h>
 #include <serial.h>
@@ -86,14 +86,15 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             for (uint64_t addr = start_page; addr < end_page; addr += PAGE_SIZE) {
                 /* We check if mapped. If mapped by kernel (huge pages), we can't easily overwrite without splitting. */
                 /* Assuming vaddr >= 4GB, it should be unmapped initially. */
-                if (vmm_virt_to_phys(addr) == 0) {
+                if (hal_mem_get_phys(addr) == 0) {
                      void* phys = pmm_alloc_page();
                      if (!phys) {
                          serial_write_string("[ELF] OOM during loading.\n");
                          return 0;
                      }
-                     /* Always map as USER | WRITE | PRESENT for loading */
-                     vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+                     /* Always map as USER | WRITE | EXEC | PRESENT for loading */
+                     /* Note: HAL_MEM_READ is implicit with map */
+                     hal_mem_map((uint64_t)phys, addr, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER | HAL_MEM_EXEC);
 
                      /* Zero the page content initially */
                      memset((void*)addr, 0, PAGE_SIZE);
