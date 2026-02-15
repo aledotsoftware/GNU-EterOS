@@ -5,6 +5,7 @@
 #include <pmm.h>
 #include <string.h>
 #include <serial.h>
+#include <task.h>
 
 uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
     serial_write_string("[ELF] Loading file: ");
@@ -50,6 +51,8 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         serial_write_string("[ELF] Type: ET_EXEC. Ignoring base offset.\n");
     }
 
+    uint64_t max_vaddr = 0;
+
     /* Iterate Program Headers */
     for (int i = 0; i < header.e_phnum; i++) {
         Elf64_Phdr phdr;
@@ -65,6 +68,10 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             uint64_t file_size = phdr.p_filesz;
             uint64_t vaddr = phdr.p_vaddr + load_offset;
             uint64_t file_offset = phdr.p_offset;
+
+            if (vaddr + mem_size > max_vaddr) {
+                max_vaddr = vaddr + mem_size;
+            }
 
             /* Security Check: Ensure segment is in User Space */
             if (vaddr >= 0x0000800000000000 || (vaddr + mem_size) >= 0x0000800000000000) {
@@ -108,6 +115,16 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
                 }
             }
         }
+    }
+
+    task_t* current = task_get_current();
+    if (current) {
+        current->brk = max_vaddr;
+        serial_write_string("[ELF] Set process BRK to 0x");
+        char brk_buf[32];
+        utoa_hex_s(max_vaddr, brk_buf, sizeof(brk_buf));
+        serial_write_string(brk_buf);
+        serial_write_string("\n");
     }
 
     return header.e_entry + load_offset;

@@ -56,6 +56,12 @@ typedef struct task {
     uint32_t       signal_mask;             /* Mask of blocked signals */
     uint32_t       signal_pending;          /* Bitmap of pending signals */
     void           (*signal_handlers[32])(int); /* Signal Handlers */
+
+    /* Linux Compatibility (TLS & Heap) */
+    uint64_t       brk;                     /* Program break (end of data segment) */
+    uint64_t       fs_base;                 /* FS Segment Base (TLS) */
+    uint64_t       gs_base;                 /* GS Segment Base (TLS) */
+
     void           (*entry)(void);          /* Entry point for task_entry_wrapper */
 } task_t;
 

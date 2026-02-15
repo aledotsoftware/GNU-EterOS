@@ -20,6 +20,7 @@
 #include "../include/timer.h"
 #include "../include/gdt.h"
 #include "../include/cpu.h"
+#include "../include/msr.h"
 
 /* ========================================================================= */
 /* Estado Global del Scheduler                                               */
@@ -95,6 +96,11 @@ void scheduler_init(void) {
     tasks[0].signal_pending = 0;
     memset(tasks[0].signal_handlers, 0, sizeof(tasks[0].signal_handlers));
 
+    /* Linux Init */
+    tasks[0].brk = 0;
+    tasks[0].fs_base = 0;
+    tasks[0].gs_base = 0;
+
     task_count = 1;
     current_task = 0;
     scheduler_active = true;
@@ -151,6 +157,11 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].signal_mask = 0;
     tasks[slot].signal_pending = 0;
     memset(tasks[slot].signal_handlers, 0, sizeof(tasks[slot].signal_handlers));
+
+    /* Linux Init */
+    tasks[slot].brk = 0;
+    tasks[slot].fs_base = 0;
+    tasks[slot].gs_base = 0;
 
     /*
      * Preparar el stack para que context_switch pueda "entrar" por primera vez.
@@ -263,6 +274,10 @@ void schedule(void) {
     if (tasks[old].state == TASK_RUNNING) {
         tasks[old].state = TASK_READY;
     }
+
+    /* Save current TLS state */
+    tasks[old].fs_base = rdmsr(MSR_FS_BASE);
+    tasks[old].gs_base = rdmsr(MSR_KERNEL_GS_BASE); /* User GS is in KERNEL_GS_BASE while in kernel */
     
     tasks[next].state = TASK_RUNNING;
     current_task = next;
@@ -272,6 +287,10 @@ void schedule(void) {
         tss_set_rsp0(tasks[next].kernel_stack);
         per_cpu_data.kernel_stack = tasks[next].kernel_stack;
     }
+
+    /* Restore TLS state */
+    wrmsr(MSR_FS_BASE, tasks[next].fs_base);
+    wrmsr(MSR_KERNEL_GS_BASE, tasks[next].gs_base);
 
     context_switch(&tasks[old].rsp, tasks[next].rsp);
 

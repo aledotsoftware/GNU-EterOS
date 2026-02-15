@@ -13,6 +13,8 @@
 #include <keyboard.h>
 #include <fs/vfs.h>
 #include <mm.h>
+#include <pmm.h>
+#include <hal.h>
 #include <errno.h>
 #include <sys/signal.h>
 
@@ -55,6 +57,28 @@ void syscall_init(void) {
 /* Syscall Implementations                                                   */
 /* ========================================================================= */
 
+#define O_ACCMODE   00000003
+#define O_RDONLY    00000000
+#define O_WRONLY    00000001
+#define O_RDWR      00000002
+
+#define ARCH_SET_GS 0x1001
+#define ARCH_SET_FS 0x1002
+
+struct utsname {
+    char sysname[65];
+    char nodename[65];
+    char release[65];
+    char version[65];
+    char machine[65];
+    char domainname[65];
+};
+
+struct iovec {
+    void  *iov_base;
+    size_t iov_len;
+};
+
 static int64_t sys_write(int fd, const void* buf, size_t count) {
     if (fd == 1 || fd == 2) {
         /* Stdout / Stderr -> Serial + VGA */
@@ -93,7 +117,7 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
 }
 
 static int64_t sys_open(const char* path, int flags, int mode) {
-    (void)flags; (void)mode;
+    (void)mode;
     task_t* current = task_get_current();
 
     /* Find free FD */
@@ -110,7 +134,14 @@ static int64_t sys_open(const char* path, int flags, int mode) {
     fs_node_t* node = vfs_lookup(fs_root, path);
     if (!node) return -ENOENT;
 
-    open_fs(node, 0, 0); /* flags not fully supported yet */
+    uint8_t read_mode = 0;
+    uint8_t write_mode = 0;
+
+    if ((flags & O_ACCMODE) == O_RDONLY) { read_mode = 1; }
+    else if ((flags & O_ACCMODE) == O_WRONLY) { write_mode = 1; }
+    else if ((flags & O_ACCMODE) == O_RDWR) { read_mode = 1; write_mode = 1; }
+
+    open_fs(node, read_mode, write_mode);
 
     current->fd_table[fd].node = node;
     current->fd_table[fd].offset = 0;
@@ -167,6 +198,94 @@ static int64_t sys_kill(int pid, int sig) {
     return -ESRCH;
 }
 
+static int64_t sys_brk(uint64_t brk) {
+    task_t* current = task_get_current();
+    if (brk == 0) return current->brk;
+
+    /* If brk is smaller than current, just update it (shrink) */
+    if (brk < current->brk) {
+        current->brk = brk;
+        return current->brk;
+    }
+
+    /* Growing heap */
+    uint64_t old_page = PAGE_ALIGN_UP(current->brk);
+    uint64_t new_page = PAGE_ALIGN_UP(brk);
+
+    /* Allocate pages if we crossed a page boundary */
+    if (new_page > old_page) {
+        for (uint64_t addr = old_page; addr < new_page; addr += PAGE_SIZE) {
+             /* Check if already mapped */
+             if (hal_mem_get_phys(addr) == 0) {
+                  void* phys = pmm_alloc_page();
+                  if (!phys) return -ENOMEM;
+                  /* User | Read/Write */
+                  hal_mem_map((uint64_t)phys, addr, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER);
+                  memset((void*)addr, 0, PAGE_SIZE);
+             }
+        }
+    }
+    current->brk = brk;
+    return current->brk;
+}
+
+static int64_t sys_arch_prctl(int code, uint64_t addr) {
+    task_t* current = task_get_current();
+    if (code == ARCH_SET_FS) {
+        current->fs_base = addr;
+        wrmsr(MSR_FS_BASE, addr);
+        return 0;
+    } else if (code == ARCH_SET_GS) {
+        current->gs_base = addr;
+        /* We are in kernel, so user GS base is in KERNEL_GS_BASE */
+        wrmsr(MSR_KERNEL_GS_BASE, addr);
+        return 0;
+    }
+    return -EINVAL;
+}
+
+static int64_t sys_uname(struct utsname* buf) {
+    if (!buf) return -EFAULT;
+
+    /* Simulate Linux 5.5 */
+    strlcpy(buf->sysname, "Linux", 65);
+    strlcpy(buf->nodename, "eterOS", 65);
+    strlcpy(buf->release, "5.5.0-generic", 65);
+    strlcpy(buf->version, "#1 SMP 2026", 65);
+    strlcpy(buf->machine, "x86_64", 65);
+    strlcpy(buf->domainname, "localdomain", 65);
+    return 0;
+}
+
+static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
+    (void)fd; (void)request; (void)arg;
+    /* Determine if it is a TTY */
+    if (fd == 0 || fd == 1 || fd == 2) return 0; // Success for stdio
+    return -ENOTTY;
+}
+
+static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
+    if (fd < 0 || !iov) return -EINVAL;
+    int64_t total = 0;
+    for (int i=0; i<iovcnt; i++) {
+        int64_t res = sys_write(fd, iov[i].iov_base, iov[i].iov_len);
+        if (res < 0) return res;
+        total += res;
+    }
+    return total;
+}
+
+static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
+    if (fd < 0 || !iov) return -EINVAL;
+    int64_t total = 0;
+    for (int i=0; i<iovcnt; i++) {
+        int64_t res = sys_read(fd, iov[i].iov_base, iov[i].iov_len);
+        if (res < 0) return res;
+        total += res;
+    }
+    return total;
+}
+
 void syscall_handler(struct syscall_regs* regs) {
     /* ULTRA DEBUG: Print immediately */
     /*
@@ -194,11 +313,7 @@ void syscall_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_lseek((int)regs->rdi, (int64_t)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_exit) {
         serial_write_string("[SYSCALL] Task exit called.\n");
-        /* task_exit() never returns — it marks the task DEAD and context-switches away.
-         * We must NOT return from syscall_handler after this, or sysret will
-         * jump back to the user RIP which is no longer valid. */
         task_exit();
-        /* Never reached */
         __builtin_unreachable();
     } else if (regs->rax == SYS_getpid) {
         ret = (uint64_t)sys_getpid();
@@ -207,6 +322,18 @@ void syscall_handler(struct syscall_regs* regs) {
     } else if (regs->rax == SYS_sched_yield) {
         task_yield();
         ret = 0;
+    } else if (regs->rax == SYS_brk) {
+        ret = (uint64_t)sys_brk((uint64_t)regs->rdi);
+    } else if (regs->rax == 158) { /* SYS_arch_prctl is 158 */
+        ret = (uint64_t)sys_arch_prctl((int)regs->rdi, (uint64_t)regs->rsi);
+    } else if (regs->rax == SYS_uname) {
+        ret = (uint64_t)sys_uname((struct utsname*)regs->rdi);
+    } else if (regs->rax == SYS_ioctl) {
+        ret = (uint64_t)sys_ioctl((int)regs->rdi, (unsigned long)regs->rsi, (void*)regs->rdx);
+    } else if (regs->rax == SYS_writev) {
+        ret = (uint64_t)sys_writev((int)regs->rdi, (const struct iovec*)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == SYS_readv) {
+        ret = (uint64_t)sys_readv((int)regs->rdi, (const struct iovec*)regs->rsi, (int)regs->rdx);
     }
 
     regs->rax = ret;
