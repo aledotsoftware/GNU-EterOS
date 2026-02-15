@@ -241,12 +241,12 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 - [x] **Context Switching:** Transición segura Ring 0 → Ring 3 (`iretq`, TSS RSP0)
 - [x] **Syscalls (SYSCALL/SYSRET):** Mecanismo MSR (`EFER`, `STAR`, `LSTAR`) habilitado.
 - [x] **User Loader:** Carga de payload binario en 0x40000000 (`kernel/apps/user_loader.c`)
-- [~] **Memoria de Usuario:** Separación de espacio kernel/usuario (PML4 User bit)
-- [ ] **Cargador ELF64:** Cargar y ejecutar binarios externos complejos
-- [ ] **Multiprocesamiento (fork/clone):** Duplicar procesos para paralelismo
+- [x] **Memoria de Usuario:** Separación de espacio kernel/usuario (PML4 User bit)
+- [x] **Cargador ELF64:** Cargar y ejecutar binarios externos complejos
+- [~] **Multiprocesamiento (fork/clone):** Duplicar procesos para paralelismo (Threading en espacio compartido)
 
 ### Fase 4.5: Compatibilidad POSIX
-- [~] **Tabla de Syscalls Linux:** Implementación inicial (`write`, `exit`) en `kernel/arch/x86_64/syscall.c`
+- [~] **Tabla de Syscalls Linux:** Implementación inicial (`write`, `exit`, `getpid`, `sched_yield`) en `kernel/arch/x86_64/syscall.c`
 - [ ] **Portar musl libc:** Librería C minimalista para aplicaciones
 - [ ] **Soporte de señales:** SIGKILL, SIGSEGV, etc.
 - [ ] **Estructura `/dev`, `/proc`:** Nodos de dispositivos virtuales

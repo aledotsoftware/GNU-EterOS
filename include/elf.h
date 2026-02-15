@@ -70,6 +70,6 @@ typedef struct {
 #define PF_R 0x4
 
 /* Function prototypes */
-uint64_t elf_load_file(const char* path);
+uint64_t elf_load_file(const char* path, uint64_t base_vaddr);
 
 #endif
