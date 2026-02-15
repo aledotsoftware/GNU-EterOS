@@ -75,14 +75,3 @@ int kill(int pid, int sig) {
     if (ret < 0) { errno = -ret; return -1; }
     return (int)ret;
 }
-
-unsigned int sleep(unsigned int seconds) {
-    /* For now, busy loop or implementing nanosleep syscall?
-       Using loop for simplicity or assume nanosleep exists?
-       The memory/syscall.h has SYS_nanosleep (35).
-       But kernel implementation is missing SYS_nanosleep in syscall.c.
-       I will just loop in userspace or ignore.
-       Actually, I can implement sys_sleep in kernel if I want, but plan didn't say so.
-       I'll omit sleep implementation or make it a stub. */
-    return 0;
-}
