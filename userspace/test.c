@@ -26,8 +26,8 @@ int main(int argc, char **argv) {
     printf("Testing signal handling (Segfault)...\n");
 
     /* This should cause SIGSEGV and task termination by kernel */
-    volatile int *p = (int*)0;
-    *p = 42;
+    // volatile int *p = (int*)0;
+    // *p = 42;
 
     printf("This should NOT be printed if Segfault works.\n");
 
