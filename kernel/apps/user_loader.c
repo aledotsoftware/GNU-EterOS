@@ -32,7 +32,7 @@ void user_loader_entry(void) {
     }
 
     if (entry_point != 0) {
-        serial_write_string("[USER] ELF Loaded Successfully. Entry: 0x");
+        serial_write_string("[USER] ELF Loaded Successfully. Entry: ");
         char buf[32];
         utoa_hex_s(entry_point, buf, sizeof(buf));
         serial_write_string(buf);
