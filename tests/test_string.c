@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <time.h>
 
 /* Capture standard library functions before they are renamed */
 static void* (*std_memset)(void*, int, size_t) = memset;
@@ -15,7 +16,40 @@ static int (*std_strcmp)(const char*, const char*) = strcmp;
 #endif
 #include "../include/string.h"
 
+void benchmark_memcmp() {
+    const size_t size = 1024 * 1024; /* 1 MB */
+    const int iterations = 1000;
+
+    char* buf1 = malloc(size);
+    char* buf2 = malloc(size);
+
+    if (!buf1 || !buf2) {
+        printf("Benchmark failed: malloc error\n");
+        return;
+    }
+
+    /* Fill buffers (make them identical to force full comparison) */
+    std_memset(buf1, 0xAA, size);
+    std_memset(buf2, 0xAA, size);
+
+    clock_t start = clock();
+
+    volatile int res = 0; /* Prevent optimization */
+    for (int i = 0; i < iterations; i++) {
+        res += memcmp(buf1, buf2, size);
+    }
+
+    clock_t end = clock();
+    double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+    printf("Benchmark memcmp: %d iterations of 1MB comparison took %f seconds\n", iterations, time_taken);
+
+    free(buf1);
+    free(buf2);
+}
+
 int main() {
+    benchmark_memcmp();
     printf("Running string tests...\n");
 
     /* Test itoa_s */
