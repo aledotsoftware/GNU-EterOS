@@ -24,18 +24,10 @@
 #include <task.h>
 #include <net/socket.h>
 
-#include "lwip/init.h"
-#include "lwip/netif.h"
-#include "lwip/dhcp.h"
-#include "lwip/timeouts.h"
-#include "lwip/ip_addr.h"
-#include "netif/ethernet.h"
-#include "ethernetif.h"
 #include <net/e1000.h>
 
 /* Compatibility for legacy apps */
 int network_ready = 0;
-struct netif netif;
 
 
 /* Forward declarations for non-HAL kernel services */
