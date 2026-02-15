@@ -12,11 +12,16 @@
 #define ACPI_SCAN_START 0x000E0000
 #define ACPI_SCAN_END   0x000FFFFF
 
+#include <cpu.h>
+
 /* Variables globales */
 static acpi_rsdp_t* rsdp = NULL;
 static acpi_rsdt_t* rsdt = NULL;
 static acpi_madt_t* madt = NULL;
-static int cpu_count = 0;
+
+/* Estado global de CPUs (Topología) */
+cpu_info_t cpus[MAX_CPUS];
+int total_cpus = 0;
 
 /* Verificar checksum de una tabla */
 static int acpi_check_sum(void* table, size_t length) {
@@ -61,7 +66,10 @@ static void parse_madt(void) {
     uint8_t* ptr = (uint8_t*)madt->entries;
     uint8_t* end = (uint8_t*)madt + madt->header.length;
     
-    cpu_count = 0;
+    uint8_t* ptr = (uint8_t*)madt->entries;
+    uint8_t* end = (uint8_t*)madt + madt->header.length;
+    
+    total_cpus = 0;
     
     while (ptr < end) {
         madt_entry_header_t* entry = (madt_entry_header_t*)ptr;
@@ -70,11 +78,22 @@ static void parse_madt(void) {
             case MADT_ENTRY_LAPIC: {
                 madt_lapic_t* lapic = (madt_lapic_t*)entry;
                 if (lapic->flags & 1) { /* Processor Enabled */
-                    cpu_count++;
-                    serial_write_string("[ACPI] CPU Found! APIC ID: ");
-                    itoa_s(lapic->apic_id, buf, 64, 10);
-                    serial_write_string(buf);
-                    serial_write_string("\n");
+                    if (total_cpus < MAX_CPUS) {
+                        cpus[total_cpus].apic_id = lapic->apic_id;
+                        cpus[total_cpus].acpi_id = lapic->acpi_processor_id;
+                        cpus[total_cpus].index = total_cpus;
+                        cpus[total_cpus].state = (total_cpus == 0) ? CPU_STATE_ONLINE : CPU_STATE_OFFLINE; /* BSP is online */
+                        
+                        serial_write_string("[ACPI] CPU Found! Index: ");
+                        itoa_s(total_cpus, buf, 64, 10);
+                        serial_write_string(buf);
+                        serial_write_string(" APIC ID: ");
+                        itoa_s(lapic->apic_id, buf, 64, 10);
+                        serial_write_string(buf);
+                        serial_write_string("\n");
+                        
+                        total_cpus++;
+                    }
                 }
                 break;
             }
@@ -92,7 +111,7 @@ static void parse_madt(void) {
     }
     
     serial_write_string("[ACPI] Total CPUs detected: ");
-    itoa_s(cpu_count, buf, 64, 10);
+    itoa_s(total_cpus, buf, 64, 10);
     serial_write_string(buf);
     serial_write_string("\n");
 }
@@ -134,5 +153,5 @@ void acpi_init(void) {
 }
 
 int acpi_get_cpu_count(void) {
-    return cpu_count > 0 ? cpu_count : 1; /* Al menos 1 CPU (BSP) */
+    return total_cpus > 0 ? total_cpus : 1;
 }
