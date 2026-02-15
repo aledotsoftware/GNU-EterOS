@@ -239,6 +239,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\apps\sysmon.c",
     "$KERNEL_DIR\apps\gui_demo.c",
     "$KERNEL_DIR\apps\user_loader.c",
+    "$KERNEL_DIR\apps\wget.c",
     "$KERNEL_DIR\task.c",
     "$KERNEL_DIR\fs\initrd.c",
     "$KERNEL_DIR\fs\vfs.c",

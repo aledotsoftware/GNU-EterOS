@@ -46,6 +46,12 @@ void net_init(void) {
     serial_write_string("[NET] Starting DHCP...\n");
     /* Start DHCP */
     dhcp_start(&main_netif);
+
+    /* Set fallback DNS (8.8.8.8) */
+    ip_addr_t dns_fallback;
+    IP4_ADDR(&dns_fallback, 8, 8, 8, 8);
+    dns_setserver(0, &dns_fallback);
+
     serial_write_string("[NET] Init done.\n");
 }
 

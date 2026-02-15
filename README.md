@@ -272,8 +272,13 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 
 
 ### Fase 5.1: Optimizacion de la interfaz grafica y aplicaciones
+- [ ] **Optimizacion de la interfaz graficas con el motor de dibujo Omni**
+- [ ] **Optimizacion de las aplicaciones del sistema **
 
 
+### Fase 5.3: Subsistema de Compatibilidad Web (Aether-Web)
+- [ ] **Chromium Embedded:** Port nativo del motor Blink.
+- [ ] **PWA Runtime:** Ejecución de aplicaciones web como nativas (.crx, .wbn o pwa online).
 
 ### Fase 5.5: Subsistema de Compatibilidad Linux (Aether-Linux-Subsystem)
 *Objetivo: Ejecutar binarios ELF de Linux sin máquinas virtuales.*
@@ -298,9 +303,6 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 - [ ] **Objective-C Runtime:** Soporte para librerías base de Apple.
 - [ ] **Cocoa Bridge:** Mapeo de primitivas gráficas de Quartz a AetherGraphics.
 
-### Fase 5.10: Subsistema de Compatibilidad Web (Aether-Web)
-- [ ] **Chromium Embedded:** Port nativo del motor Blink.
-- [ ] **PWA Runtime:** Ejecución de aplicaciones web como nativas (.crx, .wbn o pwa online).
 
 Punto Crítico: La transición de Tier 1 (No MMU) a Tier 3 (MMU/Paging) requiere que tu HAL sea extremadamente abstracta para que el código superior no dependa de cómo se mapea la memoria.
 
