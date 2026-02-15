@@ -10,13 +10,14 @@
 
 typedef int32_t ssize_t;
 typedef uint64_t size_t;
+typedef int pid_t;
 
 /* File Descriptors */
 #define STDIN_FILENO  0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
-/* Flags for open() - Partial mapping to Kernel flags or just placeholders */
+/* Flags for open() */
 #define O_RDONLY    0x0000
 #define O_WRONLY    0x0001
 #define O_RDWR      0x0002
@@ -25,13 +26,41 @@ typedef uint64_t size_t;
 #define O_TRUNC     0x0200
 #define O_APPEND    0x0400
 
+/* access() mode flags */
+#define F_OK    0
+#define R_OK    4
+#define W_OK    2
+#define X_OK    1
+
+/* File I/O */
 int open(const char *pathname, int flags);
 int close(int fd);
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 int64_t lseek(int fd, int64_t offset, int whence);
+
+/* Process */
 int getpid(void);
+int getppid(void);
 int kill(int pid, int sig);
+int fork(void);
+void exit(int status);
+
+/* File Descriptors */
+int pipe(int pipefd[2]);
+int dup2(int oldfd, int newfd);
+int access(const char *pathname, int mode);
+
+/* Memory */
+void *brk(void *addr);
+void *sbrk(int64_t increment);
+
+/* Scheduling */
+int sched_yield(void);
 unsigned int sleep(unsigned int seconds);
+int usleep(unsigned int usec);
+
+/* Misc */
+char *getcwd(char *buf, size_t size);
 
 #endif /* _UNISTD_H */
