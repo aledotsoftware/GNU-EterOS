@@ -220,7 +220,7 @@ Dirección       | Contenido
 ### Fase 3.5: Networking & Storage
 - [x] **Driver NIC:** Intel PRO/1000 (e1000) con detección PCI y MAC
 - [x] **Cliente DHCP:** Discover/Offer para obtención de IP (Fix Linker Error)
-- [~] **Integración lwIP:** Stack TCP/IP completo (Porting layer en progreso en `kernel/net/lwip_port`)
+- [x] **Integración lwIP:** Stack TCP/IP completo (Porting layer finalizado en `kernel/net/lwip_port` + lwIP 2.2.0)
 - [x] **Soporte FAT32:** Lectura de archivos y directorios con soporte 8.3.
 - [x] **Wget:** Downloader HTTP básico (`kernel/apps/wget.c`).
 

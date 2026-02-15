@@ -24,7 +24,6 @@
 #include <task.h>
 #include <net/socket.h>
 
-/* lwIP Headers disabled - Library not present 
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/dhcp.h"
@@ -32,8 +31,11 @@
 #include "lwip/ip_addr.h"
 #include "netif/ethernet.h"
 #include "ethernetif.h"
-*/
 #include <net/e1000.h>
+
+/* Compatibility for legacy apps */
+int network_ready = 0;
+struct netif netif;
 
 
 /* Forward declarations for non-HAL kernel services */
@@ -57,30 +59,35 @@ static void kernel_halt(void);
 
 static void network_task(void) {
     while(1) {
-        net_poll();
+        /* Protect lwIP access with simple lock */
+        hal_interrupts_disable();
+        ethernetif_poll(&netif);
+        sys_check_timeouts();
+
+        /* Update status for legacy apps */
+        if (!network_ready && netif.ip_addr.addr != 0) {
+            network_ready = 1;
+            hal_console_write("  [NET]  DHCP Bound! IP assigned.\n");
+        }
+        hal_interrupts_enable();
+
         task_yield();
     }
 }
 
-/* ========================================================================= */
-/* Network Stubs (Legacy Support)                                            */
-/* ========================================================================= */
-/* int network_ready = 1; Defined in net/stack.c */
+static void init_network(void) {
+    ip4_addr_t ipaddr, netmask, gw;
+    IP4_ADDR(&ipaddr, 0, 0, 0, 0);
+    IP4_ADDR(&netmask, 0, 0, 0, 0);
+    IP4_ADDR(&gw, 0, 0, 0, 0);
 
-/* raw_tcp_get might also be in stack.c? Let's check first. */
-int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
-    (void)host;
-    (void)path;
-    (void)max_len;
+    lwip_init();
 
-    const char* stub_response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello from Stub!";
-    size_t len = strlen(stub_response);
-    if (len >= max_len) len = max_len - 1;
+    netif_add(&netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, ethernet_input);
+    netif_set_default(&netif);
+    netif_set_up(&netif);
 
-    memcpy(response_buf, stub_response, len);
-    response_buf[len] = 0;
-
-    return (int)len;
+    dhcp_start(&netif);
 }
 
 /* ========================================================================= */
@@ -160,9 +167,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* Attempt to init E1000 (Generic Driver but requires PCI) */
     if (e1000_init(NULL) == 0) {
         hal_console_write("  [NET]  Hardware inicializado.\n");
-        net_init();
-        extern void dhcp_discover(void);
-        dhcp_discover();
+        init_network();
         task_create("Network", network_task);
     } else {
         hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");

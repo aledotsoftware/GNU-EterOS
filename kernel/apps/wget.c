@@ -1,6 +1,7 @@
 #include <string.h>
 #include <serial.h>
 #include <vga.h>
+#include <hal.h>
 #include "lwip/tcp.h"
 #include "lwip/dns.h"
 #include "lwip/ip_addr.h"
@@ -159,6 +160,7 @@ static void wget_dns_found(const char *name, const ip_addr_t *ipaddr, void *call
             terminal_write_string("[WGET] Error connecting.\n");
             current_request.complete = 1;
         }
+        tcp_output(current_request.pcb);
     } else {
         terminal_write_string("[WGET] DNS Resolution failed.\n");
         current_request.complete = 1;
@@ -185,13 +187,17 @@ void wget_run(const char* url_in) {
     current_request.path = path;
     current_request.complete = 0;
 
+    hal_interrupts_disable();
     ip_addr_t dns_res;
     err_t err = dns_gethostbyname(host, &dns_res, wget_dns_found, NULL);
 
     if (err == ERR_OK) {
         /* Cached immediately */
         wget_dns_found(host, &dns_res, NULL);
-    } else if (err == ERR_INPROGRESS) {
+    }
+    hal_interrupts_enable();
+
+    if (err == ERR_OK || err == ERR_INPROGRESS) {
         /* Wait for callback */
         /* Since we are in NO_SYS, the main loop (network_task) handles polling.
            But we are in a shell command, which blocks.
