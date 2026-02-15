@@ -73,7 +73,7 @@ struct gdt_ptr {
  */
 static struct gdt_entry gdt[GDT_ENTRIES] __attribute__((aligned(16)));
 static struct tss_struct tss __attribute__((aligned(16)));
-static struct gdt_ptr gdtr;
+struct gdt_ptr gdtr;
 
 /* Funciones en ASM */
 extern void gdt_flush(uint64_t gdtr_addr);
