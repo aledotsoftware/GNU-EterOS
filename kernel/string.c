@@ -152,6 +152,23 @@ void* memmove(void* dest, const void* src, size_t n) {
 int memcmp(const void* s1, const void* s2, size_t n) {
     const uint8_t* a = (const uint8_t*)s1;
     const uint8_t* b = (const uint8_t*)s2;
+
+#ifdef __x86_64__
+    // Optimization for x86_64: Compare 8-byte blocks
+    // This significantly reduces the number of iterations for large blocks.
+    // We use uint64_t to compare 8 bytes at a time.
+    while (n >= 8) {
+        if (*(const uint64_t*)a != *(const uint64_t*)b) {
+            // If there is a difference, break the fast loop
+            // and let the byte-by-byte loop find the exact position
+            // to return the correct value (sign).
+            break;
+        }
+        a += 8;
+        b += 8;
+        n -= 8;
+    }
+#endif
     
     while (n--) {
         if (*a != *b) {
