@@ -1,5 +1,5 @@
 /**
- * éterOS - Simple Memory Allocator (First-Fit + Coalescing)
+ * éterOS - Simple Memory Allocator (Next-Fit + Coalescing)
  * 
  * Implementación de un gestor de memoria dinámica simple.
  * Usa una lista doblemente enlazada de bloques libres y ocupados.
@@ -38,6 +38,7 @@ typedef struct block_header {
 } block_header_t;
 
 static block_header_t* heap_start = NULL;
+static block_header_t* last_alloc = NULL; /* Puntero para Next-Fit strategy */
 static size_t memory_used = 0;
 static size_t memory_total = 0;
 
@@ -127,6 +128,7 @@ void mm_init(boot_info_t* boot_info) {
 
     /* Inicializar variables globales */
     heap_start = (block_header_t*)best_start;
+    last_alloc = heap_start; /* Inicializar cursor Next-Fit */
     memory_total = best_size;
 
     /* Configurar bloque inicial */
@@ -167,9 +169,12 @@ void* kmalloc(size_t size) {
     }
 
     size_t aligned_size = align(size);
-    block_header_t* curr = heap_start;
     
-    while (curr) {
+    /* Next Fit Strategy: Start search from last_alloc */
+    block_header_t* start_block = (last_alloc) ? last_alloc : heap_start;
+    block_header_t* curr = start_block;
+
+    do {
         if (curr->is_free && curr->size >= aligned_size) {
             if (curr->size >= aligned_size + sizeof(block_header_t) + HEAP_ALIGNMENT) {
                 block_header_t* new_block = (block_header_t*)((uintptr_t)curr + 
@@ -186,14 +191,25 @@ void* kmalloc(size_t size) {
 
                 curr->size = aligned_size;
                 curr->next = new_block;
+
+                /* Update last_alloc to the new free block (remainder) for better locality next time */
+                last_alloc = new_block;
+            } else {
+                /* Exact fit or close enough */
+                /* Update last_alloc to the next block (or wrap around if NULL) */
+                last_alloc = curr->next ? curr->next : heap_start;
             }
             
             curr->is_free = 0;
             memory_used += curr->size + sizeof(block_header_t);
             return (void*)((uintptr_t)curr + sizeof(block_header_t));
         }
+
         curr = curr->next;
-    }
+        if (!curr) {
+            curr = heap_start; /* Wrap around */
+        }
+    } while (curr != start_block); /* Stop if we've looped back to start */
     
     serial_write_string("[MM] CRITICAL: Out of Memory!\n");
     return NULL;
@@ -229,6 +245,11 @@ void kfree(void* ptr) {
 
     /* Merge with next block if free */
     if (block->next && block->next->is_free) {
+        /* If last_alloc points to the block being merged (removed), update it */
+        if (last_alloc == block->next) {
+            last_alloc = block;
+        }
+
         block->size += sizeof(block_header_t) + block->next->size;
         block->next = block->next->next;
         if (block->next) {
@@ -238,6 +259,11 @@ void kfree(void* ptr) {
 
     /* Merge with prev block if free */
     if (block->prev && block->prev->is_free) {
+        /* If last_alloc points to the block being merged (removed), update it */
+        if (last_alloc == block) {
+            last_alloc = block->prev;
+        }
+
         block->prev->size += sizeof(block_header_t) + block->size;
         block->prev->next = block->next;
         if (block->next) {

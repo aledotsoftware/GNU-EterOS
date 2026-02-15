@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <limits.h>
+#include <time.h>
 
 /* Capture standard library functions before they are renamed */
 static void* (*std_memset)(void*, int, size_t) = memset;
@@ -51,6 +52,12 @@ void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
     snprintf(buffer, buffer_size, "0x%llx", (unsigned long long)value);
 }
 
+/* Mock pmm functions */
+void pmm_mark_region_used(uint64_t base, size_t size) {
+    (void)base;
+    (void)size;
+}
+
 /* Include the file under test directly to access static variables */
 #include "../kernel/mm/heap.c"
 
@@ -65,6 +72,7 @@ void reset_heap() {
 
     // Reset global state
     heap_start = (block_header_t*)heap_memory;
+    last_alloc = heap_start; /* Reset Next Fit cursor */
     memory_total = HEAP_SIZE;
     memory_used = 0;
 
@@ -73,6 +81,7 @@ void reset_heap() {
     heap_start->is_free = 1;
     heap_start->magic = HEAP_MAGIC;
     heap_start->next = NULL;
+    heap_start->prev = NULL;
 }
 
 void test_kmalloc_overflow() {
@@ -237,6 +246,44 @@ void test_kcalloc() {
     printf("PASSED\n");
 }
 
+void test_performance() {
+    printf("Running test_performance... ");
+    reset_heap();
+
+    // Config
+    const int N = 2000;
+    void* ptrs[N];
+
+    clock_t start = clock();
+
+    // 1. Allocate many small blocks
+    for(int i=0; i<N; i++) {
+        ptrs[i] = kmalloc(64);
+        assert(ptrs[i] != NULL);
+    }
+
+    // 2. Free every second block to fragment
+    for(int i=0; i<N; i+=2) {
+        kfree(ptrs[i]);
+        ptrs[i] = NULL;
+    }
+
+    // 3. Allocate again (should fill holes efficiently with Next Fit)
+    for(int i=0; i<N; i+=2) {
+        ptrs[i] = kmalloc(64);
+        assert(ptrs[i] != NULL);
+    }
+
+    // 4. Cleanup
+    for(int i=0; i<N; i++) {
+        if(ptrs[i]) kfree(ptrs[i]);
+    }
+
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Done in %f seconds. PASSED\n", time_spent);
+}
+
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     test_kmalloc_basic();
@@ -247,6 +294,7 @@ int main() {
     test_double_free();
     test_kcalloc();
     test_kmalloc_overflow();
+    test_performance();
 
     printf("\nAll heap tests passed!\n");
     return 0;
