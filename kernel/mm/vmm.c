@@ -10,6 +10,7 @@
 #include "../../include/pmm.h"
 #include "../../include/string.h"
 #include "../../include/serial.h"
+#include "../../include/hal/mm.h"
 
 /* Estructura de una entrada de tabla de páginas (64-bit) */
 typedef uint64_t pt_entry_t;
@@ -141,4 +142,48 @@ uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
     if (!(pt[pt_idx] & PAGE_PRESENT)) return 0;
     
     return (pt[pt_idx] & PAGE_ADDR_MASK) + (virt_addr & 0xFFF);
+}
+
+/* ========================================================================= */
+/* HAL Implementation                                                        */
+/* ========================================================================= */
+
+int hal_mem_map(uint64_t phys_addr, uint64_t virt_addr, uint32_t flags) {
+    uint64_t arch_flags = PAGE_PRESENT;
+
+    /* Translate HAL flags to x86_64 Paging flags */
+    if (flags & HAL_MEM_WRITE) {
+        arch_flags |= PAGE_WRITE;
+    }
+    if (flags & HAL_MEM_USER) {
+        arch_flags |= PAGE_USER;
+    }
+
+    /*
+     * NX (No-Execute) Handling:
+     * If HAL_MEM_EXEC is NOT set, we should theoretically set PAGE_NO_EXEC.
+     * However, enabling NX requires EFER.NXE to be set.
+     * For now, we will be permissive to avoid breaking legacy code that
+     * forgets HAL_MEM_EXEC.
+     *
+     * Strict mode would be:
+     * if (!(flags & HAL_MEM_EXEC)) arch_flags |= PAGE_NO_EXEC;
+     */
+
+    if (flags & HAL_MEM_CACHE_DISABLE) {
+        /* PCD (Page Cache Disable) is usually bit 4 */
+        arch_flags |= 0x10;
+    }
+
+    /* Call the architecture specific mapper */
+    return vmm_map_page(phys_addr, virt_addr, arch_flags);
+}
+
+int hal_mem_unmap(uint64_t virt_addr) {
+    vmm_unmap_page(virt_addr);
+    return 0;
+}
+
+uint64_t hal_mem_get_phys(uint64_t virt_addr) {
+    return vmm_virt_to_phys(virt_addr);
 }

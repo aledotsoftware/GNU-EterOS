@@ -182,17 +182,16 @@ void syscall_handler(struct syscall_regs* regs) {
     if (regs->rax == 0xCAFEBABE) {
         serial_write_string("[SYSCALL] Magic Number Detected!\n");
         ret = 0;
+    } else if (regs->rax == SYS_read) {
+        ret = (uint64_t)sys_read((int)regs->rdi, (void*)regs->rsi, (size_t)regs->rdx);
     } else if (regs->rax == SYS_write) {
-        /* Standard write handler */
-        if (regs->rdi == 1 || regs->rdi == 2) {
-             const char* msg = (const char*)regs->rsi;
-             size_t len = (size_t)regs->rdx;
-             for(size_t i=0; i<len; i++) {
-                 serial_putchar(msg[i]);
-                 terminal_putchar(msg[i]);
-             }
-             ret = len;
-        }
+        ret = (uint64_t)sys_write((int)regs->rdi, (const void*)regs->rsi, (size_t)regs->rdx);
+    } else if (regs->rax == SYS_open) {
+        ret = (uint64_t)sys_open((const char*)regs->rdi, (int)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == SYS_close) {
+        ret = (uint64_t)sys_close((int)regs->rdi);
+    } else if (regs->rax == SYS_lseek) {
+        ret = (uint64_t)sys_lseek((int)regs->rdi, (int64_t)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_exit) {
         serial_write_string("[SYSCALL] Task exit called.\n");
         /* task_exit() never returns — it marks the task DEAD and context-switches away.
@@ -202,12 +201,9 @@ void syscall_handler(struct syscall_regs* regs) {
         /* Never reached */
         __builtin_unreachable();
     } else if (regs->rax == SYS_getpid) {
-        task_t* current = task_get_current();
-        if (current) {
-            ret = current->id;
-        } else {
-            ret = 0;
-        }
+        ret = (uint64_t)sys_getpid();
+    } else if (regs->rax == SYS_kill) {
+        ret = (uint64_t)sys_kill((int)regs->rdi, (int)regs->rsi);
     } else if (regs->rax == SYS_sched_yield) {
         task_yield();
         ret = 0;

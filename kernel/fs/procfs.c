@@ -2,6 +2,7 @@
 #include <fs/vfs.h>
 #include <string.h>
 #include <mm.h>
+#include <pmm.h>
 #include <timer.h>
 
 /* Global root node for ProcFS */
@@ -47,6 +48,45 @@ static uint32_t proc_uptime_read(fs_node_t *node, uint32_t offset, uint32_t size
 }
 
 /* ========================================================================= */
+/* /proc/meminfo Implementation                                              */
+/* ========================================================================= */
+static uint32_t proc_meminfo_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node;
+    char meminfo_str[256];
+    char num_buf[32];
+
+    uint64_t total = pmm_get_total_ram();
+    uint64_t free = pmm_get_free_ram();
+    uint64_t used = pmm_get_used_ram();
+
+    /* Format similar to Linux /proc/meminfo but simplified */
+    /* TotalRam: X kB */
+    strlcpy(meminfo_str, "MemTotal:       ", sizeof(meminfo_str));
+    itoa_s((int64_t)(total / 1024), num_buf, sizeof(num_buf), 10);
+    strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
+    strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
+
+    /* MemFree: Y kB */
+    strlcat(meminfo_str, "MemFree:        ", sizeof(meminfo_str));
+    itoa_s((int64_t)(free / 1024), num_buf, sizeof(num_buf), 10);
+    strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
+    strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
+
+    /* MemUsed: Z kB */
+    strlcat(meminfo_str, "MemUsed:        ", sizeof(meminfo_str));
+    itoa_s((int64_t)(used / 1024), num_buf, sizeof(num_buf), 10);
+    strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
+    strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
+
+    size_t len = strlen(meminfo_str);
+    if (offset >= len) return 0;
+    if (offset + size > len) size = (uint32_t)(len - offset);
+
+    memcpy(buffer, meminfo_str + offset, size);
+    return size;
+}
+
+/* ========================================================================= */
 /* ProcFS Directory Operations                                               */
 /* ========================================================================= */
 static struct dirent *procfs_readdir(fs_node_t *node, uint32_t index) {
@@ -59,6 +99,11 @@ static struct dirent *procfs_readdir(fs_node_t *node, uint32_t index) {
     if (index == 1) {
         strlcpy(procfs_dirent.name, "uptime", sizeof(procfs_dirent.name));
         procfs_dirent.inode = 1;
+        return &procfs_dirent;
+    }
+    if (index == 2) {
+        strlcpy(procfs_dirent.name, "meminfo", sizeof(procfs_dirent.name));
+        procfs_dirent.inode = 2;
         return &procfs_dirent;
     }
     return 0;
@@ -81,6 +126,10 @@ static fs_node_t *procfs_finddir(fs_node_t *node, char *name) {
         strlcpy(fnode->name, "uptime", sizeof(fnode->name));
         fnode->read = proc_uptime_read;
         fnode->inode = 1;
+    } else if (strcmp(name, "meminfo") == 0) {
+        strlcpy(fnode->name, "meminfo", sizeof(fnode->name));
+        fnode->read = proc_meminfo_read;
+        fnode->inode = 2;
     } else {
         kfree(fnode);
         return 0;

@@ -246,10 +246,10 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 - [~] **Multiprocesamiento (fork/clone):** Duplicar procesos para paralelismo (Threading en espacio compartido)
 
 ### Fase 4.5: Compatibilidad POSIX
-- [~] **Tabla de Syscalls Linux:** Implementación inicial (`write`, `exit`, `getpid`, `sched_yield`) en `kernel/arch/x86_64/syscall.c`
+- [~] **Tabla de Syscalls Linux:** Implementación ampliada (`open`, `close`, `read`, `write`, `lseek`, `kill`, `exit`, `getpid`, `sched_yield`).
 - [ ] **Portar musl libc:** Librería C minimalista para aplicaciones
-- [ ] **Soporte de señales:** SIGKILL, SIGSEGV, etc.
-- [ ] **Estructura `/dev`, `/proc`:** Nodos de dispositivos virtuales
+- [ ] **Soporte de señales:** SIGKILL (terminate) funcional.
+- [x] **Estructura `/dev`, `/proc`:** Implementados `/dev/null`, `/dev/zero`, `/dev/tty`, `/dev/random`, `/dev/urandom`, `/proc/uptime`, `/proc/version`, `/proc/meminfo`.
 
 
 

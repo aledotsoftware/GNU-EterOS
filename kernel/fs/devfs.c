@@ -61,6 +61,43 @@ static uint32_t dev_tty_write(fs_node_t *node, uint32_t offset, uint32_t size, u
 }
 
 /* ========================================================================= */
+/* /dev/random & /dev/urandom Implementation                                 */
+/* ========================================================================= */
+static uint32_t rand_seed = 123456789;
+
+static uint32_t xorshift32(void) {
+    uint32_t x = rand_seed;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    rand_seed = x;
+    return x;
+}
+
+static uint32_t dev_random_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset;
+    /* Mix in TSC for entropy */
+    uint32_t lo, hi;
+    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+    rand_seed ^= lo ^ hi;
+
+    for (uint32_t i = 0; i < size; i++) {
+        buffer[i] = (uint8_t)(xorshift32() & 0xFF);
+    }
+    return size;
+}
+
+static uint32_t dev_random_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset;
+    /* Allow writing to mix into pool */
+    for (uint32_t i = 0; i < size; i++) {
+        rand_seed ^= buffer[i];
+        xorshift32();
+    }
+    return size;
+}
+
+/* ========================================================================= */
 /* DevFS Directory Operations                                                */
 /* ========================================================================= */
 
@@ -80,6 +117,16 @@ static struct dirent *devfs_readdir(fs_node_t *node, uint32_t index) {
     if (index == 2) {
         strlcpy(devfs_dirent.name, "tty", sizeof(devfs_dirent.name));
         devfs_dirent.inode = 2;
+        return &devfs_dirent;
+    }
+    if (index == 3) {
+        strlcpy(devfs_dirent.name, "random", sizeof(devfs_dirent.name));
+        devfs_dirent.inode = 3;
+        return &devfs_dirent;
+    }
+    if (index == 4) {
+        strlcpy(devfs_dirent.name, "urandom", sizeof(devfs_dirent.name));
+        devfs_dirent.inode = 4;
         return &devfs_dirent;
     }
     return 0;
@@ -109,6 +156,16 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->read = dev_tty_read;
         fnode->write = dev_tty_write;
         fnode->inode = 2;
+    } else if (strcmp(name, "random") == 0) {
+        strlcpy(fnode->name, "random", sizeof(fnode->name));
+        fnode->read = dev_random_read;
+        fnode->write = dev_random_write;
+        fnode->inode = 3;
+    } else if (strcmp(name, "urandom") == 0) {
+        strlcpy(fnode->name, "urandom", sizeof(fnode->name));
+        fnode->read = dev_random_read;
+        fnode->write = dev_random_write;
+        fnode->inode = 4;
     } else {
         kfree(fnode);
         return 0;
