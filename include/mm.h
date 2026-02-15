@@ -37,6 +37,11 @@ void* kmalloc(size_t size);
 void* kcalloc(size_t num, size_t size);
 
 /**
+ * Redimensiona un bloque de memoria.
+ */
+void* krealloc(void* ptr, size_t size);
+
+/**
  * Libera un bloque de memoria previamente asignado por kmalloc o kcalloc.
  * Si ptr es NULL, no hace nada.
  */

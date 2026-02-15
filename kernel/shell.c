@@ -323,80 +323,17 @@ static void cmd_mem(const char* args) {
 
 static void cmd_net(const char* args) {
     (void)args;
-    char buf[32];
-    terminal_write_string("\n");
-    terminal_write_colored("  [Interfaz eth0]\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    terminal_write_string("    Driver:  ");
-    terminal_write_colored("Intel PRO/1000 (e1000)\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-    
-    uint8_t* mac = e1000_get_mac();
-    
-    terminal_write_string("    MAC:     ");
-    for (int i = 0; i < 6; i++) {
-        uint8_t val = mac[i];
-        char hex[3];
-        char h = (val >> 4) & 0xF;
-        char l = val & 0xF;
-        hex[0] = (h < 10) ? '0' + h : 'A' + (h - 10);
-        hex[1] = (l < 10) ? '0' + l : 'A' + (l - 10);
-        hex[2] = 0;
-        terminal_write_string(hex);
-        if (i < 5) terminal_write_string(":");
-    }
-    terminal_write_string("\n");
-
-    extern uint32_t my_ip;
-    extern int network_ready;
-    
-    terminal_write_string("    Status:  ");
-    if (network_ready) {
-        terminal_write_colored("CONECTADO\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-        terminal_write_string("    IP:      ");
-        uint8_t* ip = (uint8_t*)&my_ip;
-        for(int i=0; i<4; i++) {
-            itoa_s(ip[i], buf, sizeof(buf), 10);
-            terminal_write_string(buf);
-            if (i<3) terminal_write_string(".");
-        }
-        terminal_write_string("\n");
-    } else {
-        terminal_write_colored("DESCONECTADO / ESPERANDO IP...\n", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
-    }
-    terminal_write_string("\n");
+    terminal_write_string("Network disabled.\n");
 }
 
 static void cmd_dhcp(const char* args) {
     (void)args;
-    terminal_write_string("\n");
-    terminal_write_colored("  [DHCP Client]\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-
-    extern int network_ready;
-    extern uint32_t my_ip;
-    if (network_ready) {
-        terminal_write_string("  Status: Connected (lwIP Stack)\n");
-        terminal_write_string("  IP Assigned: ");
-        char buf[32];
-        uint8_t* ip = (uint8_t*)&my_ip;
-        for(int i=0; i<4; i++) {
-            itoa_s(ip[i], buf, sizeof(buf), 10);
-            terminal_write_string(buf);
-            if (i<3) terminal_write_string(".");
-        }
-        terminal_write_string("\n");
-    } else {
-        terminal_write_colored("  Status: In Progress / DHCP Discovering...\n", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
-    }
-    terminal_write_string("\n");
+    terminal_write_string("Network disabled.\n");
 }
 
 static void cmd_wget(const char* args) {
-    if (!args || *args == '\0') {
-        terminal_write_string("\nUsage: wget http://hostname/path\n\n");
-        return;
-    }
-    
-    extern void wget_run(const char* url);
-    wget_run(args);
+    (void)args;
+    terminal_write_string("Network disabled.\n");
 }
 
 static void cmd_reboot(const char* args) {

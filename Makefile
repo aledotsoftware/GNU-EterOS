@@ -42,6 +42,8 @@ CFLAGS  = -ffreestanding       \
           -Wall                \
           -Wextra              \
           -Os                  \
+          -Ikernel/apps/doomgeneric/include \
+          -Ikernel/apps/doomgeneric/doomgeneric \
           -I$(INCLUDE_DIR)     \
           -I$(KERNEL_DIR)/net/lwip/src/include \
           -I$(KERNEL_DIR)/net/lwip_port
@@ -91,6 +93,33 @@ LWIP_PORT_SRCS = $(LWIP_PORT_DIR)/ethernetif.c \
 
 LWIP_SRCS = $(LWIP_CORE_SRCS) $(LWIP_IPV4_SRCS) $(LWIP_NETIF_SRCS) $(LWIP_PORT_SRCS)
 
+# ---- Doomgeneric Sources ----
+DOOM_ROOT = kernel/apps/doomgeneric
+DOOM_GENERIC_DIR = $(DOOM_ROOT)/doomgeneric
+
+DOOM_ALL_SRCS = $(wildcard $(DOOM_GENERIC_DIR)/*.c)
+
+DOOM_EXCLUDE = $(DOOM_GENERIC_DIR)/doomgeneric_win.c \
+               $(DOOM_GENERIC_DIR)/doomgeneric_sdl.c \
+               $(DOOM_GENERIC_DIR)/doomgeneric_xlib.c \
+               $(DOOM_GENERIC_DIR)/doomgeneric_soso.c \
+               $(DOOM_GENERIC_DIR)/doomgeneric_sosox.c \
+               $(DOOM_GENERIC_DIR)/doomgeneric_linuxvt.c \
+               $(DOOM_GENERIC_DIR)/doomgeneric_emscripten.c \
+               $(DOOM_GENERIC_DIR)/doomgeneric_allegro.c \
+               $(DOOM_GENERIC_DIR)/i_allegromusic.c \
+               $(DOOM_GENERIC_DIR)/i_allegrosound.c \
+               $(DOOM_GENERIC_DIR)/i_sdlmusic.c \
+               $(DOOM_GENERIC_DIR)/i_sdlsound.c \
+               $(DOOM_GENERIC_DIR)/dummy.c
+
+DOOM_CORE_SRCS = $(filter-out $(DOOM_EXCLUDE), $(DOOM_ALL_SRCS))
+
+DOOM_ETEROS_SRCS = $(DOOM_ROOT)/doom_libc.c \
+                   $(DOOM_ROOT)/doomgeneric_eteros.c
+
+DOOM_SRCS = $(DOOM_CORE_SRCS) $(DOOM_ETEROS_SRCS)
+
 KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/string.c             \
               $(KERNEL_DIR)/shell.c              \
@@ -107,8 +136,6 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/apps/santitravel.c     \
               $(KERNEL_DIR)/apps/sysmon.c          \
               $(KERNEL_DIR)/apps/user_loader.c     \
-              $(KERNEL_DIR)/drivers/net/e1000.c    \
-              $(KERNEL_DIR)/net/compat.c           \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/fs/initrd.c            \
               $(KERNEL_DIR)/fs/vfs.c               \
@@ -133,8 +160,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/arch/x86_64/syscall.c \
               $(KERNEL_DIR)/drivers/disk/partition.c \
               $(KERNEL_DIR)/fs/elf.c \
-              $(KERNEL_DIR)/apps/wget.c \
-              $(LWIP_SRCS)
+              $(DOOM_SRCS)
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
@@ -206,6 +232,8 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/fs
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/ui
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/crypto
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/apps/doomgeneric
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/apps/doomgeneric/doomgeneric
 
 # ---- Bootloader (Solo x86_64) ----
 boot: dirs $(BOOT_BIN)
