@@ -187,3 +187,7 @@ int hal_mem_unmap(uint64_t virt_addr) {
 uint64_t hal_mem_get_phys(uint64_t virt_addr) {
     return vmm_virt_to_phys(virt_addr);
 }
+
+uint64_t vmm_get_pml4(void) {
+    return (uint64_t)pml4;
+}
