@@ -17,6 +17,11 @@ void cpu_init_bsp(void) {
         cpus[0].apic_id = 0; /* Asumimos ID 0 por defecto */
         cpus[0].index = 0;
         cpus[0].state = CPU_STATE_ONLINE;
+        cpus[0].self = (uint64_t)&cpus[0];
+    }
+
+    for (int i = 0; i < total_cpus; i++) {
+        cpus[i].self = (uint64_t)&cpus[i];
     }
 
     cpu_info_t* bsp = &cpus[0];
