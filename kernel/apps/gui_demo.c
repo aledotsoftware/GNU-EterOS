@@ -132,7 +132,7 @@ static void flux_launch_space(flux_node_id_t node);
 
 /* Helper Draw Functions */
 static void draw_generic_app_content(window_t* win, const char* title, uint32_t bg_col);
-static void draw_pong_content(window_t* win);
+
 static void draw_clock_content(window_t* win);
 
 /* Animation State Forward Decl (needed for input handling) */
@@ -1892,21 +1892,7 @@ static void draw_generic_app_content(window_t* win, const char* title, uint32_t 
     wm_print_at(win, 20, 40, "Aplicacion en construccion...");
 }
 
-static void draw_pong_content(window_t* win) {
-    if (!win) return;
-    wm_fill_rect(win, (rect_t){0, 0, win->bounds.w, win->bounds.h}, 0x000000);
-    /* Draw Net */
-    for(int y=10; y<win->bounds.h-10; y+=20) {
-        wm_fill_rect(win, (rect_t){win->bounds.w/2 - 2, y, 4, 10}, 0xFFFFFF);
-    }
-    /* Draw Paddles */
-    wm_fill_rect(win, (rect_t){20, 100, 10, 60}, 0xFFFFFF);
-    wm_fill_rect(win, (rect_t){win->bounds.w - 30, 150, 10, 60}, 0xFFFFFF);
-    /* Draw Ball */
-    wm_fill_rect(win, (rect_t){win->bounds.w/2 - 50, 120, 10, 10}, 0xFFFFFF);
-    
-    wm_print_at(win, win->bounds.w/2 - 40, 20, "PONG - 0 : 0");
-}
+
 
 static void draw_clock_content(window_t* win) {
     if (!win) return;
