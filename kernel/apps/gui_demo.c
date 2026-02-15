@@ -36,7 +36,7 @@
 
 extern int task_get_cpu_load(void);
 extern int task_kill(uint32_t pid);
-extern uint32_t my_ip;
+uint32_t my_ip = 0;
 
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
@@ -96,6 +96,7 @@ typedef enum {
     NODE_BROWSER,
     NODE_CALENDAR,
     NODE_DEVMAN,
+    NODE_DOOM,
     NODE_COUNT
 } flux_node_id_t;
 
@@ -121,7 +122,8 @@ static const flux_app_meta_t FLUX_APPS[] = {
     { NODE_GALLERY,  "Galeria",      0xAADD55 },
     { NODE_BROWSER,  "Navegador",    0x44FFFF },
     { NODE_CALENDAR, "Calendario",   0xDDAA55 },
-    { NODE_DEVMAN,   "Dispositivos", FLUX_ACCENT_AMBER }
+    { NODE_DEVMAN,   "Dispositivos", FLUX_ACCENT_AMBER },
+    { NODE_DOOM,     "DOOM",         0xCC0000 }
 };
 
 
@@ -141,6 +143,69 @@ static flux_zoom_level_t target_zoom = FLUX_MACRO;
 static flux_node_id_t zooming_node = NODE_TERMINAL;
 static rect_t source_rect = {0,0,0,0}; /* Constellation rect */
 static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */ 
+
+/* Doom Integration */
+extern uint32_t* DG_ScreenBuffer;
+extern void doomgeneric_Create(int argc, char **argv);
+extern void doomgeneric_Tick(void);
+extern void doom_handle_input(int key, int pressed);
+
+static bool doom_running = false;
+static window_t* win_doom = NULL;
+
+void task_doom_loop(void) {
+    char* argv[] = {"doom", "-iwad", "/initrd/doom1.wad", NULL};
+    doomgeneric_Create(3, argv);
+
+    while (1) {
+        doomgeneric_Tick();
+        task_sleep(10);
+    }
+}
+
+static void draw_doom_content(void) {
+    if (!win_doom) return;
+    int w = win_doom->bounds.w;
+    int h = win_doom->bounds.h;
+
+    /* Background */
+    wm_fill_rect(win_doom, (rect_t){0, 0, w, h}, 0x000000);
+
+    /* Draw Doom Buffer (320x200 scaled x3 = 960x600) */
+    if (DG_ScreenBuffer) {
+        int doom_w = 320;
+        int doom_h = 200;
+        int scale = 3;
+
+        int start_x = (w - (doom_w * scale)) / 2;
+        int start_y = (h - (doom_h * scale)) / 2;
+
+        if (start_x < 0) start_x = 0;
+        if (start_y < 0) start_y = 0;
+
+        /* Direct framebuffer access for speed?
+           For now, use omni_fill_rect for pixels (slow) or optimized blit.
+           We don't have a scaled blit in omni yet.
+           Let's do nearest neighbor manually.
+        */
+
+        /* Optimization: accessing DG_ScreenBuffer directly. */
+        /* This is slow if we do it pixel by pixel via omni_draw_pixel. */
+        /* We should write to window buffer if available, but windows in this UI are virtual? */
+        /* gui_demo uses wm_fill_rect. */
+
+        /* Let's try a simple scanline approach. */
+        /* We can optimize later. */
+
+        for (int y = 0; y < doom_h; y++) {
+            for (int x = 0; x < doom_w; x++) {
+                uint32_t col = DG_ScreenBuffer[y * doom_w + x];
+                /* Skip black/transp if needed? No, Doom is opaque. */
+                wm_fill_rect(win_doom, (rect_t){start_x + x*scale, start_y + y*scale, scale, scale}, col);
+            }
+        }
+    }
+}
 
 
 /* ========================================================================= */
@@ -962,7 +1027,10 @@ static const char* parse_url_path(const char* url) {
     return "/";
 }
 
-extern int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len);
+int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
+    (void)host; (void)path; (void)response_buf; (void)max_len;
+    return -1;
+}
 
 static void system_net_dispatcher_task(void) {
     strlcpy(browser_status_text, "Network: Iniciando DHCP...", 64);
@@ -1536,6 +1604,44 @@ static void draw_browser_preview(int x, int y, int w, int h) {
     omni_draw_string(NULL, x + w/2 - 20, y + h/2 - 5, "WEB", 0x44FFFF, 0xF0F0F0);
 }
 
+static void draw_doom_preview(int x, int y, int w, int h) {
+    omni_fill_rect(x, y, w, h, 0x000000);
+
+    if (DG_ScreenBuffer) {
+        int doom_w = 320;
+        int doom_h = 200;
+
+        /* Scale down to fit w, h */
+        /* Sample every N pixels */
+        int skip_x = doom_w / w;
+        int skip_y = doom_h / h;
+        if (skip_x < 1) skip_x = 1;
+        if (skip_y < 1) skip_y = 1;
+
+        /* Only draw header-safe area? No, draw card content */
+        /* Card content starts at y+26? flux_draw_card handles decoration. */
+        /* This function is called for "Live Content". */
+        /* Let's draw in the content area. flux_draw_card passes x,y,w,h of the card. */
+        /* We should offset. But wait, draw_term_preview uses x,y,w,h directly but adds offsets. */
+
+        int start_y = y + 40;
+        int draw_h = h - 50;
+
+        for (int py = 0; py < draw_h; py++) {
+            for (int px = 0; px < w - 20; px++) {
+                int sx = px * skip_x;
+                int sy = py * skip_y;
+                if (sx < doom_w && sy < doom_h) {
+                    uint32_t col = DG_ScreenBuffer[sy * doom_w + sx];
+                    omni_draw_pixel(x + 10 + px, start_y + py, col);
+                }
+            }
+        }
+    } else {
+        omni_draw_string(NULL, x + 20, y + 60, "Doom Loading...", 0xCC0000, 0x000000);
+    }
+}
+
 static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
     /* Physics: Magnetic Influence Field (Enabled for Investor WOW) */
     int center_x = x + (w / 2);
@@ -1601,6 +1707,8 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         draw_santitravel_preview(draw_x, draw_y, w, h);
     } else if (node == NODE_BROWSER) {
         draw_browser_preview(draw_x, draw_y, w, h);
+    } else if (node == NODE_DOOM) {
+        draw_doom_preview(draw_x, draw_y, w, h);
     } else {
         /* Generic Preview for new apps */
         wm_fill_rect(NULL, (rect_t){draw_x+10, draw_y+40, w-20, h-50}, 0x111111);
@@ -1674,6 +1782,15 @@ static void flux_launch_space(flux_node_id_t node) {
           if (!win_devman) win_devman = wm_create_window(0, 0, 800, 600, "Dispositivos");
           win_devman->active = true;
           focused_space = win_devman;
+    } else if (node == NODE_DOOM) {
+          flux_notify("DOOM", "Rip and Tear...", 0xFF0000);
+          if (!win_doom) win_doom = wm_create_window(0, 0, 1024, 768, "DOOM");
+          win_doom->active = true;
+          focused_space = win_doom;
+          if (!doom_running) {
+              doom_running = true;
+              task_create("doom_task", task_doom_loop);
+          }
     }
 }
 
@@ -1788,6 +1905,10 @@ static void draw_focus_mode(void) {
     } else if (zooming_node == NODE_DEVMAN) {
          if (focused_space == win_devman) {
              draw_devman_content();
+         }
+    } else if (zooming_node == NODE_DOOM) {
+         if (focused_space == win_doom) {
+             draw_doom_content();
          }
     } else {
          /* Generic for others */
@@ -2282,6 +2403,10 @@ void gui_demo_run(void) {
                              if (focused_term->win && focused_term->win->active) {
                                  term_handle_key(focused_term, c);
                              }
+                         }
+                         /* Pass input to Doom if focused */
+                         if (current_zoom == FLUX_FOCUS && zooming_node == NODE_DOOM) {
+                             doom_handle_input((int)c, 1);
                          }
                      }
                 }

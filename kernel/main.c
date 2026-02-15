@@ -163,8 +163,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     #endif
 
     /* ---- 4. Inicializar Red ---- */
+    /*
     hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
-    /* Attempt to init E1000 (Generic Driver but requires PCI) */
     if (e1000_init(NULL) == 0) {
         hal_console_write("  [NET]  Hardware inicializado.\n");
         init_network();
@@ -173,6 +173,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
         hal_console_write("         (El sistema continuara sin red)\n");
     }
+    */
 
     /* ---- 5. Mostrar banner de éterOS ---- */
     kernel_print_banner();
