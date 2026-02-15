@@ -3,6 +3,7 @@
 #include <serial.h>
 #include <io.h>
 #include <timer.h>
+#include <string.h>
 
 static uint64_t lapic_base = 0;
 
@@ -19,7 +20,7 @@ void lapic_init(void) {
     
     char buf[64];
     serial_write_string("[APIC] Initializing Local APIC at 0x");
-    utoa_hex_s(lapic_base, buf, 64);
+    itoa_s((int)lapic_base, buf, 64, 16);
     serial_write_string(buf);
     serial_write_string("\n");
 
