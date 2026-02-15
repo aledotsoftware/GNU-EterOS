@@ -1804,6 +1804,15 @@ static void handle_flux_click(void) {
 /* ========================================================================= */
 /* Moved to top of file to avoid forward declaration issues */
 
+/* Ripple Effect State */
+typedef struct {
+    int x, y;
+    int radius;
+    bool active;
+} flux_ripple_t;
+
+static flux_ripple_t click_ripple = {0};
+
 /* Physics State */
 static int zoom_velocity = 0;
 
@@ -1903,6 +1912,48 @@ static rect_t draw_zoom_transition(void) {
     }
     
     return (rect_t){bx, by, bw, bh};
+}
+
+static void draw_ripple_effect(void) {
+    if (!click_ripple.active) return;
+
+    /* Expand */
+    click_ripple.radius += 3;
+    if (click_ripple.radius > 60) {
+        click_ripple.active = false;
+        return;
+    }
+
+    /* Draw Ring using Midpoint Algorithm */
+    int cx = click_ripple.x;
+    int cy = click_ripple.y;
+    int r = click_ripple.radius;
+    uint32_t col = FLUX_ACCENT_CYAN;
+    uint8_t alpha = 255 - (r * 4); /* Fade out */
+
+    int x = 0;
+    int y = r;
+    int d = 3 - 2 * r;
+
+    while (x <= y) {
+        /* Draw 2x2 blocks for visibility */
+        omni_fill_rect_alpha(cx + x, cy + y, 2, 2, col, alpha);
+        omni_fill_rect_alpha(cx - x, cy + y, 2, 2, col, alpha);
+        omni_fill_rect_alpha(cx + x, cy - y, 2, 2, col, alpha);
+        omni_fill_rect_alpha(cx - x, cy - y, 2, 2, col, alpha);
+        omni_fill_rect_alpha(cx + y, cy + x, 2, 2, col, alpha);
+        omni_fill_rect_alpha(cx - y, cy + x, 2, 2, col, alpha);
+        omni_fill_rect_alpha(cx + y, cy - x, 2, 2, col, alpha);
+        omni_fill_rect_alpha(cx - y, cy - x, 2, 2, col, alpha);
+
+        if (d < 0) {
+            d += 4 * x + 6;
+        } else {
+            d += 4 * (x - y) + 10;
+            y--;
+        }
+        x++;
+    }
 }
 
 static void draw_generic_app_content(window_t* win, const char* title, uint32_t bg_col) {
@@ -2097,6 +2148,12 @@ void gui_demo_run(void) {
                 if (new_left && !mouse_left_btn) {
                     /* Click Detected */
                     handle_flux_click();
+
+                    /* Trigger Ripple */
+                    click_ripple.x = mouse_x;
+                    click_ripple.y = mouse_y;
+                    click_ripple.radius = 5;
+                    click_ripple.active = true;
                 }
                 mouse_left_btn = new_left;
 
@@ -2182,6 +2239,9 @@ void gui_demo_run(void) {
         /* Status Bar (Always Visible) */
         draw_global_status_bar();
         
+        /* Click Ripple Effect */
+        draw_ripple_effect();
+
         /* Cursor: Neural Orb (Reactive) */
         uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
         
