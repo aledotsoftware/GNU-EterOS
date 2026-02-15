@@ -9,6 +9,7 @@
  */
 
 #include <ui/window.h>
+#include <ui/omni.h>
 #include <task.h>
 #include <types.h>
 #include <string.h>
@@ -358,11 +359,11 @@ static void draw_progress_bar(window_t* win, int x, int y, int w, int h, int per
         if (fill_w < 0) fill_w = 0;
         wm_fill_rect(win, (rect_t){x, y, fill_w, h}, color);
     } else {
-        framebuffer_rect(x, y, w, h, 0x404040);
+        omni_fill_rect(x, y, w, h, 0x404040);
         int fill_w = (w * percent_1000) / 1000;
         if (fill_w > w) fill_w = w;
         if (fill_w < 0) fill_w = 0;
-        framebuffer_rect(x, y, fill_w, h, color);
+        omni_fill_rect(x, y, fill_w, h, color);
     }
 }
 
@@ -636,7 +637,7 @@ static void draw_settings_content(void) {
     
     if (settings_tab == TAB_HUB) {
         /* == HUB MODE: Grid of Access == */
-        ui_draw_string(NULL, w/2 - 40, 40, "AJUSTES", FLUX_TEXT_PRIMARY, 0x151515);
+        omni_draw_string(NULL, w/2 - 40, 40, "AJUSTES", FLUX_TEXT_PRIMARY, 0x151515);
         
         int btn_w = 140;
         int btn_h = 100;
@@ -700,7 +701,7 @@ static void draw_settings_content(void) {
             wm_fill_rect(win_settings, (rect_t){cx, cy, 140, 30}, 0x006000);
             wm_print_at(win_settings, cx + 20, cy + 8, "Conectar...");
             cy += 40;
-            ui_draw_string(NULL, cx, cy, "Ethernet: Link Up (1 Gbps)", 0x00FF00, 0x151515);
+            omni_draw_string(NULL, cx, cy, "Ethernet: Link Up (1 Gbps)", 0x00FF00, 0x151515);
             
         } else if (settings_tab == TAB_REGION) {
             wm_print_at(win_settings, cx, cy, "Idioma del Sistema");
@@ -1057,7 +1058,7 @@ static void draw_browser_content(void) {
     
     /* Status Bar (Adequate Info) */
     wm_fill_rect(win_browser, (rect_t){0, h - 25, w, 25}, 0xDDDDDD);
-    ui_draw_string(NULL, win_browser->bounds.x + 10, win_browser->bounds.y + TITLE_BAR_HEIGHT + h - 18, 
+    omni_draw_string(NULL, win_browser->bounds.x + 10, win_browser->bounds.y + TITLE_BAR_HEIGHT + h - 18,
                    browser_status_text, 0x555555, 0xDDDDDD);
 
     /* Content Area */
@@ -1142,15 +1143,15 @@ static void draw_notifications(void) {
     int y = 40; /* Top margin */
     
     /* Background & Shadow effect */
-    framebuffer_rect(x, y, w, h, 0x202020);
-    framebuffer_rect(x, y + h, w, 2, 0x000000); /* Shadow */
+    omni_fill_rect(x, y, w, h, 0x202020);
+    omni_fill_rect(x, y + h, w, 2, 0x000000); /* Shadow */
     
     /* Accent Strip */
-    framebuffer_rect(x, y, 4, h, active_notif.accent);
+    omni_fill_rect(x, y, 4, h, active_notif.accent);
     
     /* Content */
-    ui_draw_string(NULL, x + 15, y + 15, active_notif.title, FLUX_TEXT_PRIMARY, 0x202020);
-    ui_draw_string(NULL, x + 15, y + 35, active_notif.message, FLUX_TEXT_SECONDARY, 0x202020);
+    omni_draw_string(NULL, x + 15, y + 15, active_notif.title, FLUX_TEXT_PRIMARY, 0x202020);
+    omni_draw_string(NULL, x + 15, y + 35, active_notif.message, FLUX_TEXT_SECONDARY, 0x202020);
 }
 
 /* ========================================================================= */
@@ -1173,10 +1174,10 @@ static void draw_term_preview(int x, int y, int w, int h, term_instance_t* term)
         if (idx < TERM_BUFFER_LINES && term->buffer[idx][0]) {
              char line_preview[21];
              strlcpy(line_preview, term->buffer[idx], 20);
-             ui_draw_string(NULL, x + 10, start_y + (i * line_h), line_preview, FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+             omni_draw_string(NULL, x + 10, start_y + (i * line_h), line_preview, FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
         }
     }
-    ui_draw_string(NULL, x + 10, start_y + (max_lines * line_h), "> _", FLUX_ACCENT_CYAN, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 10, start_y + (max_lines * line_h), "> _", FLUX_ACCENT_CYAN, FLUX_CARD_BG);
 }
 
 static void draw_sysmon_preview(int x, int y, int w, int h) {
@@ -1193,14 +1194,14 @@ static void draw_sysmon_preview(int x, int y, int w, int h) {
     }
     
     int bar_y = y + 60;
-    ui_draw_string(NULL, x + 10, bar_y - 15, "RAM Usage", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 10, bar_y - 15, "RAM Usage", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
     draw_progress_bar(NULL, x + 10, bar_y, w - 20, 8, ram_pct_1000, (ram_pct_1000 > 800) ? UI_COLOR_RED : FLUX_ACCENT_AMBER);
     
     int wave_y = y + 100;
-    ui_draw_string(NULL, x + 10, wave_y - 15, "CPU Activity", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
-    framebuffer_rect(x + 10, wave_y, w - 20, 1, 0x404040);
+    omni_draw_string(NULL, x + 10, wave_y - 15, "CPU Activity", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    omni_fill_rect(x + 10, wave_y, w - 20, 1, 0x404040);
     int tick = (timer_get_ticks() / 10) % 20;
-    framebuffer_rect(x + 10 + (tick * 5), wave_y - 5, 4, 10, FLUX_ACCENT_AMBER);
+    omni_fill_rect(x + 10 + (tick * 5), wave_y - 5, 4, 10, FLUX_ACCENT_AMBER);
 }
 
 static void draw_matrix_preview(int x, int y, int w, int h) {
@@ -1209,64 +1210,64 @@ static void draw_matrix_preview(int x, int y, int w, int h) {
     for (int i=0; i<5; i++) {
         int col = (x + 20) + (i * 30);
         int drop = (timer_get_ticks() / 5 + i * 3) % 10;
-        ui_draw_string(NULL, col, start_y + (drop * 10), "0", FLUX_ACCENT_VIOLET, FLUX_CARD_BG);
+        omni_draw_string(NULL, col, start_y + (drop * 10), "0", FLUX_ACCENT_VIOLET, FLUX_CARD_BG);
     }
 }
 
 static void draw_settings_preview(int x, int y, int w, int h) {
     (void)w; (void)h;
     int start_y = y + 60;
-    ui_draw_string(NULL, x + 20, start_y, "Display: 1024x768", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
-    ui_draw_string(NULL, x + 20, start_y + 20, "Network: Online", FLUX_ACCENT_CYAN, FLUX_CARD_BG);
-    ui_draw_string(NULL, x + 20, start_y + 40, "Lang: ES/EN", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 20, start_y, "Display: 1024x768", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 20, start_y + 20, "Network: Online", FLUX_ACCENT_CYAN, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 20, start_y + 40, "Lang: ES/EN", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
 }
 
 static void draw_files_preview(int x, int y, int w, int h) {
     (void)w; (void)h;
     int start_y = y + 50;
-    ui_draw_string(NULL, x + 20, start_y, "/home", FLUX_ACCENT_AMBER, FLUX_CARD_BG);
-    ui_draw_string(NULL, x + 20, start_y + 20, "/etc", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
-    ui_draw_string(NULL, x + 20, start_y + 40, "/var", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 20, start_y, "/home", FLUX_ACCENT_AMBER, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 20, start_y + 20, "/etc", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 20, start_y + 40, "/var", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
 }
 
 static void draw_santitravel_preview(int x, int y, int w, int h) {
     (void)w; (void)h;
     int start_y = y + 60;
-    ui_draw_string(NULL, x + 20, start_y, "SantiTravel", 0x55AAFF, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 20, start_y, "SantiTravel", 0x55AAFF, FLUX_CARD_BG);
     
     /* Small Airplane animation */
     int tick = (timer_get_ticks() / 5) % 30;
-    ui_draw_string(NULL, x + 20 + tick, start_y + 30, ">-o-o", 0xFFFFFF, FLUX_CARD_BG);
+    omni_draw_string(NULL, x + 20 + tick, start_y + 30, ">-o-o", 0xFFFFFF, FLUX_CARD_BG);
 }
 
 void gui_draw_boot_logo(void) {
-    uint32_t sw = framebuffer_get_width();
-    uint32_t sh = framebuffer_get_height();
+    uint32_t sw = omni_get_width();
+    uint32_t sh = omni_get_height();
     if (sw == 0) sw = 1024;
     if (sh == 0) sh = 768;
 
     /* 1. White Background */
-    framebuffer_clear(0xFFFFFF);
+    omni_fill_rect(0, 0, sw, sh, 0xFFFFFF);
 
     /* 2. Draw Logo from File (logo.raw) */
     int img_w = 200;
     int img_h = 200;
-    ui_draw_image("/logo.png", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
+    omni_draw_image_from_path("/logo.png", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
 
     /* 3. Draw Text (Dark Grey) */
     const char* title = "ETEROS GENESIS";
     int title_w = strlen(title) * 8;
-    ui_draw_string(NULL, (sw - title_w) / 2, sh / 2 + 60, title, 0x333333, 0xFFFFFF);
+    omni_draw_string(NULL, (sw - title_w) / 2, sh / 2 + 60, title, 0x333333, 0xFFFFFF);
     
     const char* sub = "Cargando subsistemas...";
     int sub_w = strlen(sub) * 8;
-    ui_draw_string(NULL, (sw - sub_w) / 2, sh / 2 + 80, sub, 0x666666, 0xFFFFFF);
+    omni_draw_string(NULL, (sw - sub_w) / 2, sh / 2 + 80, sub, 0x666666, 0xFFFFFF);
     
     /* 4. Progress Bar (Light Grey Track, Cyan Fill) */
     int bw = 300;
     int bx = (sw - bw) / 2;
     int by = sh / 2 + 110;
-    framebuffer_rect(bx, by, bw, 4, 0xEEEEEE);
+    omni_fill_rect(bx, by, bw, 4, 0xEEEEEE);
     
     framebuffer_flush();
     
@@ -1282,7 +1283,7 @@ void gui_draw_boot_logo(void) {
         int progress = ((current - start_tick) * 100) / duration_ticks;
         int fill_w = (bw * progress) / 100;
         
-        framebuffer_rect(bx, by, fill_w, 4, 0x00AAAA);
+        omni_fill_rect(bx, by, fill_w, 4, 0x00AAAA);
         
         /* Partial flush for speed! */
         framebuffer_flush_rect(bx, by, bw, 4);
@@ -1292,7 +1293,7 @@ void gui_draw_boot_logo(void) {
     }
     
     /* Ensure 100% at end */
-    framebuffer_rect(bx, by, bw, 4, 0x00AAAA);
+    omni_fill_rect(bx, by, bw, 4, 0x00AAAA);
     framebuffer_flush_rect(bx, by, bw, 4);
     
     /* Final pause (1 second) */
@@ -1304,18 +1305,18 @@ void gui_draw_boot_logo(void) {
 /* ========================================================================= */
 
 static void draw_global_status_bar(void) {
-    uint32_t screen_w = framebuffer_get_width();
+    uint32_t screen_w = omni_get_width();
     if (screen_w == 0) screen_w = 1024;
     
     int bar_h = 32;
     /* Deep Glassmorphism effect: Outer border + Inner fill */
-    framebuffer_rect(0, 0, screen_w, bar_h, 0x050505);
-    framebuffer_rect(0, bar_h - 1, screen_w, 1, 0x1A1A1A); 
+    omni_fill_rect(0, 0, screen_w, bar_h, 0x050505);
+    omni_fill_rect(0, bar_h - 1, screen_w, 1, 0x1A1A1A);
 
     /* Left: System Branding + Pulse */
     int blink = (timer_get_ticks() / 50) % 2;
-    ui_draw_string(NULL, 16, 8, "eterOS", 0xFFFFFF, 0x050505);
-    framebuffer_rect(70, 14, 4, 4, blink ? FLUX_ACCENT_CYAN : 0x444444);
+    omni_draw_string(NULL, 16, 8, "eterOS", 0xFFFFFF, 0x050505);
+    omni_fill_rect(70, 14, 4, 4, blink ? FLUX_ACCENT_CYAN : 0x444444);
     
     /* System Stats (Cached) */
     static char stats_buf[64] = "RAM ...";
@@ -1339,15 +1340,15 @@ static void draw_global_status_bar(void) {
         last_stats_upd = timer_get_ticks();
     }
     
-    ui_draw_string(NULL, 100, 10, stats_buf, 0x666666, 0x050505);
+    omni_draw_string(NULL, 100, 10, stats_buf, 0x666666, 0x050505);
 
     /* Center: Mode Indicator with Glow */
     const char* mode_str = (current_zoom == FLUX_FOCUS) ? "FOCUS" : "CONSTELACION";
     int mode_w = strlen(mode_str) * 8;
     int mode_x = (screen_w - mode_w) / 2;
-    ui_draw_string(NULL, mode_x, 8, mode_str, FLUX_TEXT_PRIMARY, 0x050505);
+    omni_draw_string(NULL, mode_x, 8, mode_str, FLUX_TEXT_PRIMARY, 0x050505);
     /* Subtle underline glow */
-    framebuffer_rect(mode_x, 24, mode_w, 1, (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_ACCENT_AMBER);
+    omni_fill_rect(mode_x, 24, mode_w, 1, (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_ACCENT_AMBER);
 
     /* Right Side */
     int right_margin = screen_w - 16;
@@ -1357,9 +1358,9 @@ static void draw_global_status_bar(void) {
     int bat_h = 12;
     int bat_x = right_margin - bat_w;
     int bat_y = (bar_h - bat_h) / 2;
-    framebuffer_rect(bat_x - 1, bat_y - 1, bat_w + 2, bat_h + 2, 0x333333);
-    framebuffer_rect(bat_x, bat_y, bat_w, bat_h, 0x111111);
-    framebuffer_rect(bat_x + 2, bat_y + 2, bat_w - 4, bat_h - 4, 0x00CC00);
+    omni_fill_rect(bat_x - 1, bat_y - 1, bat_w + 2, bat_h + 2, 0x333333);
+    omni_fill_rect(bat_x, bat_y, bat_w, bat_h, 0x111111);
+    omni_fill_rect(bat_x + 2, bat_y + 2, bat_w - 4, bat_h - 4, 0x00CC00);
     
     right_margin -= (bat_w + 20);
 
@@ -1385,7 +1386,7 @@ static void draw_global_status_bar(void) {
     
     int clock_w = 5 * 8;
     int clock_x = right_margin - clock_w;
-    ui_draw_string(NULL, clock_x, 8, clock_buf, 0xAAAAAA, 0x050505);
+    omni_draw_string(NULL, clock_x, 8, clock_buf, 0xAAAAAA, 0x050505);
 
     /* Tooltip: Date on Hover */
     if (mouse_x >= clock_x - 5 && mouse_x <= clock_x + clock_w + 5 && mouse_y <= 32) {
@@ -1414,31 +1415,31 @@ static void draw_global_status_bar(void) {
         int tip_y = 36; /* Below bar */
 
         /* Shadow */
-        framebuffer_rect(tip_x + 2, tip_y + 2, tip_w, tip_h, 0x000000);
+        omni_fill_rect(tip_x + 2, tip_y + 2, tip_w, tip_h, 0x000000);
         /* Bg */
-        framebuffer_rect(tip_x, tip_y, tip_w, tip_h, 0x252525);
+        omni_fill_rect(tip_x, tip_y, tip_w, tip_h, 0x252525);
         /* Border */
-        framebuffer_rect(tip_x, tip_y, tip_w, 1, 0x555555);
-        framebuffer_rect(tip_x, tip_y + tip_h - 1, tip_w, 1, 0x555555);
-        framebuffer_rect(tip_x, tip_y, 1, tip_h, 0x555555);
-        framebuffer_rect(tip_x + tip_w - 1, tip_y, 1, tip_h, 0x555555);
+        omni_fill_rect(tip_x, tip_y, tip_w, 1, 0x555555);
+        omni_fill_rect(tip_x, tip_y + tip_h - 1, tip_w, 1, 0x555555);
+        omni_fill_rect(tip_x, tip_y, 1, tip_h, 0x555555);
+        omni_fill_rect(tip_x + tip_w - 1, tip_y, 1, tip_h, 0x555555);
 
         /* Text */
-        ui_draw_string(NULL, tip_x + 5, tip_y + 4, date_buf, 0xFFFFFF, 0x252525);
+        omni_draw_string(NULL, tip_x + 5, tip_y + 4, date_buf, 0xFFFFFF, 0x252525);
     }
 }
 
 static void draw_browser_preview(int x, int y, int w, int h) {
     /* Background: Cyan/White */
-    framebuffer_rect(x, y, w, h, 0xFFFFFF);
+    omni_fill_rect(x, y, w, h, 0xFFFFFF);
     /* Header */
-    framebuffer_rect(x, y, w, 20, 0xCCCCCC);
+    omni_fill_rect(x, y, w, 20, 0xCCCCCC);
     /* URL Bar */
-    framebuffer_rect(x + 10, y + 25, w - 20, 15, 0xEEEEEE);
+    omni_fill_rect(x + 10, y + 25, w - 20, 15, 0xEEEEEE);
     /* Content */
-    framebuffer_rect(x + 10, y + 45, w - 20, h - 55, 0xF0F0F0);
+    omni_fill_rect(x + 10, y + 45, w - 20, h - 55, 0xF0F0F0);
     /* Icon text */
-    ui_draw_string(NULL, x + w/2 - 20, y + h/2 - 5, "WEB", 0x44FFFF, 0xF0F0F0);
+    omni_draw_string(NULL, x + w/2 - 20, y + h/2 - 5, "WEB", 0x44FFFF, 0xF0F0F0);
 }
 
 static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
@@ -1471,14 +1472,14 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
     
     /* Active Glow (Steady, no strobing for A11y) */
     if (dist_sq < 40000) {
-        framebuffer_rect(draw_x - 2, draw_y - 2, w + 4, h + 4, accent);
+        omni_fill_rect(draw_x - 2, draw_y - 2, w + 4, h + 4, accent);
     }
 
-    framebuffer_rect(draw_x, draw_y, w, h, card_bg); 
+    omni_fill_rect(draw_x, draw_y, w, h, card_bg);
     
     /* Header */
-    ui_draw_string(NULL, draw_x + 10, draw_y + 10, title, FLUX_TEXT_PRIMARY, card_bg);
-    framebuffer_rect(draw_x + 10, draw_y + 26, w - 20, 1, 0x333333);
+    omni_draw_string(NULL, draw_x + 10, draw_y + 10, title, FLUX_TEXT_PRIMARY, card_bg);
+    omni_fill_rect(draw_x + 10, draw_y + 26, w - 20, 1, 0x333333);
     
     /* Live Content / Icon Placeholder */
     int icon_cx = draw_x + (w/2);
@@ -1489,10 +1490,10 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         /* Overlay Icon - more transparent look */
         for(int iy=0; iy<60; iy++) {
             for(int ix=0; ix<80; ix++) {
-                if ((ix+iy)%2 == 0) framebuffer_putpixel(icon_cx-40+ix, icon_cy-30+iy, 0x000000);
+                if ((ix+iy)%2 == 0) omni_draw_pixel(icon_cx-40+ix, icon_cy-30+iy, 0x000000);
             }
         }
-        ui_draw_string(NULL, icon_cx - 20, icon_cy - 10, ">_", FLUX_ACCENT_CYAN, 0x000000);
+        omni_draw_string(NULL, icon_cx - 20, icon_cy - 10, ">_", FLUX_ACCENT_CYAN, 0x000000);
     } else if (node == NODE_SYSMON) {
         draw_sysmon_preview(draw_x, draw_y, w, h);
     } else if (node == NODE_MATRIX) {
@@ -1509,13 +1510,13 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         /* Generic Preview for new apps */
         wm_fill_rect(NULL, (rect_t){draw_x+10, draw_y+40, w-20, h-50}, 0x111111);
         /* Draw big initial? For now just color block */
-        framebuffer_rect(icon_cx-20, icon_cy-20, 40, 40, accent);
+        omni_fill_rect(icon_cx-20, icon_cy-20, 40, 40, accent);
     }
     
     /* Active Border (Glow effect on hover) */
     uint32_t border_col = accent;
     if (dist_sq < 40000) border_col = 0xFFFFFF;
-    framebuffer_rect(draw_x, draw_y + h - 2, w, 2, border_col);
+    omni_fill_rect(draw_x, draw_y + h - 2, w, 2, border_col);
 }
 
 /* ========================================================================= */
@@ -1602,8 +1603,8 @@ static void init_constellation(void) {
 }
 
 static void draw_constellation(void) {
-    uint32_t screen_w = framebuffer_get_width();
-    uint32_t screen_h = framebuffer_get_height();
+    uint32_t screen_w = omni_get_width();
+    uint32_t screen_h = omni_get_height();
     if (screen_w == 0) screen_w = 1024;
     if (screen_h == 0) screen_h = 768;
     
@@ -1612,20 +1613,20 @@ static void draw_constellation(void) {
     /* Capa 0: Neural Ambient (Stars) */
     /* ⚡ BOLT OPTIMIZATION: Use pre-calculated positions */
     for (int i = 0; i < 64; i++) {
-        framebuffer_putpixel(constellation_stars[i].x, constellation_stars[i].y, constellation_stars[i].col);
+        omni_draw_pixel(constellation_stars[i].x, constellation_stars[i].y, constellation_stars[i].col);
     }
 
     /* Draw Grid Background (Technical) - Very subtle */
     int grid_size = 120;
     for (uint32_t x = 0; x < screen_w; x += grid_size) {
-        framebuffer_rect(x, 0, 1, screen_h, 0x080808);
+        omni_fill_rect(x, 0, 1, screen_h, 0x080808);
     }
     for (uint32_t y = 0; y < screen_h; y += grid_size) {
-        framebuffer_rect(0, y, screen_w, 1, 0x080808);
+        omni_fill_rect(0, y, screen_w, 1, 0x080808);
     }
     
     /* Header (Capa 3) */
-    ui_draw_string(NULL, 50, 50, "CONSTELACION", FLUX_TEXT_SECONDARY, 0x000000);
+    omni_draw_string(NULL, 50, 50, "CONSTELACION", FLUX_TEXT_SECONDARY, 0x000000);
     
     /* Grid de Nodos Centrada */
     /* Grid de Nodos Dynamic 4x4 */
@@ -1666,7 +1667,7 @@ static void draw_focus_mode(void) {
     focused_space->bounds.h = 768 - (margin * 2);
     
     /* Shadow/Glow */
-    framebuffer_rect(focused_space->bounds.x - 2, focused_space->bounds.y - 2, 
+    omni_fill_rect(focused_space->bounds.x - 2, focused_space->bounds.y - 2,
                      focused_space->bounds.w + 4, focused_space->bounds.h + 4, FLUX_ACCENT_CYAN); 
                      
     /* Dispatch Draw Content based on Node ID */
@@ -1711,13 +1712,13 @@ static void draw_focus_mode(void) {
     int bar_x = (1024 - bar_w) / 2;
     int bar_y = 768 - 15;
     
-    framebuffer_rect(bar_x, bar_y, bar_w, bar_h, bar_col);
+    omni_fill_rect(bar_x, bar_y, bar_w, bar_h, bar_col);
 }
 
 /* Input Handling for Flux */
 static void handle_flux_click(void) {
-    uint32_t screen_w = framebuffer_get_width();
-    uint32_t screen_h = framebuffer_get_height();
+    uint32_t screen_w = omni_get_width();
+    uint32_t screen_h = omni_get_height();
     if (screen_w == 0) screen_w = 1024;
     if (screen_h == 0) screen_h = 768;
 
@@ -1865,7 +1866,7 @@ static rect_t draw_zoom_transition(void) {
     int bh = (source_rect.h > target_rect.h) ? source_rect.h : target_rect.h;
     
     /* Align to bounds union */
-    framebuffer_rect(bx, by, bw, bh, 0x000000);
+    omni_fill_rect(bx, by, bw, bh, 0x000000);
 
     /* Draw Expanding Card */
     rect_t r;
@@ -1874,11 +1875,11 @@ static rect_t draw_zoom_transition(void) {
     r.w = source_rect.w + ((target_rect.w - source_rect.w) * zoom_progress) / 1000;
     r.h = source_rect.h + ((target_rect.h - source_rect.h) * zoom_progress) / 1000;
     
-    framebuffer_rect(r.x, r.y, r.w, r.h, FLUX_CARD_BG);
-    framebuffer_rect(r.x, r.y, r.w, 4, FLUX_ACCENT_CYAN); 
+    omni_fill_rect(r.x, r.y, r.w, r.h, FLUX_CARD_BG);
+    omni_fill_rect(r.x, r.y, r.w, 4, FLUX_ACCENT_CYAN);
     
     if (zoom_progress > 900) {
-         ui_draw_string(NULL, r.x + 20, r.y + 20, "Materializando...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
+         omni_draw_string(NULL, r.x + 20, r.y + 20, "Materializando...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
     }
     
     return (rect_t){bx, by, bw, bh};
@@ -2014,6 +2015,7 @@ void gui_demo_run(void) {
 
     serial_write_string("[GUI] Initializing WM...\n");
     wm_init();
+    omni_init();
     
     /* serial_write_string("[GUI] Creating terminal window...\n");
     term_create(); */ 
@@ -2154,7 +2156,7 @@ void gui_demo_run(void) {
         if ((int)current_zoom == -1) {
              /* Transitioning: Clearing is handled inside draw_zoom_transition (localized) */
         } else {
-             framebuffer_clear(0x000000);
+             omni_fill_rect(0, 0, omni_get_width(), omni_get_height(), 0x000000);
         }
         
         if (current_zoom == FLUX_MACRO) {
@@ -2177,17 +2179,17 @@ void gui_demo_run(void) {
         
         /* Glow Effect (Steady, no pulse) */
         /* ⚡ BOLT OPTIMIZATION: Use block rects instead of 81 putpixel calls */
-        framebuffer_rect(mouse_x - 3, mouse_y - 1, 7, 3, 0x303030);
-        framebuffer_rect(mouse_x - 1, mouse_y - 3, 3, 7, 0x303030);
-        framebuffer_rect(mouse_x - 2, mouse_y - 2, 5, 5, 0x404040);
+        omni_fill_rect(mouse_x - 3, mouse_y - 1, 7, 3, 0x303030);
+        omni_fill_rect(mouse_x - 1, mouse_y - 3, 3, 7, 0x303030);
+        omni_fill_rect(mouse_x - 2, mouse_y - 2, 5, 5, 0x404040);
         
         /* Core Orb (Tactile Click Feedback) */
         if (mouse_left_btn) {
             /* Pressed: Smaller, Amber Core */
-            framebuffer_rect(mouse_x - 1, mouse_y - 1, 2, 2, FLUX_ACCENT_AMBER);
+            omni_fill_rect(mouse_x - 1, mouse_y - 1, 2, 2, FLUX_ACCENT_AMBER);
         } else {
             /* Hover: Standard 4x4 Core */
-            framebuffer_rect(mouse_x - 2, mouse_y - 2, 4, 4, cursor_col);
+            omni_fill_rect(mouse_x - 2, mouse_y - 2, 4, 4, cursor_col);
         }
         
         /* Optimization: Flush only dirty regions during transition */

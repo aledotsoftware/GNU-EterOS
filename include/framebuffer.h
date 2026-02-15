@@ -29,4 +29,9 @@ void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t b
 /* Backend para la terminal */
 void terminal_framebuffer_write(const char* data, size_t size);
 
+/* Acceso directo al buffer (para optimizaciones Omni) */
+uint32_t* framebuffer_get_buffer(void);
+uint32_t framebuffer_get_pitch(void);
+uint32_t framebuffer_get_bpp(void);
+
 #endif

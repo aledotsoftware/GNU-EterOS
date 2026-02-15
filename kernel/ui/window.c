@@ -6,6 +6,7 @@
 #include <types.h>
 #include <string.h>
 #include <framebuffer.h>
+#include <ui/omni.h>
 
 /* #define MAX_WINDOWS 10 -- Now in ui/window.h */
 
@@ -41,25 +42,25 @@ void wm_draw_window(window_t* win) {
     const int TITLE_H = 30;
     
     /* 0. Sombra (Offset +4, +4) */
-    framebuffer_rect((uint32_t)win->bounds.x + 4, (uint32_t)win->bounds.y + 4,
-                     (uint32_t)win->bounds.w, (uint32_t)win->bounds.h,
-                     0x000000); /* Black shadow */
+    omni_fill_rect(win->bounds.x + 4, win->bounds.y + 4,
+                   win->bounds.w, win->bounds.h,
+                   0x000000); /* Black shadow */
 
     /* 1. Fondo */
     /* rect local -> global */
-    framebuffer_rect((uint32_t)win->bounds.x, (uint32_t)win->bounds.y,
-                     (uint32_t)win->bounds.w, (uint32_t)win->bounds.h,
-                     win->bg_color);
+    omni_fill_rect(win->bounds.x, win->bounds.y,
+                   win->bounds.w, win->bounds.h,
+                   win->bg_color);
                      
     /* 2. Barra título (Más alta para Touch - 30px) */
     uint32_t title_color = UI_COLOR_CYAN; 
     
-    framebuffer_rect((uint32_t)win->bounds.x, (uint32_t)win->bounds.y,
-                     (uint32_t)win->bounds.w, TITLE_H,
-                     title_color);
+    omni_fill_rect(win->bounds.x, win->bounds.y,
+                   win->bounds.w, TITLE_H,
+                   title_color);
                      
     /* Título (Centrado verticalmente en 30px) */
-    ui_draw_string(NULL, win->bounds.x + 8, win->bounds.y + 7, win->title, UI_COLOR_BLACK, title_color);
+    omni_draw_string(NULL, win->bounds.x + 8, win->bounds.y + 7, win->title, UI_COLOR_BLACK, title_color);
     
     /* 3. Botón Cerrar [X] (Touch Target grande - Magnet Effect) */
     /* El botón visual es 20x20, pero el área de click será mayor */
@@ -68,16 +69,16 @@ void wm_draw_window(window_t* win) {
     int btn_x = win->bounds.x + win->bounds.w - btn_size - btn_margin;
     int btn_y = win->bounds.y + btn_margin;
     
-    framebuffer_rect(btn_x, btn_y, btn_size, btn_size, 0xFF4040); /* Rojo suave */
+    omni_fill_rect(btn_x, btn_y, btn_size, btn_size, 0xFF4040); /* Rojo suave */
     
     /* Dibujar X */
     for(int i=4; i<=15; i++) {
-        ui_draw_pixel(btn_x + i, btn_y + i, 0xFFFFFF);
-        ui_draw_pixel(btn_x + 19 - i, btn_y + i, 0xFFFFFF);
+        omni_draw_pixel(btn_x + i, btn_y + i, 0xFFFFFF);
+        omni_draw_pixel(btn_x + 19 - i, btn_y + i, 0xFFFFFF);
     }
     
     /* 4. Borde */
-    ui_draw_rect(&win->bounds, 0xC0C0C0);
+    omni_draw_rect(win->bounds.x, win->bounds.y, win->bounds.w, win->bounds.h, 0xC0C0C0);
 }
 
 void wm_draw_all(void) {
@@ -104,7 +105,7 @@ void wm_print_at(window_t* win, int32_t x, int32_t y, const char* text) {
     clip.w = win->bounds.w;
     clip.h = win->bounds.h - TITLE_H;
 
-    ui_draw_string(&clip, abs_x, abs_y, text, win->fg_color, win->bg_color);
+    omni_draw_string(&clip, abs_x, abs_y, text, win->fg_color, win->bg_color);
 }
 
 void wm_fill_rect(window_t* win, rect_t rect, uint32_t color) {
@@ -142,7 +143,7 @@ void wm_fill_rect(window_t* win, rect_t rect, uint32_t color) {
     /* Si no queda nada, salir */
     if (rect.w <= 0 || rect.h <= 0) return;
     
-    framebuffer_rect((uint32_t)abs_x, (uint32_t)abs_y, (uint32_t)rect.w, (uint32_t)rect.h, color);
+    omni_fill_rect(abs_x, abs_y, rect.w, rect.h, color);
 }
 
 void wm_move_window(window_t* win, int32_t dx, int32_t dy) {
@@ -156,16 +157,16 @@ void wm_move_window(window_t* win, int32_t dx, int32_t dy) {
 
 void wm_redraw_desktop(void) {
     /* 1. Fondo "Desktop" (Dark Teal) */
-    framebuffer_clear(0x002040);
+    omni_fill_rect(0, 0, omni_get_width(), omni_get_height(), 0x002040);
     
     /* 2. Grid Effect */
     /* Draw horizontal lines */
     for (uint32_t y = 0; y < 768; y += 40) {
-        framebuffer_rect(0, y, 1024, 1, 0x003050);
+        omni_fill_rect(0, y, 1024, 1, 0x003050);
     }
     /* Draw vertical lines */
     for (uint32_t x = 0; x < 1024; x += 40) {
-        framebuffer_rect(x, 0, 1, 768, 0x003050);
+        omni_fill_rect(x, 0, 1, 768, 0x003050);
     }
 
     /* 3. Redraw all windows */

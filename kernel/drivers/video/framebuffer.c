@@ -37,7 +37,10 @@ void framebuffer_init(boot_info_t* info) {
 
 uint32_t framebuffer_get_width(void) { return fb_width; }
 uint32_t framebuffer_get_height(void) { return fb_height; }
+uint32_t framebuffer_get_bpp(void) { return fb_bpp; }
 
+uint32_t* framebuffer_get_buffer(void) { return active_buffer; }
+uint32_t framebuffer_get_pitch(void) { return fb_pitch; }
 
 void framebuffer_enable_double_buffer(void) {
     if (back_buffer) return;
