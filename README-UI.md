@@ -179,9 +179,9 @@ Flux UI es nativo para Realidad Extendida.
 3.  [x] **Primitivas de Dibujo**: Rectángulos, Líneas, Texto (Bitmap Font).
 4.  [x] **Carga de Assets**: Lectura de imágenes RAW desde Initrd.
 
-### Fase 1: Interacción Básica
-1.  **Cursor por Software**: Dibujar puntero del mouse sobre el frame usando composición Alpha (sin hardware sprite).
-2.  **Prototipo "Toque Magnético"**: Implementar la deformación de botones al acercar el cursor.
-3.  **Sistema de Ventanas (Window Manager)**: Estructura de árbol para manejar redibujado y clipping.
-4.  **Zoom de Texto**: Implementar LOD (Level of Detail) en tipografía.
-3.  **Transición de Gravedad**: Rotación de layout fluido en el demo.
+### Fase 1: Interacción Básica ✅
+1.  [x] **Cursor por Software:** Dibujar puntero del mouse sobre el frame usando composición Alpha (Motor Omni).
+2.  [x] **Prototipo "Toque Magnético":** Implementar la deformación y desplazamiento de botones al acercar el cursor (Influence Field).
+3.  [x] **Sistema de Ventanas (Window Manager):** Estructura de árbol para manejar redibujado, apilamiento (Z-order) y clipping.
+4.  [~] **Zoom de Texto:** Implementar LOD (Level of Detail) en tipografía (vía escalado de bitmaps).
+5.  [x] **Transición de Gravedad:** Animaciones suaves de Zoom (In/Out) basadas en física de resortes (Spring Physics).
