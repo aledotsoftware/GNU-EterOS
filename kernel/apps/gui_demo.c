@@ -13,6 +13,12 @@
 #include <types.h>
 #include <string.h>
 #include <vga.h>
+#include <gui_demo.h>
+#include <net/socket.h>
+
+#ifndef htons
+#define htons(x) ((((x) & 0xff) << 8) | (((x) & 0xff00) >> 8))
+#endif
 #include <timer.h>
 #include <keyboard.h>
 #include <mouse.h>
@@ -790,7 +796,7 @@ static void handle_settings_click(int win_local_x, int win_local_y) {
 /* ========================================================================= */
 
 static window_t* win_browser = NULL;
-static char browser_url[128] = "https://tudexgames.com/ads.txt";
+static char browser_url[128] = "http://142.250.180.14"; /* Google IP (No DNS yet) */
 static char browser_content[2048] = "";
 static bool browser_loading = false;
 static char browser_status_text[64] = "Listo";
@@ -878,6 +884,58 @@ static const char* parse_url_path(const char* url) {
     return "/";
 }
 
+static uint32_t parse_ip_simple(const char* str) {
+    uint8_t bytes[4] = {0,0,0,0};
+    int idx = 0;
+    while (*str && idx < 4) {
+        if (*str >= '0' && *str <= '9') {
+            bytes[idx] = bytes[idx] * 10 + (*str - '0');
+        } else if (*str == '.') {
+            idx++;
+        }
+        str++;
+    }
+    return *((uint32_t*)bytes);
+}
+
+static int native_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
+    uint32_t ip = parse_ip_simple(host);
+    if (ip == 0) return -1;
+
+    int s = net_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (s < 0) return -4;
+
+    struct sockaddr_in dest;
+    dest.sin_family = AF_INET;
+    dest.sin_port = htons(80);
+    dest.sin_addr = ip;
+
+    if (net_connect(s, &dest, sizeof(dest)) < 0) {
+        net_close(s);
+        return -2;
+    }
+
+    char req[512];
+    strlcpy(req, "GET ", 512);
+    strlcat(req, path, 512);
+    strlcat(req, " HTTP/1.0\r\nHost: ", 512);
+    strlcat(req, host, 512);
+    strlcat(req, "\r\nUser-Agent: EterWeb/1.0\r\n\r\n", 512);
+    
+    net_send(s, req, strlen(req), 0);
+    
+    int total = 0;
+    int len;
+    while ((len = net_recv(s, response_buf + total, max_len - total - 1, 0)) > 0) {
+        total += len;
+        if ((size_t)total >= max_len - 1) break;
+    }
+    response_buf[total] = 0;
+    
+    net_close(s);
+    return total;
+}
+
 static void system_net_dispatcher_task(void) {
     strlcpy(browser_status_text, "Network: Iniciando DHCP...", 64);
     
@@ -895,14 +953,24 @@ static void system_net_dispatcher_task(void) {
         task_exit();
     }
     
-    strlcpy(browser_status_text, "DNS: Resolviendo host...", 64);
+    strlcpy(browser_status_text, "DNS: Resolviendo host (Skipped)...", 64);
     task_sleep(400);
     
     strlcpy(browser_status_text, "TCP: Conectando...", 64);
     
-    extern int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len);
+    /* Parse Host from URL (Naive) */
+    char host_buf[64] = "142.250.180.14"; 
+    /* Extract IP from browser_url if possible, usually it is http://IP/... */
+    char* p = flux_strstr(browser_url, "http://");
+    if (p) p += 7;
+    else p = browser_url;
+    
+    int i = 0;
+    while (*p && *p != '/' && i < 63) host_buf[i++] = *p++;
+    host_buf[i] = 0;
+    
     const char* path = parse_url_path(browser_url);
-    int res = raw_tcp_get("tudexgames.com", path, proto_buffer, sizeof(proto_buffer));
+    int res = native_tcp_get(host_buf, path, proto_buffer, sizeof(proto_buffer));
     
     if (res > 0) {
         strlcpy(browser_content, proto_buffer, sizeof(browser_content));
@@ -1330,6 +1398,19 @@ static void draw_global_status_bar(void) {
     }
 }
 
+static void draw_browser_preview(int x, int y, int w, int h) {
+    /* Background: Cyan/White */
+    framebuffer_rect(x, y, w, h, 0xFFFFFF);
+    /* Header */
+    framebuffer_rect(x, y, w, 20, 0xCCCCCC);
+    /* URL Bar */
+    framebuffer_rect(x + 10, y + 25, w - 20, 15, 0xEEEEEE);
+    /* Content */
+    framebuffer_rect(x + 10, y + 45, w - 20, h - 55, 0xF0F0F0);
+    /* Icon text */
+    ui_draw_string(NULL, x + w/2 - 20, y + h/2 - 5, "WEB", 0x44FFFF, 0xF0F0F0);
+}
+
 static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
     /* Physics: Magnetic Influence Field (Enabled for Investor WOW) */
     int center_x = x + (w / 2);
@@ -1392,6 +1473,8 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         draw_files_preview(draw_x, draw_y, w, h);
     } else if (node == NODE_SANTITRAVEL) {
         draw_santitravel_preview(draw_x, draw_y, w, h);
+    } else if (node == NODE_BROWSER) {
+        draw_browser_preview(draw_x, draw_y, w, h);
     } else {
         /* Generic Preview for new apps */
         wm_fill_rect(NULL, (rect_t){draw_x+10, draw_y+40, w-20, h-50}, 0x111111);
