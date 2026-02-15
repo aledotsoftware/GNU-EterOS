@@ -36,7 +36,7 @@
 
 extern int task_get_cpu_load(void);
 extern int task_kill(uint32_t pid);
-uint32_t my_ip = 0;
+extern uint32_t my_ip; // Defined in stack.c
 
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
@@ -49,6 +49,12 @@ static volatile bool desktop_running = true;
 /* Ventanas y Estado */
 static window_t* win_sysinfo = NULL;
 static window_t* win_devman = NULL;
+
+/* Flux Hub (Universal Launcher) */
+static bool hub_active = false;
+static char hub_input[64] = "";
+static void draw_flux_hub(void);
+static void handle_hub_input(char c);
 
 /* Mouse */
 static int32_t mouse_x = 512;
@@ -122,8 +128,8 @@ static const flux_app_meta_t FLUX_APPS[] = {
     { NODE_GALLERY,  "Galeria",      0xAADD55 },
     { NODE_BROWSER,  "Navegador",    0x44FFFF },
     { NODE_CALENDAR, "Calendario",   0xDDAA55 },
-    { NODE_DEVMAN,   "Dispositivos", FLUX_ACCENT_AMBER },
-    { NODE_DOOM,     "DOOM",         0xCC0000 }
+    { NODE_DEVMAN,   "Dispositivos", FLUX_ACCENT_AMBER }
+    // { NODE_DOOM,     "DOOM",         0xCC0000 } // Engine missing
 };
 
 
@@ -144,67 +150,32 @@ static flux_node_id_t zooming_node = NODE_TERMINAL;
 static rect_t source_rect = {0,0,0,0}; /* Constellation rect */
 static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */ 
 
-/* Doom Integration */
-extern uint32_t* DG_ScreenBuffer;
-extern void doomgeneric_Create(int argc, char **argv);
-extern void doomgeneric_Tick(void);
-extern void doom_handle_input(int key, int pressed);
+/* Doom Integration Disabled - Engine missing */
+// extern uint32_t* DG_ScreenBuffer;
+// extern void doomgeneric_Create(int argc, char **argv);
+// extern void doomgeneric_Tick(void);
+// extern void doom_handle_input(int key, int pressed);
 
 static bool doom_running = false;
 static window_t* win_doom = NULL;
 
 void task_doom_loop(void) {
-    char* argv[] = {"doom", "-iwad", "/initrd/doom1.wad", NULL};
+    /* char* argv[] = {"doom", "-iwad", "/initrd/doom1.wad", NULL};
     doomgeneric_Create(3, argv);
 
     while (1) {
         doomgeneric_Tick();
         task_sleep(10);
-    }
+    } */
+    task_exit();
 }
 
 static void draw_doom_content(void) {
     if (!win_doom) return;
     int w = win_doom->bounds.w;
     int h = win_doom->bounds.h;
-
-    /* Background */
     wm_fill_rect(win_doom, (rect_t){0, 0, w, h}, 0x000000);
-
-    /* Draw Doom Buffer (320x200 scaled x3 = 960x600) */
-    if (DG_ScreenBuffer) {
-        int doom_w = 320;
-        int doom_h = 200;
-        int scale = 3;
-
-        int start_x = (w - (doom_w * scale)) / 2;
-        int start_y = (h - (doom_h * scale)) / 2;
-
-        if (start_x < 0) start_x = 0;
-        if (start_y < 0) start_y = 0;
-
-        /* Direct framebuffer access for speed?
-           For now, use omni_fill_rect for pixels (slow) or optimized blit.
-           We don't have a scaled blit in omni yet.
-           Let's do nearest neighbor manually.
-        */
-
-        /* Optimization: accessing DG_ScreenBuffer directly. */
-        /* This is slow if we do it pixel by pixel via omni_draw_pixel. */
-        /* We should write to window buffer if available, but windows in this UI are virtual? */
-        /* gui_demo uses wm_fill_rect. */
-
-        /* Let's try a simple scanline approach. */
-        /* We can optimize later. */
-
-        for (int y = 0; y < doom_h; y++) {
-            for (int x = 0; x < doom_w; x++) {
-                uint32_t col = DG_ScreenBuffer[y * doom_w + x];
-                /* Skip black/transp if needed? No, Doom is opaque. */
-                wm_fill_rect(win_doom, (rect_t){start_x + x*scale, start_y + y*scale, scale, scale}, col);
-            }
-        }
-    }
+    wm_print_at(win_doom, 20, 20, "DOOM Engine no encontrado.");
 }
 
 
@@ -1027,10 +998,10 @@ static const char* parse_url_path(const char* url) {
     return "/";
 }
 
-int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
+/* int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
     (void)host; (void)path; (void)response_buf; (void)max_len;
     return -1;
-}
+} */ // Removed - implementation in raw_tcp.c
 
 static void system_net_dispatcher_task(void) {
     strlcpy(browser_status_text, "Network: Iniciando DHCP...", 64);
@@ -1478,9 +1449,11 @@ static void draw_global_status_bar(void) {
     omni_fill_gradient_v(0, 0, screen_w, bar_h, 0x0A0A0A, 0x050505);
     omni_fill_rect(0, bar_h - 1, screen_w, 1, 0x1A1A1A);
 
-    /* Left: System Branding + Pulse */
+    /* Left: System Branding / Hub Toggle Button */
     int blink = (timer_get_ticks() / 50) % 2;
-    omni_draw_string(NULL, 16, 8, "eterOS", 0xFFFFFF, 0x050505);
+    uint32_t logo_col = hub_active ? FLUX_ACCENT_CYAN : 0xFFFFFF;
+    omni_draw_string(NULL, 16, 8, "eterOS", logo_col, 0x050505);
+    /* Mini-indicator for Hub availability */
     omni_fill_rect(70, 14, 4, 4, blink ? FLUX_ACCENT_CYAN : 0x444444);
     
     /* System Stats (Cached) */
@@ -1609,40 +1582,7 @@ static void draw_browser_preview(int x, int y, int w, int h) {
 
 static void draw_doom_preview(int x, int y, int w, int h) {
     omni_fill_rect(x, y, w, h, 0x000000);
-
-    if (DG_ScreenBuffer) {
-        int doom_w = 320;
-        int doom_h = 200;
-
-        /* Scale down to fit w, h */
-        /* Sample every N pixels */
-        int skip_x = doom_w / w;
-        int skip_y = doom_h / h;
-        if (skip_x < 1) skip_x = 1;
-        if (skip_y < 1) skip_y = 1;
-
-        /* Only draw header-safe area? No, draw card content */
-        /* Card content starts at y+26? flux_draw_card handles decoration. */
-        /* This function is called for "Live Content". */
-        /* Let's draw in the content area. flux_draw_card passes x,y,w,h of the card. */
-        /* We should offset. But wait, draw_term_preview uses x,y,w,h directly but adds offsets. */
-
-        int start_y = y + 40;
-        int draw_h = h - 50;
-
-        for (int py = 0; py < draw_h; py++) {
-            for (int px = 0; px < w - 20; px++) {
-                int sx = px * skip_x;
-                int sy = py * skip_y;
-                if (sx < doom_w && sy < doom_h) {
-                    uint32_t col = DG_ScreenBuffer[sy * doom_w + sx];
-                    omni_draw_pixel(x + 10 + px, start_y + py, col);
-                }
-            }
-        }
-    } else {
-        omni_draw_string(NULL, x + 20, y + 60, "Doom Loading...", 0xCC0000, 0x000000);
-    }
+    omni_draw_string(NULL, x + 20, y + 60, "Doom (No Engine)", 0xCC0000, 0x000000);
 }
 
 static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32_t accent, flux_node_id_t node) {
@@ -1941,6 +1881,24 @@ static void handle_flux_click(void) {
     if (screen_w == 0) screen_w = 1024;
     if (screen_h == 0) screen_h = 768;
 
+    /* Global Hub Toggle (Top Left Logo) */
+    if (mouse_y < 32 && mouse_x < 100) {
+        hub_active = !hub_active;
+        if (hub_active) hub_input[0] = 0;
+        return;
+    }
+
+    if (hub_active) {
+        /* If clicking outside the hub, close it */
+        int w = 500; int h = 400;
+        int x = (screen_w - w) / 2;
+        int y = (screen_h - h) / 2;
+        if (mouse_x < x || mouse_x > x + w || mouse_y < y || mouse_y > y + h) {
+            hub_active = false;
+        }
+        return;
+    }
+
     if (current_zoom == FLUX_MACRO) {
         /* Hit testing Constellation Cards - 4x4 Grid */
         int card_w = 180;
@@ -2195,6 +2153,110 @@ static void draw_clock_content(window_t* win) {
 
 
 /* ========================================================================= */
+/* Flux Hub: UI & Interaction                                                */
+/* ========================================================================= */
+
+static void draw_flux_hub(void) {
+    if (!hub_active) return;
+    
+    uint32_t sw = omni_get_width(); if (sw == 0) sw = 1024;
+    uint32_t sh = omni_get_height(); if (sh == 0) sh = 768;
+    
+    int w = 500;
+    int h = 320;
+    int x = (sw - w) / 2;
+    int y = (sh - h) / 2;
+    
+    /* 1. Backdrop Glow */
+    omni_fill_rect_alpha(x - 5, y - 5, w + 10, h + 10, FLUX_ACCENT_CYAN, 0x40);
+    
+    /* 2. Glass Panel */
+    omni_fill_rect_alpha(x, y, w, h, 0x101010, 0xF8);
+    omni_fill_rect(x, y, w, 1, 0x444444); /* Top Highlight */
+    
+    /* 3. Header */
+    omni_draw_string(NULL, x + 20, y + 20, "FLUX HUB", FLUX_TEXT_SECONDARY, 0x101010);
+    
+    /* 4. Search Input */
+    int ix = x + 20;
+    int iy = y + 45;
+    int iw = w - 40;
+    omni_fill_rect(ix, iy, iw, 35, 0x202020);
+    if (strlen(hub_input) == 0) {
+        omni_draw_string(NULL, ix + 10, iy + 10, "Escribe para buscar o ejecutar...", 0x555555, 0x202020);
+    } else {
+        omni_draw_string(NULL, ix + 10, iy + 10, hub_input, 0xFFFFFF, 0x202020);
+    }
+    
+    /* Cursor */
+    if ((timer_get_ticks() / 30) % 2 == 0) {
+        int cx = ix + 10 + strlen(hub_input) * 8;
+        omni_fill_rect(cx, iy + 10, 2, 16, FLUX_ACCENT_CYAN);
+    }
+
+    /* 5. Filtered List */
+    int list_y = iy + 50;
+    int match_count = 0;
+    for (int i = 0; i < NODE_COUNT; i++) {
+        if (match_count >= 8) break;
+        
+        bool match = (strlen(hub_input) == 0);
+        if (!match) {
+            /* Case-insensitive simple match */
+            if (flux_strstr(FLUX_APPS[i].title, hub_input)) match = true;
+        }
+
+        if (match) {
+            uint32_t text_col = (match_count == 0 && strlen(hub_input) > 0) ? FLUX_ACCENT_CYAN : 0xAAAAAA;
+            omni_draw_string(NULL, ix + 15, list_y + (match_count * 22), FLUX_APPS[i].title, text_col, 0x101010);
+            match_count++;
+        }
+    }
+    
+    if (match_count == 0 && strlen(hub_input) > 0) {
+        omni_draw_string(NULL, ix + 15, list_y, "Enter: Ejecutar como comando del sistema", FLUX_ACCENT_AMBER, 0x101010);
+    }
+}
+
+static void handle_hub_input(char c) {
+    if (c == 27) { /* ESC */
+        hub_active = false;
+        return;
+    }
+    
+    if (c == '\n') {
+        /* 1. Try to find matching app */
+        for (int i = 0; i < NODE_COUNT; i++) {
+            if (flux_strstr(FLUX_APPS[i].title, hub_input)) {
+                flux_launch_space((flux_node_id_t)i);
+                hub_active = false;
+                return;
+            }
+        }
+        
+        /* 2. Fallback: Execute as Shell Command */
+        if (strlen(hub_input) > 0) {
+            extern int shell_exec(char* cmd);
+            shell_exec(hub_input);
+            flux_notify("Terminal", "Comando ejecutado", FLUX_ACCENT_CYAN);
+        }
+        hub_active = false;
+        return;
+    }
+    
+    if (c == '\b') {
+        int len = strlen(hub_input);
+        if (len > 0) hub_input[len - 1] = 0;
+    } else if (c >= 32 && c <= 126) {
+        int len = strlen(hub_input);
+        if (len < 63) {
+            hub_input[len] = c;
+            hub_input[len + 1] = 0;
+        }
+    }
+}
+
+/* ========================================================================= */
 /* UI Event Queue (Reactive Input System)                                    */
 /* ========================================================================= */
 
@@ -2361,12 +2423,16 @@ void gui_demo_run(void) {
 
                  /* Global Navigation Hotkeys */
                  if (c == 27) { /* ESC */
-                     if (current_zoom == FLUX_MACRO) {
+                     if (hub_active) {
+                         hub_active = false;
+                     } else if (current_zoom == FLUX_MACRO) {
                          desktop_running = false;
                      } else {
                          target_zoom = FLUX_MACRO;
                          flux_set_zoom(FLUX_MACRO, NODE_TERMINAL);
                      }
+                 } else if (hub_active) {
+                     handle_hub_input(c);
                  } else {
                      /* Browser Input Intercept (Special Case) */
                      if (current_zoom == FLUX_FOCUS && focused_space == win_browser && browser_url_active) {
@@ -2408,9 +2474,9 @@ void gui_demo_run(void) {
                              }
                          }
                          /* Pass input to Doom if focused */
-                         if (current_zoom == FLUX_FOCUS && zooming_node == NODE_DOOM) {
+                         /* if (current_zoom == FLUX_FOCUS && zooming_node == NODE_DOOM) {
                              doom_handle_input((int)c, 1);
-                         }
+                         } */
                      }
                 }
             }
@@ -2444,6 +2510,9 @@ void gui_demo_run(void) {
         
         /* Click Ripple Effect */
         draw_ripple_effect();
+
+        /* Flux Hub Overlay (Modal) */
+        draw_flux_hub();
 
         /* Cursor: Neural Orb (Reactive) */
         uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
