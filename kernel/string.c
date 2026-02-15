@@ -152,7 +152,24 @@ void* memmove(void* dest, const void* src, size_t n) {
 int memcmp(const void* s1, const void* s2, size_t n) {
     const uint8_t* a = (const uint8_t*)s1;
     const uint8_t* b = (const uint8_t*)s2;
-    
+
+    /*
+     * Optimization: Compare 8 bytes at a time.
+     * We use a typedef with __may_alias__ to respect strict aliasing rules,
+     * and __aligned__(1) to allow unaligned access without undefined behavior.
+     */
+    typedef uint64_t __attribute__((__may_alias__, __aligned__(1))) aliased_uint64_t;
+
+    while (n >= 8) {
+        if (*(const aliased_uint64_t*)a != *(const aliased_uint64_t*)b) {
+            /* Difference found within this block. Fall back to byte-wise to find exact byte. */
+            break;
+        }
+        a += 8;
+        b += 8;
+        n -= 8;
+    }
+
     while (n--) {
         if (*a != *b) {
             return *a - *b;
