@@ -12,12 +12,12 @@ syscall_entry:
     swapgs
 
     ; 2. Save User Stack Pointer temporarily in per-cpu struct (user_stack_scratch)
-    ; include/cpu.h: offsetof(cpu_info_t, user_stack_scratch) = 48 (0x30)
-    mov [gs:48], rsp
+    ; include/cpu.h: offsetof(cpu_info_t, user_stack_scratch) = 56 (0x38)
+    mov [gs:56], rsp
 
     ; 3. Load Kernel Stack Pointer from per-cpu struct (kernel_stack_top)
-    ; include/cpu.h: offsetof(cpu_info_t, kernel_stack_top) = 40 (0x28)
-    mov rsp, [gs:40]
+    ; include/cpu.h: offsetof(cpu_info_t, kernel_stack_top) = 48 (0x30)
+    mov rsp, [gs:48]
 
     ; DEBUG: Print '!' to serial (Now safe on Kernel Stack)
     push rax
@@ -63,7 +63,7 @@ syscall_entry:
     pop rax     ; Restore RAX (return value)
 
     ; 7. Restore User Stack (user_stack_scratch)
-    mov rsp, [gs:48]
+    mov rsp, [gs:56]
 
     ; 8. Swap GS back
     swapgs
