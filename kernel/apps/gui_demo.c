@@ -2065,7 +2065,7 @@ void gui_demo_run(void) {
         /* --- 1. POLL KEYBOARD DRIVER --- */
         while (keyboard_has_input()) {
             char c = keyboard_getchar();
-            ui_event_t evt;
+            ui_event_t evt = {0};
             evt.type = UI_EVENT_KEY_PRESS;
             evt.key = c;
             ui_push_event(evt);

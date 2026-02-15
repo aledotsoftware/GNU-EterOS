@@ -247,6 +247,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\fs\procfs.c",
     "$KERNEL_DIR\ui\image.c",
     "$KERNEL_DIR\ui\upng.c",
+    "$KERNEL_DIR\ui\omni.c",
     "$KERNEL_DIR\drivers\disk\partition.c",
     "$KERNEL_DIR\fs\elf.c"
 )
