@@ -27,6 +27,7 @@
 
 #include <net/e1000.h>
 #include <acpi.h>
+#include <apic.h>
 
 /* Compatibility for legacy apps */
 extern int network_ready;
