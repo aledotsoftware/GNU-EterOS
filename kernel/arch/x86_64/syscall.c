@@ -20,8 +20,7 @@
 
 extern void syscall_entry(void);
 
-/* Definition of per-cpu data */
-per_cpu_t per_cpu_data;
+/* Definition of per-cpu data removed - handled by smp.c */
 
 void syscall_init(void) {
     serial_write_string("[SYSCALL] Initializing MSRs for x86_64...\n");
@@ -43,12 +42,10 @@ void syscall_init(void) {
     /* 4. SFMASK: RFLAGS mask (clear IF 0x200, TF 0x100) */
     wrmsr(MSR_SFMASK, 0x200);
 
-    /* 5. GS_BASE: Point to Per-CPU data for swapgs */
-    wrmsr(MSR_GS_BASE, (uint64_t)&per_cpu_data);
-    wrmsr(MSR_KERNEL_GS_BASE, 0);
-
-    /* Initialize stack for the current kernel thread (Task 0) */
-    per_cpu_data.kernel_stack = 0x90000; 
+    /* 5. GS_BASE: Initialization moved to cpu_init_bsp() / cpu_init_ap() in smp.c */
+    /* wrmsr(MSR_GS_BASE, ...); */
+    
+    /* Initialize stack: handled by task.c / smp.c */ 
 
     serial_write_string("[SYSCALL] x86_64 mechanism enabled.\n");
 }
