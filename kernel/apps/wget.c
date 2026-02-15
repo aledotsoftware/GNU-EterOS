@@ -9,7 +9,7 @@
  * éterOS - wget using Native Socket API
  */
 
-static int parse_url(const char* url, char* host, size_t host_size, char* path, size_t path_size) {
+static void parse_url(const char* url, char* host, size_t host_size, char* path, size_t path_size) {
     if (strncmp(url, "http://", 7) == 0) {
         url += 7;
     }
@@ -18,21 +18,14 @@ static int parse_url(const char* url, char* host, size_t host_size, char* path, 
     if (slash) {
         size_t host_len = slash - url;
         if (host_len >= host_size) {
-            return -1;
+            host_len = host_size - 1;
         }
         memcpy(host, url, host_len);
         host[host_len] = '\0';
-
-        if (strlcpy(path, slash, path_size) >= path_size) {
-            return -1;
-        }
+        strlcpy(path, slash, path_size);
     } else {
-        if (strlcpy(host, url, host_size) >= host_size) {
-            return -1;
-        }
-        if (strlcpy(path, "/", path_size) >= path_size) {
-            return -1;
-        }
+        strlcpy(host, url, host_size);
+        strlcpy(path, "/", path_size);
     }
     return 0;
 }
@@ -54,11 +47,7 @@ static uint32_t ip_aton(const char* cp) {
 void wget_run(const char* url_in) {
     char host[256];
     char path[256];
-
-    if (parse_url(url_in, host, sizeof(host), path, sizeof(path)) != 0) {
-        terminal_write_string("[WGET] Error: URL too long (host or path exceeds buffer limit).\n");
-        return;
-    }
+    parse_url(url_in, host, sizeof(host), path, sizeof(path));
     
     terminal_write_string("[WGET] Host: ");
     terminal_write_string(host);
