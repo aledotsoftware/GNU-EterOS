@@ -160,6 +160,22 @@ void omni_fill_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) 
 
     if (omni_bpp == 32) {
         uint32_t* row = omni_fb + (y * omni_pitch_div4) + x;
+
+        /* Optimization: Coalesce contiguous memory writes (e.g. Full Screen Clear) */
+        if ((uint32_t)w == omni_pitch_div4) {
+            memset32(row, color, (size_t)w * h);
+            return;
+        }
+
+        /* Optimization: Avoid memset overhead for vertical lines (e.g. Grid/UI borders) */
+        if (w == 1) {
+            for (int i = 0; i < h; i++) {
+                *row = color;
+                row += omni_pitch_div4;
+            }
+            return;
+        }
+
         for (int i = 0; i < h; i++) {
             memset32(row, color, w);
             row += omni_pitch_div4;
