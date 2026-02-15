@@ -392,6 +392,43 @@ function Invoke-KernelBuild {
     Write-Step "OK" "Kernel: $size bytes"
 }
 
+
+function Invoke-UserspaceBuild {
+    Write-Step "CC" "Compilando Userspace (libc + test.elf)..."
+
+    $userDir = "userspace"
+    $libcSrc = "$userDir\libc\src"
+    $libcObjDir = "$BUILD_DIR\userspace\libc"
+    $initrdRoot = "initrd_root"
+
+    if (!(Test-Path $libcObjDir)) { New-Item -ItemType Directory -Force -Path $libcObjDir | Out-Null }
+    if (!(Test-Path $initrdRoot)) { New-Item -ItemType Directory -Force -Path $initrdRoot | Out-Null }
+
+
+    # libc objects
+    $libcObjs = @()
+    $libcSources = Get-ChildItem "$libcSrc\*.c"
+    foreach ($src in $libcSources) {
+        $obj = "$libcObjDir\$($src.Name -replace '\.c$', '.o')"
+        $libcObjs += $obj
+        # Write-Step "CC" "libc/$($src.Name)"
+        & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $src.FullName -o $obj
+        if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar libc ($($src.Name))"; exit 1 }
+    }
+
+    # test.elf
+    $testSrc = "$userDir\test.c"
+    $testObj = "$BUILD_DIR\userspace\test.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $testSrc -o $testObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test.c"; exit 1 }
+
+    $testElf = "$initrdRoot\test.elf"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testElf $libcObjs $testObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al enlazar test.elf"; exit 1 }
+
+    Write-Step "OK" "Userspace construido: $testElf"
+}
+
 function Invoke-InitrdBuild {
     $initrdBin = "$BUILD_DIR\initrd.bin"
     $initrdSrc = "initrd_root"
@@ -526,6 +563,7 @@ function Invoke-PxeBuild {
     
     # 2. Asegurar que tenemos Kernel e Initrd construidos
     Invoke-KernelBuild
+    Invoke-UserspaceBuild
     Invoke-InitrdBuild
     
     # 3. Ensamblar la imagen monolitica (igual que Invoke-ImageBuild)
@@ -562,6 +600,9 @@ function Invoke-UsbBuild {
     Write-Step "IMG" "Generando imagen USB HDD (32MB)..."
     Invoke-BootBuild
     Invoke-KernelBuild
+    Invoke-BootBuild
+    Invoke-KernelBuild
+    Invoke-UserspaceBuild
     Invoke-InitrdBuild
     
     # Tamaño fijo de 32MB para asegurar compatibilidad con Etcher/BIOS
@@ -607,6 +648,9 @@ function Invoke-IsoBuild {
     # Asegurar que tenemos la imagen base
     Invoke-BootBuild
     Invoke-KernelBuild
+    Invoke-BootBuild
+    Invoke-KernelBuild
+    Invoke-UserspaceBuild
     Invoke-InitrdBuild
     Invoke-ImageBuild
     
@@ -818,6 +862,7 @@ switch ($Target) {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-UserspaceBuild
         Invoke-InitrdBuild
         Invoke-ImageBuild
         Invoke-VdiBuild
@@ -852,12 +897,16 @@ switch ($Target) {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-UserspaceBuild
+        Invoke-InitrdBuild
         Invoke-ImageBuild
     }
     "run" {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-UserspaceBuild
+        Invoke-InitrdBuild
         Invoke-ImageBuild
         Invoke-QemuRun
     }
@@ -865,6 +914,8 @@ switch ($Target) {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-UserspaceBuild
+        Invoke-InitrdBuild
         Invoke-ImageBuild
         Invoke-QemuRun -NoGraphic $true
     }
@@ -872,6 +923,8 @@ switch ($Target) {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-UserspaceBuild
+        Invoke-InitrdBuild
         Invoke-ImageBuild
         Invoke-QemuRun -DebugMode $true
     }
@@ -879,6 +932,8 @@ switch ($Target) {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-UserspaceBuild
+        Invoke-InitrdBuild
         Invoke-ImageBuild
         Invoke-VdiBuild
     }
@@ -886,6 +941,8 @@ switch ($Target) {
         Initialize-BuildDirs
         Invoke-BootBuild
         Invoke-KernelBuild
+        Invoke-UserspaceBuild
+        Invoke-InitrdBuild
         Invoke-ImageBuild
         Invoke-VBoxRun
     }
