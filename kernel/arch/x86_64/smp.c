@@ -26,6 +26,9 @@ void cpu_init_bsp(void) {
     wrmsr(MSR_GS_BASE, (uint64_t)bsp);
     wrmsr(MSR_KERNEL_GS_BASE, (uint64_t)bsp); /* SwapGS fallback */
     
+    /* Configurar stack inicial del kernel (Boot Stack) */
+    bsp->kernel_stack_top = 0x90000; 
+    
     serial_write_string("[SMP] BSP (CPU 0) Initialized. GS_BASE set.\n");
     
     /* Verificar que get_current_cpu funciona */
