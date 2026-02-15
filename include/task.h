@@ -16,10 +16,16 @@
 /* ========================================================================= */
 /* Configuración                                                             */
 /* ========================================================================= */
-#define MAX_TASKS       32
+#define MAX_TASKS       256
 #define TASK_STACK_SIZE  32768   /* 32 KB por tarea (GUI requires more) */
 #define SCHEDULER_HZ     10    /* Switch cada 10 ticks (100ms a 100Hz PIT) */
 #define MAX_FD           16    /* Máximo de descriptores de archivo por tarea */
+
+/**
+ * Inicializa el scheduler para un Application Processor (AP).
+ * Crea una tarea idle específica para este núcleo.
+ */
+void task_init_ap(void);
 
 typedef struct file_descriptor {
     struct fs_node* node;
