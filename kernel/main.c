@@ -27,7 +27,7 @@
 #include <net/e1000.h>
 
 /* Compatibility for legacy apps */
-int network_ready = 0;
+extern int network_ready;
 
 
 /* Forward declarations for non-HAL kernel services */
