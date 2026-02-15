@@ -67,6 +67,9 @@ typedef struct task {
     uint64_t       brk;                     /* Program break (end of data segment) */
     uint64_t       fs_base;                 /* FS Segment Base (TLS) */
     uint64_t       gs_base;                 /* GS Segment Base (TLS) */
+    uint8_t        os_abi;                  /* ABI (0=SysV/Native, 3=Linux) */
+    uint64_t       user_rsp;                /* User Stack Pointer (saved during syscall) */
+    uint64_t       mmap_base;               /* Base address for mmap allocator */
 
     void           (*entry)(void);          /* Entry point for task_entry_wrapper */
 } task_t;
@@ -145,6 +148,13 @@ int task_get_max(void);
  * @return 0 si éxito, -1 si error o no encontrada.
  */
 int task_kill(uint32_t pid);
+
+/**
+ * Crea un duplicado del proceso actual (Fork).
+ * @param regs Puntero a struct syscall_regs (estado actual).
+ * @return PID del hijo al padre, 0 al hijo.
+ */
+int task_fork(void* regs);
 
 /**
  * Busca una tarea por su ID único.

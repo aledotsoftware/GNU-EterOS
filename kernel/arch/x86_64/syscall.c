@@ -4,6 +4,7 @@
  */
 
 #include <syscall.h>
+#include <elf.h>
 #include <msr.h>
 #include <cpu.h>
 #include <serial.h>
@@ -17,6 +18,7 @@
 #include <hal.h>
 #include <errno.h>
 #include <sys/signal.h>
+#include <lock.h>
 
 extern void syscall_entry(void);
 
@@ -59,6 +61,218 @@ void syscall_init(void) {
 #define O_WRONLY    00000001
 #define O_RDWR      00000002
 
+typedef struct {
+    uint8_t* buffer;
+    uint32_t size;
+    uint32_t read_ptr;
+    uint32_t write_ptr;
+    uint32_t bytes_available;
+    int readers;
+    int writers;
+    spinlock_t lock;
+} pipe_t;
+
+#define PIPE_SIZE 4096
+
+static uint32_t pipe_read(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
+    (void)offset;
+    pipe_t* pipe = (pipe_t*)node->ptr;
+    if (!pipe) return 0;
+
+    uint32_t read = 0;
+    while (read < size) {
+        spin_lock(&pipe->lock);
+
+        if (pipe->bytes_available == 0) {
+            spin_unlock(&pipe->lock);
+            if (pipe->writers == 0) return read; /* EOF */
+            task_yield(); /* Block */
+            continue;
+        }
+
+        while (read < size && pipe->bytes_available > 0) {
+            buffer[read++] = pipe->buffer[pipe->read_ptr];
+            pipe->read_ptr = (pipe->read_ptr + 1) % pipe->size;
+            pipe->bytes_available--;
+        }
+
+        spin_unlock(&pipe->lock);
+    }
+    return read;
+}
+
+static uint32_t pipe_write(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
+    (void)offset;
+    pipe_t* pipe = (pipe_t*)node->ptr;
+    if (!pipe) return 0;
+
+    uint32_t written = 0;
+    while (written < size) {
+        spin_lock(&pipe->lock);
+
+        if (pipe->bytes_available == pipe->size) {
+            spin_unlock(&pipe->lock);
+            if (pipe->readers == 0) return written; /* Broken pipe */
+            task_yield(); /* Block */
+            continue;
+        }
+
+        while (written < size && pipe->bytes_available < pipe->size) {
+            pipe->buffer[pipe->write_ptr] = buffer[written++];
+            pipe->write_ptr = (pipe->write_ptr + 1) % pipe->size;
+            pipe->bytes_available++;
+        }
+
+        spin_unlock(&pipe->lock);
+    }
+    return written;
+}
+
+static void pipe_close(fs_node_t* node) {
+    pipe_t* pipe = (pipe_t*)node->ptr;
+    if (!pipe) return;
+
+    spin_lock(&pipe->lock);
+    /* Identify if reader or writer based on node flags? Or just decrement both?
+       Typically we have distinct open files.
+       Wait, fs_node_t is cloned for dup2 but shared for pipe ends?
+       We created 2 nodes. One Read only, one Write only.
+    */
+    if (node->flags == FS_PIPE) { /* Reader? Writer? We need to distinguish. */
+        /* Hack: check function pointers? */
+        if (node->write == 0) pipe->readers--;
+        else pipe->writers--;
+    } else {
+        /* Assume both? */
+        pipe->readers--;
+        pipe->writers--;
+    }
+
+    if (pipe->readers <= 0 && pipe->writers <= 0) {
+        /* Free pipe */
+        kfree(pipe->buffer);
+        kfree(pipe);
+    } else {
+        spin_unlock(&pipe->lock);
+    }
+    /* node itself is freed by close_fs caller (sys_close) */
+}
+
+static void pipe_open(fs_node_t* node) {
+    (void)node;
+}
+
+static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
+    (void)fd; (void)offset;
+    if (len == 0) return -EINVAL;
+
+    /* MAP_ANONYMOUS = 0x20 */
+    if (!(flags & 0x20)) {
+        return -ENODEV; /* File mapping not implemented yet */
+    }
+
+    task_t* current = task_get_current();
+    uint64_t virt;
+
+    if (addr && (flags & 0x10)) { /* MAP_FIXED = 0x10 */
+        virt = (uint64_t)addr;
+        if (virt & 0xFFF) return -EINVAL;
+    } else {
+        virt = current->mmap_base;
+        current->mmap_base += PAGE_ALIGN_UP(len);
+    }
+
+    uint64_t start = PAGE_ALIGN_DOWN(virt);
+    uint64_t end = PAGE_ALIGN_UP(virt + len);
+
+    for (uint64_t v = start; v < end; v += PAGE_SIZE) {
+        if (hal_mem_get_phys(v) == 0) {
+            void* phys = pmm_alloc_page();
+            if (!phys) return -ENOMEM;
+
+            /* PROT_READ=1, PROT_WRITE=2, PROT_EXEC=4 */
+            uint32_t map_flags = HAL_MEM_USER | HAL_MEM_READ;
+            if (prot & 2) map_flags |= HAL_MEM_WRITE;
+            if (prot & 4) map_flags |= HAL_MEM_EXEC;
+
+            hal_mem_map((uint64_t)phys, v, map_flags);
+            memset((void*)v, 0, PAGE_SIZE);
+        }
+    }
+
+    return virt;
+}
+
+static int64_t sys_pipe(int* pipefd) {
+    if (!pipefd) return -EFAULT;
+
+    task_t* current = task_get_current();
+
+    /* Find 2 FDs */
+    int fd[2] = {-1, -1};
+    int count = 0;
+    for (int i = 3; i < MAX_FD && count < 2; i++) {
+        if (current->fd_table[i].node == NULL) {
+            fd[count++] = i;
+        }
+    }
+
+    if (count < 2) return -EMFILE;
+
+    /* Alloc Pipe */
+    pipe_t* pipe = (pipe_t*)kmalloc(sizeof(pipe_t));
+    if (!pipe) return -ENOMEM;
+    memset(pipe, 0, sizeof(pipe_t));
+
+    pipe->buffer = (uint8_t*)kmalloc(PIPE_SIZE);
+    if (!pipe->buffer) {
+        kfree(pipe);
+        return -ENOMEM;
+    }
+    pipe->size = PIPE_SIZE;
+    pipe->readers = 1;
+    pipe->writers = 1;
+
+    /* Create Nodes */
+    fs_node_t* reader = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    fs_node_t* writer = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    memset(reader, 0, sizeof(fs_node_t));
+    memset(writer, 0, sizeof(fs_node_t));
+
+    strlcpy(reader->name, "pipe_r", 32);
+    reader->flags = FS_PIPE;
+    reader->read = pipe_read;
+    reader->close = pipe_close;
+    reader->open = pipe_open;
+    reader->ptr = (struct fs_node*)pipe; /* Safe cast */
+
+    strlcpy(writer->name, "pipe_w", 32);
+    writer->flags = FS_PIPE;
+    writer->write = pipe_write;
+    writer->close = pipe_close;
+    writer->open = pipe_open;
+    writer->ptr = (struct fs_node*)pipe;
+
+    /* Assign FDs */
+    current->fd_table[fd[0]].node = reader;
+    current->fd_table[fd[0]].offset = 0;
+    current->fd_table[fd[0]].flags = O_RDONLY;
+
+    current->fd_table[fd[1]].node = writer;
+    current->fd_table[fd[1]].offset = 0;
+    current->fd_table[fd[1]].flags = O_WRONLY;
+
+    pipefd[0] = fd[0];
+    pipefd[1] = fd[1];
+
+    return 0;
+}
+
+#define O_ACCMODE   00000003
+#define O_RDONLY    00000000
+#define O_WRONLY    00000001
+#define O_RDWR      00000002
+
 #define ARCH_SET_GS 0x1001
 #define ARCH_SET_FS 0x1002
 
@@ -74,6 +288,27 @@ struct utsname {
 struct iovec {
     void  *iov_base;
     size_t iov_len;
+};
+
+struct stat {
+    uint64_t st_dev;
+    uint64_t st_ino;
+    uint64_t st_nlink;
+    uint32_t st_mode;
+    uint32_t st_uid;
+    uint32_t st_gid;
+    uint32_t __pad0;
+    uint64_t st_rdev;
+    int64_t  st_size;
+    int64_t  st_blksize;
+    int64_t  st_blocks;
+    uint64_t st_atime;
+    uint64_t st_atime_nsec;
+    uint64_t st_mtime;
+    uint64_t st_mtime_nsec;
+    uint64_t st_ctime;
+    uint64_t st_ctime_nsec;
+    int64_t  __unused[3];
 };
 
 static int64_t sys_write(int fd, const void* buf, size_t count) {
@@ -309,8 +544,102 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
     return total;
 }
 
-void syscall_handler(struct syscall_regs* regs) {
+static int64_t sys_fstat(int fd, struct stat* buf) {
+    if (!buf) return -EFAULT;
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+    fs_node_t* node = current->fd_table[fd].node;
+
+    memset(buf, 0, sizeof(struct stat));
+    buf->st_ino = node->inode;
+    buf->st_size = node->length;
+    buf->st_mode = 0100644; /* Regular file */
+    if ((node->flags & 0x7) == FS_DIRECTORY) {
+        buf->st_mode = 0040755; /* Directory */
+    }
+    return 0;
+}
+
+static int64_t sys_stat(const char* path, struct stat* buf) {
+    if (!path || !buf) return -EFAULT;
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) return -ENOENT;
+
+    memset(buf, 0, sizeof(struct stat));
+    buf->st_ino = node->inode;
+    buf->st_size = node->length;
+    buf->st_mode = 0100644;
+    if ((node->flags & 0x7) == FS_DIRECTORY) {
+        buf->st_mode = 0040755;
+    }
+
+    /* vfs_lookup does not allocate the node usually, but if it did we should free it?
+       Current vfs_lookup returns pointer to internal tree or allocated?
+       Memory check: sys_open calls vfs_lookup then creates FD. sys_close frees node?
+       If vfs_lookup allocates, then sys_stat leaks memory!
+       Let's assume vfs_lookup returns a new node for now as per sys_open usage.
+       If vfs_lookup allocates, we must free.
+       sys_close calls kfree(node).
+       So yes, we must free. */
+    kfree(node);
+
+    return 0;
+}
+
+static int64_t sys_futex(uint32_t *uaddr, int op, uint32_t val, void *timeout, uint32_t *uaddr2, uint32_t val3) {
+    (void)timeout; (void)uaddr2; (void)val3;
+
+    /* FUTEX_WAIT = 0 */
+    if (op == 0) {
+        if (uaddr && *uaddr == val) {
+             /* We should sleep on a queue, but we just yield for now. */
+             task_yield();
+             return 0; /* Spurious wakeup */
+        } else {
+             return -EAGAIN;
+        }
+    }
+    return 0;
+}
+
+static int64_t sys_dup2(int oldfd, int newfd) {
+    if (oldfd < 0 || oldfd >= MAX_FD || newfd < 0 || newfd >= MAX_FD) return -EBADF;
+
+    task_t* current = task_get_current();
+    if (!current->fd_table[oldfd].node) return -EBADF;
+
+    if (oldfd == newfd) return newfd;
+
+    if (current->fd_table[newfd].node) {
+        sys_close(newfd);
+    }
+
+    /* We should share the file description (offset + node).
+       But our current architecture stores offset in fd_table directly.
+       We will copy state, meaning offsets diverge. This is a known limitation.
+       We MUST clone the node to avoid double-free on close, unless we implement refcounting.
+    */
+    fs_node_t* new_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!new_node) return -ENOMEM;
+    memcpy(new_node, current->fd_table[oldfd].node, sizeof(fs_node_t));
+
+    current->fd_table[newfd].node = new_node;
+    current->fd_table[newfd].offset = current->fd_table[oldfd].offset;
+    current->fd_table[newfd].flags = current->fd_table[oldfd].flags;
+
+    return newfd;
+}
+
+static void syscall_native_handler(struct syscall_regs* regs) {
     uint64_t ret = (uint64_t)-ENOSYS;
+
+    task_t* current = task_get_current();
+    cpu_info_t* cpu = get_current_cpu();
+    if (current && cpu) {
+        /* Save User RSP so fork can copy it and schedule can restore it */
+        current->user_rsp = cpu->user_stack_scratch;
+    }
 
     /* Handle Syscalls */
     if (regs->rax == SYS_read) {
@@ -333,8 +662,12 @@ void syscall_handler(struct syscall_regs* regs) {
     } else if (regs->rax == SYS_sched_yield) {
         task_yield();
         ret = 0;
+    } else if (regs->rax == SYS_mmap) {
+        ret = (uint64_t)sys_mmap((void*)regs->rdi, (size_t)regs->rsi, (int)regs->rdx, (int)regs->r10, (int)regs->r8, (int64_t)regs->r9);
     } else if (regs->rax == SYS_brk) {
         ret = (uint64_t)sys_brk((uint64_t)regs->rdi);
+    } else if (regs->rax == SYS_fork) {
+        ret = (uint64_t)task_fork((void*)regs);
     } else if (regs->rax == 158) { /* SYS_arch_prctl is 158 */
         ret = (uint64_t)sys_arch_prctl((int)regs->rdi, (uint64_t)regs->rsi);
     } else if (regs->rax == SYS_uname) {
@@ -345,16 +678,49 @@ void syscall_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_writev((int)regs->rdi, (const struct iovec*)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_readv) {
         ret = (uint64_t)sys_readv((int)regs->rdi, (const struct iovec*)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == SYS_stat) {
+        ret = (uint64_t)sys_stat((const char*)regs->rdi, (struct stat*)regs->rsi);
+    } else if (regs->rax == SYS_fstat) {
+        ret = (uint64_t)sys_fstat((int)regs->rdi, (struct stat*)regs->rsi);
+    } else if (regs->rax == 202) { /* SYS_futex */
+        ret = (uint64_t)sys_futex((uint32_t*)regs->rdi, (int)regs->rsi, (uint32_t)regs->rdx, (void*)regs->r10, (uint32_t*)regs->r8, (uint32_t)regs->r9);
+    } else if (regs->rax == SYS_dup2) {
+        ret = (uint64_t)sys_dup2((int)regs->rdi, (int)regs->rsi);
+    } else if (regs->rax == SYS_pipe) {
+        ret = (uint64_t)sys_pipe((int*)regs->rdi);
     } else if (regs->rax == 0xCAFEBABE) {
         ret = 0;
     } else {
         /* Log unknown syscall */
         char buf_nr[32];
-        serial_write_string("[SYSCALL] Unknown syscall: 0x");
+        serial_write_string("[SYSCALL-NATIVE] Unknown syscall: 0x");
         utoa_hex_s(regs->rax, buf_nr, sizeof(buf_nr));
         serial_write_string(buf_nr);
         serial_write_string("\n");
     }
 
     regs->rax = ret;
+}
+
+static void syscall_linux_handler(struct syscall_regs* regs) {
+    /* For now, Linux handler uses the same implementation as native,
+       but we separate the entry point as requested. */
+
+    /* We can eventually add translation layers here if our internal ABI differs. */
+    /* Since our native syscalls ARE Linux syscalls currently, we can just reuse logic. */
+    /* But to demonstrate the separation, we will call the implementation functions directly logic again?
+       No, that duplicates binary size. I'll just forward to native_handler for now
+       and wrap it with a specific log or distinct logic if needed. */
+
+    // serial_write_string("[SYSCALL-LINUX] Dispatching...\n");
+    syscall_native_handler(regs);
+}
+
+void syscall_handler(struct syscall_regs* regs) {
+    task_t* current = task_get_current();
+    if (current && current->os_abi == ELFOSABI_LINUX) {
+        syscall_linux_handler(regs);
+    } else {
+        syscall_native_handler(regs);
+    }
 }

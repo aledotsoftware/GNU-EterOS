@@ -22,6 +22,7 @@
 #include "../../../include/string.h"
 #include "../../../include/timer.h"
 #include "../../../include/task.h"
+#include "../../../include/vmm.h"
 
 /* ========================================================================= */
 /* Tabla IDT (256 entradas × 16 bytes = 4 KB)                               */
@@ -105,6 +106,15 @@ static const char* exception_names[] = {
  * Handler genérico de excepción: muestra el error y detiene la CPU.
  */
 static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint64_t error_code) {
+    /* Check if Page Fault (14) */
+    if (vector == 14) {
+        uint64_t cr2;
+        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        if (vmm_handle_page_fault(cr2, error_code)) {
+            return; /* Handled */
+        }
+    }
+
     /* Check if exception happened in User Mode (CS & 3 == 3) */
     if ((frame->cs & 3) == 3) {
         serial_write_string("\n[EXCEPTION] User Mode Fault detected. Terminating task.\n");

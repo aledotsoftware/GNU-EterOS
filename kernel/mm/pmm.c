@@ -22,6 +22,9 @@ extern uint8_t _kernel_end;
 static uint8_t* pmm_bitmap = NULL;
 static uint64_t pmm_bitmap_size = 0; /* En bytes */
 
+/* Array de Reference Counts (1 byte por página) */
+static uint8_t* pmm_ref_counts = NULL;
+
 static uint64_t total_ram = 0;
 static uint64_t used_ram = 0;
 static uint64_t total_pages = 0;
@@ -135,10 +138,16 @@ void pmm_init(void) {
     pmm_bitmap_size = total_pages / 8;
     /* Asegurar que cubra todo (round up) */
     if (total_pages % 8) pmm_bitmap_size++;
+
+    /* Ubicar el RefCounts array después del bitmap (Alineado a 4KB) */
+    pmm_ref_counts = (uint8_t*)PAGE_ALIGN_UP((uint64_t)pmm_bitmap + pmm_bitmap_size);
     
     /* Inicializar bitmap: MARCAR TODO COMO USADO (1) por defecto */
     /* Luego liberaremos solo las regiones USABLE del mapa E820 */
     memset(pmm_bitmap, 0xFF, pmm_bitmap_size);
+    /* Inicializar refcounts: MARCAR TODO COMO USADO (1) por defecto */
+    memset(pmm_ref_counts, 1, total_pages);
+
     used_ram = total_ram; /* Temporalmente todo usado */
 
     /* 3. Procesar mapa E820 y liberar regiones usables */
@@ -154,9 +163,10 @@ void pmm_init(void) {
     /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel) */
     pmm_mark_region_used(0x0, 0x100000); 
 
-    /* b) Reservar explícitamente el espacio del Bitmap */
-    uint64_t pmm_end = (uint64_t)pmm_bitmap + pmm_bitmap_size;
+    /* b) Reservar explícitamente el espacio del Bitmap y RefCounts */
+    uint64_t pmm_end = (uint64_t)pmm_ref_counts + total_pages;
     pmm_mark_region_used((uint64_t)pmm_bitmap, pmm_bitmap_size);
+    pmm_mark_region_used((uint64_t)pmm_ref_counts, total_pages);
     
     /* c) Tablas de paginación del bootloader (0x70000-0x76000, ya dentro del 1MB) */
 
@@ -178,6 +188,7 @@ void* pmm_alloc_page(void) {
         if (!bitmap_test(i)) {
             /* Encontrado frame libre */
             bitmap_set(i);
+            if (pmm_ref_counts) pmm_ref_counts[i] = 1;
             used_ram += PAGE_SIZE;
             return (void*)(i * PAGE_SIZE);
         }
@@ -192,10 +203,42 @@ void pmm_free_page(void* addr) {
     
     if (page_idx >= total_pages) return;
     
+    if (pmm_ref_counts) {
+        if (pmm_ref_counts[page_idx] > 0) {
+            pmm_ref_counts[page_idx]--;
+        }
+        if (pmm_ref_counts[page_idx] > 0) {
+            /* Still referenced, do not free */
+            return;
+        }
+    }
+
     if (bitmap_test(page_idx)) {
         bitmap_unset(page_idx);
         used_ram -= PAGE_SIZE;
     }
+}
+
+void pmm_ref_page(void* addr) {
+    uint64_t page_idx = (uint64_t)addr / PAGE_SIZE;
+    if (page_idx >= total_pages) return;
+
+    if (pmm_ref_counts) {
+        /* Cap at 255 to prevent overflow */
+        if (pmm_ref_counts[page_idx] < 255) {
+            pmm_ref_counts[page_idx]++;
+        }
+    }
+}
+
+void pmm_unref_page(void* addr) {
+    pmm_free_page(addr);
+}
+
+uint8_t pmm_get_ref_count(void* addr) {
+    uint64_t page_idx = (uint64_t)addr / PAGE_SIZE;
+    if (page_idx >= total_pages) return 0;
+    return pmm_ref_counts ? pmm_ref_counts[page_idx] : 0;
 }
 
 uint64_t pmm_get_total_ram(void) { return total_ram; }

@@ -15,6 +15,10 @@ typedef uint64_t Elf64_Xword;
 
 /* ELF Header */
 #define EI_NIDENT 16
+#define EI_OSABI  7
+
+#define ELFOSABI_NONE  0
+#define ELFOSABI_LINUX 3
 
 typedef struct {
     unsigned char e_ident[EI_NIDENT];
