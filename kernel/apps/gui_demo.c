@@ -61,6 +61,9 @@ static int32_t mouse_x = 512;
 static int32_t mouse_y = 384;
 static bool    mouse_left_btn = false;
 
+/* Performance: Intelligent Redraw */
+static bool gui_needs_redraw = true;
+
 
 
 /* ========================================================================= */
@@ -2397,9 +2400,6 @@ void gui_demo_run(void) {
         }
         last_frame_ticks = current_ticks;
 
-        /* ⚡ OMNI v2.0: Begin frame - cache buffer pointer once */
-        omni_begin_frame();
-
         rect_t dirty = {0, 0, 1024, 768};
 
         /* --- 1. POLL KEYBOARD DRIVER --- */
@@ -2414,6 +2414,7 @@ void gui_demo_run(void) {
         /* --- 2. COMPOSITOR EVENT LOOP (Async Processing) --- */
         ui_event_t evt;
         while (ui_pop_event(&evt)) {
+            gui_needs_redraw = true; /* Any hardware event wakes up the UI */
             if (evt.type == UI_EVENT_MOUSE_PACKET) {
                 /* Update Mouse Position */
                 mouse_x += evt.dx;
@@ -2440,6 +2441,7 @@ void gui_demo_run(void) {
 
             } else if (evt.type == UI_EVENT_KEY_PRESS) {
                 char c = evt.key;
+                gui_needs_redraw = true; /* Key triggers redraw */
 
                  /* Global Navigation Hotkeys */
                  if (c == 27) { /* ESC */
@@ -2503,8 +2505,20 @@ void gui_demo_run(void) {
         }
 
         /* Update Logic */
+        if (target_zoom != current_zoom || zoom_progress > 0 || hub_active) {
+            gui_needs_redraw = true;
+        }
+        
         flux_update_zoom();
         
+        if (!gui_needs_redraw) {
+            task_sleep(10); /* ⚡ BOLT: Extreme power saving mode */
+            continue;
+        }
+
+        /* ⚡ OMNI v2.0: Begin frame - cache buffer pointer once */
+        omni_begin_frame();
+
         /* Capa 0: Deep Void (Premium Dark) */
         
         if ((int)current_zoom == -1) {
@@ -2512,6 +2526,9 @@ void gui_demo_run(void) {
         } else {
              omni_fill_rect(0, 0, omni_get_width(), omni_get_height(), 0x000000);
         }
+        
+        /* GUI state is now consistent with last events, reset for next tick */
+        gui_needs_redraw = false;
         
         if (current_zoom == FLUX_MACRO) {
             draw_constellation();
@@ -2552,22 +2569,23 @@ void gui_demo_run(void) {
             omni_fill_rect(mouse_x - 2, mouse_y - 2, 4, 4, cursor_col);
         }
         
-        /* Optimization: Flush only dirty regions during transition */
-        if ((int)current_zoom == -1) {
-            /* 1. Flush Animation Area */
-            framebuffer_flush_rect(dirty.x, dirty.y, dirty.w, dirty.h);
-            
-            /* 2. Flush Mouse Area (approx 40x40 around pointer) */
-            int mk_x = mouse_x - 20; if (mk_x < 0) mk_x = 0;
-            int mk_y = mouse_y - 20; if (mk_y < 0) mk_y = 0;
-            framebuffer_flush_rect(mk_x, mk_y, 40, 40);
-            
-            /* 3. Flush Status Bar (Assume top 40px and bottom 40px cover it) */
-            framebuffer_flush_rect(0, 0, 1024, 40);
-            framebuffer_flush_rect(0, 768-40, 1024, 40);
+        /* 🚀 EFFICIENCY OPTIMIZATION: Only flush what actually changed */
+        int32_t dx, dy, dw, dh;
+        omni_get_dirty_rect(&dx, &dy, &dw, &dh);
+        
+        /* Ensure the mouse cursor region is always included in the flush */
+        /* (since the cursor itself doesn't mark dirty in the draw logic usually) */
+        int mk_x = mouse_x - 10; if (mk_x < 0) mk_x = 0;
+        int mk_y = mouse_y - 10; if (mk_y < 0) mk_y = 0;
+        /* framebuffer_flush_rect handles merging if we call it twice, 
+           but here we just do one optimized flush or two small ones. */
+           
+        if (dw == 1024 && dh == 768) {
+            framebuffer_flush(); /* Full flush if screen was cleared */
         } else {
-            framebuffer_flush(); 
-        } 
+            framebuffer_flush_rect(dx, dy, dw, dh);
+            framebuffer_flush_rect(mk_x, mk_y, 20, 20); /* Flush mouse */
+        }
 
         /* Smoother loop: Unlocked framerate (Yield to scheduler) */
         task_yield(); 
