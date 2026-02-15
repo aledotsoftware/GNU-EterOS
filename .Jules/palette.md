@@ -13,3 +13,7 @@
 ## 2026-05-28 - [Invisible Information Layers]
 **Learning:** In space-constrained kernel UIs, tooltips on hover effectively declutter the persistent interface while keeping detailed information accessible. Using a simple "hover check -> render overlay" pattern is cheap and intuitive.
 **Action:** Consider implementing a generic `ui_tooltip(rect, text)` helper for future components.
+
+## 2026-05-29 - [Text Input Affordance]
+**Learning:** A text input without a cursor (caret) feels like a static label, confusing users about whether it's editable. A simple blinking vertical bar creates immediate affordance for typing.
+**Action:** Always include a visual cursor in focused text fields, even in minimal kernel GUIs.
