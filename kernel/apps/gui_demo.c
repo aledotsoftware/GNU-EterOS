@@ -1056,6 +1056,15 @@ static void draw_browser_content(void) {
     win_browser->bg_color = 0xFFFFFF;
     wm_print_at(win_browser, 20, 18, browser_url);
     
+    /* Cursor Blinking Logic */
+    if (browser_url_active) {
+        int cursor_x = 20 + (strlen(browser_url) * 8);
+        bool blink = (timer_get_ticks() / 30) % 2 == 0;
+        if (blink) {
+            wm_fill_rect(win_browser, (rect_t){cursor_x, 18, 2, 16}, 0x333333);
+        }
+    }
+
     /* Status Bar (Adequate Info) */
     wm_fill_rect(win_browser, (rect_t){0, h - 25, w, 25}, 0xDDDDDD);
     omni_draw_string(NULL, win_browser->bounds.x + 10, win_browser->bounds.y + TITLE_BAR_HEIGHT + h - 18,
