@@ -27,6 +27,7 @@ static void parse_url(const char* url, char* host, size_t host_size, char* path,
         strlcpy(host, url, host_size);
         strlcpy(path, "/", path_size);
     }
+    return 0;
 }
 
 static uint32_t ip_aton(const char* cp) {
