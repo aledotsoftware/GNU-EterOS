@@ -12,12 +12,12 @@ syscall_entry:
     swapgs
 
     ; 2. Save User Stack Pointer temporarily in per-cpu struct (user_stack_scratch)
-    ; include/cpu.h: offsetof(cpu_info_t, user_stack_scratch) = 40 (0x28)
-    mov [gs:40], rsp
+    ; include/cpu.h: offsetof(cpu_info_t, user_stack_scratch) = 48 (0x30)
+    mov [gs:48], rsp
 
     ; 3. Load Kernel Stack Pointer from per-cpu struct (kernel_stack_top)
-    ; include/cpu.h: offsetof(cpu_info_t, kernel_stack_top) = 32 (0x20)
-    mov rsp, [gs:32]
+    ; include/cpu.h: offsetof(cpu_info_t, kernel_stack_top) = 40 (0x28)
+    mov rsp, [gs:40]
 
     ; 4. Save Registers to match struct syscall_regs
     ; Struct: r11, rcx, rbp, rdi, rsi, rdx, r10, r8, r9, rax
@@ -54,7 +54,7 @@ syscall_entry:
     pop rax     ; Restore RAX (return value)
 
     ; 7. Restore User Stack (user_stack_scratch)
-    mov rsp, [gs:40]
+    mov rsp, [gs:48]
 
     ; 8. Swap GS back
     swapgs
