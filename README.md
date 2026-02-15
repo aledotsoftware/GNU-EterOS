@@ -27,12 +27,9 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 | Tier | Edición | Dispositivos | Arquitecturas | Memoria / Protección |
 |---|---|---|---|---|
 | **Tier 1** | éterOS-Micro | Aire acondicionado, sensores IoT, drones | ARM Cortex-M, AVR, RISC-V32, Xtensa | **No MMU** / MPU (Static) |
-| **Tier 2** | éterOS-Core | Tablets, phones, RPi, satélites | aarch64, RISC-V64 | **MMU** / Paging (4-Level) |
+| **Tier 2** | éterOS-Core | Tablets, phones, RPi, satélites | aarch64 (RK3566), RISC-V64 | **MMU** / Paging (4-Level) |
 | **Tier 3** | éterOS-Full | PCs, servidores, data centers | x86_64 | **MMU** / Ring 0-3 Protection |
 
-## 📂 Estructura del Proyecto
-
-```
 ## 📂 Estructura del Proyecto
 
 ```
@@ -53,7 +50,7 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 │   │   │   ├── syscall.c       # Syscalls (MSRs, STAR, LSTAR)
 │   │   │   ├── interrupts.asm  # Stubs de interrupción ASM
 │   │   │   └── user_mode.asm   # Context Switch Ring 0 <-> Ring 3
-│   │   ├── aarch64/            # 🚧 En Desarrollo (RPi, phones, satélites)
+│   │   ├── aarch64/            # 🚧 En Desarrollo (Soporte RK3566 inicial)
 │   │   ├── arm-cortex-m/       # 🚧 En Desarrollo (STM32, Pico, IoT)
 │   │   ├── riscv64/            # ⚠️ Implementación Preliminar (HAL, UART, PLIC, SBI)
 │   │   └── xtensa/             # 🚧 En Desarrollo (ESP32)
@@ -88,7 +85,7 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 │   │   ├── dhcp.c              # Cliente DHCP (Discover/Offer)
 │   │   ├── tcp.c               # Stack TCP minimalista
 │   │   ├── stack.c             # Logica de sockets y buffer
-│   │   └── lwip_port/          # Port del stack lwIP (TCP/IP) - En progreso
+│   │   └── lwip_port/          # Port del stack lwIP (TCP/IP) - lwIP 2.2.0 Estable
 │   ├── crypto/                 # Criptografía
 │   │   ├── sha256.c            # Hashing SHA-256
 │   │   └── ed25519.c           # Firmas EdDSA (Seguridad)
@@ -191,14 +188,14 @@ Dirección       | Contenido
 - [x] **Heap Dinámico:** `kmalloc()`, `kfree()`, `kcalloc()` con first-fit y coalescing (8 MB)
 - [x] **Estabilidad:** Bootloader corregido (Stage 2 expandido a 8 KB), PMM underflow fix, layout de imagen alineado
 
-### Fase 2: Drivers y E/S Esencial (En progreso)
+### Fase 2: Drivers y E/S Esencial ✅
 - [x] **Teclado PS/2 Mejorado:** Scancodes Set 1 + Extended (0xE0), flechas, Home/End/Delete/PgUp/PgDown
 - [x] **Optimizaciones de Rendimiento:** VGA Scroll (64-bit mov), Serial DMA-like Burst, Shell no-bloqueante
 - [x] **Shell con Historial:** Flecha ⬆️/⬇️ para navegar comandos anteriores (8 entradas)
 - [x] **Temporizador PIT:** 100 Hz, API de `uptime`, `timer_wait()` para delays
 - [x] **Comando `uptime`:** Muestra horas/minutos/segundos desde boot
 - [x] **Comando `sysinfo` mejorado:** RAM real (PMM), timer, uptime dinámico
-- [x] **Driver NIC (e1000):** Intel PRO/1000 con dirección MAC y escaneo PCI
+- [x] **Driver NIC (e1000):** Intel PRO/1000 NIC driver con dirección MAC y escaneo PCI
 - [x] **Cliente DHCP:** Discover/Offer básico para obtener IP
 - [x] **Driver de Video VBE/GOP:** Framebuffer de alta resolución (Linear Framebuffer)
 - [x] **Terminal Gráfica:** Logger en pantalla usando Framebuffer (sysmon, panics)
@@ -254,21 +251,19 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 
 
 
-### Fase 5: Entorno Gráfico (Flux UI & AetherGraphics)
+### Fase 5: Entorno Gráfico (Flux UI & AetherGraphics) ✅
 - [x] **Motor de Dibujo "Omni":** Primitivas 2D (líneas, rectángulos, fuentes) y **Decodificador PNG Nativo** para iconos y assets (`kernel/ui/upng.c`)
 - [x] **Double Buffering Activo:** Renderizado libre de parpadeo con composicion en RAM antes de flush (`kernel/ui/image.c`)
-- [~] **Event Loop Reactivo:** Sistema de despacho de mensajes (Mouse + Teclado) dirigido a la ventana focalizada con soporte para gestos.
+- [x] **Event Loop Reactivo:** Sistema de despacho de mensajes (Mouse + Teclado) dirigido a la ventana focalizada.
 - [x] **Compositor de Ventanas:** Gestión de apilamiento (Z-order) y transparencia alfa básica en el kernel (`kernel/ui/window.c`)
-- [x] **Flux UI Experience:** Entorno táctil/estilizado con animaciones de zoom, tarjetas flotantes y multitarea fluida.
-- [x] **Flux Widgets Library:** Componentes interactivos: Botones, Barras, Inputs.
-- [x] **Navegador Eter:** Aplicación demo de red.
-- [x] **Aplicaciones Nativas:**
-    - `gui_demo.c`: Demo técnica de multitarea y UI.
-    - `santitravel.c`: Juego de texto portado.
-    - `sysmon.c`: Monitor de recursos del sistema.
-    - `wget.c`: Utilidad de descarga.
-- [] ** Introducir la terminal en el entorno grafico**
-- [x] ** Introducir el navegador en el entorno grafico**
+- [x] **Flux UI Experience:** Entorno táctil/estilizado con 15+ aplicaciones integradas:
+    - 📟 **Terminal Flux:** Integrada con soporte completo para comandos (`ls`, `ps`, `sysinfo`).
+    - 📁 **Monitor de Sistema:** Gestión visual de procesos y recursos.
+    - 🛠️ **Admin. de Dispositivos:** Inventario de hardware (PCI, RK3566/x86_64).
+    - 🎮 **SantiTravel:** El legendario juego de aventuras portado a la GUI.
+    - 🎨 **Creative Suite:** Aplicaciones de Lienzo (Paint), Notas y Galería.
+    - 🌐 **Navegador Eter:** Acceso a red con soporte lwIP.
+    - 🔧 **Utilidades:** Calculadora, Reloj, Clima y Ajustes del sistema.
 
 
 ### Fase 5.1: Optimizacion de la interfaz grafica y aplicaciones
