@@ -31,6 +31,7 @@
 #include <rtc.h>
 #include <fs/initrd.h>
 #include <syscall.h>
+#include <hal.h>
 
 extern int task_get_cpu_load(void);
 extern int task_kill(uint32_t pid);
@@ -52,7 +53,6 @@ static window_t* win_devman = NULL;
 static int32_t mouse_x = 512;
 static int32_t mouse_y = 384;
 static bool    mouse_left_btn = false;
-static bool    mouse_clicked = false;
 
 
 
@@ -961,57 +961,7 @@ static const char* parse_url_path(const char* url) {
     return "/";
 }
 
-static uint32_t parse_ip_simple(const char* str) {
-    uint8_t bytes[4] = {0,0,0,0};
-    int idx = 0;
-    while (*str && idx < 4) {
-        if (*str >= '0' && *str <= '9') {
-            bytes[idx] = bytes[idx] * 10 + (*str - '0');
-        } else if (*str == '.') {
-            idx++;
-        }
-        str++;
-    }
-    return *((uint32_t*)bytes);
-}
-
-static int native_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
-    uint32_t ip = parse_ip_simple(host);
-    if (ip == 0) return -1;
-
-    int s = net_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (s < 0) return -4;
-
-    struct sockaddr_in dest;
-    dest.sin_family = AF_INET;
-    dest.sin_port = htons(80);
-    dest.sin_addr = ip;
-
-    if (net_connect(s, &dest, sizeof(dest)) < 0) {
-        net_close(s);
-        return -2;
-    }
-
-    char req[512];
-    strlcpy(req, "GET ", 512);
-    strlcat(req, path, 512);
-    strlcat(req, " HTTP/1.0\r\nHost: ", 512);
-    strlcat(req, host, 512);
-    strlcat(req, "\r\nUser-Agent: EterWeb/1.0\r\n\r\n", 512);
-    
-    net_send(s, req, strlen(req), 0);
-    
-    int total = 0;
-    int len;
-    while ((len = net_recv(s, response_buf + total, max_len - total - 1, 0)) > 0) {
-        total += len;
-        if ((size_t)total >= max_len - 1) break;
-    }
-    response_buf[total] = 0;
-    
-    net_close(s);
-    return total;
-}
+extern int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len);
 
 static void system_net_dispatcher_task(void) {
     strlcpy(browser_status_text, "Network: Iniciando DHCP...", 64);
@@ -1047,7 +997,7 @@ static void system_net_dispatcher_task(void) {
     host_buf[i] = 0;
     
     const char* path = parse_url_path(browser_url);
-    int res = native_tcp_get(host_buf, path, proto_buffer, sizeof(proto_buffer));
+    int res = raw_tcp_get(host_buf, path, proto_buffer, sizeof(proto_buffer));
     
     if (res > 0) {
         strlcpy(browser_content, proto_buffer, sizeof(browser_content));
@@ -1987,19 +1937,71 @@ static void draw_clock_content(window_t* win) {
 
 
 
-static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
-    mouse_x += dx; mouse_y += dy;
-    if (mouse_x < 0) mouse_x = 0;
-    if (mouse_y < 0) mouse_y = 0;
-    if (mouse_x >= 1024) mouse_x = 1023;
-    if (mouse_y >= 768) mouse_y = 767;
-    
-    bool left_btn = (buttons & 1);
-    
-    if (left_btn && !mouse_left_btn) {
-        mouse_clicked = true;
+/* ========================================================================= */
+/* UI Event Queue (Reactive Input System)                                    */
+/* ========================================================================= */
+
+typedef enum {
+    UI_EVENT_MOUSE_PACKET,
+    UI_EVENT_KEY_PRESS
+} ui_event_type_t;
+
+typedef struct {
+    ui_event_type_t type;
+    int32_t dx;
+    int32_t dy;
+    uint8_t buttons;
+    char key;
+} ui_event_t;
+
+#define UI_EVENT_QUEUE_SIZE 128
+static ui_event_t ui_event_queue[UI_EVENT_QUEUE_SIZE];
+static volatile int ui_event_head = 0;
+static volatile int ui_event_tail = 0;
+
+/* Internal push logic */
+static void ui_queue_push_impl(ui_event_t evt) {
+    int next = (ui_event_head + 1) % UI_EVENT_QUEUE_SIZE;
+    if (next != ui_event_tail) {
+        ui_event_queue[ui_event_head] = evt;
+        ui_event_head = next;
     }
-    mouse_left_btn = left_btn;
+}
+
+/* Called from ISR (Mouse) - Interrupts assumed disabled */
+static void ui_push_event_isr(ui_event_t evt) {
+    ui_queue_push_impl(evt);
+}
+
+/* Called from Thread (Keyboard) - Protected */
+static void ui_push_event(ui_event_t evt) {
+    hal_interrupts_disable();
+    ui_queue_push_impl(evt);
+    hal_interrupts_enable();
+}
+
+/* Thread-safe pop (called from Main) */
+static bool ui_pop_event(ui_event_t* evt) {
+    bool result = false;
+    hal_interrupts_disable();
+    if (ui_event_head != ui_event_tail) {
+        *evt = ui_event_queue[ui_event_tail];
+        ui_event_tail = (ui_event_tail + 1) % UI_EVENT_QUEUE_SIZE;
+        result = true;
+    }
+    hal_interrupts_enable();
+    return result;
+}
+
+static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
+    ui_event_t evt;
+    evt.type = UI_EVENT_MOUSE_PACKET;
+    evt.dx = dx;
+    evt.dy = dy;
+    evt.buttons = buttons;
+    evt.key = 0;
+    
+    ui_push_event_isr(evt);
 }
 
 void gui_demo_run(void) {
@@ -2058,60 +2060,94 @@ void gui_demo_run(void) {
 
         rect_t dirty = {0, 0, 1024, 768};
 
-        /* Handle Mouse Click in main thread context */
-        if (mouse_clicked) {
-            mouse_clicked = false;
-            handle_flux_click();
+        /* --- 1. POLL KEYBOARD DRIVER --- */
+        while (keyboard_has_input()) {
+            char c = keyboard_getchar();
+            ui_event_t evt;
+            evt.type = UI_EVENT_KEY_PRESS;
+            evt.key = c;
+            ui_push_event(evt);
+        }
+
+        /* --- 2. COMPOSITOR EVENT LOOP (Async Processing) --- */
+        ui_event_t evt;
+        while (ui_pop_event(&evt)) {
+            if (evt.type == UI_EVENT_MOUSE_PACKET) {
+                /* Update Mouse Position */
+                mouse_x += evt.dx;
+                mouse_y += evt.dy;
+                /* Clamp */
+                if (mouse_x < 0) mouse_x = 0;
+                if (mouse_y < 0) mouse_y = 0;
+                if (mouse_x >= 1024) mouse_x = 1023;
+                if (mouse_y >= 768) mouse_y = 767;
+
+                /* Handle Click (Rising Edge) */
+                bool new_left = (evt.buttons & 1);
+                if (new_left && !mouse_left_btn) {
+                    /* Click Detected */
+                    handle_flux_click();
+                }
+                mouse_left_btn = new_left;
+
+            } else if (evt.type == UI_EVENT_KEY_PRESS) {
+                char c = evt.key;
+
+                 /* Global Navigation Hotkeys */
+                 if (c == 27) { /* ESC */
+                     if (current_zoom == FLUX_MACRO) {
+                         desktop_running = false;
+                     } else {
+                         target_zoom = FLUX_MACRO;
+                         flux_set_zoom(FLUX_MACRO, NODE_TERMINAL);
+                     }
+                 } else {
+                     /* Browser Input Intercept (Special Case) */
+                     if (current_zoom == FLUX_FOCUS && focused_space == win_browser && browser_url_active) {
+                        if (c == '\n') {
+                            browser_url_active = false;
+                            sys_net_fetch(browser_url);
+                        } else if (c == '\b') {
+                            int len = strlen(browser_url);
+                            if (len > 0) browser_url[len-1] = 0;
+                        } else {
+                            int len = strlen(browser_url);
+                            if (len < (int)sizeof(browser_url)-1) {
+                                browser_url[len] = c;
+                                browser_url[len+1] = 0;
+                            }
+                        }
+                     } else {
+                         /* Standard Navigation */
+                         bool typing_in_term = (current_zoom == FLUX_FOCUS && focused_term != NULL);
+
+                          if (!typing_in_term) {
+                              if ((unsigned char)c == KEY_UP) { /* UP Arrow */
+                                  if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
+                                      flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL);
+                                      flux_launch_space(NODE_TERMINAL);
+                                  }
+                              }
+                              else if ((unsigned char)c == KEY_DOWN) { /* DOWN Arrow */
+                                  if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
+                                      target_zoom = FLUX_MACRO;
+                                  }
+                              }
+                          }
+
+                         /* Pass input to terminal if focused */
+                         if (current_zoom == FLUX_FOCUS && focused_term != NULL) {
+                             if (focused_term->win && focused_term->win->active) {
+                                 term_handle_key(focused_term, c);
+                             }
+                         }
+                     }
+                }
+            }
         }
 
         /* Update Logic */
         flux_update_zoom();
-
-        /* ... keyboard input ... */
-        if (keyboard_has_input()) {
-             char c = keyboard_getchar();
-             
-             /* Global Navigation Hotkeys */
-             if (c == 27) { /* ESC */
-                 if (current_zoom == FLUX_MACRO) {
-                     desktop_running = false;
-                 } else {
-                     target_zoom = FLUX_MACRO;
-                     flux_set_zoom(FLUX_MACRO, NODE_TERMINAL); /* Node doesn't matter for macro */
-                 }
-                 /* continue; would skip the rest of the loop, including drawing! 
-                    We should just stop processing input for this frame or handle logic carefully. 
-                    Actually, 'continue' in a 'while' loop skips to next iteration. 
-                    So drawing is skipped. This causes flickering or black screen if held.
-                    Better to just not process move/term logic. */
-             } else {
-                 /* Infinite Zoom Controls (Arrows) - Only if NOT typing in terminal */
-                 bool typing_in_term = (current_zoom == FLUX_FOCUS && focused_term != NULL);
-                 
-                  if (!typing_in_term) {
-                      if ((unsigned char)c == KEY_UP) { /* UP Arrow */
-                          if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
-                              flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL); 
-                              flux_launch_space(NODE_TERMINAL); 
-                          }
-                      }
-                      else if ((unsigned char)c == KEY_DOWN) { /* DOWN Arrow */
-                          if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
-                              target_zoom = FLUX_MACRO;
-                          }
-                      }
-                  }
-                 
-                 /* Pass input to terminal if focused */
-                 if (current_zoom == FLUX_FOCUS && focused_term != NULL) {
-                     /* We assume focused_term is valid if set. 
-                        Ideally we check if focused_space matches focused_term->win */
-                     if (focused_term->win && focused_term->win->active) {
-                         term_handle_key(focused_term, c);
-                     }
-                 }
-            }
-        }
         
         /* Capa 0: Deep Void (Premium Dark) */
         
@@ -2170,28 +2206,6 @@ void gui_demo_run(void) {
         } else {
             framebuffer_flush(); 
         } 
-        /* Layer 4: Keyboard Input Dispatching */
-        extern bool keyboard_has_input(void);
-        extern char keyboard_getchar(void);
-        while (keyboard_has_input()) {
-            char c = keyboard_getchar();
-            if (current_zoom == FLUX_FOCUS && focused_space == win_browser && browser_url_active) {
-                if (c == '\n') {
-                    browser_url_active = false;
-                    sys_net_fetch(browser_url);
-                } else if (c == '\b') {
-                    int len = strlen(browser_url);
-                    if (len > 0) browser_url[len-1] = 0;
-                } else {
-                    int len = strlen(browser_url);
-                    if (len < (int)sizeof(browser_url)-1) {
-                        browser_url[len] = c;
-                        browser_url[len+1] = 0;
-                    }
-                }
-            } else if (current_zoom == FLUX_MACRO && c == 27) { /* ESC to reload shell? No, keep focus context */
-            }
-        }
 
         /* Smoother loop: Unlocked framerate (Yield to scheduler) */
         task_yield(); 
