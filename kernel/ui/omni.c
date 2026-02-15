@@ -117,24 +117,15 @@ static inline uint32_t _alpha_blend(uint32_t dst, uint32_t src, uint8_t alpha) {
     uint32_t inv_alpha = 255 - alpha;
 
     /* SWAR Optimization: Process R/B in parallel, then G */
-    /* 1. Mask R and B channels: 0x00RR00BB */
     uint32_t s_rb = src & 0xFF00FF;
     uint32_t d_rb = dst & 0xFF00FF;
-    
-    /* 2. Calculate blended R and B.
-       Mult by alpha/inv_alpha fits in 16 bits, so R doesn't overflow into B's space.
-       Result is 0xRRrr00BBbb (where lower byte is fraction) */
     uint32_t rb = (s_rb * alpha + d_rb * inv_alpha) >> 8;
     
-    /* 3. Mask G channel: 0x0000GG00 */
-    uint32_t s_g = src & 0xFF00;
-    uint32_t d_g = dst & 0xFF00;
-    
-    /* 4. Calculate blended G. Result is 0xGGgg */
+    uint32_t s_g = src & 0x00FF00;
+    uint32_t d_g = dst & 0x00FF00;
     uint32_t g = (s_g * alpha + d_g * inv_alpha) >> 8;
     
-    /* 5. Recombine, ensuring R/B mask cleans up any garbage in G slots */
-    return 0xFF000000 | (rb & 0xFF00FF) | (g & 0xFF00);
+    return 0xFF000000 | (rb & 0xFF00FF) | (g & 0x00FF00);
 }
 
 void omni_draw_pixel(int32_t x, int32_t y, uint32_t color) {
@@ -212,19 +203,21 @@ void omni_fill_rect_alpha(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
         /* Pre-calculate invariant source components for SWAR blending */
         uint32_t inv_alpha = 255 - alpha;
         uint32_t s_rb_a = (color & 0xFF00FF) * alpha;
-        uint32_t s_g_a  = (color & 0xFF00) * alpha;
+        uint32_t s_g_a  = (color & 0x00FF00) * alpha;
 
         for (int i = 0; i < h; i++) {
-            for (int j = 0; j < w; j++) {
-                uint32_t dst = row[j];
-
+            /* Optimized inner loop: use local pointer and unroll or let compiler optimize */
+            uint32_t* p = row;
+            int count = w;
+            while (count--) {
+                uint32_t dst = *p;
                 uint32_t d_rb = dst & 0xFF00FF;
-                uint32_t d_g  = dst & 0xFF00;
+                uint32_t d_g  = dst & 0x00FF00;
 
                 uint32_t rb = (s_rb_a + d_rb * inv_alpha) >> 8;
                 uint32_t g  = (s_g_a  + d_g  * inv_alpha) >> 8;
 
-                row[j] = 0xFF000000 | (rb & 0xFF00FF) | (g & 0xFF00);
+                *p++ = 0xFF000000 | (rb & 0xFF00FF) | (g & 0x00FF00);
             }
             row += omni_pitch_div4;
         }
