@@ -2162,59 +2162,79 @@ static void draw_flux_hub(void) {
     uint32_t sw = omni_get_width(); if (sw == 0) sw = 1024;
     uint32_t sh = omni_get_height(); if (sh == 0) sh = 768;
     
-    int w = 500;
-    int h = 320;
+    int w = 600;
+    int h = 450;
     int x = (sw - w) / 2;
     int y = (sh - h) / 2;
     
-    /* 1. Backdrop Glow */
-    omni_fill_rect_alpha(x - 5, y - 5, w + 10, h + 10, FLUX_ACCENT_CYAN, 0x40);
+    /* 1. Ultra-Glass Backdrop */
+    omni_fill_rect_alpha(x - 8, y - 8, w + 16, h + 16, 0x000000, 0x60);
+    omni_fill_rect_alpha(x, y, w, h, 0x080808, 0xF2);
+    omni_fill_rect(x, y, w, 1, 0x555555);
     
-    /* 2. Glass Panel */
-    omni_fill_rect_alpha(x, y, w, h, 0x101010, 0xF8);
-    omni_fill_rect(x, y, w, 1, 0x444444); /* Top Highlight */
+    /* 2. Header & Search Area */
+    omni_draw_string(NULL, x + 25, y + 25, "UNIVERSAL DOM EXPLORER", FLUX_ACCENT_CYAN, 0x080808);
     
-    /* 3. Header */
-    omni_draw_string(NULL, x + 20, y + 20, "FLUX HUB", FLUX_TEXT_SECONDARY, 0x101010);
-    
-    /* 4. Search Input */
-    int ix = x + 20;
-    int iy = y + 45;
-    int iw = w - 40;
-    omni_fill_rect(ix, iy, iw, 35, 0x202020);
+    int ix = x + 25;
+    int iy = y + 55;
+    int iw = w - 50;
+    omni_fill_rect(ix, iy, iw, 35, 0x151515);
     if (strlen(hub_input) == 0) {
-        omni_draw_string(NULL, ix + 10, iy + 10, "Escribe para buscar o ejecutar...", 0x555555, 0x202020);
+        omni_draw_string(NULL, ix + 10, iy + 10, "Busca apps, procesos o archivos...", 0x444444, 0x151515);
     } else {
-        omni_draw_string(NULL, ix + 10, iy + 10, hub_input, 0xFFFFFF, 0x202020);
+        omni_draw_string(NULL, ix + 10, iy + 10, hub_input, 0xFFFFFF, 0x151515);
     }
     
-    /* Cursor */
-    if ((timer_get_ticks() / 30) % 2 == 0) {
-        int cx = ix + 10 + strlen(hub_input) * 8;
-        omni_fill_rect(cx, iy + 10, 2, 16, FLUX_ACCENT_CYAN);
-    }
-
-    /* 5. Filtered List */
-    int list_y = iy + 50;
+    /* 3. Categorized Listing (The "DOM") */
+    int list_y = iy + 55;
+    int col_w = (w - 60) / 2;
+    
+    /* LEFT: Apps & System */
+    omni_draw_string(NULL, ix, list_y, "[ NODOS DE APLICACION ]", 0x666666, 0x080808);
     int match_count = 0;
     for (int i = 0; i < NODE_COUNT; i++) {
-        if (match_count >= 8) break;
-        
-        bool match = (strlen(hub_input) == 0);
-        if (!match) {
-            /* Case-insensitive simple match */
-            if (flux_strstr(FLUX_APPS[i].title, hub_input)) match = true;
-        }
-
-        if (match) {
-            uint32_t text_col = (match_count == 0 && strlen(hub_input) > 0) ? FLUX_ACCENT_CYAN : 0xAAAAAA;
-            omni_draw_string(NULL, ix + 15, list_y + (match_count * 22), FLUX_APPS[i].title, text_col, 0x101010);
+        if (match_count >= 6) break;
+        if (strlen(hub_input) == 0 || flux_strstr(FLUX_APPS[i].title, hub_input)) {
+            uint32_t col = (match_count == 0 && strlen(hub_input) > 0) ? FLUX_ACCENT_CYAN : FLUX_TEXT_SECONDARY;
+            omni_draw_string(NULL, ix + 10, list_y + 20 + (match_count * 20), FLUX_APPS[i].title, col, 0x080808);
             match_count++;
         }
     }
     
-    if (match_count == 0 && strlen(hub_input) > 0) {
-        omni_draw_string(NULL, ix + 15, list_y, "Enter: Ejecutar como comando del sistema", FLUX_ACCENT_AMBER, 0x101010);
+    /* RIGHT: Active Processes (The "Live DOM") */
+    int rx = ix + col_w + 30;
+    omni_draw_string(NULL, rx, list_y, "[ PROCESOS ACTIVOS ]", 0x666666, 0x080808);
+    int proc_count = 0;
+    for (int i = 0; i < 32; i++) {
+        task_t* t = task_get_by_id(i);
+        if (t && t->state != TASK_DEAD) {
+            if (proc_count >= 6) break;
+            char p_buf[32];
+            strlcpy(p_buf, t->name, 20);
+            strlcat(p_buf, " (RUN)", 32);
+            omni_draw_string(NULL, rx + 10, list_y + 20 + (proc_count * 20), p_buf, 0x88CC88, 0x080808);
+            proc_count++;
+        }
+    }
+    
+    /* BOTTOM: File System (The "Static DOM") */
+    int bx = ix;
+    int by = list_y + 160;
+    omni_draw_string(NULL, bx, by, "[ DISCO (DOM) ]", 0x666666, 0x080808);
+    
+    /* Simular listado de /initrd */
+    const char* files[] = {"test.elf", "logo.png", "hello.txt", "doom1.wad", "README"};
+    int fc = 0;
+    for (int i = 0; i < 5; i++) {
+        if (strlen(hub_input) == 0 || flux_strstr(files[i], hub_input)) {
+            if (fc >= 4) break;
+            omni_draw_string(NULL, bx + 10, by + 20 + (fc * 20), files[i], 0xAAAAAA, 0x080808);
+            fc++;
+        }
+    }
+    
+    if (match_count == 0 && fc == 0 && proc_count > 0 && strlen(hub_input) > 0) {
+        omni_draw_string(NULL, ix, by + 120, "CMD: Presiona Enter para ejecutar comando", FLUX_ACCENT_AMBER, 0x080808);
     }
 }
 
