@@ -13,6 +13,8 @@
 #include <keyboard.h>
 #include <fs/vfs.h>
 #include <mm.h>
+#include <errno.h>
+#include <sys/signal.h>
 
 extern void syscall_entry(void);
 
@@ -49,13 +51,131 @@ void syscall_init(void) {
     serial_write_string("[SYSCALL] x86_64 mechanism enabled.\n");
 }
 
+/* ========================================================================= */
+/* Syscall Implementations                                                   */
+/* ========================================================================= */
+
+static int64_t sys_write(int fd, const void* buf, size_t count) {
+    if (fd == 1 || fd == 2) {
+        /* Stdout / Stderr -> Serial + VGA */
+        const char* msg = (const char*)buf;
+        for(size_t i=0; i<count; i++) {
+            serial_putchar(msg[i]);
+            terminal_putchar(msg[i]);
+        }
+        return count;
+    }
+
+    /* File Descriptor Write */
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    uint32_t written = write_fs(current->fd_table[fd].node,
+                                current->fd_table[fd].offset,
+                                count,
+                                (uint8_t*)buf);
+    current->fd_table[fd].offset += written;
+    return written;
+}
+
+static int64_t sys_read(int fd, void* buf, size_t count) {
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    uint32_t read = read_fs(current->fd_table[fd].node,
+                            current->fd_table[fd].offset,
+                            count,
+                            (uint8_t*)buf);
+    current->fd_table[fd].offset += read;
+    return read;
+}
+
+static int64_t sys_open(const char* path, int flags, int mode) {
+    (void)flags; (void)mode;
+    task_t* current = task_get_current();
+
+    /* Find free FD */
+    int fd = -1;
+    for (int i = 3; i < MAX_FD; i++) { /* Start from 3 (0,1,2 reserved) */
+        if (current->fd_table[i].node == NULL) {
+            fd = i;
+            break;
+        }
+    }
+    if (fd == -1) return -EMFILE;
+
+    /* Lookup path */
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) return -ENOENT;
+
+    open_fs(node, 0, 0); /* flags not fully supported yet */
+
+    current->fd_table[fd].node = node;
+    current->fd_table[fd].offset = 0;
+    current->fd_table[fd].flags = flags;
+
+    return fd;
+}
+
+static int64_t sys_close(int fd) {
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    close_fs(current->fd_table[fd].node);
+
+    /* Free the node memory (vfs_lookup allocates it) */
+    kfree(current->fd_table[fd].node);
+    current->fd_table[fd].node = NULL;
+
+    return 0;
+}
+
+static int64_t sys_lseek(int fd, int64_t offset, int whence) {
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    /* SEEK_SET=0, SEEK_CUR=1, SEEK_END=2 */
+    if (whence == 0) {
+        current->fd_table[fd].offset = offset;
+    } else if (whence == 1) {
+        current->fd_table[fd].offset += offset;
+    } else if (whence == 2) {
+        current->fd_table[fd].offset = current->fd_table[fd].node->length + offset;
+    } else {
+        return -EINVAL;
+    }
+
+    return current->fd_table[fd].offset;
+}
+
+static int64_t sys_getpid(void) {
+    return task_get_current()->id;
+}
+
+static int64_t sys_kill(int pid, int sig) {
+    (void)sig; /* Signal handling mostly ignores sig type for now except termination */
+    if (pid <= 0) return -EINVAL;
+
+    /* Currently we only support termination-like behavior for kill */
+    if (task_kill((uint32_t)pid) == 0) {
+        return 0;
+    }
+    return -ESRCH;
+}
+
 void syscall_handler(struct syscall_regs* regs) {
     /* ULTRA DEBUG: Print immediately */
+    /*
     char buf_nr[32];
     serial_write_string("[SYSCALL] ENTRY NR=0x");
     utoa_hex_s(regs->rax, buf_nr, sizeof(buf_nr));
     serial_write_string(buf_nr);
     serial_write_string("\n");
+    */
 
     uint64_t ret = (uint64_t)-38; /* -ENOSYS */
 

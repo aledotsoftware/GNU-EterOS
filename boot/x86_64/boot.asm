@@ -23,7 +23,7 @@
 
 ; ---- Constantes Globales ----
 STAGE2_SECTORS      equ 16             ; Sectores de Stage 2 (8 KB)
-KERNEL_SECTORS      equ 256            ; Sectores del kernel (128 KB)
+KERNEL_SECTORS      equ 512            ; Sectores del kernel (256 KB)
 STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
 KERNEL_LOAD_ADDR    equ 0x10000         ; Dirección donde se carga el kernel
 STACK_TOP           equ 0x7C00          ; El stack crece hacia abajo

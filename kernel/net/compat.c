@@ -13,7 +13,57 @@
 #include "lwip/netif.h"
 #include "lwip/timeouts.h"
 #include "lwip/ip_addr.h"
+#include "lwip/dhcp.h"
+#include "netif/ethernet.h"
+#include "../lwip_port/ethernetif.h"
 #include <task.h>
+
+/* Global network state for legacy compatibility */
+volatile int network_ready = 0;
+uint32_t my_ip = 0;
+static struct netif main_netif;
+
+void net_init(void) {
+    serial_write_string("[NET] Initializing lwIP...\n");
+    lwip_init();
+
+    ip_addr_t ipaddr, netmask, gw;
+    IP4_ADDR(&ipaddr, 0,0,0,0);
+    IP4_ADDR(&netmask, 0,0,0,0);
+    IP4_ADDR(&gw, 0,0,0,0);
+
+    serial_write_string("[NET] Adding netif...\n");
+    /* Add network interface */
+    if (netif_add(&main_netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, ethernet_input) == NULL) {
+        serial_write_string("[NET] Failed to add netif\n");
+        return;
+    }
+
+    serial_write_string("[NET] Setting default/up...\n");
+    netif_set_default(&main_netif);
+    netif_set_up(&main_netif);
+
+    serial_write_string("[NET] Starting DHCP...\n");
+    /* Start DHCP */
+    dhcp_start(&main_netif);
+    serial_write_string("[NET] Init done.\n");
+}
+
+void net_poll(void) {
+    /* Poll the driver */
+    ethernetif_poll(&main_netif);
+
+    /* Handle lwIP timeouts */
+    sys_check_timeouts();
+
+    /* Update global status */
+    if (netif_is_up(&main_netif) && !ip_addr_isany(&main_netif.ip_addr)) {
+        my_ip = ip4_addr_get_u32(&main_netif.ip_addr);
+        network_ready = 1;
+    } else {
+        network_ready = 0;
+    }
+}
 
 /* State for blocking operations */
 typedef struct {

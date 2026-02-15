@@ -259,8 +259,8 @@ ifeq ($(ARCH), x86_64)
 	@# Escribir kernel después del bootloader
 	@# Stage 1 = 1 sector, Stage 2 = 16 sectores, kernel va en sector 17 (0-indexed seek)
 	dd if=$(KERNEL_BIN) of=$(OS_IMAGE) bs=512 seek=17 conv=notrunc 2>/dev/null
-	@# Escribir Initrd después del kernel (Sector 17 + 256 = 273)
-	dd if=$(INITRD_IMG) of=$(OS_IMAGE) bs=512 seek=273 conv=notrunc 2>/dev/null
+	@# Escribir Initrd después del kernel (Sector 17 + 512 = 529)
+	dd if=$(INITRD_IMG) of=$(OS_IMAGE) bs=512 seek=529 conv=notrunc 2>/dev/null
 	@echo "[IMG]  Imagen generada: $(OS_IMAGE) ($$(wc -c < $(OS_IMAGE)) bytes)"
 else
 	@echo "[IMG]  Generación de imagen para $(ARCH) no implementada."

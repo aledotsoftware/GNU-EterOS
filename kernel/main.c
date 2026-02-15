@@ -147,8 +147,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* Attempt to init E1000 (Generic Driver but requires PCI) */
     if (e1000_init(NULL) == 0) {
         hal_console_write("  [NET]  Hardware inicializado.\n");
-        init_network();
-        task_create("Network", network_task);
+        /* init_network(); */
+        /* task_create("Network", network_task); */
     } else {
         hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
         hal_console_write("         (El sistema continuara sin red)\n");

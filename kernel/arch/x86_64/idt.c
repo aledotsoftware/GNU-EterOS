@@ -105,6 +105,41 @@ static const char* exception_names[] = {
  * Handler genérico de excepción: muestra el error y detiene la CPU.
  */
 static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint64_t error_code) {
+    /* Check if exception happened in User Mode (CS & 3 == 3) */
+    if ((frame->cs & 3) == 3) {
+        serial_write_string("\n[EXCEPTION] User Mode Fault detected. Terminating task.\n");
+
+        char buf[32];
+        if (vector < NUM_EXCEPTION_NAMES) {
+            serial_write_string("    Reason: ");
+            serial_write_string(exception_names[vector]);
+            serial_write_string("\n");
+        }
+
+        serial_write_string("    RIP: 0x");
+        utoa_hex_s(frame->rip, buf, sizeof(buf));
+        serial_write_string(buf);
+        serial_write_string("\n");
+
+        /* Kill current task */
+        task_t* current = task_get_current();
+        if (current) {
+            serial_write_string("    Task PID: ");
+            itoa_s(current->id, buf, sizeof(buf), 10);
+            serial_write_string(buf);
+            serial_write_string("\n");
+
+            task_kill(current->id);
+            /* task_kill calls schedule() if killing self, so we shouldn't return here */
+        }
+
+        /* Just in case we return (e.g. error killing task), loop forever or schedule */
+        schedule();
+        for(;;) __asm__ volatile("hlt");
+        return;
+    }
+
+    /* Kernel Panic */
     terminal_write_colored("\n  [PANIC] ", VGA_COLOR_RED, VGA_COLOR_BLACK);
 
     if (vector < NUM_EXCEPTION_NAMES) {
