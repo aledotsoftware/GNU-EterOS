@@ -154,26 +154,34 @@ int memcmp(const void* s1, const void* s2, size_t n) {
     const uint8_t* b = (const uint8_t*)s2;
 
 #ifdef __x86_64__
-    /* Optimization: Compare 8 bytes at a time */
-    if (n >= 8) {
-        const uint64_t* a64 = (const uint64_t*)s1;
-        const uint64_t* b64 = (const uint64_t*)s2;
-
-        while (n >= 8) {
-            if (*a64 != *b64) {
-                /* Mismatch found, break to byte-wise comparison to find exact difference */
-                break;
-            }
-            a64++;
-            b64++;
-            n -= 8;
+    // Optimization for x86_64: Compare 8-byte blocks
+    // This significantly reduces the number of iterations for large blocks.
+    // We use uint64_t to compare 8 bytes at a time.
+    while (n >= 8) {
+        if (*(const uint64_t*)a != *(const uint64_t*)b) {
+            // If there is a difference, break the fast loop
+            // and let the byte-by-byte loop find the exact position
+            // to return the correct value (sign).
+            break;
         }
-
-        a = (const uint8_t*)a64;
-        b = (const uint8_t*)b64;
+        a += 8;
+        b += 8;
+        n -= 8;
     }
 #endif
     
+    /* Optimization: Compare 8 bytes at a time if pointers are aligned */
+    if (((uintptr_t)a & 7) == 0 && ((uintptr_t)b & 7) == 0) {
+        while (n >= 8) {
+            if (*(const uint64_t*)a != *(const uint64_t*)b) {
+                break;
+            }
+            a += 8;
+            b += 8;
+            n -= 8;
+        }
+    }
+
     while (n--) {
         if (*a != *b) {
             return *a - *b;
