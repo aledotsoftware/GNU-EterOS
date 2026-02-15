@@ -1402,6 +1402,9 @@ static void draw_santitravel_preview(int x, int y, int w, int h) {
 }
 
 void gui_draw_boot_logo(void) {
+    /* Ensure Omni Engine is initialized (FB cached) */
+    omni_init();
+
     uint32_t sw = omni_get_width();
     uint32_t sh = omni_get_height();
     if (sw == 0) sw = 1024;
