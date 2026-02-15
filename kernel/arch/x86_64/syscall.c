@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <sys/signal.h>
 #include <lock.h>
+#include <timer.h>
 
 extern void syscall_entry(void);
 
@@ -446,14 +447,32 @@ static int64_t sys_getpid(void) {
 }
 
 static int64_t sys_kill(int pid, int sig) {
-    (void)sig; /* Signal handling mostly ignores sig type for now except termination */
     if (pid <= 0) return -EINVAL;
-
-    /* Currently we only support termination-like behavior for kill */
-    if (task_kill((uint32_t)pid) == 0) {
-        return 0;
+    if (sig < 0 || sig > 31) return -EINVAL;
+    if (sig == 0) {
+        /* Signal 0: just check if process exists */
+        task_t* target = task_get_by_id((uint32_t)pid);
+        return target ? 0 : -ESRCH;
     }
-    return -ESRCH;
+
+    /* SIGKILL (9) and SIGSTOP (19): Cannot be caught or ignored */
+    if (sig == SIGKILL || sig == SIGTERM) {
+        if (task_kill((uint32_t)pid) == 0) {
+            serial_write_string("[SIGNAL] Delivered SIGKILL/SIGTERM to PID\n");
+            return 0;
+        }
+        return -ESRCH;
+    }
+
+    /* All other signals: queue as pending on target task */
+    task_t* target = task_get_by_id((uint32_t)pid);
+    if (!target) return -ESRCH;
+    if (target->state == TASK_DEAD) return -ESRCH;
+
+    /* Set the signal pending bit (if not masked) */
+    target->signal_pending |= (1u << sig);
+    serial_write_string("[SIGNAL] Queued signal on task\n");
+    return 0;
 }
 
 static int64_t sys_brk(uint64_t brk) {
@@ -631,6 +650,198 @@ static int64_t sys_dup2(int oldfd, int newfd) {
     return newfd;
 }
 
+/* ========================================================================= */
+/* Signal Syscalls                                                           */
+/* ========================================================================= */
+
+#define SA_RESTORER 0x04000000
+
+struct kernel_sigaction {
+    void     (*handler)(int);
+    uint64_t  flags;
+    void     (*restorer)(void);
+    uint64_t  mask;
+};
+
+static int64_t sys_rt_sigaction(int sig, const struct kernel_sigaction* act,
+                                struct kernel_sigaction* oldact, size_t sigsetsize) {
+    (void)sigsetsize;
+    if (sig < 1 || sig > 31) return -EINVAL;
+    /* SIGKILL and SIGSTOP cannot be caught */
+    if (sig == SIGKILL || sig == SIGSTOP) return -EINVAL;
+
+    task_t* current = task_get_current();
+
+    /* Return old action */
+    if (oldact) {
+        oldact->handler = current->signal_handlers[sig];
+        oldact->flags = 0;
+        oldact->restorer = 0;
+        oldact->mask = 0;
+    }
+
+    /* Install new action */
+    if (act) {
+        current->signal_handlers[sig] = act->handler;
+    }
+
+    return 0;
+}
+
+static int64_t sys_rt_sigprocmask(int how, const uint64_t* set, uint64_t* oldset, size_t sigsetsize) {
+    (void)sigsetsize;
+    task_t* current = task_get_current();
+
+    if (oldset) {
+        *oldset = current->signal_mask;
+    }
+
+    if (set) {
+        /* SIG_BLOCK=0, SIG_UNBLOCK=1, SIG_SETMASK=2 */
+        if (how == 0) {
+            current->signal_mask |= (uint32_t)*set;
+        } else if (how == 1) {
+            current->signal_mask &= ~(uint32_t)*set;
+        } else if (how == 2) {
+            current->signal_mask = (uint32_t)*set;
+        } else {
+            return -EINVAL;
+        }
+        /* SIGKILL and SIGSTOP can never be blocked */
+        current->signal_mask &= ~((1u << SIGKILL) | (1u << SIGSTOP));
+    }
+
+    return 0;
+}
+
+static int64_t sys_rt_sigreturn(void) {
+    /* Minimal stub - real implementation would restore signal frame */
+    return 0;
+}
+
+/* ========================================================================= */
+/* Additional POSIX Syscalls (musl libc support)                             */
+/* ========================================================================= */
+
+struct timespec {
+    int64_t tv_sec;
+    int64_t tv_nsec;
+};
+
+static int64_t sys_nanosleep(const struct timespec* req, struct timespec* rem) {
+    if (!req) return -EFAULT;
+
+    /* Convert to milliseconds for task_sleep */
+    uint64_t ms = (uint64_t)(req->tv_sec * 1000) + (uint64_t)(req->tv_nsec / 1000000);
+    if (ms == 0) ms = 1; /* At least 1ms */
+
+    task_sleep(ms);
+
+    /* Set remaining time to 0 (we slept the full duration) */
+    if (rem) {
+        rem->tv_sec = 0;
+        rem->tv_nsec = 0;
+    }
+    return 0;
+}
+
+static int64_t sys_clock_gettime(int clock_id, struct timespec* tp) {
+    (void)clock_id;
+    if (!tp) return -EFAULT;
+
+    uint32_t uptime = timer_get_uptime_seconds();
+    tp->tv_sec = uptime;
+    tp->tv_nsec = (timer_get_ticks() % 100) * 10000000; /* Approximate from PIT */
+    return 0;
+}
+
+static int64_t sys_getppid(void) {
+    /* éterOS does not track parent PID yet, return 1 (init) */
+    return 1;
+}
+
+static int64_t sys_gettid(void) {
+    return task_get_current()->id;
+}
+
+static int64_t sys_set_tid_address(int* tidptr) {
+    /* musl calls this during thread init; just return our TID */
+    (void)tidptr;
+    return task_get_current()->id;
+}
+
+static int64_t sys_exit_group(int status) {
+    (void)status;
+    task_exit();
+    __builtin_unreachable();
+}
+
+static int64_t sys_munmap(void* addr, size_t len) {
+    /* Minimal stub: we don't actually free pages yet */
+    (void)addr; (void)len;
+    return 0;
+}
+
+static int64_t sys_mprotect(void* addr, size_t len, int prot) {
+    /* Stub: we don't change page protections dynamically yet */
+    (void)addr; (void)len; (void)prot;
+    return 0;
+}
+
+static int64_t sys_madvise(void* addr, size_t len, int advice) {
+    /* Stub: no-op advisory */
+    (void)addr; (void)len; (void)advice;
+    return 0;
+}
+
+static int64_t sys_getuid(void)  { return 0; /* root */ }
+static int64_t sys_getgid(void)  { return 0; }
+static int64_t sys_geteuid(void) { return 0; }
+static int64_t sys_getegid(void) { return 0; }
+
+static int64_t sys_access(const char* path, int mode) {
+    (void)mode;
+    if (!path) return -EFAULT;
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) return -ENOENT;
+    kfree(node);
+    return 0;
+}
+
+static int64_t sys_fcntl(int fd, int cmd, int64_t arg) {
+    (void)arg;
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+
+    /* F_GETFD=1, F_SETFD=2, F_GETFL=3, F_SETFL=4 */
+    if (cmd == 1) return 0; /* F_GETFD: no close-on-exec */
+    if (cmd == 2) return 0; /* F_SETFD: ignore */
+    if (cmd == 3) return current->fd_table[fd].flags; /* F_GETFL */
+    if (cmd == 4) { current->fd_table[fd].flags = (int)arg; return 0; } /* F_SETFL */
+    return -EINVAL;
+}
+
+static int64_t sys_dup(int oldfd) {
+    task_t* current = task_get_current();
+    if (oldfd < 0 || oldfd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[oldfd].node) return -EBADF;
+
+    /* Find lowest free FD */
+    for (int i = 0; i < MAX_FD; i++) {
+        if (!current->fd_table[i].node) {
+            return sys_dup2(oldfd, i);
+        }
+    }
+    return -EMFILE;
+}
+
+static int64_t sys_getcwd(char* buf, size_t size) {
+    if (!buf || size < 2) return -EINVAL;
+    /* éterOS has no per-process CWD yet; return "/" */
+    strlcpy(buf, "/", size);
+    return (int64_t)buf;
+}
+
 static void syscall_native_handler(struct syscall_regs* regs) {
     uint64_t ret = (uint64_t)-ENOSYS;
 
@@ -688,15 +899,60 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_dup2((int)regs->rdi, (int)regs->rsi);
     } else if (regs->rax == SYS_pipe) {
         ret = (uint64_t)sys_pipe((int*)regs->rdi);
+    } else if (regs->rax == SYS_rt_sigaction) {
+        ret = (uint64_t)sys_rt_sigaction((int)regs->rdi, (const struct kernel_sigaction*)regs->rsi,
+                                         (struct kernel_sigaction*)regs->rdx, (size_t)regs->r10);
+    } else if (regs->rax == SYS_rt_sigprocmask) {
+        ret = (uint64_t)sys_rt_sigprocmask((int)regs->rdi, (const uint64_t*)regs->rsi,
+                                            (uint64_t*)regs->rdx, (size_t)regs->r10);
+    } else if (regs->rax == SYS_rt_sigreturn) {
+        ret = (uint64_t)sys_rt_sigreturn();
+    } else if (regs->rax == SYS_nanosleep) {
+        ret = (uint64_t)sys_nanosleep((const struct timespec*)regs->rdi, (struct timespec*)regs->rsi);
+    } else if (regs->rax == SYS_access) {
+        ret = (uint64_t)sys_access((const char*)regs->rdi, (int)regs->rsi);
+    } else if (regs->rax == SYS_dup) {
+        ret = (uint64_t)sys_dup((int)regs->rdi);
+    } else if (regs->rax == SYS_fcntl) {
+        ret = (uint64_t)sys_fcntl((int)regs->rdi, (int)regs->rsi, (int64_t)regs->rdx);
+    } else if (regs->rax == SYS_getcwd) {
+        ret = (uint64_t)sys_getcwd((char*)regs->rdi, (size_t)regs->rsi);
+    } else if (regs->rax == SYS_getuid) {
+        ret = (uint64_t)sys_getuid();
+    } else if (regs->rax == SYS_getgid) {
+        ret = (uint64_t)sys_getgid();
+    } else if (regs->rax == SYS_geteuid) {
+        ret = (uint64_t)sys_geteuid();
+    } else if (regs->rax == SYS_getegid) {
+        ret = (uint64_t)sys_getegid();
+    } else if (regs->rax == SYS_mprotect) {
+        ret = (uint64_t)sys_mprotect((void*)regs->rdi, (size_t)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == SYS_munmap) {
+        ret = (uint64_t)sys_munmap((void*)regs->rdi, (size_t)regs->rsi);
+    } else if (regs->rax == SYS_madvise) {
+        ret = (uint64_t)sys_madvise((void*)regs->rdi, (size_t)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == 110) { /* SYS_getppid */
+        ret = (uint64_t)sys_getppid();
+    } else if (regs->rax == 186) { /* SYS_gettid */
+        ret = (uint64_t)sys_gettid();
+    } else if (regs->rax == 218) { /* SYS_set_tid_address */
+        ret = (uint64_t)sys_set_tid_address((int*)regs->rdi);
+    } else if (regs->rax == 228) { /* SYS_clock_gettime */
+        ret = (uint64_t)sys_clock_gettime((int)regs->rdi, (struct timespec*)regs->rsi);
+    } else if (regs->rax == 231) { /* SYS_exit_group */
+        ret = (uint64_t)sys_exit_group((int)regs->rdi);
     } else if (regs->rax == 0xCAFEBABE) {
         ret = 0;
     } else {
-        /* Log unknown syscall */
-        char buf_nr[32];
-        serial_write_string("[SYSCALL-NATIVE] Unknown syscall: 0x");
-        utoa_hex_s(regs->rax, buf_nr, sizeof(buf_nr));
-        serial_write_string(buf_nr);
-        serial_write_string("\n");
+        /* Log unknown syscall - but don't spam for common musl probes */
+        if (regs->rax != 302 && regs->rax != 334) { /* pkey_alloc, rseq */
+            char buf_nr[32];
+            serial_write_string("[SYSCALL-NATIVE] Unknown syscall: 0x");
+            utoa_hex_s(regs->rax, buf_nr, sizeof(buf_nr));
+            serial_write_string(buf_nr);
+            serial_write_string("\n");
+        }
+        ret = (uint64_t)-ENOSYS;
     }
 
     regs->rax = ret;
