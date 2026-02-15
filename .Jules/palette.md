@@ -1,3 +1,7 @@
+## 2026-02-15 - [The Logo as an Anchor]
+**Learning:** Logos in the status bar often serve as "Home" or "Start" buttons. Without hover feedback or a tooltip, they remain "mystery meat" navigation elements. Adding a subtle highlight and a functional hint (e.g., "HUB") transforms a branding element into a clear interactive anchor.
+**Action:** Always provide hover affordance for branding elements that double as system-level controls.
+
 ## 2026-05-27 - [Boot Splash Implementation]
 **Learning:** For low-level kernel UIs, programmatic geometry (circles, lines) is often cleaner and more efficient than decoding bitmap assets for simple logos. It also scales perfectly to any resolution.
 **Action:** When designing simple icons or logos for kernel mode, prefer geometric primitives over asset loading unless absolutely necessary.
