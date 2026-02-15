@@ -101,6 +101,32 @@ static int64_t sys_write(int fd, const void* buf, size_t count) {
 }
 
 static int64_t sys_read(int fd, void* buf, size_t count) {
+    if (fd == 0) {
+        /* Stdin -> Keyboard */
+        char* cbuf = (char*)buf;
+        size_t i = 0;
+        while (i < count) {
+            char c = keyboard_getchar();
+            
+            /* Echo the character to serial and terminal */
+            serial_putchar(c);
+            terminal_putchar(c);
+            
+            if (c == '\b') {
+                if (i > 0) i--;
+                continue;
+            }
+            
+            cbuf[i++] = c;
+            if (c == '\n' || c == '\r') {
+                /* Normalize newline */
+                if (c == '\r') cbuf[i-1] = '\n';
+                return i;
+            }
+        }
+        return i;
+    }
+
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
@@ -284,21 +310,10 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
 }
 
 void syscall_handler(struct syscall_regs* regs) {
-    /* ULTRA DEBUG: Print immediately */
+    uint64_t ret = (uint64_t)-ENOSYS;
 
-    char buf_nr[32];
-    serial_write_string("[SYSCALL] ENTRY NR=0x");
-    utoa_hex_s(regs->rax, buf_nr, sizeof(buf_nr));
-    serial_write_string(buf_nr);
-    serial_write_string("\n");
-
-
-    uint64_t ret = (uint64_t)-38; /* -ENOSYS */
-
-    if (regs->rax == 0xCAFEBABE) {
-        serial_write_string("[SYSCALL] Magic Number Detected!\n");
-        ret = 0;
-    } else if (regs->rax == SYS_read) {
+    /* Handle Syscalls */
+    if (regs->rax == SYS_read) {
         ret = (uint64_t)sys_read((int)regs->rdi, (void*)regs->rsi, (size_t)regs->rdx);
     } else if (regs->rax == SYS_write) {
         ret = (uint64_t)sys_write((int)regs->rdi, (const void*)regs->rsi, (size_t)regs->rdx);
@@ -309,7 +324,6 @@ void syscall_handler(struct syscall_regs* regs) {
     } else if (regs->rax == SYS_lseek) {
         ret = (uint64_t)sys_lseek((int)regs->rdi, (int64_t)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_exit) {
-        serial_write_string("[SYSCALL] Task exit called.\n");
         task_exit();
         __builtin_unreachable();
     } else if (regs->rax == SYS_getpid) {
@@ -331,6 +345,15 @@ void syscall_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_writev((int)regs->rdi, (const struct iovec*)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_readv) {
         ret = (uint64_t)sys_readv((int)regs->rdi, (const struct iovec*)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == 0xCAFEBABE) {
+        ret = 0;
+    } else {
+        /* Log unknown syscall */
+        char buf_nr[32];
+        serial_write_string("[SYSCALL] Unknown syscall: 0x");
+        utoa_hex_s(regs->rax, buf_nr, sizeof(buf_nr));
+        serial_write_string(buf_nr);
+        serial_write_string("\n");
     }
 
     regs->rax = ret;
