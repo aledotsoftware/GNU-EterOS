@@ -25,6 +25,10 @@
 #include <fs/initrd.h>
 #include <syscall.h>
 
+extern int task_get_cpu_load(void);
+extern int task_kill(uint32_t pid);
+extern uint32_t my_ip;
+
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
 /* ========================================================================= */
@@ -319,8 +323,8 @@ static void term_create(void) {
     if (x > 600) x = 100;
     if (y > 400) y = 100;
     
-    /* Ventana ligeramente más ancha para title bar moderna */
-    terminals[slot].win = wm_create_window(x, y, 360, 260 + TITLE_BAR_HEIGHT - 20, title);
+    /* Ventana Full-Space para Terminal */
+    terminals[slot].win = wm_create_window(x, y, 900, 600, title);
     if (!terminals[slot].win) return;
     
     terminals[slot].win->bg_color = UI_COLOR_BLACK;
@@ -354,6 +358,35 @@ static void draw_progress_bar(window_t* win, int x, int y, int w, int h, int per
     }
 }
 
+static void handle_sysinfo_click(int x, int y) {
+    /* Handle Kill Logic */
+    if (!win_sysinfo) return;
+    int w = win_sysinfo->bounds.w;
+    int list_y = 180;
+    
+    if (y > list_y + 26) {
+        int row = (y - (list_y + 35)) / 16;
+        if (row >= 0) {
+            /* Find task at this row */
+            int visible_row = 0;
+            int max_slots = task_get_max();
+            for (int i = 0; i < max_slots; i++) {
+                task_t* t = task_get_at(i);
+                if (t && t->name[0] != '\0' && t->state != TASK_DEAD) {
+                    if (visible_row == row) {
+                        /* Check X coordinate for Kill Button (w-30 area) */
+                        if (x > w - 40) {
+                            task_kill(t->id);
+                        }
+                        return;
+                    }
+                    visible_row++;
+                }
+            }
+        }
+    }
+}
+
 static void draw_sysinfo_content(void) {
     int w = win_sysinfo->bounds.w;
     int h = win_sysinfo->bounds.h;
@@ -361,7 +394,7 @@ static void draw_sysinfo_content(void) {
     
     /* Header Bar */
     wm_fill_rect(win_sysinfo, (rect_t){0, 0, w, 40}, 0x252525);
-    wm_print_at(win_sysinfo, 20, 12, "ETER-MONITOR v2.0 (Live Kernel Context)");
+    wm_print_at(win_sysinfo, 20, 12, "ETER-MONITOR v2.1 (Live)");
     
     /* Stats Layout */
     int card_w = (w / 2) - 30;
@@ -378,33 +411,42 @@ static void draw_sysinfo_content(void) {
     
     char ram_buf[64] = "RAM: ";
     char num[16];
-    itoa_s(used / (1024*1024), num, 16, 10); strlcat(ram_buf, num, 64); strlcat(ram_buf, " MB / ", 64);
-    itoa_s(total / (1024*1024), num, 16, 10); strlcat(ram_buf, num, 64); strlcat(ram_buf, " MB", 64);
+    itoa_s(used / (1024*1024), num, 16, 10); strlcat(ram_buf, num, 64); strlcat(ram_buf, " MB", 64);
     wm_print_at(win_sysinfo, 40, 75, ram_buf);
     draw_progress_bar(win_sysinfo, 40, 100, card_w - 40, 12, usage_pct_1000, FLUX_ACCENT_AMBER);
 
-    /* CPU CARD with Live Graph */
+    /* CPU & NET CARD */
     rect_t cpu_card = {w/2 + 10, 60, card_w, 100};
     wm_fill_rect(win_sysinfo, cpu_card, 0x2A2A2A);
     wm_fill_rect(win_sysinfo, (rect_t){w/2 + 10, 60, 4, 100}, FLUX_ACCENT_CYAN);
-    wm_print_at(win_sysinfo, w/2 + 30, 75, "CPU Load: Real-time");
     
-    /* Visual activity graph */
-    int gx = w/2 + 30;
-    int gy = 100;
-    int gw = card_w - 40;
-    int gh = 40;
-    wm_fill_rect(win_sysinfo, (rect_t){gx, gy, gw, gh}, 0x151515);
-    for (int i=0; i<gw; i+=4) {
-        int v = (timer_get_ticks() + i) % 30;
-        int bh = (v * gh) / 30;
-        wm_fill_rect(win_sysinfo, (rect_t){gx + i, gy + gh - bh, 2, bh}, 0x008080);
+    char cpu_buf[32] = "CPU Load: ";
+    int load = task_get_cpu_load();
+    itoa_s(load, num, 16, 10);
+    strlcat(cpu_buf, num, 32);
+    strlcat(cpu_buf, "%", 32);
+    wm_print_at(win_sysinfo, w/2 + 30, 70, cpu_buf);
+    
+    /* CPU Progress Bar */
+    draw_progress_bar(win_sysinfo, w/2 + 30, 90, card_w - 40, 10, load * 10, FLUX_ACCENT_CYAN);
+
+    /* Network Info */
+    char net_buf[32] = "IP: ";
+    uint8_t* ip = (uint8_t*)&my_ip;
+    if (my_ip == 0) {
+        strlcat(net_buf, "No Conn", 32);
+    } else {
+        itoa_s(ip[0], num, 16, 10); strlcat(net_buf, num, 32); strlcat(net_buf, ".", 32);
+        itoa_s(ip[1], num, 16, 10); strlcat(net_buf, num, 32); strlcat(net_buf, ".", 32);
+        itoa_s(ip[2], num, 16, 10); strlcat(net_buf, num, 32); strlcat(net_buf, ".", 32);
+        itoa_s(ip[3], num, 16, 10); strlcat(net_buf, num, 32);
     }
+    wm_print_at(win_sysinfo, w/2 + 30, 110, net_buf);
 
     /* Process List (Lower Section) */
     int list_y = 180;
     wm_fill_rect(win_sysinfo, (rect_t){20, list_y, w - 40, h - list_y - 20}, 0x222222);
-    wm_print_at(win_sysinfo, 40, list_y + 10, "PID   State   Name                 CPUID");
+    wm_print_at(win_sysinfo, 40, list_y + 10, "PID   State   Name                 [Kill]");
     wm_fill_rect(win_sysinfo, (rect_t){40, list_y + 26, w - 80, 1}, 0x444444);
     
     int row = 0;
@@ -425,6 +467,10 @@ static void draw_sysinfo_content(void) {
              strlcat(row_buf, t->name, 80);
              
              wm_print_at(win_sysinfo, 40, list_y + 35 + (row * 16), row_buf);
+             
+             /* Draw valid kill button */
+             wm_print_at(win_sysinfo, w - 35, list_y + 35 + (row * 16), "[X]");
+             
              row++;
              if (row > 10) break;
         }
@@ -433,8 +479,9 @@ static void draw_sysinfo_content(void) {
 
 static window_t* win_matrix = NULL;
 static volatile bool matrix_running = false;
-#define MATRIX_COLS 40
-#define MATRIX_ROWS 20
+/* Matrix Logic (Scalable) */
+#define MATRIX_COLS 128
+#define MATRIX_ROWS 76
 static char matrix_chars[MATRIX_COLS][MATRIX_ROWS];
 static int  matrix_drops[MATRIX_COLS];
 
@@ -456,8 +503,12 @@ void task_matrix_rain(void) {
             if (tail >= 0 && tail < MATRIX_ROWS) matrix_chars[x][tail] = ' ';
             if (head > MATRIX_ROWS + 5) matrix_drops[x] = -(x % 10) - 2;
         }
-        wm_fill_rect(win_matrix, (rect_t){0, 0, 320, 200}, UI_COLOR_BLACK);
-        for (int x = 0; x < MATRIX_COLS; x++) {
+        wm_fill_rect(win_matrix, (rect_t){0, 0, win_matrix->bounds.w, win_matrix->bounds.h}, UI_COLOR_BLACK);
+        
+        int draw_cols = win_matrix->bounds.w / 8;
+        if (draw_cols > MATRIX_COLS) draw_cols = MATRIX_COLS;
+        
+        for (int x = 0; x < draw_cols; x++) {
             for (int y = 0; y < MATRIX_ROWS; y++) {
                 char c = matrix_chars[x][y];
                 if (c != ' ') {
@@ -1594,6 +1645,8 @@ static void handle_flux_click(void) {
              
              if (focused_space == win_settings) {
                  handle_settings_click(lx, ly - TITLE_BAR_HEIGHT);
+             } else if (focused_space == win_sysinfo) {
+                 handle_sysinfo_click(lx, ly - TITLE_BAR_HEIGHT);
              } else if (focused_space == win_files) {
                  handle_files_click(lx, ly - TITLE_BAR_HEIGHT);
              } else if (focused_space == win_santitravel) {
