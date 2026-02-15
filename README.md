@@ -259,10 +259,10 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 - [~] **Multiprocesamiento (fork/clone):** Duplicar procesos para paralelismo (Threading en espacio compartido)
 
 ### Fase 4.5: Compatibilidad POSIX
-- [x] **Tabla de Syscalls Linux:** Implementación ampliada (`open`, `close`, `read`, `write`, `lseek`, `kill`, `exit`, `getpid`, `sched_yield`).
+- [x] **Tabla de Syscalls Linux:** Implementación ampliada (`open`, `close`, `read`, `write`, `lseek`, `kill`, `exit`, `getpid`, `sched_yield`, `pipe`, `mmap`, `stat`, `fstat`, `futex`, `dup2`, `fork`).
 - [ ] **Portar musl libc:** Librería C minimalista para aplicaciones
 - [ ] **Soporte de señales:** SIGKILL (terminate) funcional.
-- [x] **Estructura `/dev`, `/proc`:** Implementados `/dev/null`, `/dev/zero`, `/dev/tty`, `/dev/random`, `/dev/urandom`, `/proc/uptime`, `/proc/version`, `/proc/meminfo`.
+- [x] **Estructura `/dev`, `/proc`, `/sys`:** Implementados `/dev/null`, `/dev/zero`, `/dev/tty`, `/dev/random`, `/dev/urandom`, `/proc/uptime`, `/proc/version`, `/proc/meminfo`.
 
 
 
@@ -443,10 +443,10 @@ Stat y Fstat: Las apps preguntan constantemente "¿qué tamaño tiene este archi
 
 
 
-### Fase 5.5: Subsistema de Compatibilidad Linux (Aether-Linux-Subsystem)
+### Fase 5.5: Subsistema de Compatibilidad Linux (Aether-Linux-Subsystem) 🚧
 *Objetivo: Ejecutar binarios ELF de Linux sin máquinas virtuales.*
-- [ ] **Traducción de Syscalls:** Mapeo de syscalls de Linux (ABI) a nativas de éterOS.
-- [ ] **VFS Layer:** Implementación de `/proc`, `/sys`.
+- [x] **Traducción de Syscalls:** Dispatcher `syscall_linux_handler` implementado con detección de `ELFOSABI_LINUX`.
+- [ ] **VFS Layer:** Soporte para file-backed `mmap` y herencia de FDs en `fork`.
 - [ ] **Linux Driver Wrapper:** Capa de pegamento (Glue Logic) para reutilizar drivers de red/wifi.
 💡 Una sugerencia para la Fase 5.5 (Capa Linux)
 Dado que mencionas el "Aether-Linux-Subsystem", te recomendaría mirar el proyecto Noah o Lina. En lugar de emular, puedes interceptar las interrupciones de las syscalls de Linux (como la int 0x80 o syscall con el número de registro de Linux) y mapearlas a tus funciones nativas en kernel/arch/x86_64/syscall.c. Esto te permitiría correr binarios de Linux sin recompilarlos.
