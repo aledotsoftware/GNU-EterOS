@@ -1452,9 +1452,17 @@ static void draw_global_status_bar(void) {
     omni_fill_gradient_v(0, 0, screen_w, bar_h, 0x0A0A0A, 0x050505);
     omni_fill_rect(0, bar_h - 1, screen_w, 1, 0x1A1A1A);
 
-    /* Left: System Branding / Hub Toggle Button */
+    /* Left: System Branding / Hub Toggle Button (The "Start" Button) */
+    bool hover_hub = (mouse_x < 100 && mouse_y < 32);
+    if (hover_hub) {
+        omni_fill_rect_alpha(0, 0, 100, bar_h - 1, 0xFFFFFF, 0x15);
+        /* Tooltip Hint */
+        omni_fill_rect_alpha(16, 36, 60, 20, 0x222222, 0xF0);
+        omni_draw_string(NULL, 22, 40, "HUB", FLUX_ACCENT_CYAN, 0x222222);
+    }
+    
     int blink = (timer_get_ticks() / 50) % 2;
-    uint32_t logo_col = hub_active ? FLUX_ACCENT_CYAN : 0xFFFFFF;
+    uint32_t logo_col = (hub_active || hover_hub) ? FLUX_ACCENT_CYAN : 0xFFFFFF;
     omni_draw_string(NULL, 16, 8, "eterOS", logo_col, 0x050505);
     /* Mini-indicator for Hub availability */
     omni_fill_rect(70, 14, 4, 4, blink ? FLUX_ACCENT_CYAN : 0x444444);
