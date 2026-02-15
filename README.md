@@ -251,6 +251,9 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 - [ ] **Soporte de señales:** SIGKILL, SIGSEGV, etc.
 - [ ] **Estructura `/dev`, `/proc`:** Nodos de dispositivos virtuales
 
+
+
+
 ### Fase 5: Entorno Gráfico (Flux UI & AetherGraphics)
 - [x] **Motor de Dibujo "Omni":** Primitivas 2D (líneas, rectángulos, fuentes) y **Decodificador PNG Nativo** para iconos y assets (`kernel/ui/upng.c`)
 - [x] **Double Buffering Activo:** Renderizado libre de parpadeo con composicion en RAM antes de flush (`kernel/ui/image.c`)
@@ -265,7 +268,7 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
     - `sysmon.c`: Monitor de recursos del sistema.
     - `wget.c`: Utilidad de descarga.
 - [] ** Introducir la terminal en el entorno grafico**
-- [] ** Introducir el navegador en el entorno grafico**
+- [x] ** Introducir el navegador en el entorno grafico**
 
 
 ### Fase 5.1: Optimizacion de la interfaz grafica y aplicaciones
@@ -298,6 +301,15 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 ### Fase 5.10: Subsistema de Compatibilidad Web (Aether-Web)
 - [ ] **Chromium Embedded:** Port nativo del motor Blink.
 - [ ] **PWA Runtime:** Ejecución de aplicaciones web como nativas (.crx, .wbn o pwa online).
+
+Punto Crítico: La transición de Tier 1 (No MMU) a Tier 3 (MMU/Paging) requiere que tu HAL sea extremadamente abstracta para que el código superior no dependa de cómo se mapea la memoria.
+
+Sugerencia: Para que la UI sea "reactiva", asegurate de que el mouse y el teclado generen eventos en una cola que el compositor procese de forma asíncrona, evitando bloqueos en la renderización.
+
+Recomendación: Priorizá la Fase 5.5 (Linux). Al tener ya una capa POSIX y lwIP, ejecutar binarios ELF de Linux es el camino más corto para tener software real (como Apache) corriendo rápido.
+
+Estrategia: El plan de usar un "Linux Driver Wrapper" (Fase 5.5) es vital. No intentes escribir drivers nativos para todo; reutilizar la lógica de Linux mediante una capa de "pegamento" (glue logic) es lo que salvó a muchos SOs independientes.
+
 
 
 
