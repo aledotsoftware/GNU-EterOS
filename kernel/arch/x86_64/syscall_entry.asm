@@ -11,15 +11,6 @@ syscall_entry:
     ; 1. Swap GS to get access to per-cpu data (stored in KERNEL_GS_BASE = cpu_info_t*)
     swapgs
 
-    ; DEBUG: Print '!' to serial
-    push rax
-    push rdx
-    mov dx, 0x3F8
-    mov al, '!'
-    out dx, al
-    pop rdx
-    pop rax
-
     ; 2. Save User Stack Pointer temporarily in per-cpu struct (user_stack_scratch)
     ; include/cpu.h: offsetof(cpu_info_t, user_stack_scratch) = 48 (0x30)
     mov [gs:48], rsp
@@ -27,6 +18,15 @@ syscall_entry:
     ; 3. Load Kernel Stack Pointer from per-cpu struct (kernel_stack_top)
     ; include/cpu.h: offsetof(cpu_info_t, kernel_stack_top) = 40 (0x28)
     mov rsp, [gs:40]
+
+    ; DEBUG: Print '!' to serial (Now safe on Kernel Stack)
+    push rax
+    push rdx
+    mov dx, 0x3F8
+    mov al, '!'
+    out dx, al
+    pop rdx
+    pop rax
 
     ; 4. Save Registers to match struct syscall_regs
     ; Struct: r11, rcx, rbp, rdi, rsi, rdx, r10, r8, r9, rax
