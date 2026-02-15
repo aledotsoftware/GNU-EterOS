@@ -94,11 +94,18 @@ void mm_init(boot_info_t* boot_info) {
                 if (region_end > region_start) {
                     uint64_t available_size = region_end - region_start;
 
+#define MAX_HEAP_SIZE (96 * 1024 * 1024)
+
                     /* Usamos la primera región válida que encontremos que sea suficientemente grande */
                     /* (Mínimo 1MB para ser útil) */
                     if (available_size >= 1024 * 1024) {
                         best_start = (uintptr_t)region_start;
                         best_size = (size_t)available_size;
+                        
+                        /* Limit heap size to keep some physical memory for PMM/Process tables */
+                        if (best_size > MAX_HEAP_SIZE) {
+                            best_size = MAX_HEAP_SIZE;
+                        }
                         break; /* Encontramos nuestro heap */
                     }
                 }
