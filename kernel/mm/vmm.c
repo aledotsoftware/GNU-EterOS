@@ -191,3 +191,146 @@ uint64_t hal_mem_get_phys(uint64_t virt_addr) {
 uint64_t vmm_get_pml4(void) {
     return (uint64_t)pml4;
 }
+
+static void clone_pt_recursive(pt_entry_t* dest, pt_entry_t* src, int level, int cow) {
+    for (int i = 0; i < 512; i++) {
+        if (!(src[i] & PAGE_PRESENT)) continue;
+
+        /* Check for Shared Kernel Regions */
+        /* Level 4 (PML4), Index != 0 -> Shared Kernel (Higher Half) */
+        if (level == 4 && i != 0) {
+            dest[i] = src[i];
+            continue;
+        }
+        /* Level 3 (PDPT inside PML4[0]), Index < 8 -> Shared Kernel (0-8GB Identity) */
+        if (level == 3 && i < 8) {
+             dest[i] = src[i];
+             continue;
+        }
+
+        if (level > 1) {
+            /* Alloc new table for next level */
+            void* new_table = pmm_alloc_page();
+            if (!new_table) return; /* OOM */
+            memset(new_table, 0, PAGE_SIZE);
+
+            /* Recurse */
+            pt_entry_t* child_src = (pt_entry_t*)(src[i] & PAGE_ADDR_MASK);
+            pt_entry_t* child_dest = (pt_entry_t*)new_table;
+
+            clone_pt_recursive(child_dest, child_src, level - 1, cow);
+
+            /* Link new table */
+            dest[i] = (uint64_t)new_table | (src[i] & 0xFFF);
+        } else {
+            /* Level 1 (PT) -> Clone Page */
+            uint64_t phys = src[i] & PAGE_ADDR_MASK;
+            uint64_t flags = src[i] & ~PAGE_ADDR_MASK;
+
+            /* Ignore non-user pages found in user region (shouldn't happen but safety) */
+            if (!(flags & PAGE_USER)) {
+                dest[i] = src[i];
+                continue;
+            }
+
+            if (cow) {
+                /* CoW Logic */
+                /* Update Source: Read-Only, CoW */
+                src[i] |= PAGE_COW;
+                src[i] &= ~PAGE_WRITE;
+
+                /* Dest: Same phys, same flags */
+                dest[i] = src[i];
+
+                /* Increment Ref */
+                pmm_ref_page((void*)phys);
+            } else {
+                /* Deep Copy */
+                void* new_page = pmm_alloc_page();
+                if (new_page) {
+                    memcpy(new_page, (void*)phys, PAGE_SIZE);
+                    dest[i] = (uint64_t)new_page | flags;
+                }
+            }
+        }
+    }
+}
+
+uint64_t vmm_clone_pml4(int cow) {
+    pt_entry_t* new_pml4 = (pt_entry_t*)pmm_alloc_page();
+    if (!new_pml4) return 0;
+    memset(new_pml4, 0, PAGE_SIZE);
+
+    /* Start recursion from Level 4 */
+    clone_pt_recursive(new_pml4, pml4, 4, cow);
+
+    /* If we modified current tables (CoW), we must flush TLB */
+    if (cow) {
+        uint64_t current_cr3;
+        __asm__ volatile("mov %%cr3, %0" : "=r"(current_cr3));
+        __asm__ volatile("mov %0, %%cr3" : : "r"(current_cr3) : "memory");
+    }
+
+    return (uint64_t)new_pml4;
+}
+
+int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
+    /* Error Code:
+       Bit 0: Present (0=Not Present, 1=Protection Violation)
+       Bit 1: Write (1=Write)
+       Bit 2: User (1=User)
+    */
+
+    int present = error_code & 1;
+    int write   = error_code & 2;
+    int user    = error_code & 4;
+
+    /* Handle CoW: Write + Present + User */
+    if (present && write && user) {
+        /* Walk to find the entry */
+        uint64_t pml4_idx = PML4_INDEX(addr);
+        uint64_t pdpt_idx = PDPT_INDEX(addr);
+        uint64_t pd_idx   = PD_INDEX(addr);
+        uint64_t pt_idx   = PT_INDEX(addr);
+
+        pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
+        if (!pdpt) return 0;
+        pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
+        if (!pd) return 0;
+        pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
+        if (!pt) return 0;
+
+        if (pt[pt_idx] & PAGE_COW) {
+             /* CoW Fault! */
+             uint64_t old_phys = pt[pt_idx] & PAGE_ADDR_MASK;
+             uint64_t flags = pt[pt_idx] & ~PAGE_ADDR_MASK;
+
+             /* Check refcount */
+             if (pmm_get_ref_count((void*)old_phys) == 1) {
+                 /* Optimize: If refcount is 1, just make it writable again (we are the last owner) */
+                 pt[pt_idx] &= ~PAGE_COW;
+                 pt[pt_idx] |= PAGE_WRITE;
+             } else {
+                 /* Alloc new page */
+                 void* new_phys = pmm_alloc_page();
+                 if (!new_phys) {
+                     serial_write_string("[VMM] OOM during CoW\n");
+                     return 0;
+                 }
+
+                 /* Copy content */
+                 memcpy(new_phys, (void*)old_phys, PAGE_SIZE);
+
+                 /* Remap */
+                 pt[pt_idx] = (uint64_t)new_phys | (flags & ~PAGE_COW) | PAGE_WRITE;
+
+                 /* Decrement old ref */
+                 pmm_unref_page((void*)old_phys);
+             }
+
+             invlpg(addr);
+             return 1; /* Handled */
+        }
+    }
+    return 0; /* Not handled */
+}

@@ -48,3 +48,33 @@ context_switch:
     ; Si la tarea ya corría antes, vuelve a schedule() -> timer ISR -> iretq.
     ; Si es la primera vez, salta a task_entry_wrapper().
     ret
+
+; -----------------------------------------------------------------------------
+; fork_return()
+;   Punto de retorno para procesos hijos creados con fork().
+;   Restaura el estado de usuario y retorna via sysret.
+;   La tarea hija "despierta" aquí con RSP apuntando a los registros guardados.
+; -----------------------------------------------------------------------------
+global fork_return
+fork_return:
+    ; Restaurar registros en orden inverso al push en syscall_entry
+    pop r11     ; RFLAGS
+    pop rcx     ; RIP
+    pop rbp
+    pop rdi
+    pop rsi
+    pop rdx
+    pop r10
+    pop r8
+    pop r9
+    pop rax     ; Return Value (0 para el hijo)
+
+    ; Restaurar User Stack Pointer desde Per-CPU Data (offset 56)
+    ; schedule() se aseguró de que gs:56 tenga el user_rsp del hijo.
+    mov rsp, [gs:56]
+
+    ; Restaurar User GS Base
+    swapgs
+
+    ; Retornar a Ring 3
+    o64 sysret

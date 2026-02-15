@@ -43,6 +43,16 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         return 0;
     }
 
+    task_t* current = task_get_current();
+    if (current) {
+        current->os_abi = header.e_ident[EI_OSABI];
+        if (current->os_abi == ELFOSABI_LINUX) {
+             serial_write_string("[ELF] Detected Linux ABI.\n");
+        } else {
+             serial_write_string("[ELF] Detected Native/SysV ABI.\n");
+        }
+    }
+
     uint64_t load_offset = 0;
     if (header.e_type == ET_DYN) {
         load_offset = base_vaddr;
@@ -117,7 +127,6 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         }
     }
 
-    task_t* current = task_get_current();
     if (current) {
         current->brk = max_vaddr;
         serial_write_string("[ELF] Set process BRK to 0x");

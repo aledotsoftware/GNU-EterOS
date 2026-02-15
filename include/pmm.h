@@ -65,6 +65,23 @@ void* pmm_alloc_page(void);
 void pmm_free_page(void* addr);
 
 /**
+ * Incrementa el contador de referencias de una página física.
+ * Usado para Copy-on-Write y memoria compartida.
+ */
+void pmm_ref_page(void* addr);
+
+/**
+ * Decrementa el contador de referencias.
+ * Alias de pmm_free_page (que ahora maneja refcounting).
+ */
+void pmm_unref_page(void* addr);
+
+/**
+ * Obtiene el contador de referencias actual de una página.
+ */
+uint8_t pmm_get_ref_count(void* addr);
+
+/**
  * Marca un rango de memoria física como OCUPADO.
  * Usado por el Heap (mm_init) para evitar que el PMM asigne páginas dentro del heap.
  */

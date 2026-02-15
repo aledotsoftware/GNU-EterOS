@@ -12,6 +12,7 @@
 #define PAGE_WRITE      0x2
 #define PAGE_USER       0x4
 #define PAGE_HUGE       0x80
+#define PAGE_COW        0x200 /* Bit 9: Copy-on-Write (OS Available) */
 #define PAGE_NO_EXEC    0x8000000000000000
 
 /* Máscara para obtener la dirección física de una entrada (bits 12-51) */
@@ -65,5 +66,21 @@ uint64_t vmm_virt_to_phys(uint64_t virt_addr);
  * Obtiene la dirección del PML4 actual (CR3).
  */
 uint64_t vmm_get_pml4(void);
+
+/**
+ * Clona el espacio de direcciones actual (PML4).
+ * @param cow Si true, usa Copy-on-Write para páginas de usuario.
+ *            Si false, realiza una copia profunda (Deep Copy).
+ * @return Dirección física del nuevo PML4.
+ */
+uint64_t vmm_clone_pml4(int cow);
+
+/**
+ * Manejador de Page Faults (llamado desde ISR 14).
+ * @param addr Dirección virtual que causó el fallo (CR2).
+ * @param error_code Código de error pusheado por CPU.
+ * @return 1 si fue manejado, 0 si no.
+ */
+int vmm_handle_page_fault(uint64_t addr, uint64_t error_code);
 
 #endif /* ETEROS_VMM_H */

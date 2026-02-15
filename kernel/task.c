@@ -23,6 +23,10 @@
 #include "../include/cpu.h"
 #include "../include/msr.h"
 #include "../include/lock.h"
+#include "../include/vmm.h"
+#include "../include/syscall.h"
+
+extern void fork_return(void);
 
 /* ========================================================================= */
 /* Estado Global del Scheduler                                               */
@@ -103,6 +107,7 @@ void scheduler_init(void) {
     tasks[0].brk = 0;
     tasks[0].fs_base = 0;
     tasks[0].gs_base = 0;
+    tasks[0].mmap_base = 0x700000000000ULL;
 
     task_count = 1;
     current_task = 0;
@@ -184,6 +189,7 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].brk = 0;
     tasks[slot].fs_base = 0;
     tasks[slot].gs_base = 0;
+    tasks[slot].mmap_base = 0x700000000000ULL;
 
     /*
      * Preparar el stack para que context_switch pueda "entrar" por primera vez.
@@ -313,6 +319,8 @@ void schedule(void) {
         if (cpu) {
             cpu->kernel_stack_top = tasks[next].kernel_stack;
             cpu->current_task = &tasks[next];
+            /* Restore User Stack Pointer (for syscall exit / fork_return) */
+            cpu->user_stack_scratch = tasks[next].user_rsp;
         }
     }
 
@@ -472,4 +480,100 @@ task_t* task_get_by_id(uint32_t id) {
 
 int task_get_cpu_load(void) {
     return cpu_last_load;
+}
+
+int task_fork(void* regs_ptr) {
+    struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;
+
+    spin_lock(&sched_lock);
+
+    /* 1. Find slot */
+    if (task_count >= MAX_TASKS) {
+        spin_unlock(&sched_lock);
+        return -1;
+    }
+    int slot = -1;
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (tasks[i].state == TASK_DEAD || (i >= task_count && tasks[i].state == 0)) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == -1) {
+        spin_unlock(&sched_lock);
+        return -1;
+    }
+
+    /* 2. Alloc Stack */
+    uint8_t* stack = (uint8_t*)kmalloc(TASK_STACK_SIZE);
+    if (!stack) {
+        spin_unlock(&sched_lock);
+        return -1;
+    }
+    memset(stack, 0, TASK_STACK_SIZE);
+
+    /* 3. Setup Child Task */
+    tasks[slot].id = next_id++;
+    tasks[slot].state = TASK_READY;
+    tasks[slot].stack_base = stack;
+    tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
+
+    /* 4. Clone Address Space (CoW) */
+    /* Use current task's CR3, not necessarily kernel's CR3 */
+    tasks[slot].cr3 = vmm_clone_pml4(1);
+
+    /* 5. Copy Task Struct Fields */
+    task_t* parent = task_get_current();
+    strlcpy(tasks[slot].name, parent->name, sizeof(tasks[slot].name));
+    /* Append (fork) to name? Optional */
+
+    /* POSIX/Linux Fields */
+    memcpy(tasks[slot].fd_table, parent->fd_table, sizeof(parent->fd_table));
+    /* NOTE: VFS nodes are shared pointers! Refcounting needed but missing. */
+
+    tasks[slot].signal_mask = parent->signal_mask;
+    memcpy(tasks[slot].signal_handlers, parent->signal_handlers, sizeof(parent->signal_handlers));
+    tasks[slot].brk = parent->brk;
+    tasks[slot].fs_base = parent->fs_base;
+    tasks[slot].gs_base = parent->gs_base;
+    tasks[slot].os_abi = parent->os_abi;
+    tasks[slot].user_rsp = parent->user_rsp; /* Saved from syscall entry */
+    tasks[slot].mmap_base = parent->mmap_base;
+
+    /* 6. Setup Child Stack for Return */
+    /* We need to copy `regs` to child stack top */
+    uint64_t* sp = (uint64_t*)tasks[slot].kernel_stack;
+
+    /* Push syscall_regs */
+    sp = (uint64_t*)((uint8_t*)sp - sizeof(struct syscall_regs));
+    memcpy(sp, regs, sizeof(struct syscall_regs));
+
+    /* Modify RAX to 0 */
+    ((struct syscall_regs*)sp)->rax = 0;
+
+    /* Push context_switch frame to return to `fork_return` */
+    /* fork_return expects nothing on stack except what context_switch pops? */
+    /* context_switch pops: r15, r14, r13, r12, rbx, rbp */
+    /* And then RETs. */
+    /* So we push return address `fork_return`. */
+    /* And 6 zeros (rbp..r15). */
+
+    *(--sp) = (uint64_t)fork_return; /* RIP for ret */
+    *(--sp) = 0; /* rbp */
+    *(--sp) = 0; /* rbx */
+    *(--sp) = 0; /* r12 */
+    *(--sp) = 0; /* r13 */
+    *(--sp) = 0; /* r14 */
+    *(--sp) = 0; /* r15 */
+
+    tasks[slot].rsp = (uint64_t)sp;
+
+    if (slot >= task_count) task_count = slot + 1;
+
+    spin_unlock(&sched_lock);
+
+    serial_write_string("[SCHED] Forked process PID ");
+    /* ... log pid ... */
+
+    return tasks[slot].id;
 }
