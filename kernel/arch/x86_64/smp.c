@@ -9,15 +9,24 @@
 #include <string.h>
 #include <serial.h>
 #include <mm.h>
+#include <apic.h>
+#include <vmm.h>
+#include <task.h>
+
+/* Symbols from trampoline.asm */
+extern char trampoline_start[];
+extern char trampoline_end[];
+
+/* Variables inside trampoline to be patched */
+#define TRAMPOLINE_BASE 0x8000
+#define TRAMPOLINE_OFFSET(x) ((uint64_t)(x) - (uint64_t)trampoline_start)
 
 void cpu_init_bsp(void) {
     if (total_cpus == 0) {
-        /* Si ACPI falló o no detectó nada, asumimos 1 CPU (BSP) */
         total_cpus = 1;
-        cpus[0].apic_id = 0; /* Asumimos ID 0 por defecto */
+        cpus[0].apic_id = lapic_get_id(); /* Use real ID */
         cpus[0].index = 0;
         cpus[0].state = CPU_STATE_ONLINE;
-        cpus[0].self = (uint64_t)&cpus[0];
     }
 
     for (int i = 0; i < total_cpus; i++) {
@@ -25,32 +34,126 @@ void cpu_init_bsp(void) {
     }
 
     cpu_info_t* bsp = &cpus[0];
-    
-    /* Configurar GS Base para apuntar a la estructura per-cpu */
-    /* Esto permite usar get_current_cpu() */
     wrmsr(MSR_GS_BASE, (uint64_t)bsp);
-    wrmsr(MSR_KERNEL_GS_BASE, (uint64_t)bsp); /* SwapGS fallback */
+    wrmsr(MSR_KERNEL_GS_BASE, (uint64_t)bsp);
     
-    /* Configurar stack inicial del kernel (Boot Stack) */
     bsp->kernel_stack_top = 0x90000; 
     
     serial_write_string("[SMP] BSP (CPU 0) Initialized. GS_BASE set.\n");
-    
-    /* Verificar que get_current_cpu funciona */
-    cpu_info_t* current = get_current_cpu();
-    if (current == bsp) {
-        serial_write_string("[SMP] Self-check OK: get_current_cpu() returns correct pointer.\n");
-        // char buf[32];
-        // itoa_s(current->apic_id, buf, 32, 10);
-        // serial_write_string("[SMP] APIC ID: ");
-        // serial_write_string(buf);
-        // serial_write_string("\n");
-    } else {
-        serial_write_string("[SMP] CRITICAL ERROR: GS_BASE mismatch!\n");
+}
+
+/* Common GDT 32-bit for Trampoline */
+static uint64_t temp_gdt[] = {
+    0x0000000000000000, /* Null */
+    0x00cf9a000000ffff, /* Code 32 */
+    0x00cf92000000ffff  /* Data 32 */
+};
+
+extern struct {
+    uint16_t limit;
+    uint64_t base;
+} __attribute__((packed)) gdtr;
+
+void smp_init(void) {
+    if (total_cpus <= 1) {
+        serial_write_string("[SMP] Single CPU system detected, skipping SMP boot.\n");
+        return;
+    }
+
+    serial_write_string("[SMP] Booting Application Processors...\n");
+
+    /* 1. Preparar el trampolín */
+    uint64_t len = (uint64_t)trampoline_end - (uint64_t)trampoline_start;
+    memcpy((void*)TRAMPOLINE_BASE, trampoline_start, len);
+
+    /* 2. Parchear valores en el trampolín */
+    extern char trampoline_gdt_ptr[];
+    extern char trampoline_gdt64_ptr[];
+    extern char trampoline_pml4[];
+    extern char trampoline_stack[];
+    extern char trampoline_entry[];
+    extern char trampoline_cpu_index[];
+
+    /* GDT 32 ptr */
+    *(uint16_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_gdt_ptr)) = sizeof(temp_gdt) - 1;
+    *(uint32_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_gdt_ptr) + 2) = (uint32_t)((uintptr_t)temp_gdt);
+
+    /* GDT 64 ptr (Reuse the system GDT) */
+    *(uint16_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_gdt64_ptr)) = gdtr.limit;
+    *(uint64_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_gdt64_ptr) + 2) = gdtr.base;
+
+    /* PML4 */
+    *(uint32_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_pml4)) = (uint32_t)vmm_get_pml4();
+
+    /* Entry Point */
+    extern void cpu_init_ap_wrapper(int index);
+    *(uint64_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_entry)) = (uint64_t)cpu_init_ap_wrapper;
+
+    /* 3. Despertar cada AP */
+    for (int i = 1; i < total_cpus; i++) {
+        cpu_info_t* cpu = &cpus[i];
+        
+        serial_write_string("[SMP] Booting CPU ");
+        char b[16]; itoa_s(i, b, 16, 10); serial_write_string(b);
+        serial_write_string(" (APIC ID: ");
+        itoa_s(cpu->apic_id, b, 16, 10); serial_write_string(b);
+        serial_write_string("\n");
+
+        /* Preparar stack para este CPU */
+        void* stack = kmalloc(4096); /* Small stack for initialization */
+        cpu->kernel_stack_top = (uint64_t)stack + 4096;
+        
+        *(uint64_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_stack)) = cpu->kernel_stack_top;
+        *(uint32_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_cpu_index)) = i;
+
+        cpu->state = CPU_STATE_BOOTING;
+
+        /* INIT IPI */
+        lapic_send_init(cpu->apic_id);
+        
+        /* STARTUP IPI (Vector 0x08 -> 0x8000) */
+        lapic_send_startup(cpu->apic_id, 0x08);
+
+        /* Esperar a que el AP se marque como ONLINE */
+        int timeout = 1000000;
+        while (cpu->state != CPU_STATE_ONLINE && timeout > 0) {
+            timeout--;
+            __asm__ volatile("pause");
+        }
+
+        if (cpu->state == CPU_STATE_ONLINE) {
+            serial_write_string("[SMP] CPU ");
+            serial_write_string(b);
+            serial_write_string(" is ONLINE.\n");
+        } else {
+            serial_write_string("[SMP] CPU ");
+            serial_write_string(b);
+            serial_write_string(" FAILED to boot.\n");
+        }
     }
 }
 
-/* Esta función será llamada por cada AP cuando despierten */
-void cpu_init_ap(void) {
-    /* TODO: Fase 6 - Implementar inicialización de APs */
+void cpu_init_ap(int index) {
+    /* Deshabilitar interrupciones locales temporalmente */
+    __asm__ volatile("cli");
+    
+    cpu_info_t* cpu = &cpus[index];
+    
+    /* Configurar GS Base */
+    wrmsr(MSR_GS_BASE, (uint64_t)cpu);
+    wrmsr(MSR_KERNEL_GS_BASE, (uint64_t)cpu);
+
+    /* Habilitar interrupciones locales del APIC */
+    lapic_init();
+
+    /* Señalizar que estamos listos */
+    cpu->state = CPU_STATE_ONLINE;
+
+    /* Inicializar scheduler local y entrar en loop */
+    // task_init_ap();
+    
+    /* Halt loop if no tasks */
+    for(;;) {
+        __asm__ volatile("hlt");
+    }
 }
