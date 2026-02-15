@@ -5,11 +5,19 @@
 ; Debe ser copiado a una dirección alineada a página < 1MB (ej 0x8000).
 ; =============================================================================
 
+DEFAULT REL
+
 [bits 16]
 
 SECTION .text
 global trampoline_start
 global trampoline_end
+global trampoline_gdt_ptr
+global trampoline_gdt64_ptr
+global trampoline_pml4
+global trampoline_stack
+global trampoline_entry
+global trampoline_cpu_index
 
 trampoline_start:
     cli
@@ -18,12 +26,7 @@ trampoline_start:
     mov es, ax
     mov ss, ax
     
-    ; La dirección de carga real será pasada por el kernel
-    ; Pero para el salto largo modo protegido necesitamos saberla.
-    ; Usamos una técnica de relocalización simple.
-    
     ; 1. Cargar GDT de 32 bits temporal
-    ; El kernel escribirá la dirección de la GDT en trampoline_gdt_ptr
     lgdt [trampoline_gdt_ptr - trampoline_start + 0x8000]
 
     ; 2. Pasamos a Modo Protegido
@@ -42,7 +45,6 @@ protected_mode:
     mov ss, ax
 
     ; 4. Configurar Paginación para Long Mode
-    ; El kernel escribirá el PML4 en trampoline_pml4
     mov eax, [trampoline_pml4 - trampoline_start + 0x8000]
     mov cr3, eax
 
@@ -71,12 +73,11 @@ protected_mode:
 [bits 64]
 long_mode:
     ; 10. Configurar Stack y Saltar al C Entry Point
-    ; El kernel escribirá estos valores antes de despertar al AP
-    mov rsp, [trampoline_stack - trampoline_start + 0x8000]
-    mov rax, [trampoline_entry - trampoline_start + 0x8000]
+    mov rsp, [abs trampoline_stack - trampoline_start + 0x8000]
+    mov rax, [abs trampoline_entry - trampoline_start + 0x8000]
     
     ; Pasar el CPU index como argumento (RDI)
-    mov edi, [trampoline_cpu_index - trampoline_start + 0x8000]
+    mov edi, [abs trampoline_cpu_index - trampoline_start + 0x8000]
     
     jmp rax
 
