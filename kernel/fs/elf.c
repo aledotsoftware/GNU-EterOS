@@ -89,10 +89,10 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
                 return 0;
             }
 
-            /* Warning: Identity Map Conflict (< 4GB) */
+            /* Error: Identity Map Conflict (< 4GB) */
             if (vaddr < 0x100000000) {
-                serial_write_string("[ELF] Warning: Segment address < 4GB conflicts with Kernel Identity Map.\n");
-                /* We continue, but it will likely crash if we don't switch CR3 */
+                serial_write_string("[ELF] Error: Segment address < 4GB conflicts with Kernel Identity Map. Load rejected.\n");
+                return 0;
             }
 
             /* Calculate page range */
