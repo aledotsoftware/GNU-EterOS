@@ -53,8 +53,9 @@ typedef struct {
     volatile cpu_state_t state;
     
     /* Contexto de Ejecución */
-    struct task_struct* current_task; /* Tarea actual en este núcleo */
-    struct task_struct* idle_task;    /* Tarea idle específica de este núcleo */
+    void* current_task;               /* Pointer to current task_t */
+    void* idle_task;                  /* Pointer to idle task_t */
+    uint32_t sched_ticks;             /* Per-CPU scheduler tick counter */
     
     /* Scheduler Local */
     /* Aquí irían las colas de ejecución locales (runqueues) */
