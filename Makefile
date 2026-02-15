@@ -127,6 +127,9 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
               $(KERNEL_DIR)/arch/x86_64/gdt.c \
+              $(KERNEL_DIR)/arch/x86_64/acpi.c \
+              $(KERNEL_DIR)/arch/x86_64/smp.c \
+              $(KERNEL_DIR)/arch/x86_64/apic.c \
               $(KERNEL_DIR)/arch/x86_64/syscall.c \
               $(KERNEL_DIR)/drivers/disk/partition.c \
               $(KERNEL_DIR)/fs/elf.c \
@@ -137,6 +140,8 @@ KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
                   $(KERNEL_DIR)/arch/x86_64/interrupts.asm \
                   $(KERNEL_DIR)/arch/x86_64/syscall_entry.asm \
+                  $(KERNEL_DIR)/arch/x86_64/trampoline.asm \
+                  $(KERNEL_DIR)/arch/x86_64/smp_trampoline_wrapper.asm \
                   $(KERNEL_DIR)/arch/x86_64/user_mode.asm \
                   $(KERNEL_DIR)/arch/x86_64/user_payload.asm
 
