@@ -285,7 +285,10 @@ void schedule(void) {
     /* Actualizar TSS RSP0 y Per-CPU Kernel Stack para Syscalls */
     if (tasks[next].kernel_stack != 0) {
         tss_set_rsp0(tasks[next].kernel_stack);
-        per_cpu_data.kernel_stack = tasks[next].kernel_stack;
+        cpu_info_t* cpu = get_current_cpu();
+        if (cpu) {
+            cpu->kernel_stack_top = tasks[next].kernel_stack;
+        }
     }
 
     /* Restore TLS state */
@@ -368,7 +371,10 @@ void task_exit(void) {
         /* Actualizar TSS RSP0 y Per-CPU */
         if (tasks[next].kernel_stack != 0) {
             tss_set_rsp0(tasks[next].kernel_stack);
-            per_cpu_data.kernel_stack = tasks[next].kernel_stack;
+            cpu_info_t* cpu = get_current_cpu();
+            if (cpu) {
+                cpu->kernel_stack_top = tasks[next].kernel_stack;
+            }
         }
         
         /* Context switch — nunca volveremos aquí porque la tarea vieja está DEAD
