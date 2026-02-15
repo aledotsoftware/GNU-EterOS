@@ -81,6 +81,16 @@ void syscall_handler(struct syscall_regs* regs) {
         task_exit();
         /* Never reached */
         __builtin_unreachable();
+    } else if (regs->rax == SYS_getpid) {
+        task_t* current = task_get_current();
+        if (current) {
+            ret = current->id;
+        } else {
+            ret = 0;
+        }
+    } else if (regs->rax == SYS_sched_yield) {
+        task_yield();
+        ret = 0;
     }
 
     regs->rax = ret;

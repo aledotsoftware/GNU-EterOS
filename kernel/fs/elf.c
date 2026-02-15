@@ -6,7 +6,7 @@
 #include <string.h>
 #include <serial.h>
 
-uint64_t elf_load_file(const char* path) {
+uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
     serial_write_string("[ELF] Loading file: ");
     serial_write_string(path);
     serial_write_string("\n");
@@ -42,6 +42,14 @@ uint64_t elf_load_file(const char* path) {
         return 0;
     }
 
+    uint64_t load_offset = 0;
+    if (header.e_type == ET_DYN) {
+        load_offset = base_vaddr;
+        serial_write_string("[ELF] Type: ET_DYN (PIE). Applying base offset.\n");
+    } else {
+        serial_write_string("[ELF] Type: ET_EXEC. Ignoring base offset.\n");
+    }
+
     /* Iterate Program Headers */
     for (int i = 0; i < header.e_phnum; i++) {
         Elf64_Phdr phdr;
@@ -55,7 +63,7 @@ uint64_t elf_load_file(const char* path) {
         if (phdr.p_type == PT_LOAD) {
             uint64_t mem_size = phdr.p_memsz;
             uint64_t file_size = phdr.p_filesz;
-            uint64_t vaddr = phdr.p_vaddr;
+            uint64_t vaddr = phdr.p_vaddr + load_offset;
             uint64_t file_offset = phdr.p_offset;
 
             /* Security Check: Ensure segment is in User Space */
@@ -64,12 +72,20 @@ uint64_t elf_load_file(const char* path) {
                 return 0;
             }
 
+            /* Warning: Identity Map Conflict (< 4GB) */
+            if (vaddr < 0x100000000) {
+                serial_write_string("[ELF] Warning: Segment address < 4GB conflicts with Kernel Identity Map.\n");
+                /* We continue, but it will likely crash if we don't switch CR3 */
+            }
+
             /* Calculate page range */
             uint64_t start_page = PAGE_ALIGN_DOWN(vaddr);
             uint64_t end_page   = PAGE_ALIGN_UP(vaddr + mem_size);
 
             /* Map pages */
             for (uint64_t addr = start_page; addr < end_page; addr += PAGE_SIZE) {
+                /* We check if mapped. If mapped by kernel (huge pages), we can't easily overwrite without splitting. */
+                /* Assuming vaddr >= 4GB, it should be unmapped initially. */
                 if (vmm_virt_to_phys(addr) == 0) {
                      void* phys = pmm_alloc_page();
                      if (!phys) {
@@ -93,5 +109,5 @@ uint64_t elf_load_file(const char* path) {
         }
     }
 
-    return header.e_entry;
+    return header.e_entry + load_offset;
 }
