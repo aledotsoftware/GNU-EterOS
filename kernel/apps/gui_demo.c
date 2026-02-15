@@ -424,7 +424,7 @@ static void draw_sysinfo_content(void) {
     int load = task_get_cpu_load();
     itoa_s(load, num, 16, 10);
     strlcat(cpu_buf, num, 32);
-    strlcat(cpu_buf, "%", 32);
+    strlcat(cpu_buf, "% (1 Core)", 32);
     wm_print_at(win_sysinfo, w/2 + 30, 70, cpu_buf);
     
     /* CPU Progress Bar */
