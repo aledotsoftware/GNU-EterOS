@@ -4,20 +4,40 @@
 #include <types.h>
 #include <ui/primitives.h>
 
-/* Omni Drawing Engine - High Performance 2D Graphics */
+/* ========================================================================= */
+/* Omni Drawing Engine v2.0 - éterOS High Performance 2D Graphics            */
+/* ========================================================================= */
+/*
+ * Fase 5.1 Optimizations:
+ * - Frame-batched buffer caching (omni_begin_frame)
+ * - Dirty region tracking for partial flushes
+ * - Alpha blending (256-level) for compositing
+ * - Transparent text rendering (no background overdraw)
+ * - Gradient fills, rounded rectangles, filled circles
+ * - Optimized line drawing (horizontal/vertical fast paths)
+ * - Row-based image blitting (memcpy per row vs per-pixel)
+ */
 
-/* Initializes the Omni engine (caches framebuffer pointers) */
+/* Frame Management */
 void omni_init(void);
+void omni_begin_frame(void);
+void omni_get_dirty_rect(int32_t* x, int32_t* y, int32_t* w, int32_t* h);
 
 /* Basic Primitives */
 void omni_draw_pixel(int32_t x, int32_t y, uint32_t color);
 void omni_fill_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
+void omni_fill_rect_alpha(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color, uint8_t alpha);
 void omni_draw_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
+void omni_draw_rounded_rect(int32_t x, int32_t y, int32_t w, int32_t h, int32_t radius, uint32_t color);
 void omni_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
+void omni_fill_circle(int32_t cx, int32_t cy, int32_t radius, uint32_t color);
+void omni_fill_gradient_v(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color_top, uint32_t color_bottom);
 
 /* Text Rendering */
 void omni_draw_char(int32_t x, int32_t y, char c, uint32_t fg, uint32_t bg);
+void omni_draw_char_transparent(int32_t x, int32_t y, char c, uint32_t fg);
 void omni_draw_string(const rect_t* clip, int32_t x, int32_t y, const char* str, uint32_t fg, uint32_t bg);
+void omni_draw_string_transparent(int32_t x, int32_t y, const char* str, uint32_t fg);
 
 /* Bitmap & Image Support */
 #define OMNI_BITMAP_ALPHA 1  /* Enable alpha blending */
