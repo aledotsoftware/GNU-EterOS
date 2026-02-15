@@ -115,20 +115,26 @@ static inline uint32_t _alpha_blend(uint32_t dst, uint32_t src, uint8_t alpha) {
     if (alpha == 0x00) return dst;
     
     uint32_t inv_alpha = 255 - alpha;
+
+    /* SWAR Optimization: Process R/B in parallel, then G */
+    /* 1. Mask R and B channels: 0x00RR00BB */
+    uint32_t s_rb = src & 0xFF00FF;
+    uint32_t d_rb = dst & 0xFF00FF;
     
-    uint32_t sr = (src >> 16) & 0xFF;
-    uint32_t sg = (src >> 8) & 0xFF;
-    uint32_t sb = src & 0xFF;
+    /* 2. Calculate blended R and B.
+       Mult by alpha/inv_alpha fits in 16 bits, so R doesn't overflow into B's space.
+       Result is 0xRRrr00BBbb (where lower byte is fraction) */
+    uint32_t rb = (s_rb * alpha + d_rb * inv_alpha) >> 8;
     
-    uint32_t dr = (dst >> 16) & 0xFF;
-    uint32_t dg = (dst >> 8) & 0xFF;
-    uint32_t db = dst & 0xFF;
+    /* 3. Mask G channel: 0x0000GG00 */
+    uint32_t s_g = src & 0xFF00;
+    uint32_t d_g = dst & 0xFF00;
     
-    uint32_t r = (sr * alpha + dr * inv_alpha) >> 8;
-    uint32_t g = (sg * alpha + dg * inv_alpha) >> 8;
-    uint32_t b = (sb * alpha + db * inv_alpha) >> 8;
+    /* 4. Calculate blended G. Result is 0xGGgg */
+    uint32_t g = (s_g * alpha + d_g * inv_alpha) >> 8;
     
-    return 0xFF000000 | (r << 16) | (g << 8) | b;
+    /* 5. Recombine, ensuring R/B mask cleans up any garbage in G slots */
+    return 0xFF000000 | (rb & 0xFF00FF) | (g & 0xFF00);
 }
 
 void omni_draw_pixel(int32_t x, int32_t y, uint32_t color) {
@@ -160,6 +166,22 @@ void omni_fill_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) 
 
     if (omni_bpp == 32) {
         uint32_t* row = omni_fb + (y * omni_pitch_div4) + x;
+
+        /* Optimization: Coalesce contiguous memory writes (e.g. Full Screen Clear) */
+        if ((uint32_t)w == omni_pitch_div4) {
+            memset32(row, color, (size_t)w * h);
+            return;
+        }
+
+        /* Optimization: Avoid memset overhead for vertical lines (e.g. Grid/UI borders) */
+        if (w == 1) {
+            for (int i = 0; i < h; i++) {
+                *row = color;
+                row += omni_pitch_div4;
+            }
+            return;
+        }
+
         for (int i = 0; i < h; i++) {
             memset32(row, color, w);
             row += omni_pitch_div4;
@@ -186,9 +208,23 @@ void omni_fill_rect_alpha(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
     
     if (omni_bpp == 32) {
         uint32_t* row = omni_fb + (y * omni_pitch_div4) + x;
+
+        /* Pre-calculate invariant source components for SWAR blending */
+        uint32_t inv_alpha = 255 - alpha;
+        uint32_t s_rb_a = (color & 0xFF00FF) * alpha;
+        uint32_t s_g_a  = (color & 0xFF00) * alpha;
+
         for (int i = 0; i < h; i++) {
             for (int j = 0; j < w; j++) {
-                row[j] = _alpha_blend(row[j], color, alpha);
+                uint32_t dst = row[j];
+
+                uint32_t d_rb = dst & 0xFF00FF;
+                uint32_t d_g  = dst & 0xFF00;
+
+                uint32_t rb = (s_rb_a + d_rb * inv_alpha) >> 8;
+                uint32_t g  = (s_g_a  + d_g  * inv_alpha) >> 8;
+
+                row[j] = 0xFF000000 | (rb & 0xFF00FF) | (g & 0xFF00);
             }
             row += omni_pitch_div4;
         }
