@@ -112,6 +112,13 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     cpu_init_bsp();
     #endif
 
+    #if defined(ARCH_X86_64)
+    /* ---- 2.7 Inicializar APIC y Despertar Cores ---- */
+    #include <apic.h>
+    lapic_init();   /* Inicializar Local APIC del core principal */
+    smp_init();     /* Despertar los Application Processors (APs) */
+    #endif
+
     /* ---- 3. Inicializar Memory Managers (Solo Tier 2+) ---- */
     #if ETEROS_TIER >= 2
         /* Memory Management Unit (Paging/MPU) */
