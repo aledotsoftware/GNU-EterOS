@@ -23,11 +23,12 @@ void user_loader_entry(void) {
     /* In kernel/main.c usually initrd is root. */
     /* Let's try "test.elf" relative to root. */
 
-    entry_point = elf_load_file("test.elf");
+    /* Load PIE binaries at 0x200000000 to avoid identity map conflicts */
+    entry_point = elf_load_file("test.elf", 0x200000000);
 
     if (entry_point == 0) {
         /* Try /test.elf */
-        entry_point = elf_load_file("/test.elf");
+        entry_point = elf_load_file("/test.elf", 0x200000000);
     }
 
     if (entry_point != 0) {
