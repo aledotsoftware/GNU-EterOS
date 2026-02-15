@@ -49,37 +49,25 @@ static void kernel_print_banner(void);
 static void kernel_print_sysinfo(void);
 static void kernel_halt(void);
 
+extern void net_poll(void);
+extern uint32_t my_ip;
+
 static void network_task(void) {
     while(1) {
-        /* Protect lwIP access with simple lock */
-        hal_interrupts_disable();
-        ethernetif_poll(&netif);
-        sys_check_timeouts();
+        net_poll();
 
-        /* Update status for legacy apps */
-        if (!network_ready && netif.ip_addr.addr != 0) {
+        /* Update status */
+        if (!network_ready && my_ip != 0) {
             network_ready = 1;
             hal_console_write("  [NET]  DHCP Bound! IP assigned.\n");
         }
-        hal_interrupts_enable();
 
         task_yield();
     }
 }
 
 static void init_network(void) {
-    ip4_addr_t ipaddr, netmask, gw;
-    IP4_ADDR(&ipaddr, 0, 0, 0, 0);
-    IP4_ADDR(&netmask, 0, 0, 0, 0);
-    IP4_ADDR(&gw, 0, 0, 0, 0);
-
-    lwip_init();
-
-    netif_add(&netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, ethernet_input);
-    netif_set_default(&netif);
-    netif_set_up(&netif);
-
-    dhcp_start(&netif);
+    net_init();
 }
 
 /* ========================================================================= */
