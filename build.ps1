@@ -261,6 +261,7 @@ if ($Arch -eq "x86_64") {
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\syscall.c"
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\acpi.c"
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\smp.c"
+    $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\apic.c"
     $KERNEL_SRCS += "$KERNEL_DIR\arch\x86_64\boot\nvram.c"
 }
 elseif ($Arch -eq "aarch64") {
