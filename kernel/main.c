@@ -50,6 +50,7 @@ void vmm_init(void);
 /* ========================================================================= */
 static void kernel_print_banner(void);
 static void kernel_print_sysinfo(void);
+
 static void kernel_halt(void);
 
 extern void net_poll(void);

@@ -73,6 +73,14 @@ struct tcp_header {
     uint16_t urgent_ptr;
 } __attribute__((packed));
 
+struct pseudo_header {
+    uint32_t src;
+    uint32_t dest;
+    uint8_t zero;
+    uint8_t proto;
+    uint16_t len;
+} __attribute__((packed));
+
 #define TCP_FIN (1 << 0)
 #define TCP_SYN (1 << 1)
 #define TCP_RST (1 << 2)

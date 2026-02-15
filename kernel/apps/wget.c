@@ -4,14 +4,19 @@
 #include <hal.h>
 #include <task.h>
 #include <net/socket.h>
+#include <net/defs.h>
 
 /**
  * éterOS - wget using Native Socket API
  */
 
-static void parse_url(const char* url, char* host, size_t host_size, char* path, size_t path_size) {
+static uint16_t parse_url(const char* url, char* host, size_t host_size, char* path, size_t path_size) {
+    uint16_t port = 80;
     if (strncmp(url, "http://", 7) == 0) {
         url += 7;
+    } else if (strncmp(url, "https://", 8) == 0) {
+        url += 8;
+        port = 443;
     }
     
     const char* slash = strchr(url, '/');
@@ -27,10 +32,10 @@ static void parse_url(const char* url, char* host, size_t host_size, char* path,
         strlcpy(host, url, host_size);
         strlcpy(path, "/", path_size);
     }
-    return;
+    return port;
 }
 
-static uint32_t ip_aton(const char* cp) {
+uint32_t ip_aton(const char* cp) {
     uint32_t val = 0;
     for (int i = 0; i < 4; i++) {
         uint32_t part = 0;
@@ -47,11 +52,16 @@ static uint32_t ip_aton(const char* cp) {
 void wget_run(const char* url_in) {
     char host[256];
     char path[256];
-    parse_url(url_in, host, sizeof(host), path, sizeof(path));
+    uint16_t port = parse_url(url_in, host, sizeof(host), path, sizeof(path));
     
-    terminal_write_string("[WGET] Host: ");
+    terminal_write_string("[WGET] Target: ");
+    if (port == 443) terminal_write_string("https://"); else terminal_write_string("http://");
     terminal_write_string(host);
     terminal_write_string("\n");
+
+    if (port == 443) {
+        terminal_write_string("[WGET] Warning: TLS (HTTPS) no implementado. Conectando via TCP plano.\n");
+    }
     
     uint32_t ip = ip_aton(host);
     if (ip == 0) {
@@ -59,7 +69,7 @@ void wget_run(const char* url_in) {
         if (strcmp(host, "google.com") == 0) ip = 0x4850fa8e; /* 142.250.80.72 */
         else if (strcmp(host, "tudexgames.com") == 0) ip = 0x288C43AC; /* 172.67.140.40 */
         else {
-            terminal_write_string("[WGET] Error: Only IP addresses or hardcoded hosts supported currently.\n");
+            terminal_write_string("[WGET] Error: Solo soportamos IP o hosts harcodeados.\n");
             return;
         }
     }
@@ -72,7 +82,7 @@ void wget_run(const char* url_in) {
     
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port = 80;
+    addr.sin_port = htons(port);
     addr.sin_addr = ip;
     
     terminal_write_string("[WGET] Connecting...\n");

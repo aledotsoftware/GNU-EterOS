@@ -9,6 +9,7 @@
 #include "../../include/vga.h"
 #include "../../include/mm.h"
 #include "../../include/timer.h"
+#include "../../include/hal.h"
 
 /* Constants and structs are now in include/net/dhcp.h and include/net/defs.h */
 
@@ -88,9 +89,9 @@ void dhcp_discover(void) {
     /* 5. Send Packet */
     uint16_t total_len = sizeof(struct ethernet_header) + sizeof(struct ip_header) + udp_len;
     
-    terminal_write_colored("[DHCP] Enviando Discover...\n", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    hal_console_write("[DHCP] Enviando Discover...\n");
     if (e1000_send_packet(buffer, total_len) < 0) {
-        terminal_write_colored("[DHCP] Error: No se pudo enviar el paquete (Driver inactivo o error HW).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+        hal_console_write("[DHCP] Error: No se pudo enviar el paquete.\n");
         return;
     }
     
@@ -100,31 +101,61 @@ void dhcp_discover(void) {
     
     uint8_t rx_buffer[1514];
     uint64_t start_ticks = timer_get_ticks();
-    uint64_t timeout_ticks = 3 * TIMER_HZ; /* 3 seconds */
+    uint64_t timeout_ticks = 5 * TIMER_HZ; /* 5 seconds */
     
     while(timer_get_ticks() - start_ticks < timeout_ticks) {
         int len = e1000_receive(rx_buffer, sizeof(rx_buffer));
         if (len > 0) {
             const struct dhcp_packet* r_dhcp = NULL;
             if (dhcp_parse_offer(rx_buffer, len, xid, &r_dhcp) == 0) {
-                 terminal_write_colored("[DHCP] Oferta Recibida!\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+                 hal_console_write("[DHCP] Oferta Recibida!\n");
+
+                 /* Parse Options for Mask, Gateway, DNS */
+                 uint32_t mask = 0;
+                 uint32_t gw = 0;
+                 uint32_t dns = 0;
+
+                 const uint8_t* opt = r_dhcp->options;
+                 while (*opt != 255 && (opt - r_dhcp->options) < 308) {
+                     uint8_t type = *opt++;
+                     if (type == 0) continue; /* Padding */
+                     uint8_t slen = *opt++;
+                     
+                     if (type == 1) { /* Subnet Mask */
+                         memcpy(&mask, opt, 4);
+                     } else if (type == 3) { /* Router/Gateway */
+                         memcpy(&gw, opt, 4);
+                     } else if (type == 6) { /* DNS */
+                         memcpy(&dns, opt, 4);
+                     }
+                     opt += slen;
+                 }
 
                  /* Print Offered IP (yiaddr) */
                  const uint8_t* ip = (const uint8_t*)&r_dhcp->yiaddr;
+                 hal_console_write("  IP Address: ");
+                 itoa_s(ip[0], numbuf, sizeof(numbuf), 10); hal_console_write(numbuf); hal_console_write(".");
+                 itoa_s(ip[1], numbuf, sizeof(numbuf), 10); hal_console_write(numbuf); hal_console_write(".");
+                 itoa_s(ip[2], numbuf, sizeof(numbuf), 10); hal_console_write(numbuf); hal_console_write(".");
+                 itoa_s(ip[3], numbuf, sizeof(numbuf), 10); hal_console_write(numbuf);
+                 hal_console_write("\n");
 
-                 terminal_write_string("  IP Address: ");
-                 itoa_s(ip[0], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
-                 itoa_s(ip[1], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
-                 itoa_s(ip[2], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf); terminal_write_string(".");
-                 itoa_s(ip[3], numbuf, sizeof(numbuf), 10); terminal_write_string(numbuf);
-                 terminal_write_string("\n");
+                 if (gw != 0) {
+                     const uint8_t* gip = (const uint8_t*)&gw;
+                     hal_console_write("  Gateway:    ");
+                     itoa_s(gip[0], numbuf, sizeof(numbuf), 10); hal_console_write(numbuf); hal_console_write(".");
+                     itoa_s(gip[1], numbuf, sizeof(numbuf), 10); hal_console_write(numbuf); hal_console_write(".");
+                     itoa_s(gip[2], numbuf, sizeof(numbuf), 10); hal_console_write(numbuf); hal_console_write(".");
+                     itoa_s(gip[3], numbuf, sizeof(numbuf), 10); hal_console_write(numbuf);
+                     hal_console_write("\n");
+                 }
 
                  /* Store in Global Stack */
                  extern uint32_t my_ip, gateway_ip, dns_ip;
                  extern int network_ready;
                  my_ip = r_dhcp->yiaddr;
-                 gateway_ip = (my_ip & 0x00FFFFFF) | 0x01000000; 
-                 dns_ip = 0x08080808; 
+                 gateway_ip = (gw != 0) ? gw : ((my_ip & 0x00FFFFFF) | 0x02000000); 
+                 dns_ip = (dns != 0) ? dns : 0x08080808; 
                  network_ready = 1;
 
                  return;
@@ -135,5 +166,5 @@ void dhcp_discover(void) {
         timer_sleep(10);
     }
     
-    terminal_write_colored("[DHCP] Timeout. Sin respuesta.\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+    hal_console_write("[DHCP] Timeout. Sin respuesta de servidor DHCP.\n");
 }

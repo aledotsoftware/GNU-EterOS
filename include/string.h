@@ -102,6 +102,7 @@ int strncmp(const char* s1, const char* s2, size_t n);
  *
  * @param buffer_size Tamaño del buffer de destino.
  */
+int atoi(const char* str);
 void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base);
 
 /**

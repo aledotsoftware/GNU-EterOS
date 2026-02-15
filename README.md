@@ -397,6 +397,48 @@ Información de Versión: Muestra el hash del commit actual, fecha de build y es
 
 
 
+Mecanismo de Intercepción (Capa ABI)
+Linux usa registros específicos para sus syscalls en x86_64 (RAX para el número, RDI, RSI, RDX, R10, R8, R9 para argumentos).
+
+Multiplexor de Syscalls: Tu manejador de interrupción actual debe detectar si el binario que hizo la llamada es "Nativo" o "Linux" (basado en el espacio de memoria o una bandera en la estructura task_t) y derivar la llamada a una tabla de saltos distinta.
+
+Identidad ELF: Tu cargador de ELF debe reconocer el EI_OSABI en la cabecera del archivo para marcar el proceso como "Linux-compliant".
+
+2. Gestión de Memoria: Copy-on-Write (CoW)
+Casi cualquier app de Linux, al iniciar, hace un fork().
+
+Situación actual: Si tu fork() actual duplica toda la RAM físicamente, el sistema se quedará sin memoria rápido.
+
+Lo que falta: Implementar Copy-on-Write en el VMM. Al hacer fork, marcas las páginas de memoria como "Solo Lectura" para ambos procesos. Solo cuando uno escribe, el kernel lanza un Page Fault, duplica la página y cambia los permisos. Sin esto, no podrás levantar procesos pesados.
+
+3. Implementación de Futexes (Fast Userspace Mutexes)
+Este es el "talón de Aquiles" de muchos kernels nuevos.
+
+Por qué es vital: Casi toda app moderna de Linux usa la glibc o musl, y estas usan futex() para hilos (pthreads) y sincronización.
+
+Lo que falta: Una syscall sys_futex que pueda poner a dormir hilos y despertarlos basándose en una dirección de memoria virtual. Sin esto, los binarios se quedan "congelados" esperando un lock que nunca llega.
+
+4. Soporte para TLS (Thread Local Storage) y FS/GS Base
+Linux depende fuertemente de los registros de segmento FS y GS para manejar los datos locales de cada hilo (como la variable errno).
+
+Lo que falta: Implementar las syscalls arch_prctl (específicamente ARCH_SET_FS y ARCH_SET_GS). Si la app no puede setear su puntero TLS, crasheará antes de llegar al main().
+
+5. Fidelidad en el VFS (File Descriptors y Pipes)
+Linux trata todo como un archivo, pero con comportamientos muy específicos:
+
+pipe() y dup2(): Vitales para la redirección de entrada/salida (| y >).
+
+mmap() de archivos: Linux carga los binarios mapeando el archivo directamente a memoria. Tu VFS debe soportar mapear un archivo del disco/initrd a una región del espacio virtual del usuario.
+
+Stat y Fstat: Las apps preguntan constantemente "¿qué tamaño tiene este archivo?" o "¿es un directorio?". Necesitas completar estas estructuras de datos para que coincidan exactamente con las de Linux.
+
+
+
+
+
+
+
+
 
 
 

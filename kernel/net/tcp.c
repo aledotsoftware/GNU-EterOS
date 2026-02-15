@@ -4,20 +4,13 @@
 #include <string.h>
 #include <timer.h>
 #include <task.h>
+#include <hal.h>
 
 extern uint32_t my_ip;
 extern uint8_t gateway_mac[6];
 extern uint16_t net_checksum(void* vdata, size_t length);
 
 /* Pseudo Header for Checksum */
-struct pseudo_header {
-    uint32_t src;
-    uint32_t dest;
-    uint8_t zero;
-    uint8_t proto;
-    uint16_t len;
-} __attribute__((packed));
-
 static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, int flags) {
     uint8_t buffer[1514];
     struct ethernet_header* eth = (struct ethernet_header*)buffer;
@@ -109,6 +102,7 @@ void tcp_input(socket_entry_t* sock, struct tcp_header* tcp, int len, uint32_t s
 
             sock->ack_num += data_len;
             /* Send ACK */
+            hal_console_write("[TCP] Data rx, sending ACK\n");
             tcp_send_packet(sock, NULL, 0, TCP_ACK);
         } else if (flags & TCP_ACK) {
              /* Pure ACK, update sequence? */
@@ -153,12 +147,16 @@ int tcp_connect(socket_entry_t* sock, uint32_t dest_ip, uint16_t dest_port) {
     sock->ack_num = 0;
     sock->state = SOCKET_STATE_SYN_SENT;
 
+    hal_console_write("[TCP] Connecting... sending SYN\n");
     tcp_send_packet(sock, NULL, 0, TCP_SYN);
 
     /* Wait for ESTABLISHED */
     uint64_t start = timer_get_ticks();
     while (sock->state != SOCKET_STATE_ESTABLISHED) {
-        if (timer_get_ticks() - start > 300) return -1; /* 3s Timeout */
+        if (timer_get_ticks() - start > 500) { /* 5s Timeout */
+            hal_console_write("[TCP] Connection Timeout.\n");
+            return -1;
+        }
 
         /* If we don't rely on background task, we must poll here.
            Since we don't know if background task is running,
@@ -170,6 +168,7 @@ int tcp_connect(socket_entry_t* sock, uint32_t dest_ip, uint16_t dest_port) {
         task_yield();
     }
 
+    hal_console_write("[TCP] Connected! (ESTABLISHED)\n");
     return 0;
 }
 

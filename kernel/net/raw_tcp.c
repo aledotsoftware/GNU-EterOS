@@ -4,6 +4,7 @@
 #include <timer.h>
 #include <task.h>
 #include <vga.h>
+#include <hal.h>
 
 extern uint32_t my_ip, gateway_ip;
 extern uint8_t gateway_mac[6];
@@ -14,10 +15,20 @@ extern uint16_t net_checksum(void* vdata, size_t length);
 #define TUDEX_IP 0x288C43AC 
 
 int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
-    (void)host; (void)path;
-    
     if (my_ip == 0) return -1;
     
+    extern uint32_t ip_aton(const char* cp);
+    uint32_t target_ip = ip_aton(host);
+    if (target_ip == 0) {
+        if (strcmp(host, "tudexgames.com") == 0) target_ip = TUDEX_IP;
+        else if (strcmp(host, "google.com") == 0) target_ip = 0x4850fa8e;
+        else return -1;
+    }
+
+    hal_console_write("[RAW-TCP] Connecting to ");
+    hal_console_write(host);
+    hal_console_write("...\n");
+
     /* 1. ARP for Gateway */
     if (gateway_mac[0] == 0xFF) {
         if (net_arp_lookup(gateway_ip) != 0) return -1;
@@ -43,7 +54,7 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
     ip->ttl = 64;
     ip->proto = IP_PROTO_TCP;
     ip->src = my_ip;
-    ip->dest = TUDEX_IP;
+    ip->dest = target_ip;
     ip->checksum = 0;
     ip->checksum = net_checksum(ip, sizeof(struct ip_header));
     
@@ -54,8 +65,19 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
     tcp->flags = htons(0x5002); /* SYN, Offset 5 (20 bytes) */
     tcp->window = htons(2048);
     tcp->checksum = 0;
-    /* Pseudo-header for TCP checksum (Simplified) */
-    tcp->checksum = net_checksum(tcp, sizeof(struct tcp_header));
+
+    /* Pseudo-header for SYN Checksum */
+    struct pseudo_header ph_syn;
+    ph_syn.src = my_ip;
+    ph_syn.dest = target_ip;
+    ph_syn.zero = 0;
+    ph_syn.proto = IP_PROTO_TCP;
+    ph_syn.len = htons(sizeof(struct tcp_header));
+
+    uint8_t chk_buf_syn[64];
+    memcpy(chk_buf_syn, &ph_syn, 12);
+    memcpy(chk_buf_syn + 12, tcp, sizeof(struct tcp_header));
+    tcp->checksum = net_checksum(chk_buf_syn, 12 + sizeof(struct tcp_header));
     
     e1000_send_packet(buffer, sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct tcp_header));
     
@@ -68,7 +90,7 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
         int rlen = e1000_receive(rx, sizeof(rx));
         if (rlen > 40) {
             struct ip_header* rip = (struct ip_header*)(rx + 14);
-            if (rip->proto == IP_PROTO_TCP && rip->src == TUDEX_IP) {
+            if (rip->proto == IP_PROTO_TCP && rip->src == target_ip) {
                 struct tcp_header* rtcp = (struct tcp_header*)(rx + 14 + 20);
                 if (ntohs(rtcp->flags) & TCP_SYN && ntohs(rtcp->flags) & TCP_ACK) {
                     server_seq = ntohl(rtcp->seq);
@@ -100,21 +122,15 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
     memcpy(buffer + 14 + 20 + 20, get_req, get_len);
     
     /* Correct TCP Checksum with Pseudo-header */
-    struct {
-        uint32_t src;
-        uint32_t dest;
-        uint8_t zero;
-        uint8_t proto;
-        uint16_t len;
-    } __attribute__((packed)) pseudo;
-    pseudo.src = my_ip;
-    pseudo.dest = TUDEX_IP;
-    pseudo.zero = 0;
-    pseudo.proto = IP_PROTO_TCP;
-    pseudo.len = htons(sizeof(struct tcp_header) + get_len);
+    struct pseudo_header ph_get;
+    ph_get.src = my_ip;
+    ph_get.dest = target_ip;
+    ph_get.zero = 0;
+    ph_get.proto = IP_PROTO_TCP;
+    ph_get.len = htons(sizeof(struct tcp_header) + get_len);
     
     uint8_t chk_buf[512];
-    memcpy(chk_buf, &pseudo, 12);
+    memcpy(chk_buf, &ph_get, 12);
     memcpy(chk_buf + 12, tcp, sizeof(struct tcp_header) + get_len);
     tcp->checksum = net_checksum(chk_buf, 12 + sizeof(struct tcp_header) + get_len);
     
@@ -126,7 +142,7 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
         int rlen = e1000_receive(rx, sizeof(rx));
         if (rlen > 40) {
             struct ip_header* rip = (struct ip_header*)(rx + 14);
-            if (rip->proto == IP_PROTO_TCP && rip->src == TUDEX_IP) {
+            if (rip->proto == IP_PROTO_TCP && rip->src == target_ip) {
                 struct tcp_header* rtcp = (struct tcp_header*)(rx + 14 + 20);
                 int data_off = (ntohs(rtcp->flags) >> 12) * 4;
                 int data_len = ntohs(rip->len) - 20 - data_off;

@@ -6,6 +6,7 @@
 #include <task.h>
 #include <vga.h>
 #include <mm.h>
+#include <hal.h>
 
 /* Global Network Info */
 uint32_t my_ip = 0;
@@ -94,8 +95,8 @@ void net_poll(void) {
         } else if (type == ETHERNET_TYPE_IP) {
             struct ip_header* ip = (struct ip_header*)(buffer + sizeof(struct ethernet_header));
 
-            /* Basic IP Checks */
-            if (ip->dest == my_ip) {
+            /* Basic IP Checks: Allow if addressed to us, or if broadcast, or if we don't have an IP yet */
+            if (ip->dest == my_ip || ip->dest == 0xFFFFFFFF || my_ip == 0) {
                 if (ip->proto == IP_PROTO_TCP) {
                     struct tcp_header* tcp = (struct tcp_header*)((uint8_t*)ip + ((ip->ver_ihl & 0xF) * 4));
                     int ip_hdr_len = (ip->ver_ihl & 0xF) * 4;
@@ -110,17 +111,18 @@ void net_poll(void) {
                             /* If connected, check remote IP/Port */
                             if (s->state != SOCKET_STATE_LISTEN) {
                                 if (s->remote_ip != ip->src) {
-                                     /* Allow generic match if waiting for connection or loose check? */
                                      /* Strict check: */
                                      if (s->remote_ip != 0 && s->remote_ip != ip->src) continue;
                                 }
-                                /* Check port? */
                             }
 
                             tcp_input(s, tcp, tcp_len, ip->src);
                             break;
                         }
                     }
+                } else if (ip->proto == IP_PROTO_UDP) {
+                    /* UDP support could be added here for DHCP in network_task */
+                    /* But currently dhcp_discover does its own polling. */
                 }
             }
         }
@@ -154,15 +156,29 @@ int net_arp_lookup(uint32_t target_ip) {
     memset(arp->dest_mac, 0, 6);
     arp->dest_ip = target_ip;
     
+    hal_console_write("[ARP] Looking up MAC for ");
+    uint8_t* tip = (uint8_t*)&target_ip;
+    char buf[16];
+    itoa_s(tip[0], buf, sizeof(buf), 10); hal_console_write(buf); hal_console_write(".");
+    itoa_s(tip[1], buf, sizeof(buf), 10); hal_console_write(buf); hal_console_write(".");
+    itoa_s(tip[2], buf, sizeof(buf), 10); hal_console_write(buf); hal_console_write(".");
+    itoa_s(tip[3], buf, sizeof(buf), 10); hal_console_write(buf);
+    hal_console_write("...\n");
+
     e1000_send_packet(buffer, sizeof(struct ethernet_header) + sizeof(struct arp_packet));
     
     /* Wait for response via net_poll */
     uint64_t start = timer_get_ticks();
-    while (timer_get_ticks() - start < 100) { /* 1s timeout */
+    while (timer_get_ticks() - start < 150) { /* 1.5s timeout */
         net_poll(); /* Process incoming packets */
-        if (target_ip == gateway_ip && gateway_mac[0] != 0xFF) return 0; /* Found! */
+        if (target_ip == gateway_ip && gateway_mac[0] != 0xFF) {
+            hal_console_write("[ARP] Resolved Gateway MAC.\n");
+            return 0; /* Found! */
+        }
         task_yield();
     }
+    
+    hal_console_write("[ARP] Timeout. MAC not resolved.\n");
     return -1;
 }
 

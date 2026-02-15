@@ -878,7 +878,7 @@ static char browser_url[128] = "http://142.250.180.14"; /* Google IP (No DNS yet
 static char browser_content[2048] = "";
 static bool browser_loading = false;
 static char browser_status_text[64] = "Listo";
-static char proto_buffer[2048] = "";
+
 
 /* ========================================================================= */
 /* CAPA 3: SERVIDOR EXTERNO (Independiente)                                  */
@@ -968,48 +968,123 @@ static void system_net_dispatcher_task(void) {
     strlcpy(browser_status_text, "Network: Iniciando DHCP...", 64);
     
     extern int network_ready;
-    
     int timeout = 50;
     while (!network_ready && timeout-- > 0) {
         task_sleep(100);
     }
     
     if (!network_ready) {
-        strlcpy(browser_content, "Error: No se pudo obtener IP via DHCP (Hardware Offline).", sizeof(browser_content));
+        strlcpy(browser_content, "Error: No se pudo obtener IP via DHCP.", sizeof(browser_content));
         strlcpy(browser_status_text, "DHCP Fail", 64);
         browser_loading = false;
         task_exit();
     }
     
-    strlcpy(browser_status_text, "DNS: Resolviendo host (Skipped)...", 64);
-    task_sleep(400);
-    
     strlcpy(browser_status_text, "TCP: Conectando...", 64);
     
-    /* Parse Host from URL (Naive) */
-    char host_buf[64] = "142.250.180.14"; 
-    /* Extract IP from browser_url if possible, usually it is http://IP/... */
+    /* Parse Protocol and Host from URL */
+    uint16_t port = 80;
     char* p = flux_strstr(browser_url, "http://");
-    if (p) p += 7;
-    else p = browser_url;
-    
-    int i = 0;
-    while (*p && *p != '/' && i < 63) host_buf[i++] = *p++;
-    host_buf[i] = 0;
-    
-    const char* path = parse_url_path(browser_url);
-    int res = raw_tcp_get(host_buf, path, proto_buffer, sizeof(proto_buffer));
-    
-    if (res > 0) {
-        strlcpy(browser_content, proto_buffer, sizeof(browser_content));
-        strlcpy(browser_status_text, "200 OK - Conexion Real", 64);
+    if (p) {
+        p += 7;
     } else {
-        if (res == -2) strlcpy(browser_content, "Error: El servidor no respondio al SYN (TCP Timeout).", sizeof(browser_content));
-        else if (res == -3) strlcpy(browser_content, "Error: Se conecto pero no hubo datos (HTTP Timeout).", sizeof(browser_content));
-        else strlcpy(browser_content, "Error: Fallo en la capa de red (E1000/ARP).", sizeof(browser_content));
-        strlcpy(browser_status_text, "Net Error", 64);
+        p = flux_strstr(browser_url, "https://");
+        if (p) {
+            p += 8;
+            port = 443;
+            flux_notify("Security", "TLS no implementado (HTTPS). Usando raw TCP.", FLUX_ACCENT_AMBER);
+        } else {
+            p = browser_url;
+        }
     }
     
+    char host_buf[64]; 
+    int i = 0;
+    while (*p && *p != '/' && *p != ':' && i < 63) host_buf[i++] = *p++;
+    host_buf[i] = 0;
+    
+    /* Check for custom port */
+    if (*p == ':') {
+        p++;
+        char pbuf[8];
+        int pi = 0;
+        while (*p >= '0' && *p <= '9' && pi < 7) pbuf[pi++] = *p++;
+        pbuf[pi] = 0;
+        if (pi > 0) {
+            port = (uint16_t)atoi(pbuf);
+        }
+    }
+
+    const char* path = parse_url_path(browser_url);
+    
+    /* Use Socket API */
+    socket_t sock = net_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock < 0) {
+        strlcpy(browser_content, "Error: No se pudo crear el socket.", sizeof(browser_content));
+        browser_loading = false;
+        task_exit();
+    }
+
+    /* Resolve IP */
+    uint32_t target_ip = 0;
+    if (strcmp(host_buf, "tudexgames.com") == 0) target_ip = 0x288C43AC;
+    else if (strcmp(host_buf, "google.com") == 0) target_ip = 0x4850fa8e;
+    else {
+        extern uint32_t ip_aton(const char* cp);
+        target_ip = ip_aton(host_buf);
+    }
+
+    if (target_ip == 0) {
+        strlcpy(browser_content, "Error: No se pudo resolver el host.", sizeof(browser_content));
+        net_close(sock);
+        browser_loading = false;
+        task_exit();
+    }
+
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr = target_ip;
+
+    if (net_connect(sock, &addr, sizeof(addr)) != 0) {
+        strlcpy(browser_content, "Error: TCP Connection Failed (Timeout).", sizeof(browser_content));
+        net_close(sock);
+        browser_loading = false;
+        task_exit();
+    }
+
+    strlcpy(browser_status_text, "HTTP: Enviando GET...", 64);
+    char get_req[256];
+    strlcpy(get_req, "GET ", 256);
+    strlcat(get_req, path, 256);
+    strlcat(get_req, " HTTP/1.0\r\nHost: ", 256);
+    strlcat(get_req, host_buf, 256);
+    strlcat(get_req, "\r\nConnection: close\r\n\r\n", 256);
+
+    net_send(sock, get_req, strlen(get_req), 0);
+
+    strlcpy(browser_status_text, "Net: Recibiendo datos...", 64);
+    
+    int total_read = 0;
+    int r;
+    while (total_read < (int)sizeof(browser_content) - 1) {
+        r = net_recv(sock, browser_content + total_read, sizeof(browser_content) - 1 - total_read, MSG_DONTWAIT);
+        if (r > 0) total_read += r;
+        else if (r == 0) break; /* Closed */
+        else {
+            /* Check if still establishing or just waiting */
+            task_sleep(50);
+            if (total_read > 0) { /* If we got something, wait a bit more, else break? */
+                 /* Minimalist: Wait up to 2s for more data? */
+            }
+        }
+    }
+    browser_content[total_read] = 0;
+    
+    if (total_read > 0) strlcpy(browser_status_text, "200 OK - Flux Socket", 64);
+    else strlcpy(browser_status_text, "Recv Error / Empty", 64);
+
+    net_close(sock);
     browser_loading = false;
     task_exit();
 }
