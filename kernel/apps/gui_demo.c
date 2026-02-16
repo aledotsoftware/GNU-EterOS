@@ -1510,6 +1510,32 @@ static void draw_global_status_bar(void) {
     omni_fill_rect(bat_x - 1, bat_y - 1, bat_w + 2, bat_h + 2, 0x333333);
     omni_fill_rect(bat_x, bat_y, bat_w, bat_h, 0x111111);
     omni_fill_rect(bat_x + 2, bat_y + 2, bat_w - 4, bat_h - 4, 0x00CC00);
+
+    /* Tooltip: Battery on Hover */
+    if (mouse_x >= bat_x - 5 && mouse_x <= bat_x + bat_w + 5 && mouse_y <= 32) {
+        /* Localized String */
+        const char* bat_str = (settings_lang == 0) ? "100% - Energia" : "100% - Power";
+
+        int tip_w = strlen(bat_str) * 8 + 10;
+        int tip_h = 20;
+        /* Center below battery */
+        int tip_x = bat_x + (bat_w - tip_w) / 2;
+        if (tip_x + tip_w > (int)screen_w) tip_x = screen_w - tip_w - 2;
+        int tip_y = 36;
+
+        /* Shadow */
+        omni_fill_rect(tip_x + 2, tip_y + 2, tip_w, tip_h, 0x000000);
+        /* Bg */
+        omni_fill_rect(tip_x, tip_y, tip_w, tip_h, 0x252525);
+        /* Border */
+        omni_fill_rect(tip_x, tip_y, tip_w, 1, 0x555555);
+        omni_fill_rect(tip_x, tip_y + tip_h - 1, tip_w, 1, 0x555555);
+        omni_fill_rect(tip_x, tip_y, 1, tip_h, 0x555555);
+        omni_fill_rect(tip_x + tip_w - 1, tip_y, 1, tip_h, 0x555555);
+
+        /* Text */
+        omni_draw_string(NULL, tip_x + 5, tip_y + 4, bat_str, 0xFFFFFF, 0x252525);
+    }
     
     right_margin -= (bat_w + 20);
 
