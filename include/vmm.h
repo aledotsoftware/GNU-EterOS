@@ -83,4 +83,10 @@ uint64_t vmm_clone_pml4(int cow);
  */
 int vmm_handle_page_fault(uint64_t addr, uint64_t error_code);
 
+/**
+ * Verifica si una dirección virtual está mapeada como usuario.
+ * @return 1 si es accesible por usuario (PAGE_USER set en todos los niveles), 0 si no.
+ */
+int vmm_is_user_page(uint64_t virt_addr);
+
 #endif /* ETEROS_VMM_H */
