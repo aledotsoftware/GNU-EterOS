@@ -1905,6 +1905,9 @@ static void draw_focus_mode(void) {
     /* Shadow/Glow */
     omni_fill_rect(focused_space->bounds.x - 2, focused_space->bounds.y - 2,
                      focused_space->bounds.w + 4, focused_space->bounds.h + 4, FLUX_ACCENT_CYAN); 
+
+    /* Draw Window Frame (Title Bar, Close Button, Background) */
+    wm_draw_window(focused_space);
                      
     /* Dispatch Draw Content based on Node ID */
     if (zooming_node == NODE_TERMINAL) {
@@ -2051,6 +2054,20 @@ static void handle_flux_click(void) {
         
         /* Pass clicks to active window if inside bounds */
         if (focused_space) {
+             /* Check Close Button Click (Top Right) */
+             int title_h = 30; /* Defined in window.c */
+             int btn_size = 20;
+             int btn_margin = (title_h - btn_size) / 2;
+
+             int btn_x = focused_space->bounds.x + focused_space->bounds.w - btn_size - btn_margin;
+             int btn_y = focused_space->bounds.y + btn_margin;
+
+             if (mouse_x >= btn_x && mouse_x <= btn_x + btn_size &&
+                 mouse_y >= btn_y && mouse_y <= btn_y + btn_size) {
+                 target_zoom = FLUX_MACRO;
+                 return;
+             }
+
              int lx = mouse_x - focused_space->bounds.x;
              int ly = mouse_y - focused_space->bounds.y;
              
