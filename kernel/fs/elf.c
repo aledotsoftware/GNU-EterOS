@@ -79,6 +79,12 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             uint64_t vaddr = phdr.p_vaddr + load_offset;
             uint64_t file_offset = phdr.p_offset;
 
+            /* Check for integer overflow in vaddr + mem_size */
+            if (vaddr + mem_size < vaddr) {
+                serial_write_string("[ELF] Error: Segment address wraparound (overflow).\n");
+                return 0;
+            }
+
             if (vaddr + mem_size > max_vaddr) {
                 max_vaddr = vaddr + mem_size;
             }
@@ -95,11 +101,16 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
                 return 0;
             }
 
+            /* Determine final permissions based on ELF Header */
+            uint32_t final_flags = HAL_MEM_USER | HAL_MEM_READ;
+            if (phdr.p_flags & PF_W) final_flags |= HAL_MEM_WRITE;
+            if (phdr.p_flags & PF_X) final_flags |= HAL_MEM_EXEC;
+
             /* Calculate page range */
             uint64_t start_page = PAGE_ALIGN_DOWN(vaddr);
             uint64_t end_page   = PAGE_ALIGN_UP(vaddr + mem_size);
 
-            /* Map pages */
+            /* Pass 1: Map pages as RW (Read/Write) to allow loading content */
             for (uint64_t addr = start_page; addr < end_page; addr += PAGE_SIZE) {
                 /* We check if mapped. If mapped by kernel (huge pages), we can't easily overwrite without splitting. */
                 /* Assuming vaddr >= 4GB, it should be unmapped initially. */
@@ -109,20 +120,44 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
                          serial_write_string("[ELF] OOM during loading.\n");
                          return 0;
                      }
-                     /* Always map as USER | WRITE | EXEC | PRESENT for loading */
+                     /* Always map as USER | WRITE initially for loading */
                      /* Note: HAL_MEM_READ is implicit with map */
-                     hal_mem_map((uint64_t)phys, addr, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER | HAL_MEM_EXEC);
+                     hal_mem_map((uint64_t)phys, addr, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER);
 
                      /* Zero the page content initially */
                      memset((void*)addr, 0, PAGE_SIZE);
                 }
             }
 
-            /* Now copy data */
+            /* Now copy data (while pages are RW) */
             if (file_size > 0) {
                 if (read_fs(node, file_offset, file_size, (uint8_t*)vaddr) != file_size) {
                      serial_write_string("[ELF] Failed to read segment data.\n");
                 }
+            }
+
+            /* Pass 2: Remap pages with strict permissions (W^X) */
+            for (uint64_t addr = start_page; addr < end_page; addr += PAGE_SIZE) {
+                 uint32_t page_flags = final_flags;
+
+                 /* Handle shared/misaligned pages: */
+                 /* If segment starts mid-page, that page is shared with previous segment. */
+                 /* If segment ends mid-page, that page is shared with next segment. */
+                 /* We MUST keep Write permission on shared pages to avoid breaking adjacent data segments. */
+
+                 bool is_shared = false;
+                 if (addr == start_page && (vaddr & (PAGE_SIZE - 1))) is_shared = true;
+                 if (addr == end_page - PAGE_SIZE && ((vaddr + mem_size) & (PAGE_SIZE - 1))) is_shared = true;
+
+                 if (is_shared) {
+                     page_flags |= HAL_MEM_WRITE;
+                 }
+
+                 /* Apply new flags (e.g. adding EXEC or removing WRITE) */
+                 uint64_t phys = hal_mem_get_phys(addr);
+                 if (phys) {
+                     hal_mem_map(phys, addr, page_flags);
+                 }
             }
         }
     }
