@@ -20,6 +20,7 @@
 #include <sys/signal.h>
 #include <lock.h>
 #include <timer.h>
+#include <vmm.h>
 
 extern void syscall_entry(void);
 
@@ -163,6 +164,36 @@ static void pipe_open(fs_node_t* node) {
     (void)node;
 }
 
+static int validate_user_buffer(const void* addr, size_t size) {
+    uint64_t start = (uint64_t)addr;
+    uint64_t end = start + size;
+
+    if (end < start) return 0; /* Overflow */
+
+    uint64_t page_start = start & ~0xFFF;
+    uint64_t page_end = (end + 0xFFF) & ~0xFFF;
+
+    for (uint64_t p = page_start; p < page_end; p += PAGE_SIZE) {
+        if (!vmm_is_user_page(p)) return 0;
+    }
+    return 1;
+}
+
+static int validate_user_string(const char* str) {
+    if (!str) return 0;
+    uint64_t ptr = (uint64_t)str;
+
+    for (int i = 0; i < 4096; i++) {
+        if ((ptr & 0xFFF) == 0 || i == 0) {
+             if (!vmm_is_user_page(ptr & ~0xFFF)) return 0;
+        }
+
+        if (*(char*)ptr == '\0') return 1;
+        ptr++;
+    }
+    return 0; /* Too long */
+}
+
 static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
     (void)fd; (void)offset;
     if (len == 0) return -EINVAL;
@@ -205,7 +236,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
 }
 
 static int64_t sys_pipe(int* pipefd) {
-    if (!pipefd) return -EFAULT;
+    if (!validate_user_buffer(pipefd, 2 * sizeof(int))) return -EFAULT;
 
     task_t* current = task_get_current();
 
@@ -313,6 +344,8 @@ struct stat {
 };
 
 static int64_t sys_write(int fd, const void* buf, size_t count) {
+    if (!validate_user_buffer(buf, count)) return -EFAULT;
+
     if (fd == 1 || fd == 2) {
         /* Stdout / Stderr -> Serial + VGA */
         const char* msg = (const char*)buf;
@@ -337,6 +370,8 @@ static int64_t sys_write(int fd, const void* buf, size_t count) {
 }
 
 static int64_t sys_read(int fd, void* buf, size_t count) {
+    if (!validate_user_buffer(buf, count)) return -EFAULT;
+
     if (fd == 0) {
         /* Stdin -> Keyboard */
         char* cbuf = (char*)buf;
@@ -376,6 +411,8 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
 }
 
 static int64_t sys_open(const char* path, int flags, int mode) {
+    if (!validate_user_string(path)) return -EFAULT;
+
     (void)mode;
     task_t* current = task_get_current();
 
@@ -522,7 +559,7 @@ static int64_t sys_arch_prctl(int code, uint64_t addr) {
 }
 
 static int64_t sys_uname(struct utsname* buf) {
-    if (!buf) return -EFAULT;
+    if (!validate_user_buffer(buf, sizeof(struct utsname))) return -EFAULT;
 
     /* Simulate Linux 5.5 */
     strlcpy(buf->sysname, "Linux", 65);
@@ -564,7 +601,8 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
 }
 
 static int64_t sys_fstat(int fd, struct stat* buf) {
-    if (!buf) return -EFAULT;
+    if (!validate_user_buffer(buf, sizeof(struct stat))) return -EFAULT;
+
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
@@ -581,7 +619,9 @@ static int64_t sys_fstat(int fd, struct stat* buf) {
 }
 
 static int64_t sys_stat(const char* path, struct stat* buf) {
-    if (!path || !buf) return -EFAULT;
+    if (!validate_user_string(path)) return -EFAULT;
+    if (!validate_user_buffer(buf, sizeof(struct stat))) return -EFAULT;
+
     fs_node_t* node = vfs_lookup(fs_root, path);
     if (!node) return -ENOENT;
 
@@ -800,8 +840,9 @@ static int64_t sys_geteuid(void) { return 0; }
 static int64_t sys_getegid(void) { return 0; }
 
 static int64_t sys_access(const char* path, int mode) {
+    if (!validate_user_string(path)) return -EFAULT;
+
     (void)mode;
-    if (!path) return -EFAULT;
     fs_node_t* node = vfs_lookup(fs_root, path);
     if (!node) return -ENOENT;
     kfree(node);

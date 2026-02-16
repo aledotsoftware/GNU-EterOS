@@ -334,3 +334,51 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
     }
     return 0; /* Not handled */
 }
+
+int vmm_is_user_page(uint64_t virt_addr) {
+    /* Read CR3 to get current PML4 physical address */
+    uint64_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+
+    /* In Identity Mapping, Phys == Virt */
+    pt_entry_t* pml4 = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);
+
+    uint64_t pml4_idx = PML4_INDEX(virt_addr);
+    uint64_t pdpt_idx = PDPT_INDEX(virt_addr);
+    uint64_t pd_idx   = PD_INDEX(virt_addr);
+    uint64_t pt_idx   = PT_INDEX(virt_addr);
+
+    /* Level 4: PML4 */
+    if (!(pml4[pml4_idx] & PAGE_PRESENT)) return 0;
+    if (!(pml4[pml4_idx] & PAGE_USER)) return 0;
+
+    pt_entry_t* pdpt = (pt_entry_t*)(pml4[pml4_idx] & PAGE_ADDR_MASK);
+
+    /* Level 3: PDPT */
+    if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) return 0;
+    if (!(pdpt[pdpt_idx] & PAGE_USER)) return 0;
+
+    if (pdpt[pdpt_idx] & PAGE_HUGE) {
+        /* 1GB Page - User bit is sufficient */
+        return 1;
+    }
+
+    pt_entry_t* pd = (pt_entry_t*)(pdpt[pdpt_idx] & PAGE_ADDR_MASK);
+
+    /* Level 2: PD */
+    if (!(pd[pd_idx] & PAGE_PRESENT)) return 0;
+    if (!(pd[pd_idx] & PAGE_USER)) return 0;
+
+    if (pd[pd_idx] & PAGE_HUGE) {
+        /* 2MB Page - User bit is sufficient */
+        return 1;
+    }
+
+    pt_entry_t* pt = (pt_entry_t*)(pd[pd_idx] & PAGE_ADDR_MASK);
+
+    /* Level 1: PT */
+    if (!(pt[pt_idx] & PAGE_PRESENT)) return 0;
+    if (!(pt[pt_idx] & PAGE_USER)) return 0;
+
+    return 1;
+}

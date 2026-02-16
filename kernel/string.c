@@ -292,6 +292,7 @@ size_t strlen(const char* str) {
         s += 4;
     }
 #endif
+#endif
 }
 
 size_t strnlen(const char* s, size_t maxlen) {
