@@ -19,7 +19,9 @@
 #define strlen eteros_strlen
 #define strncpy eteros_strncpy
 #define strlcpy eteros_strlcpy
+#define strnlen eteros_strnlen
 #define strcmp eteros_strcmp
+#define explicit_bzero eteros_explicit_bzero
 #endif
 
 /* ========================================================================= */
@@ -47,6 +49,11 @@ void* memset16(void* dest, uint16_t c, size_t n);
 void* memset32(void* dest, uint32_t c, size_t n);
 
 /**
+ * Limpia n bytes de memoria de forma segura (previene optimización del compilador).
+ */
+void explicit_bzero(void* s, size_t n);
+
+/**
  * Mueve n bytes de src a dest (soporta solapamiento).
  */
 void* memmove(void* dest, const void* src, size_t n);
@@ -65,6 +72,11 @@ int memcmp(const void* s1, const void* s2, size_t n);
  * Retorna la longitud de una cadena terminada en null.
  */
 size_t strlen(const char* str);
+
+/**
+ * Retorna la longitud de una cadena hasta maxlen.
+ */
+size_t strnlen(const char* str, size_t maxlen);
 
 /**
  * Copia hasta n caracteres de src a dest.

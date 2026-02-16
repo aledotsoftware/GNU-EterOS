@@ -520,6 +520,54 @@ int main() {
         printf("strcmp tests passed\n");
     }
 
+    /* Test strnlen */
+    {
+        /* Test 1: Normal string, maxlen > len */
+        assert(strnlen("Hello", 10) == 5);
+
+        /* Test 2: Normal string, maxlen < len */
+        assert(strnlen("Hello", 3) == 3);
+
+        /* Test 3: Normal string, maxlen == len */
+        assert(strnlen("Hello", 5) == 5);
+
+        /* Test 4: Empty string */
+        assert(strnlen("", 10) == 0);
+
+        /* Test 5: Maxlen 0 */
+        assert(strnlen("Hello", 0) == 0);
+
+        /* Test 6: Non-terminated buffer */
+        char buffer[5] = {'A', 'B', 'C', 'D', 'E'};
+        assert(strnlen(buffer, 5) == 5);
+        assert(strnlen(buffer, 3) == 3);
+
+        printf("strnlen tests passed\n");
+    }
+
+    /* Test explicit_bzero */
+    {
+        char buffer[20];
+
+        /* Initialize buffer */
+        memset(buffer, 'A', sizeof(buffer));
+
+        /* Zero out */
+        explicit_bzero(buffer, 10);
+
+        /* Check first 10 bytes are 0 */
+        for (int i = 0; i < 10; i++) {
+            assert(buffer[i] == 0);
+        }
+
+        /* Check remaining bytes are unchanged */
+        for (int i = 10; i < 20; i++) {
+            assert(buffer[i] == 'A');
+        }
+
+        printf("explicit_bzero tests passed\n");
+    }
+
     printf("All tests passed!\n");
     return 0;
 }
