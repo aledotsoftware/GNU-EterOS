@@ -17,6 +17,7 @@
 #include "netif/ethernet.h"
 #include "../lwip_port/ethernetif.h"
 #include <task.h>
+#include <mm.h>
 
 /* Global network state for legacy compatibility */
 volatile int network_ready = 0;
@@ -80,6 +81,7 @@ typedef struct {
     int status; /* 0=pending, 1=success, -1=error */
     volatile int completed;
     char req_buf[512]; /* Request buffer inside state for safety */
+    volatile int orphaned; /* Set if caller times out and leaves us dangling */
 } http_req_state_t;
 
 static void http_close(struct tcp_pcb *pcb) {
@@ -151,6 +153,12 @@ static void dns_found(const char *name, const ip_addr_t *ipaddr, void *callback_
     (void)name;
     http_req_state_t *state = (http_req_state_t*)callback_arg;
 
+    /* If request was cancelled/timed out, free state and return */
+    if (state->orphaned) {
+        kfree(state);
+        return;
+    }
+
     if (ipaddr && ipaddr->addr != 0) {
         state->pcb = tcp_new();
         if (!state->pcb) {
@@ -174,33 +182,36 @@ static void dns_found(const char *name, const ip_addr_t *ipaddr, void *callback_
 }
 
 int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t max_len) {
-    http_req_state_t state;
+    /* Allocate state on heap to avoid Use-After-Return if timeout occurs */
+    http_req_state_t *state = (http_req_state_t*)kmalloc(sizeof(http_req_state_t));
+    if (!state) return -1;
 
-    /* Initialize state on stack */
-    memset((void*)&state, 0, sizeof(state));
-    state.response_buf = response_buf;
-    state.max_len = max_len;
-    state.status = 0;
-    state.completed = 0;
+    memset(state, 0, sizeof(*state));
+    state->response_buf = response_buf;
+    state->max_len = max_len;
+    state->status = 0;
+    state->completed = 0;
+    state->orphaned = 0;
 
     /* Prepare request */
-    state.req_buf[0] = 0;
-    strlcpy(state.req_buf, "GET ", sizeof(state.req_buf));
-    if (path[0] != '/') strlcat(state.req_buf, "/", sizeof(state.req_buf));
-    strlcat(state.req_buf, path, sizeof(state.req_buf));
-    strlcat(state.req_buf, " HTTP/1.0\r\nHost: ", sizeof(state.req_buf));
-    strlcat(state.req_buf, host, sizeof(state.req_buf));
-    strlcat(state.req_buf, "\r\nUser-Agent: eterOS/0.1\r\n\r\n", sizeof(state.req_buf));
+    state->req_buf[0] = 0;
+    strlcpy(state->req_buf, "GET ", sizeof(state->req_buf));
+    if (path[0] != '/') strlcat(state->req_buf, "/", sizeof(state->req_buf));
+    strlcat(state->req_buf, path, sizeof(state->req_buf));
+    strlcat(state->req_buf, " HTTP/1.0\r\nHost: ", sizeof(state->req_buf));
+    strlcat(state->req_buf, host, sizeof(state->req_buf));
+    strlcat(state->req_buf, "\r\nUser-Agent: eterOS/0.1\r\n\r\n", sizeof(state->req_buf));
 
     /* Start DNS - PROTECTED */
     hal_interrupts_disable();
     ip_addr_t dns_res;
-    err_t err = dns_gethostbyname(host, &dns_res, dns_found, &state);
+    err_t err = dns_gethostbyname(host, &dns_res, dns_found, state);
 
     if (err == ERR_OK) {
-        dns_found(host, &dns_res, &state);
+        dns_found(host, &dns_res, state);
     } else if (err != ERR_INPROGRESS) {
         hal_interrupts_enable();
+        kfree(state);
         return -1; /* DNS Error immediately */
     }
     hal_interrupts_enable();
@@ -208,29 +219,40 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
     /* Wait loop (max ~10 seconds) */
     int timeout_ticks = 10000;
 
-    while (!state.completed && timeout_ticks > 0) {
+    while (!state->completed && timeout_ticks > 0) {
         task_yield();
         /* Simple delay */
         for(volatile int i=0; i<10000; i++);
         timeout_ticks--;
     }
 
-    if (!state.completed) {
+    int result_status = state->status;
+    size_t result_len = state->received_len;
+
+    if (!state->completed) {
         /* Timeout - Abort connection safely */
         hal_interrupts_disable();
-        if (state.pcb) {
-            tcp_abort(state.pcb);
+        if (state->pcb) {
+            tcp_abort(state->pcb);
+            state->pcb = NULL;
+            /* If PCB was active, tcp_abort kills it. We can free state safely. */
+            kfree(state);
+        } else {
+            /* DNS Pending or other state. Cannot cancel easily.
+               Orphan the state so callback frees it. */
+            state->orphaned = 1;
         }
         hal_interrupts_enable();
         return -2; /* Timeout */
     }
 
     /* Null terminate response if space allows */
-    if (state.received_len < max_len) {
-        response_buf[state.received_len] = 0;
+    if (result_len < max_len) {
+        response_buf[result_len] = 0;
     } else {
         response_buf[max_len - 1] = 0;
     }
 
-    return (state.status == 1) ? (int)state.received_len : state.status;
+    kfree(state);
+    return (result_status == 1) ? (int)result_len : result_status;
 }
