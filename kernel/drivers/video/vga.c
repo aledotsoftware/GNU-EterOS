@@ -32,9 +32,14 @@ static uint32_t fb_bg = 0xFF000000; // Negro por defecto
 #define VGA_MEMORY_CHARS    (VGA_MEMORY_SIZE / 2)
 static uint16_t vga_buffer_offset = 0; // Offset in characters/words from 0xB8000
 static terminal_hook_t active_hook = (void*)0;
+static bool terminal_silent = false;
 
 void terminal_set_hook(terminal_hook_t hook) {
     active_hook = hook;
+}
+
+void terminal_set_silent(bool silent) {
+    terminal_silent = silent;
 }
 
 /* ========================================================================= */
@@ -163,6 +168,8 @@ static void _terminal_putchar(char c) {
         /* O podemos dejar que pinte en fondo */
         // return;  <-- Si queremos silenciar el fondo
     }
+
+    if (terminal_silent) return;
 
     size_t width = use_framebuffer ? (1024/8) : VGA_WIDTH;
     size_t height = use_framebuffer ? (768/16) : VGA_HEIGHT;

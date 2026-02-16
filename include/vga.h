@@ -109,4 +109,9 @@ void terminal_set_cursor(size_t x, size_t y);
  */
 void terminal_scroll(void);
 
+/**
+ * Habilita o deshabilita la salida silenciosa del terminal (para boot logo).
+ */
+void terminal_set_silent(bool silent);
+
 #endif /* ETEROS_VGA_H */

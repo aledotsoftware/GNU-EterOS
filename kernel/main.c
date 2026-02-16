@@ -219,6 +219,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     }
 
     /* Al cerrar o matar la GUI, volvemos al modo texto */
+    terminal_set_silent(false);
     hal_console_write("\n  [INFO] FluxUI finalizado. Retornando a consola...\n");
     terminal_initialize(NULL); /* Reset terminal state & screen */
     shell_run(); 
