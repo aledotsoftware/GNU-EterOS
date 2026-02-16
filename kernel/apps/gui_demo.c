@@ -1917,6 +1917,30 @@ static void handle_flux_click(void) {
         int y = (screen_h - h) / 2;
         if (mouse_x < x || mouse_x > x + w || mouse_y < y || mouse_y > y + h) {
             hub_active = false;
+            return;
+        }
+
+        /* Handle clicks on Hub items */
+        int ix = x + 25;
+        int list_y = y + 55 + 55; // y + 110
+        int col_w = (w - 60) / 2;
+
+        int match_count = 0;
+        for (int i = 0; i < NODE_COUNT; i++) {
+            if (match_count >= 6) break;
+            if (strlen(hub_input) == 0 || flux_strstr(FLUX_APPS[i].title, hub_input)) {
+                int item_y = list_y + 20 + (match_count * 20);
+                int item_h = 20;
+
+                if (mouse_x >= ix && mouse_x < ix + col_w &&
+                    mouse_y >= item_y && mouse_y < item_y + item_h) {
+
+                    flux_launch_space((flux_node_id_t)i);
+                    hub_active = false;
+                    return;
+                }
+                match_count++;
+            }
         }
         return;
     }
@@ -2224,8 +2248,21 @@ static void draw_flux_hub(void) {
     for (int i = 0; i < NODE_COUNT; i++) {
         if (match_count >= 6) break;
         if (strlen(hub_input) == 0 || flux_strstr(FLUX_APPS[i].title, hub_input)) {
+            int item_y = list_y + 20 + (match_count * 20);
+            int item_h = 20;
+
+            bool hover = (mouse_x >= ix && mouse_x < ix + col_w &&
+                          mouse_y >= item_y && mouse_y < item_y + item_h);
+
+            if (hover) {
+                 omni_fill_rect_alpha(ix, item_y, col_w, item_h, 0x333333, 0xC0);
+            }
+
             uint32_t col = (match_count == 0 && strlen(hub_input) > 0) ? FLUX_ACCENT_CYAN : FLUX_TEXT_SECONDARY;
-            omni_draw_string(NULL, ix + 10, list_y + 20 + (match_count * 20), FLUX_APPS[i].title, col, 0x080808);
+
+            if (hover) col = FLUX_ACCENT_CYAN;
+
+            omni_draw_string_transparent(ix + 10, item_y, FLUX_APPS[i].title, col);
             match_count++;
         }
     }
