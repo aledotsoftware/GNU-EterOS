@@ -105,6 +105,12 @@ void* memset32(void* dest, uint32_t c, size_t n) {
 #endif
 }
 
+void explicit_bzero(void* s, size_t n) {
+    memset(s, 0, n);
+    /* Barrier to prevent compiler from optimizing away the memset */
+    __asm__ volatile("" : : "r"(s) : "memory");
+}
+
 void* memmove(void* dest, const void* src, size_t n) {
     uint8_t* d = (uint8_t*)dest;
     const uint8_t* s = (const uint8_t*)src;
@@ -219,6 +225,13 @@ size_t strlen(const char* str) {
         if (!s[3]) return s - str + 3;
         s += 4;
     }
+}
+
+size_t strnlen(const char* s, size_t maxlen) {
+    const char* p;
+    for (p = s; maxlen-- && *p; p++)
+        ;
+    return p - s;
 }
 
 char* strncpy(char* dest, const char* src, size_t n) {
