@@ -80,6 +80,7 @@ static bool gui_needs_redraw = true;
 #define FLUX_BAR_BG         0x151515  /* Status Bar */
 #define FLUX_TEXT_PRIMARY   0xFFFFFF
 #define FLUX_TEXT_SECONDARY 0xAAAAAA
+#define FLUX_DESTRUCTIVE_BG 0xFF440000
 
 typedef enum {
     FLUX_MACRO = 0,   /* Constellation (Overview) */
@@ -537,7 +538,30 @@ static void draw_sysinfo_content(void) {
              wm_print_at(win_sysinfo, 40, list_y + 35 + (row * 16), row_buf);
              
              /* Draw valid kill button */
-             wm_print_at(win_sysinfo, w - 35, list_y + 35 + (row * 16), "[X]");
+             int btn_x = w - 35;
+             int btn_y = list_y + 35 + (row * 16);
+
+             /* Hover Check */
+             int global_btn_x = win_sysinfo->bounds.x + btn_x;
+             int global_btn_y = win_sysinfo->bounds.y + TITLE_BAR_HEIGHT + btn_y;
+
+             bool hover = (mouse_x >= global_btn_x && mouse_x < global_btn_x + 24 &&
+                           mouse_y >= global_btn_y && mouse_y < global_btn_y + 16);
+
+             if (hover) {
+                 uint32_t old_fg = win_sysinfo->fg_color;
+                 uint32_t old_bg = win_sysinfo->bg_color;
+
+                 win_sysinfo->fg_color = UI_COLOR_RED;
+                 win_sysinfo->bg_color = FLUX_DESTRUCTIVE_BG;
+
+                 wm_print_at(win_sysinfo, btn_x, btn_y, "[X]");
+
+                 win_sysinfo->fg_color = old_fg;
+                 win_sysinfo->bg_color = old_bg;
+             } else {
+                 wm_print_at(win_sysinfo, btn_x, btn_y, "[X]");
+             }
              
              row++;
              if (row > 10) break;
