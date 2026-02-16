@@ -1455,6 +1455,7 @@ void gui_draw_boot_logo(void) {
     framebuffer_flush_rect(bx, by, bw, 4);
     
     /* Final pause (1 second) */
+    terminal_set_silent(true);
     task_sleep(100); 
 }
 
