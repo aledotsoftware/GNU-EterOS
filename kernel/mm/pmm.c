@@ -32,6 +32,9 @@ static uint64_t total_pages = 0;
 /* Dirección donde termina la memoria usada por el kernel + bitmap + bootloader info */
 static uint64_t free_mem_start = 0;
 
+/* Optimization: Rover for Next-Fit allocation strategy */
+static uint64_t last_free_idx = 0;
+
 /* ========================================================================= */
 /* Helpers de Bitmap                                                         */
 /* ========================================================================= */
@@ -181,16 +184,98 @@ void pmm_init(void) {
 }
 
 void* pmm_alloc_page(void) {
-    /* Algoritmo First-Fit simple en el bitmap */
-    /* TODO: Optimizar guardando el último índice libre (rover) */
+    /* ⚡ BOLT Optimization: Next-Fit Strategy + Word-wise Scanning
+     * Instead of linear bit-by-bit search (O(N)), we scan 64 pages at once
+     * and start from the last allocated position.
+     * Complexity: O(1) Amortized, O(N/64) Worst Case.
+     */
+
+    uint64_t word_idx = last_free_idx / 64;
+    uint64_t bit_idx = last_free_idx % 64;
     
-    for (uint64_t i = 0; i < total_pages; i++) {
-        if (!bitmap_test(i)) {
-            /* Encontrado frame libre */
-            bitmap_set(i);
-            if (pmm_ref_counts) pmm_ref_counts[i] = 1;
+    /* Calculate total words (rounded up) */
+    uint64_t total_words = (total_pages + 63) / 64;
+    uint64_t* bitmap_words = (uint64_t*)pmm_bitmap;
+
+    /* Pass 1: Scan from rover to end */
+    for (uint64_t i = word_idx; i < total_words; i++) {
+        uint64_t word = bitmap_words[i];
+        if (word != ~0ULL) { /* If word has at least one free bit (0) */
+
+            /* Logic to skip bits before bit_idx in the first word */
+            int start_bit = (i == word_idx) ? bit_idx : 0;
+
+            if (i == word_idx && start_bit > 0) {
+                 /* Manual scan for partial first word */
+                 for (int bit = start_bit; bit < 64; bit++) {
+                     if (!(word & (1ULL << bit))) {
+                         uint64_t page = i * 64 + bit;
+                         if (page >= total_pages) goto check_wrap;
+
+                         bitmap_set(page);
+                         if (pmm_ref_counts) pmm_ref_counts[page] = 1;
+                         used_ram += PAGE_SIZE;
+                         last_free_idx = page + 1;
+                         return (void*)(page * PAGE_SIZE);
+                     }
+                 }
+                 continue;
+            }
+
+            /* Fast scan using builtin (finds first zero bit) */
+            /* __builtin_ctzll finds # of trailing zeros. We want trailing ones if we invert? */
+            /* We want the position of the first '0'. */
+            /* ~word turns 0s to 1s. ctzll(~word) finds position of first 1 (which was 0). */
+
+            uint64_t inv_word = ~word;
+            int bit = __builtin_ctzll(inv_word);
+
+            uint64_t page = i * 64 + bit;
+            if (page >= total_pages) goto check_wrap;
+
+            bitmap_set(page);
+            if (pmm_ref_counts) pmm_ref_counts[page] = 1;
             used_ram += PAGE_SIZE;
-            return (void*)(i * PAGE_SIZE);
+            last_free_idx = page + 1;
+            return (void*)(page * PAGE_SIZE);
+        }
+    }
+
+check_wrap:
+    /* Pass 2: Wrap around from 0 to rover */
+    for (uint64_t i = 0; i <= word_idx; i++) {
+        uint64_t word = bitmap_words[i];
+        if (word != ~0ULL) {
+            int end_bit = (i == word_idx) ? bit_idx : 64;
+
+            if (end_bit == 64) {
+                 /* Full word scan */
+                 uint64_t inv_word = ~word;
+                 int bit = __builtin_ctzll(inv_word);
+                 uint64_t page = i * 64 + bit;
+
+                 if (page >= total_pages) return NULL;
+
+                 bitmap_set(page);
+                 if (pmm_ref_counts) pmm_ref_counts[page] = 1;
+                 used_ram += PAGE_SIZE;
+                 last_free_idx = page + 1;
+                 return (void*)(page * PAGE_SIZE);
+            } else {
+                 /* Partial scan (last word of the loop) */
+                 for (int bit = 0; bit < end_bit; bit++) {
+                     if (!(word & (1ULL << bit))) {
+                         uint64_t page = i * 64 + bit;
+                         if (page >= total_pages) return NULL;
+
+                         bitmap_set(page);
+                         if (pmm_ref_counts) pmm_ref_counts[page] = 1;
+                         used_ram += PAGE_SIZE;
+                         last_free_idx = page + 1;
+                         return (void*)(page * PAGE_SIZE);
+                     }
+                 }
+            }
         }
     }
     
@@ -216,6 +301,8 @@ void pmm_free_page(void* addr) {
     if (bitmap_test(page_idx)) {
         bitmap_unset(page_idx);
         used_ram -= PAGE_SIZE;
+        /* Note: We do NOT reset last_free_idx here to avoid fragmentation
+           and maintain Next-Fit behavior (allocations keep moving forward). */
     }
 }
 
