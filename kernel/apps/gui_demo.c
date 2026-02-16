@@ -452,44 +452,64 @@ static void draw_sysinfo_content(void) {
     wm_fill_rect(win_sysinfo, ram_card, 0x2A2A2A);
     wm_fill_rect(win_sysinfo, (rect_t){20, 60, 4, 100}, FLUX_ACCENT_AMBER);
     
-    uint64_t total = pmm_get_total_ram();
-    uint64_t free  = pmm_get_free_ram();
-    uint64_t used  = total - free;
-    int usage_pct_1000 = (total > 0) ? (used * 1000) / total : 0;
+    /* Cache expensive calculations (RAM/CPU/Net) - Update every 500ms */
+    static uint32_t last_update = 0;
+    static char cached_ram_buf[64] = "RAM: ...";
+    static int cached_ram_pct = 0;
+    static char cached_cpu_buf[32] = "CPU Load: ...";
+    static int cached_cpu_load = 0;
+    static char cached_net_buf[32] = "IP: ...";
     
-    char ram_buf[64] = "RAM: ";
-    char num[16];
-    itoa_s(used / (1024*1024), num, 16, 10); strlcat(ram_buf, num, 64); strlcat(ram_buf, " MB", 64);
-    wm_print_at(win_sysinfo, 40, 75, ram_buf);
-    draw_progress_bar(win_sysinfo, 40, 100, card_w - 40, 12, usage_pct_1000, FLUX_ACCENT_AMBER);
+    if (timer_get_ticks() - last_update > 50 || last_update == 0) {
+        /* Update RAM */
+        uint64_t total = pmm_get_total_ram();
+        uint64_t free  = pmm_get_free_ram();
+        uint64_t used  = total - free;
+        cached_ram_pct = (total > 0) ? (used * 1000) / total : 0;
+
+        strlcpy(cached_ram_buf, "RAM: ", 64);
+        char num[16];
+        itoa_s(used / (1024*1024), num, 16, 10);
+        strlcat(cached_ram_buf, num, 64);
+        strlcat(cached_ram_buf, " MB", 64);
+
+        /* Update CPU */
+        cached_cpu_load = task_get_cpu_load();
+        strlcpy(cached_cpu_buf, "CPU Load: ", 32);
+        itoa_s(cached_cpu_load, num, 16, 10);
+        strlcat(cached_cpu_buf, num, 32);
+        strlcat(cached_cpu_buf, "% (1 Core)", 32);
+
+        /* Update Net */
+        strlcpy(cached_net_buf, "IP: ", 32);
+        uint8_t* ip = (uint8_t*)&my_ip;
+        if (my_ip == 0) {
+            strlcat(cached_net_buf, "No Conn", 32);
+        } else {
+            itoa_s(ip[0], num, 16, 10); strlcat(cached_net_buf, num, 32); strlcat(cached_net_buf, ".", 32);
+            itoa_s(ip[1], num, 16, 10); strlcat(cached_net_buf, num, 32); strlcat(cached_net_buf, ".", 32);
+            itoa_s(ip[2], num, 16, 10); strlcat(cached_net_buf, num, 32); strlcat(cached_net_buf, ".", 32);
+            itoa_s(ip[3], num, 16, 10); strlcat(cached_net_buf, num, 32);
+        }
+
+        last_update = timer_get_ticks();
+    }
+
+    wm_print_at(win_sysinfo, 40, 75, cached_ram_buf);
+    draw_progress_bar(win_sysinfo, 40, 100, card_w - 40, 12, cached_ram_pct, FLUX_ACCENT_AMBER);
 
     /* CPU & NET CARD */
     rect_t cpu_card = {w/2 + 10, 60, card_w, 100};
     wm_fill_rect(win_sysinfo, cpu_card, 0x2A2A2A);
     wm_fill_rect(win_sysinfo, (rect_t){w/2 + 10, 60, 4, 100}, FLUX_ACCENT_CYAN);
     
-    char cpu_buf[32] = "CPU Load: ";
-    int load = task_get_cpu_load();
-    itoa_s(load, num, 16, 10);
-    strlcat(cpu_buf, num, 32);
-    strlcat(cpu_buf, "% (1 Core)", 32);
-    wm_print_at(win_sysinfo, w/2 + 30, 70, cpu_buf);
+    wm_print_at(win_sysinfo, w/2 + 30, 70, cached_cpu_buf);
     
     /* CPU Progress Bar */
-    draw_progress_bar(win_sysinfo, w/2 + 30, 90, card_w - 40, 10, load * 10, FLUX_ACCENT_CYAN);
+    draw_progress_bar(win_sysinfo, w/2 + 30, 90, card_w - 40, 10, cached_cpu_load * 10, FLUX_ACCENT_CYAN);
 
     /* Network Info */
-    char net_buf[32] = "IP: ";
-    uint8_t* ip = (uint8_t*)&my_ip;
-    if (my_ip == 0) {
-        strlcat(net_buf, "No Conn", 32);
-    } else {
-        itoa_s(ip[0], num, 16, 10); strlcat(net_buf, num, 32); strlcat(net_buf, ".", 32);
-        itoa_s(ip[1], num, 16, 10); strlcat(net_buf, num, 32); strlcat(net_buf, ".", 32);
-        itoa_s(ip[2], num, 16, 10); strlcat(net_buf, num, 32); strlcat(net_buf, ".", 32);
-        itoa_s(ip[3], num, 16, 10); strlcat(net_buf, num, 32);
-    }
-    wm_print_at(win_sysinfo, w/2 + 30, 110, net_buf);
+    wm_print_at(win_sysinfo, w/2 + 30, 110, cached_net_buf);
 
     /* Process List (Lower Section) */
     int list_y = 180;
@@ -2148,28 +2168,33 @@ static void draw_clock_content(window_t* win) {
     if (!win) return;
     wm_fill_rect(win, (rect_t){0, 0, win->bounds.w, win->bounds.h}, 0x101020);
     
-    char time_str[32];
-    uint32_t ticks = timer_get_ticks();
-    int sec = (ticks / 100) % 60;
-    int min = (ticks / 6000) % 60;
-    int hour = (ticks / 360000) % 24;
+    static char cached_time_str[32] = "--:--:--";
+    static uint32_t last_clock_update = 0;
     
-    /* Simple fake time based on uptime */
-    char buf[8];
-    itoa_s(hour, buf, sizeof(buf), 10);
-    strlcpy(time_str, buf, sizeof(time_str));
-    strlcat(time_str, ":", sizeof(time_str));
-    itoa_s(min, buf, sizeof(buf), 10);
-    if(min<10) strlcat(time_str, "0", sizeof(time_str));
-    strlcat(time_str, buf, sizeof(time_str));
-    strlcat(time_str, ":", sizeof(time_str));
-    itoa_s(sec, buf, sizeof(buf), 10);
-    if(sec<10) strlcat(time_str, "0", sizeof(time_str));
-    strlcat(time_str, buf, sizeof(time_str));
+    if (timer_get_ticks() - last_clock_update > 50 || last_clock_update == 0) {
+        uint32_t ticks = timer_get_ticks();
+        int sec = (ticks / 100) % 60;
+        int min = (ticks / 6000) % 60;
+        int hour = (ticks / 360000) % 24;
+
+        char buf[8];
+        itoa_s(hour, buf, sizeof(buf), 10);
+        strlcpy(cached_time_str, buf, sizeof(cached_time_str));
+        strlcat(cached_time_str, ":", sizeof(cached_time_str));
+        itoa_s(min, buf, sizeof(buf), 10);
+        if(min<10) strlcat(cached_time_str, "0", sizeof(cached_time_str));
+        strlcat(cached_time_str, buf, sizeof(cached_time_str));
+        strlcat(cached_time_str, ":", sizeof(cached_time_str));
+        itoa_s(sec, buf, sizeof(buf), 10);
+        if(sec<10) strlcat(cached_time_str, "0", sizeof(cached_time_str));
+        strlcat(cached_time_str, buf, sizeof(cached_time_str));
+
+        last_clock_update = timer_get_ticks();
+    }
     
     /* Big Text (Fake implementation) */
     wm_print_at(win, 60, 60, "HORA DEL SISTEMA");
-    wm_print_at(win, 80, 90, time_str);
+    wm_print_at(win, 80, 90, cached_time_str);
 }
 
 
