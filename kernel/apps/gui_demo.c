@@ -1944,6 +1944,45 @@ static void draw_focus_mode(void) {
              draw_generic_app_content(focused_space, FLUX_APPS[zooming_node].title, 0x222222);
          }
     }
+
+    /* Flux UX: Close Button Hover Glow (Micro-interaction) - Drawn AFTER content */
+    int btn_size = 20;
+    int btn_margin = (TITLE_BAR_HEIGHT - btn_size) / 2;
+    int btn_x = focused_space->bounds.x + focused_space->bounds.w - btn_size - btn_margin;
+    int btn_y = focused_space->bounds.y + btn_margin;
+
+    if (mouse_x >= btn_x && mouse_x <= btn_x + btn_size &&
+        mouse_y >= btn_y && mouse_y <= btn_y + btn_size) {
+
+        /* Draw Glow (Lighter Red) */
+        omni_fill_rect(btn_x, btn_y, btn_size, btn_size, 0xFF6666);
+
+        /* Redraw X (White) */
+        omni_draw_line(btn_x + 4, btn_y + 4, btn_x + 15, btn_y + 15, 0xFFFFFF);
+        omni_draw_line(btn_x + 15, btn_y + 4, btn_x + 4, btn_y + 15, 0xFFFFFF);
+
+        /* Tooltip: Close */
+        const char* tip = (settings_lang == 0) ? "Cerrar" : "Close";
+        int tip_w = strlen(tip) * 8 + 10;
+        int tip_h = 20;
+        int tip_x = btn_x + (btn_size - tip_w) / 2;
+
+        /* Clamp to screen width */
+        uint32_t screen_w = omni_get_width();
+        if (screen_w == 0) screen_w = 1024;
+        if (tip_x + tip_w > (int)screen_w) tip_x = screen_w - tip_w - 5;
+
+        int tip_y = btn_y + btn_size + 5;
+
+        /* Shadow */
+        omni_fill_rect(tip_x + 2, tip_y + 2, tip_w, tip_h, 0x000000);
+        /* Bg */
+        omni_fill_rect(tip_x, tip_y, tip_w, tip_h, 0x252525);
+        /* Border */
+        omni_draw_rect(tip_x, tip_y, tip_w, tip_h, 0x555555);
+        /* Text */
+        omni_draw_string(NULL, tip_x + 5, tip_y + 4, tip, 0xFFFFFF, 0x252525);
+    }
     
     /* Capa 2: Controles de Navegación (Reactive Bottom Bar) */
     /* Check Hover */
