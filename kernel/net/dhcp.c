@@ -115,21 +115,11 @@ void dhcp_discover(void) {
                  uint32_t gw = 0;
                  uint32_t dns = 0;
 
-                 const uint8_t* opt = r_dhcp->options;
-                 while (*opt != 255 && (opt - r_dhcp->options) < 308) {
-                     uint8_t type = *opt++;
-                     if (type == 0) continue; /* Padding */
-                     uint8_t slen = *opt++;
-                     
-                     if (type == 1) { /* Subnet Mask */
-                         memcpy(&mask, opt, 4);
-                     } else if (type == 3) { /* Router/Gateway */
-                         memcpy(&gw, opt, 4);
-                     } else if (type == 6) { /* DNS */
-                         memcpy(&dns, opt, 4);
-                     }
-                     opt += slen;
-                 }
+                 /* Calculate valid packet length to prevent buffer overflow */
+                 size_t packet_offset = (const uint8_t*)r_dhcp - rx_buffer;
+                 size_t packet_len = (size_t)len - packet_offset;
+
+                 dhcp_parse_options(r_dhcp, packet_len, &mask, &gw, &dns);
 
                  /* Print Offered IP (yiaddr) */
                  const uint8_t* ip = (const uint8_t*)&r_dhcp->yiaddr;

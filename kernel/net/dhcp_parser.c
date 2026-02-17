@@ -1,6 +1,7 @@
 #include "../../include/net/dhcp.h"
 #include "../../include/net/defs.h"
 #include "../../include/types.h"
+#include "../../include/string.h"
 
 /**
  * Parses a DHCP offer packet from a raw buffer.
@@ -100,4 +101,65 @@ int dhcp_parse_offer(const uint8_t* buffer, size_t len, uint32_t xid, const stru
 
     *out_dhcp = dhcp;
     return 0;
+}
+
+void dhcp_parse_options(const struct dhcp_packet* packet, size_t packet_len, uint32_t* mask, uint32_t* gw, uint32_t* dns) {
+    /* Constants for DHCP Options */
+    const uint8_t DHCP_OPT_PAD = 0;
+    const uint8_t DHCP_OPT_SUBNET_MASK = 1;
+    const uint8_t DHCP_OPT_ROUTER = 3;
+    const uint8_t DHCP_OPT_DNS = 6;
+    const uint8_t DHCP_OPT_END = 255;
+
+    /* Fixed part size (up to options) is 240 bytes (sizeof(struct dhcp_packet) - 308) */
+    size_t fixed_size = sizeof(struct dhcp_packet) - 308;
+
+    if (!packet || packet_len < fixed_size) {
+        return;
+    }
+
+    const uint8_t* start = (const uint8_t*)packet;
+    const uint8_t* end = start + packet_len;
+
+    /* Options start at offset 240 (packet->options) */
+    const uint8_t* opt = packet->options;
+
+    /* Ensure start of options is within bounds */
+    if (opt >= end) return;
+
+    while (opt < end) {
+        /* Check for Type byte */
+        if (opt + 1 > end) break;
+        uint8_t type = *opt++;
+
+        if (type == DHCP_OPT_PAD) {
+            continue;
+        }
+
+        if (type == DHCP_OPT_END) {
+            break;
+        }
+
+        /* Check for Length byte */
+        if (opt + 1 > end) break;
+        uint8_t len = *opt++;
+
+        /* Check for Value bytes */
+        if (opt + len > end) {
+            /* Truncated option, stop parsing safely */
+            break;
+        }
+
+        if (type == DHCP_OPT_SUBNET_MASK && len >= 4) {
+            if (mask) memcpy(mask, opt, 4);
+        } else if (type == DHCP_OPT_ROUTER && len >= 4) {
+            /* Router option can contain multiple IPs, we take the first one */
+            if (gw) memcpy(gw, opt, 4);
+        } else if (type == DHCP_OPT_DNS && len >= 4) {
+            /* DNS option can contain multiple IPs, we take the first one */
+            if (dns) memcpy(dns, opt, 4);
+        }
+
+        opt += len;
+    }
 }
