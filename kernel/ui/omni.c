@@ -488,14 +488,31 @@ void omni_fill_gradient_v(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
     uint32_t bb = color_bottom & 0xFF;
     
     if (omni_bpp == 32) {
+        if (h <= 0) return; /* Defense-in-depth: Ensure no division by zero */
+
+        /* ⚡ BOLT Optimization: Use fixed-point math to avoid division in loop
+           and fix unsigned underflow bug for decreasing gradients. */
+        int32_t r_val = (int32_t)tr << 16;
+        int32_t g_val = (int32_t)tg << 16;
+        int32_t b_val = (int32_t)tb << 16;
+
+        int32_t r_step = (((int32_t)br - (int32_t)tr) << 16) / h;
+        int32_t g_step = (((int32_t)bg - (int32_t)tg) << 16) / h;
+        int32_t b_step = (((int32_t)bb - (int32_t)tb) << 16) / h;
+
         for (int i = 0; i < h; i++) {
-            uint32_t r = tr + ((br - tr) * i) / h;
-            uint32_t g_ch = tg + ((bg - tg) * i) / h;
-            uint32_t b = tb + ((bb - tb) * i) / h;
-            uint32_t color = 0xFF000000 | (r << 16) | (g_ch << 8) | b;
+            uint32_t r = (uint32_t)(r_val >> 16);
+            uint32_t g = (uint32_t)(g_val >> 16);
+            uint32_t b = (uint32_t)(b_val >> 16);
+
+            uint32_t color = 0xFF000000 | (r << 16) | (g << 8) | b;
             
             uint32_t* row = omni_fb + ((y + i) * omni_pitch_div4) + x;
             memset32(row, color, w);
+
+            r_val += r_step;
+            g_val += g_step;
+            b_val += b_step;
         }
     }
 }

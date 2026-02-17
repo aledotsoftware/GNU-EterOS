@@ -47,3 +47,10 @@ rm tests/test_crypto
 
 echo "---------------------------------------------------"
 echo "All tests passed!"
+
+# Test Omni Gradient Math
+echo "---------------------------------------------------"
+echo "Running verify_gradient..."
+gcc -D__ETEROS_HOST_TEST__ tests/verify_gradient.c -o tests/verify_gradient
+./tests/verify_gradient
+rm tests/verify_gradient
