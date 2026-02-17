@@ -48,8 +48,44 @@ void benchmark_memcmp() {
     free(buf2);
 }
 
+void benchmark_strcmp() {
+    const size_t size = 1024 * 1024; /* 1 MB string */
+    const int iterations = 1000;
+
+    char* buf1 = malloc(size + 1);
+    char* buf2 = malloc(size + 1);
+
+    if (!buf1 || !buf2) {
+        printf("Benchmark failed: malloc error\n");
+        return;
+    }
+
+    /* Fill buffers with identical data */
+    std_memset(buf1, 'A', size);
+    buf1[size] = '\0';
+
+    std_memset(buf2, 'A', size);
+    buf2[size] = '\0';
+
+    clock_t start = clock();
+
+    volatile int res = 0; /* Prevent optimization */
+    for (int i = 0; i < iterations; i++) {
+        res += strcmp(buf1, buf2);
+    }
+
+    clock_t end = clock();
+    double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+    printf("Benchmark strcmp: %d iterations of 1MB comparison took %f seconds\n", iterations, time_taken);
+
+    free(buf1);
+    free(buf2);
+}
+
 int main() {
     benchmark_memcmp();
+    benchmark_strcmp();
     printf("Running string tests...\n");
 
     /* Test itoa_s */

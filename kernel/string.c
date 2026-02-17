@@ -333,6 +333,41 @@ size_t strlcat(char* dest, const char* src, size_t size) {
 }
 
 int strcmp(const char* s1, const char* s2) {
+#ifdef __x86_64__
+    /* Check if relative alignment is the same (both have same offset from 8-byte boundary) */
+    if ((((uintptr_t)s1 ^ (uintptr_t)s2) & 7) == 0) {
+        /* Align to 8 bytes */
+        while ((uintptr_t)s1 & 7) {
+            if (*s1 != *s2) return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+            if (!*s1) return 0;
+            s1++; s2++;
+        }
+
+        /* Word loop */
+        const uint64_t* lw1 = (const uint64_t*)s1;
+        const uint64_t* lw2 = (const uint64_t*)s2;
+
+        while (1) {
+            uint64_t w1 = *lw1;
+            uint64_t w2 = *lw2;
+
+            if (w1 != w2) break;
+
+            /* Check for null terminator in equal words.
+               Bit magic: (v - 0x01...) & ~v & 0x80... detects if any byte is 0 */
+            if (((w1 - 0x0101010101010101ULL) & ~w1 & 0x8080808080808080ULL)) {
+                return 0;
+            }
+
+            lw1++;
+            lw2++;
+        }
+
+        s1 = (const char*)lw1;
+        s2 = (const char*)lw2;
+    }
+#endif
+
     while (*s1 && (*s1 == *s2)) {
         s1++;
         s2++;
