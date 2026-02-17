@@ -1941,9 +1941,20 @@ static void draw_focus_mode(void) {
     focused_space->bounds.w = 1024 - (margin * 2);
     focused_space->bounds.h = 768 - (margin * 2);
     
-    /* Shadow/Glow */
-    omni_fill_rect(focused_space->bounds.x - 2, focused_space->bounds.y - 2,
-                     focused_space->bounds.w + 4, focused_space->bounds.h + 4, FLUX_ACCENT_CYAN); 
+    /* Shadow/Glow (Pulsing) */
+    uint32_t ticks = (uint32_t)timer_get_ticks();
+    int phase = ticks % 200; /* 2 second period */
+    int val = (phase < 100) ? phase : (200 - phase); /* 0..100..0 */
+    /* Alpha between 60 (approx 0x3C) and 180 (approx 0xB4) */
+    uint8_t alpha = 60 + ((val * 120) / 100);
+
+    /* Outer soft glow */
+    omni_fill_rect_alpha(focused_space->bounds.x - 6, focused_space->bounds.y - 6,
+                     focused_space->bounds.w + 12, focused_space->bounds.h + 12, FLUX_ACCENT_CYAN, alpha / 3);
+
+    /* Inner strong glow */
+    omni_fill_rect_alpha(focused_space->bounds.x - 2, focused_space->bounds.y - 2,
+                     focused_space->bounds.w + 4, focused_space->bounds.h + 4, FLUX_ACCENT_CYAN, alpha);
 
     /* Draw Window Frame (Title Bar, Close Button, Background) */
     wm_draw_window(focused_space);
@@ -2699,7 +2710,7 @@ void gui_demo_run(void) {
         }
 
         /* Update Logic */
-        if (target_zoom != current_zoom || zoom_progress > 0 || hub_active) {
+        if (target_zoom != current_zoom || zoom_progress > 0 || hub_active || current_zoom == FLUX_FOCUS) {
             gui_needs_redraw = true;
         }
         

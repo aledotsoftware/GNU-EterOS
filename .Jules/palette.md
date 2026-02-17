@@ -21,3 +21,7 @@
 ## 2026-05-29 - [Text Input Affordance]
 **Learning:** A text input without a cursor (caret) feels like a static label, confusing users about whether it's editable. A simple blinking vertical bar creates immediate affordance for typing.
 **Action:** Always include a visual cursor in focused text fields, even in minimal kernel GUIs.
+
+## 2026-05-30 - [Living Focus States]
+**Learning:** A slow, breathing pulse (2s period) for focus states communicates "active/ready" without the cognitive load of rapid blinking. It aligns with the "Influence Field" metaphor of Flux UI.
+**Action:** Use smooth alpha modulation for focus indicators instead of on/off blinking.
