@@ -548,19 +548,38 @@ static void draw_sysinfo_content(void) {
              bool hover = (mouse_x >= global_btn_x && mouse_x < global_btn_x + 24 &&
                            mouse_y >= global_btn_y && mouse_y < global_btn_y + 16);
 
+             /* 🎨 Palette: Improved Kill Button UX */
+             uint32_t btn_bg = hover ? FLUX_DESTRUCTIVE_BG : 0x444444;
+             uint32_t btn_fg = 0xFFFFFF;
+
+             /* Draw Background Rect (Visual Button) - Use full row height (16) */
+             wm_fill_rect(win_sysinfo, (rect_t){btn_x, btn_y, 20, 16}, btn_bg);
+
+             /* Draw Centered 'X' using window context */
+             uint32_t old_fg = win_sysinfo->fg_color;
+             uint32_t old_bg = win_sysinfo->bg_color;
+
+             win_sysinfo->fg_color = btn_fg;
+             win_sysinfo->bg_color = btn_bg;
+
+             wm_print_at(win_sysinfo, btn_x + 6, btn_y, "X");
+
+             win_sysinfo->fg_color = old_fg;
+             win_sysinfo->bg_color = old_bg;
+
              if (hover) {
-                 uint32_t old_fg = win_sysinfo->fg_color;
-                 uint32_t old_bg = win_sysinfo->bg_color;
+                 /* 🎨 Palette: Tooltip for clarity */
+                 const char* tip_text = "Terminate Process";
+                 int tip_w = strlen(tip_text) * 8 + 10;
+                 int tip_h = 20;
+                 /* Tooltip position (global) */
+                 int tip_x = global_btn_x - tip_w - 5;
+                 int tip_y = global_btn_y - 2;
 
-                 win_sysinfo->fg_color = UI_COLOR_RED;
-                 win_sysinfo->bg_color = FLUX_DESTRUCTIVE_BG;
-
-                 wm_print_at(win_sysinfo, btn_x, btn_y, "[X]");
-
-                 win_sysinfo->fg_color = old_fg;
-                 win_sysinfo->bg_color = old_bg;
-             } else {
-                 wm_print_at(win_sysinfo, btn_x, btn_y, "[X]");
+                 /* Draw global overlay */
+                 omni_fill_rect(tip_x, tip_y, tip_w, tip_h, 0x222222);
+                 omni_draw_rect(tip_x, tip_y, tip_w, tip_h, 0x666666);
+                 omni_draw_string(NULL, tip_x + 5, tip_y + 2, tip_text, 0xFFFFFF, 0x222222);
              }
              
              row++;
