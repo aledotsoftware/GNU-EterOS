@@ -59,6 +59,7 @@ void omni_fill_gradient_v(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
 /* Text Rendering */
 void omni_draw_char(int32_t x, int32_t y, char c, uint32_t fg, uint32_t bg);
 void omni_draw_char_transparent(int32_t x, int32_t y, char c, uint32_t fg);
+void omni_draw_char_scaled(int32_t x, int32_t y, char c, uint32_t fg, int scale);
 void omni_draw_string(const rect_t* clip, int32_t x, int32_t y, const char* str, uint32_t fg, uint32_t bg);
 void omni_draw_string_transparent(int32_t x, int32_t y, const char* str, uint32_t fg);
 
