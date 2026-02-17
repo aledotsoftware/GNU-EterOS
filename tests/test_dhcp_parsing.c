@@ -47,7 +47,7 @@ void test_valid_packet() {
     size_t len = build_valid_packet(buffer, xid);
 
     const struct dhcp_packet* out_dhcp = NULL;
-    int res = dhcp_parse_offer(buffer, len, xid, &out_dhcp);
+    int res = dhcp_parse_offer(buffer, len, xid, &out_dhcp, NULL);
 
     if (res != 0) {
         printf("FAIL: test_valid_packet returned %d\n", res);
@@ -73,19 +73,19 @@ void test_short_buffer() {
 
     /* Try passing a shorter length than required */
     /* 1. Cut Ethernet header */
-    if (dhcp_parse_offer(buffer, sizeof(struct ethernet_header) - 1, xid, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, sizeof(struct ethernet_header) - 1, xid, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_short_buffer (ethernet) should have failed\n");
         exit(1);
     }
 
     /* 2. Cut IP header */
-    if (dhcp_parse_offer(buffer, sizeof(struct ethernet_header) + sizeof(struct ip_header) - 1, xid, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, sizeof(struct ethernet_header) + sizeof(struct ip_header) - 1, xid, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_short_buffer (ip) should have failed\n");
         exit(1);
     }
 
     /* 3. Cut UDP header */
-    if (dhcp_parse_offer(buffer, sizeof(struct ethernet_header) + 20 + sizeof(struct udp_header) - 1, xid, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, sizeof(struct ethernet_header) + 20 + sizeof(struct udp_header) - 1, xid, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_short_buffer (udp) should have failed\n");
         exit(1);
     }
@@ -94,7 +94,7 @@ void test_short_buffer() {
     /* The parser requires at least fixed size of DHCP */
     size_t dhcp_offset = sizeof(struct ethernet_header) + 20 + sizeof(struct udp_header);
     /* Try passing length just before end of fixed part */
-    if (dhcp_parse_offer(buffer, dhcp_offset + 239, xid, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, dhcp_offset + 239, xid, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_short_buffer (dhcp) should have failed\n");
         exit(1);
     }
@@ -113,7 +113,7 @@ void test_invalid_values() {
     struct ethernet_header* eth = (struct ethernet_header*)buffer;
     uint16_t orig_type = eth->type;
     eth->type = htons(0x1234);
-    if (dhcp_parse_offer(buffer, len, xid, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, len, xid, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_invalid_values (eth type) should have failed\n");
         exit(1);
     }
@@ -123,7 +123,7 @@ void test_invalid_values() {
     struct ip_header* ip = (struct ip_header*)(buffer + sizeof(struct ethernet_header));
     uint8_t orig_proto = ip->proto;
     ip->proto = 6; /* TCP */
-    if (dhcp_parse_offer(buffer, len, xid, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, len, xid, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_invalid_values (ip proto) should have failed\n");
         exit(1);
     }
@@ -133,14 +133,14 @@ void test_invalid_values() {
     struct udp_header* udp = (struct udp_header*)(buffer + sizeof(struct ethernet_header) + 20);
     uint16_t orig_port = udp->dest_port;
     udp->dest_port = htons(80);
-    if (dhcp_parse_offer(buffer, len, xid, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, len, xid, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_invalid_values (udp port) should have failed\n");
         exit(1);
     }
     udp->dest_port = orig_port;
 
     /* 4. Wrong XID */
-    if (dhcp_parse_offer(buffer, len, xid + 1, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, len, xid + 1, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_invalid_values (xid) should have failed\n");
         exit(1);
     }
@@ -148,7 +148,7 @@ void test_invalid_values() {
     /* 5. Wrong Op Code */
     struct dhcp_packet* dhcp = (struct dhcp_packet*)(buffer + sizeof(struct ethernet_header) + 20 + sizeof(struct udp_header));
     dhcp->op = 1; /* Request, not Reply */
-    if (dhcp_parse_offer(buffer, len, xid, &out_dhcp) == 0) {
+    if (dhcp_parse_offer(buffer, len, xid, &out_dhcp, NULL) == 0) {
         printf("FAIL: test_invalid_values (op) should have failed\n");
         exit(1);
     }

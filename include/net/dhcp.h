@@ -38,9 +38,23 @@ void dhcp_discover(void);
  * @param len Total length of the received buffer.
  * @param xid The transaction ID to match.
  * @param out_dhcp Output pointer to the start of the DHCP packet within the buffer.
+ * @param out_dhcp_len Output pointer to the length of the DHCP payload (including options).
  *
  * @return 0 on success (valid offer matching xid), -1 on error or mismatch.
  */
-int dhcp_parse_offer(const uint8_t* buffer, size_t len, uint32_t xid, const struct dhcp_packet** out_dhcp);
+int dhcp_parse_offer(const uint8_t* buffer, size_t len, uint32_t xid, const struct dhcp_packet** out_dhcp, size_t* out_dhcp_len);
+
+/**
+ * Parses DHCP options from a packet with strict bounds checking.
+ *
+ * @param packet Pointer to the DHCP packet.
+ * @param len Length of the DHCP packet (header + options).
+ * @param mask Output pointer for Subnet Mask.
+ * @param gw Output pointer for Gateway IP.
+ * @param dns Output pointer for DNS IP.
+ *
+ * @return 0 on success, -1 on error.
+ */
+int dhcp_parse_options(const struct dhcp_packet* packet, size_t len, uint32_t* mask, uint32_t* gw, uint32_t* dns);
 
 #endif /* ETEROS_NET_DHCP_H */

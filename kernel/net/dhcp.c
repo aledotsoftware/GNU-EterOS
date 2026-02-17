@@ -107,7 +107,8 @@ void dhcp_discover(void) {
         int len = e1000_receive(rx_buffer, sizeof(rx_buffer));
         if (len > 0) {
             const struct dhcp_packet* r_dhcp = NULL;
-            if (dhcp_parse_offer(rx_buffer, len, xid, &r_dhcp) == 0) {
+            size_t dhcp_len = 0;
+            if (dhcp_parse_offer(rx_buffer, len, xid, &r_dhcp, &dhcp_len) == 0) {
                  hal_console_write("[DHCP] Oferta Recibida!\n");
 
                  /* Parse Options for Mask, Gateway, DNS */
@@ -115,21 +116,7 @@ void dhcp_discover(void) {
                  uint32_t gw = 0;
                  uint32_t dns = 0;
 
-                 const uint8_t* opt = r_dhcp->options;
-                 while (*opt != 255 && (opt - r_dhcp->options) < 308) {
-                     uint8_t type = *opt++;
-                     if (type == 0) continue; /* Padding */
-                     uint8_t slen = *opt++;
-                     
-                     if (type == 1) { /* Subnet Mask */
-                         memcpy(&mask, opt, 4);
-                     } else if (type == 3) { /* Router/Gateway */
-                         memcpy(&gw, opt, 4);
-                     } else if (type == 6) { /* DNS */
-                         memcpy(&dns, opt, 4);
-                     }
-                     opt += slen;
-                 }
+                 dhcp_parse_options(r_dhcp, dhcp_len, &mask, &gw, &dns);
 
                  /* Print Offered IP (yiaddr) */
                  const uint8_t* ip = (const uint8_t*)&r_dhcp->yiaddr;
