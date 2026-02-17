@@ -224,6 +224,25 @@ void omni_fill_rect_alpha(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
     }
 }
 
+/* Scaled character drawing (Transparency only) */
+void omni_draw_char_scaled(int32_t x, int32_t y, char c, uint32_t fg, int scale) {
+    if (scale < 1) scale = 1;
+    if (x < 0 || y < 0 || (uint32_t)(x + 8 * scale) > omni_width || (uint32_t)(y + 16 * scale) > omni_height) return;
+
+    dirty_mark(x, y, 8 * scale, 16 * scale);
+
+    const uint8_t* glyph = &font8x16[(unsigned char)c * 16];
+
+    for (int row = 0; row < 16; row++) {
+        uint8_t bits = glyph[row];
+        for (int col = 0; col < 8; col++) {
+            if (bits & (0x80 >> col)) {
+                omni_fill_rect(x + col * scale, y + row * scale, scale, scale, fg);
+            }
+        }
+    }
+}
+
 void omni_draw_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
     omni_fill_rect(x, y, w, 1, color);         /* Top */
     omni_fill_rect(x, y + h - 1, w, 1, color); /* Bottom */

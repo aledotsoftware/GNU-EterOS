@@ -1736,9 +1736,19 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         draw_doom_preview(draw_x, draw_y, w, h);
     } else {
         /* Generic Preview for new apps */
-        wm_fill_rect(NULL, (rect_t){draw_x+10, draw_y+40, w-20, h-50}, 0x111111);
-        /* Draw big initial? For now just color block */
-        omni_fill_rect(icon_cx-20, icon_cy-20, 40, 40, accent);
+        omni_fill_rect(draw_x+10, draw_y+40, w-20, h-50, 0x111111);
+
+        /* Draw big initial (Micro-UX: Scaled char for better recognition) */
+        char initial = title[0];
+        int scale = 4;
+        /* Center char: 8*4=32 width, 16*4=64 height */
+        omni_draw_char_scaled(icon_cx - 16, icon_cy - 32, initial, accent, scale);
+
+        static bool debug_logged = false;
+        if (!debug_logged && strcmp(title, "Lienzo") == 0) {
+            serial_write_string("[GUI] UX: Drawing Scaled Initial for 'Lienzo'\n");
+            debug_logged = true;
+        }
     }
     
     /* Active Border (Glow effect on hover) */
