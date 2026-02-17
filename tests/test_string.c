@@ -365,6 +365,35 @@ int main() {
         printf("memset16 test passed\n");
     }
 
+    /* Test memset32 */
+    {
+        uint32_t buffer[16];
+        /* Fill with pattern 0xAABBCCDD */
+        memset32(buffer, 0xAABBCCDD, 16);
+        for(int i=0; i<16; i++) {
+            assert(buffer[i] == 0xAABBCCDD);
+        }
+
+        /* Test odd size (remainder path) */
+        memset32(buffer, 0x11223344, 15);
+        for(int i=0; i<15; i++) {
+            assert(buffer[i] == 0x11223344);
+        }
+        /* Check last element unchanged */
+        assert(buffer[15] == 0xAABBCCDD);
+
+        /* Test size 0 */
+        memset32(buffer, 0xFFFFFFFF, 0);
+        assert(buffer[0] == 0x11223344);
+
+        /* Test size 1 */
+        memset32(buffer, 0x99887766, 1);
+        assert(buffer[0] == 0x99887766);
+        assert(buffer[1] == 0x11223344);
+
+        printf("memset32 test passed\n");
+    }
+
     /* Test memmove (overlap handling) */
     {
         char buffer[20];
