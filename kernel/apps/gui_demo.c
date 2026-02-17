@@ -1434,7 +1434,7 @@ void gui_draw_boot_logo(void) {
     /* 2. Draw Logo from File (logo.raw) */
     int img_w = 200;
     int img_h = 200;
-    omni_draw_image_from_path("/logo.png", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
+    omni_draw_image_from_path("logo.png", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
 
     /* 3. Draw Text (Dark Grey) */
     const char* title = "ETEROS GENESIS";
@@ -1480,7 +1480,16 @@ void gui_draw_boot_logo(void) {
     
     /* Final pause (1 second) */
     terminal_set_silent(true);
-    task_sleep(100); 
+    task_sleep(50);
+
+    /* Fade to Black Transition */
+    for (int alpha = 0; alpha <= 255; alpha += 8) {
+         omni_fill_rect_alpha(0, 0, sw, sh, 0x000000, alpha);
+         framebuffer_flush();
+         task_sleep(1);
+    }
+    omni_fill_rect(0, 0, sw, sh, 0x000000);
+    framebuffer_flush();
 }
 
 /* ========================================================================= */
