@@ -428,6 +428,39 @@ int atoi(const char* str) {
     return sign * res;
 }
 
+int atoi_s(const char* str, int32_t* out) {
+    if (!str || !out) return -1;
+
+    int64_t res = 0;
+    int sign = 1;
+
+    /* Skip whitespace */
+    while (*str == ' ' || (*str >= 9 && *str <= 13)) str++;
+
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    } else if (*str == '+') {
+        str++;
+    }
+
+    if (!*str) return -1; /* No digits or empty string */
+
+    while (*str >= '0' && *str <= '9') {
+        res = res * 10 + (*str - '0');
+
+        if (sign == 1 && res > INT32_MAX) return -2;
+        if (sign == -1 && -res < INT32_MIN) return -2;
+
+        str++;
+    }
+
+    if (*str != '\0') return -3; /* Invalid char */
+
+    *out = (int32_t)(sign * res);
+    return 0;
+}
+
 /* ========================================================================= */
 /* Funciones de Conversión                                                   */
 /* ========================================================================= */

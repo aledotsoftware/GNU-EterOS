@@ -568,6 +568,59 @@ int main() {
         printf("explicit_bzero tests passed\n");
     }
 
+    /* Test atoi_s */
+    {
+        int32_t val;
+        int res;
+        char str_buf[32];
+
+        /* Valid positive */
+        res = atoi_s("12345", &val);
+        assert(res == 0);
+        assert(val == 12345);
+
+        /* Valid negative */
+        res = atoi_s("-12345", &val);
+        assert(res == 0);
+        assert(val == -12345);
+
+        /* INT32_MAX */
+        sprintf(str_buf, "%d", INT32_MAX);
+        res = atoi_s(str_buf, &val);
+        assert(res == 0);
+        assert(val == INT32_MAX);
+
+        /* INT32_MIN */
+        sprintf(str_buf, "%d", INT32_MIN);
+        res = atoi_s(str_buf, &val);
+        assert(res == 0);
+        assert(val == INT32_MIN);
+
+        /* Overflow (+1) */
+        /* INT32_MAX + 1 = 2147483648 */
+        res = atoi_s("2147483648", &val);
+        assert(res == -2);
+
+        /* Underflow (-1) */
+        /* INT32_MIN - 1 = -2147483649 */
+        res = atoi_s("-2147483649", &val);
+        assert(res == -2);
+
+        /* Invalid char */
+        res = atoi_s("123a", &val);
+        assert(res == -3);
+
+        /* Empty string */
+        res = atoi_s("", &val);
+        assert(res == -1);
+
+        /* Just sign */
+        res = atoi_s("-", &val);
+        assert(res == -1);
+
+        printf("atoi_s tests passed\n");
+    }
+
     printf("All tests passed!\n");
     return 0;
 }

@@ -579,18 +579,30 @@ static void cmd_kill(const char* args) {
     /* Skip spaces */
     while (*args == ' ') args++;
 
-    /* Simple atoi implementation */
-    uint32_t pid = 0;
-    const char* ptr = args;
-    while (*ptr >= '0' && *ptr <= '9') {
-        pid = pid * 10 + (*ptr - '0');
-        ptr++;
+    char pid_buf[32];
+    size_t i = 0;
+    while (*args >= '0' && *args <= '9' && i < 31) {
+        pid_buf[i++] = *args++;
     }
+    pid_buf[i] = '\0';
 
-    if (pid == 0) {
+    if (i == 0) {
         terminal_write_colored("Error: PID invalido o es kernel (PID 0).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
         return;
     }
+
+    int32_t pid_val;
+    if (atoi_s(pid_buf, &pid_val) != 0) {
+        terminal_write_colored("Error: Formato de PID invalido (overflow).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+        return;
+    }
+
+    if (pid_val <= 0) {
+        terminal_write_colored("Error: PID invalido o es kernel (PID 0).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+        return;
+    }
+
+    uint32_t pid = (uint32_t)pid_val;
 
     if (task_kill(pid) == 0) {
         terminal_write_colored("Tarea terminada.\n", VGA_COLOR_GREEN, VGA_COLOR_BLACK);

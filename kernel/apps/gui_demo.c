@@ -1116,7 +1116,12 @@ static void system_net_dispatcher_task(void) {
         while (*p >= '0' && *p <= '9' && pi < 7) pbuf[pi++] = *p++;
         pbuf[pi] = 0;
         if (pi > 0) {
-            port = (uint16_t)atoi(pbuf);
+            int32_t port_val;
+            if (atoi_s(pbuf, &port_val) == 0 && port_val > 0 && port_val <= 65535) {
+                port = (uint16_t)port_val;
+            } else {
+                flux_notify("Error", "Puerto invalido. Usando defecto.", FLUX_ACCENT_AMBER);
+            }
         }
     }
 

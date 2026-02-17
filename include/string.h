@@ -115,6 +115,17 @@ int strncmp(const char* s1, const char* s2, size_t n);
  * @param buffer_size Tamaño del buffer de destino.
  */
 int atoi(const char* str);
+
+/**
+ * Safe conversion of string to 32-bit signed integer.
+ * Checks for overflow and invalid characters.
+ * Returns 0 on success, -1 on invalid input, -2 on overflow/underflow.
+ *
+ * @param str The string to convert.
+ * @param out Pointer to store the result.
+ */
+int atoi_s(const char* str, int32_t* out);
+
 void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base);
 
 /**
