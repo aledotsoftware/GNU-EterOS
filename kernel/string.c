@@ -91,12 +91,27 @@ void* memset16(void* dest, uint16_t c, size_t n) {
 void* memset32(void* dest, uint32_t c, size_t n) {
 #ifdef __x86_64__
     void* original_dest = dest;
+    /* ⚡ BOLT Optimization: Use rep stosq (64-bit) for bulk of memset32. */
+    /* This processes 8 bytes per instruction instead of 4. */
+    uint64_t pattern = c | ((uint64_t)c << 32);
+    size_t qwords = n / 2;
+
     __asm__ volatile (
-        "cld; rep stosl"
-        : "+D"(dest), "+c"(n)
-        : "a"(c)
+        "cld; rep stosq"
+        : "+D"(dest), "+c"(qwords)
+        : "a"(pattern)
         : "memory"
     );
+
+    /* Handle remainder if n is odd */
+    if (n & 1) {
+        __asm__ volatile (
+            "stosl"
+            : "+D"(dest)
+            : "a"(c)
+            : "memory"
+        );
+    }
     return original_dest;
 #else
     uint32_t* d = (uint32_t*)dest;
