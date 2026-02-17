@@ -1,30 +1,110 @@
 /*
- * éterOS - Window Manager (Compositor)
+ * éterOS - Window Manager (Compositor & Event System)
  * 
- * Fase 5.1 Optimizations:
- * - Removed redundant buffer refreshes from per-operation calls
- * - Window shadow uses alpha blending for glass-like effect
- * - Improved title bar aesthetics with gradient
- * - Optimized clipping in wm_fill_rect / wm_print_at
+ * Implements a Z-ordered windowing system with event dispatching.
  */
+
 #include <ui/window.h>
+#include <ui/omni.h>
 #include <types.h>
 #include <string.h>
 #include <framebuffer.h>
-#include <ui/omni.h>
+#include <keyboard.h>
+#include <mouse.h>
+#include <timer.h>
+#include <hal.h>
+#include <serial.h>
 
-static window_t current_windows[MAX_WINDOWS];
-static int window_count = 0;
+/* Window Pool & List */
+static window_t window_pool[MAX_WINDOWS];
+static window_t* windows_head = NULL; /* Bottom (Background) */
+static window_t* windows_tail = NULL; /* Top (Active) */
+static window_t* focused_window = NULL;
+
+/* Input State */
+static int32_t mouse_x = 512;
+static int32_t mouse_y = 384;
+static int32_t mouse_buttons = 0;
+
+/* Event Queue */
+typedef enum {
+    WM_EVENT_MOUSE,
+    WM_EVENT_KEY
+} wm_event_type_t;
+
+typedef struct {
+    wm_event_type_t type;
+    int32_t dx;
+    int32_t dy;
+    int32_t buttons;
+    char key;
+} wm_event_t;
+
+#define WM_EVENT_QUEUE_SIZE 128
+static wm_event_t wm_queue[WM_EVENT_QUEUE_SIZE];
+static volatile int wm_q_head = 0;
+static volatile int wm_q_tail = 0;
 
 void wm_init(void) {
-    memset(current_windows, 0, sizeof(current_windows));
-    window_count = 0;
+    memset(window_pool, 0, sizeof(window_pool));
+    windows_head = NULL;
+    windows_tail = NULL;
+    focused_window = NULL;
+
+    mouse_x = omni_get_width() / 2;
+    mouse_y = omni_get_height() / 2;
+
+    /* Register ISR callback */
+    extern void wm_push_mouse_packet(int8_t dx, int8_t dy, uint8_t buttons);
+    mouse_set_callback(wm_push_mouse_packet);
+}
+
+/* Internal Linked List Helpers */
+static void list_append(window_t* win) {
+    if (!windows_head) {
+        windows_head = win;
+        windows_tail = win;
+        win->prev = NULL;
+        win->next = NULL;
+    } else {
+        windows_tail->next = win;
+        win->prev = windows_tail;
+        win->next = NULL;
+        windows_tail = win;
+    }
+}
+
+static void list_remove(window_t* win) {
+    if (win->prev) win->prev->next = win->next;
+    else windows_head = win->next;
+
+    if (win->next) win->next->prev = win->prev;
+    else windows_tail = win->prev;
+
+    win->next = NULL;
+    win->prev = NULL;
 }
 
 window_t* wm_create_window(int32_t x, int32_t y, int32_t w, int32_t h, const char* title) {
-    if (window_count >= MAX_WINDOWS) return NULL;
+    /* Find free slot */
+    window_t* win = NULL;
+    for (int i = 0; i < MAX_WINDOWS; i++) {
+        if (!window_pool[i].active && window_pool[i].id == 0) { /* ID 0 implies free in this logic if we use 1-based IDs */
+             /* Actually just check active flag? gui_demo set active=true manually. */
+             /* Let's assume !active is free */
+             /* Better: clear memory on destroy */
+             win = &window_pool[i];
+             win->id = i + 1;
+             break;
+        }
+    }
+
+    if (!win) return NULL;
+
+    int new_id = win->id; /* Preserve ID found in loop */
+    memset(win, 0, sizeof(window_t));
+    win->id = new_id;
     
-    window_t* win = &current_windows[window_count++];
     win->active = true;
     win->bounds.x = x;
     win->bounds.y = y;
@@ -34,137 +114,212 @@ window_t* wm_create_window(int32_t x, int32_t y, int32_t w, int32_t h, const cha
     win->fg_color = UI_COLOR_WHITE;
     strlcpy(win->title, title, sizeof(win->title));
     
-    /* Dibujar inicialmente */
-    wm_draw_window(win);
+    list_append(win);
+    wm_bring_to_front(win);
+
     return win;
 }
 
-void wm_draw_window(window_t* win) {
+void wm_destroy_window(window_t* win) {
+    if (!win) return;
+    list_remove(win);
+    win->active = false;
+    win->id = 0;
+    if (focused_window == win) focused_window = windows_tail;
+}
+
+void wm_bring_to_front(window_t* win) {
+    if (!win || win == windows_tail) {
+        focused_window = win;
+        return;
+    }
+    list_remove(win);
+    list_append(win);
+    focused_window = win;
+}
+
+/* Default frame drawing */
+void wm_draw_window_frame(window_t* win) {
     if (!win->active) return;
-    
     const int TITLE_H = 30;
     
-    /* 0. Shadow (Soft, offset +3, +3) */
-    omni_fill_rect_alpha(win->bounds.x + 3, win->bounds.y + 3,
-                   win->bounds.w, win->bounds.h,
-                   0x000000, 0x80);
-
-    /* 1. Background */
-    omni_fill_rect(win->bounds.x, win->bounds.y,
-                   win->bounds.w, win->bounds.h,
-                   win->bg_color);
-                     
-    /* 2. Title Bar (Gradient for premium feel) */
-    omni_fill_gradient_v(win->bounds.x, win->bounds.y,
-                         win->bounds.w, TITLE_H,
-                         0x00BBCC, UI_COLOR_CYAN);
-                     
-    /* Title Text (Centrado verticalmente en 30px) */
-    omni_draw_string(NULL, win->bounds.x + 8, win->bounds.y + 7, win->title, UI_COLOR_BLACK, UI_COLOR_CYAN);
+    /* Shadow */
+    omni_fill_rect_alpha(win->bounds.x + 4, win->bounds.y + 4, win->bounds.w, win->bounds.h, 0x000000, 0x60);
     
-    /* 3. Close Button [X] (Touch-friendly 20x20) */
-    int btn_size = 20;
-    int btn_margin = (TITLE_H - btn_size) / 2;
-    int btn_x = win->bounds.x + win->bounds.w - btn_size - btn_margin;
-    int btn_y = win->bounds.y + btn_margin;
+    /* Background */
+    omni_fill_rect(win->bounds.x, win->bounds.y, win->bounds.w, win->bounds.h, win->bg_color);
     
-    omni_fill_rect(btn_x, btn_y, btn_size, btn_size, 0xFF4040);
+    /* Title Bar */
+    omni_fill_rect(win->bounds.x, win->bounds.y, win->bounds.w, TITLE_H, 0x303030);
+    omni_draw_string(NULL, win->bounds.x + 8, win->bounds.y + 8, win->title, 0xFFFFFF, 0x303030);
     
-    /* Draw X with line primitives (faster than per-pixel) */
-    omni_draw_line(btn_x + 4, btn_y + 4, btn_x + 15, btn_y + 15, 0xFFFFFF);
-    omni_draw_line(btn_x + 15, btn_y + 4, btn_x + 4, btn_y + 15, 0xFFFFFF);
-    
-    /* 4. Border (Single pixel) */
+    /* Border */
     omni_draw_rect(win->bounds.x, win->bounds.y, win->bounds.w, win->bounds.h, 0x505050);
 }
 
 void wm_draw_all(void) {
-    for (int i = 0; i < window_count; i++) {
-        wm_draw_window(&current_windows[i]);
+    omni_begin_frame();
+
+    /* Iterate Bottom -> Top */
+    window_t* curr = windows_head;
+    while (curr) {
+        if (curr->active) {
+            if (curr->on_paint) {
+                curr->on_paint(curr);
+            } else {
+                wm_draw_window_frame(curr);
+            }
+        }
+        curr = curr->next;
+    }
+
+    /* Draw Cursor */
+    omni_fill_rect(mouse_x, mouse_y, 4, 4, 0xFFFFFF);
+    omni_draw_rect(mouse_x, mouse_y, 4, 4, 0x000000);
+
+    framebuffer_flush();
+}
+
+void wm_draw_window(window_t* win) {
+    /* For legacy calls or forced redraw of one window (not ideal in compositing) */
+    /* In a proper compositor, we just mark dirty. Here we draw immediately. */
+    if (win->on_paint) win->on_paint(win);
+    else wm_draw_window_frame(win);
+}
+
+/* Event Queue Impl */
+void wm_push_event(wm_event_t evt) {
+    int next = (wm_q_head + 1) % WM_EVENT_QUEUE_SIZE;
+    if (next != wm_q_tail) {
+        wm_queue[wm_q_head] = evt;
+        wm_q_head = next;
     }
 }
 
-/* Draws text relative to window content area (below title bar) */
-void wm_print_at(window_t* win, int32_t x, int32_t y, const char* text) {
-    if (!win || !win->active) return;
+void wm_push_mouse_packet(int8_t dx, int8_t dy, uint8_t buttons) {
+    wm_event_t evt;
+    evt.type = WM_EVENT_MOUSE;
+    evt.dx = dx;
+    evt.dy = dy;
+    evt.buttons = buttons;
+    wm_push_event(evt);
+}
 
-    const int TITLE_H = 30;
+void wm_handle_input(int x, int y, int buttons, char key) {
+    /* Not used directly anymore, pump_events handles it */
+    (void)x; (void)y; (void)buttons; (void)key;
+}
 
-    int32_t abs_x = win->bounds.x + x;
-    int32_t abs_y = win->bounds.y + TITLE_H + y;
+void wm_pump_events(void) {
+    /* 1. Poll Keyboard */
+    while (keyboard_has_input()) {
+        char c = keyboard_getchar();
+        wm_event_t evt;
+        evt.type = WM_EVENT_KEY;
+        evt.key = c;
+        wm_push_event(evt);
+    }
     
-    /* Clipping Rect: Content Area */
-    rect_t clip;
-    clip.x = win->bounds.x;
-    clip.y = win->bounds.y + TITLE_H;
-    clip.w = win->bounds.w;
-    clip.h = win->bounds.h - TITLE_H;
+    /* 2. Process Queue */
+    bool needs_redraw = false;
+    
+    while (wm_q_tail != wm_q_head) {
+        wm_event_t evt = wm_queue[wm_q_tail];
+        wm_q_tail = (wm_q_tail + 1) % WM_EVENT_QUEUE_SIZE;
 
-    omni_draw_string(&clip, abs_x, abs_y, text, win->fg_color, win->bg_color);
+        needs_redraw = true;
+
+        if (evt.type == WM_EVENT_MOUSE) {
+            mouse_x += evt.dx;
+            mouse_y += evt.dy;
+
+            /* Clamp */
+            if (mouse_x < 0) mouse_x = 0;
+            if (mouse_y < 0) mouse_y = 0;
+            if (mouse_x >= (int)omni_get_width()) mouse_x = omni_get_width() - 1;
+            if (mouse_y >= (int)omni_get_height()) mouse_y = omni_get_height() - 1;
+
+            mouse_buttons = evt.buttons;
+
+            /* Dispatch to Top-Most Window under cursor */
+            window_t* target = windows_tail; /* Start at top */
+            bool handled = false;
+
+            while (target) {
+                if (target->active &&
+                    mouse_x >= target->bounds.x && mouse_x < target->bounds.x + target->bounds.w &&
+                    mouse_y >= target->bounds.y && mouse_y < target->bounds.y + target->bounds.h) {
+
+                    /* Hit! */
+                    if (evt.buttons & 1) {
+                         /* Click brings to front */
+                         if (target != windows_tail) {
+                             wm_bring_to_front(target);
+                         }
+                    }
+
+                    if (target->on_mouse) {
+                        /* Send local coordinates */
+                        target->on_mouse(target, mouse_x - target->bounds.x, mouse_y - target->bounds.y, mouse_buttons);
+                    }
+
+                    handled = true;
+                    break;
+                }
+                target = target->prev;
+            }
+
+        } else if (evt.type == WM_EVENT_KEY) {
+            if (focused_window && focused_window->on_key) {
+                focused_window->on_key(focused_window, evt.key);
+            }
+        }
+    }
+
+    if (needs_redraw) {
+        wm_draw_all();
+    } else {
+        /* Idle */
+        // task_sleep(10);
+    }
+}
+
+/* Helpers */
+void wm_print_at(window_t* win, int32_t x, int32_t y, const char* text) {
+    if (!win) return;
+    int tx = win->bounds.x + x;
+    int ty = win->bounds.y + y;
+    /* Clipping simplified for now */
+    rect_t clip = win->bounds;
+    omni_draw_string(&clip, tx, ty, text, win->fg_color, win->bg_color);
 }
 
 void wm_fill_rect(window_t* win, rect_t rect, uint32_t color) {
-    if (!win || !win->active) return;
+    if (!win) return;
+    int rx = win->bounds.x + rect.x;
+    int ry = win->bounds.y + rect.y;
+    /* Clip against window bounds */
+    int min_x = win->bounds.x;
+    int min_y = win->bounds.y;
+    int max_x = win->bounds.x + win->bounds.w;
+    int max_y = win->bounds.y + win->bounds.h;
     
-    const int TITLE_H = 30;
-    
-    /* Offset for title bar */
-    int32_t abs_x = win->bounds.x + rect.x;
-    int32_t abs_y = win->bounds.y + TITLE_H + rect.y;
+    if (rx < min_x) { rect.w -= (min_x - rx); rx = min_x; }
+    if (ry < min_y) { rect.h -= (min_y - ry); ry = min_y; }
+    if (rx + rect.w > max_x) rect.w = max_x - rx;
+    if (ry + rect.h > max_y) rect.h = max_y - ry;
 
-    /* Content area bounds */
-    int32_t min_x = win->bounds.x;
-    int32_t min_y = win->bounds.y + TITLE_H;
-    int32_t max_x = win->bounds.x + win->bounds.w;
-    int32_t max_y = win->bounds.y + win->bounds.h;
-
-    /* Clip */
-    if (abs_x < min_x) {
-        rect.w -= (min_x - abs_x);
-        abs_x = min_x;
-    }
-    if (abs_y < min_y) {
-        rect.h -= (min_y - abs_y);
-        abs_y = min_y;
-    }
-
-    if (abs_x + rect.w > max_x) {
-        rect.w = max_x - abs_x;
-    }
-    if (abs_y + rect.h > max_y) {
-        rect.h = max_y - abs_y;
-    }
-
-    if (rect.w <= 0 || rect.h <= 0) return;
-    
-    omni_fill_rect(abs_x, abs_y, rect.w, rect.h, color);
+    if (rect.w > 0 && rect.h > 0)
+        omni_fill_rect(rx, ry, rect.w, rect.h, color);
 }
 
 void wm_move_window(window_t* win, int32_t dx, int32_t dy) {
-    if (!win->active) return;
-    win->bounds.x += dx;
-    win->bounds.y += dy;
-    
-    wm_redraw_desktop();
+    if (win) {
+        win->bounds.x += dx;
+        win->bounds.y += dy;
+    }
 }
 
 void wm_redraw_desktop(void) {
-    omni_begin_frame();
-    
-    /* 1. Desktop Background (Dark Teal) */
-    omni_fill_rect(0, 0, omni_get_width(), omni_get_height(), 0x002040);
-    
-    /* 2. Subtle Grid */
-    for (uint32_t y = 0; y < omni_get_height(); y += 40) {
-        omni_fill_rect(0, y, omni_get_width(), 1, 0x003050);
-    }
-    for (uint32_t x = 0; x < omni_get_width(); x += 40) {
-        omni_fill_rect(x, 0, 1, omni_get_height(), 0x003050);
-    }
-
-    /* 3. Redraw all windows */
     wm_draw_all();
-    
-    /* 4. Flush */
-    framebuffer_flush();
 }

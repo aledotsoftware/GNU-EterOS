@@ -143,6 +143,23 @@ static void flux_notify(const char* title, const char* message, uint32_t accent)
 static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node);
 static void flux_launch_space(flux_node_id_t node);
 
+/* Forward declarations for Window Callbacks */
+static void terminal_on_paint(window_t* win);
+static void terminal_on_key(window_t* win, char key);
+static void sysinfo_on_paint(window_t* win);
+static void sysinfo_on_mouse(window_t* win, int x, int y, int b);
+static void settings_on_paint(window_t* win);
+static void settings_on_mouse(window_t* win, int x, int y, int b);
+static void files_on_paint(window_t* win);
+static void files_on_mouse(window_t* win, int x, int y, int b);
+static void travel_on_paint(window_t* win);
+static void travel_on_mouse(window_t* win, int x, int y, int b);
+static void browser_on_paint(window_t* win);
+static void browser_on_mouse(window_t* win, int x, int y, int b);
+static void browser_on_key(window_t* win, char key);
+static void devman_on_paint(window_t* win);
+static void doom_on_paint(window_t* win);
+
 /* Helper Draw Functions */
 static void draw_generic_app_content(window_t* win, const char* title, uint32_t bg_col);
 
@@ -379,6 +396,9 @@ static void term_create(void) {
     
     terminals[slot].win->bg_color = UI_COLOR_BLACK;
     terminals[slot].win->fg_color = UI_COLOR_WHITE; /* Ensure text is visible */
+
+    terminals[slot].win->on_paint = terminal_on_paint;
+    terminals[slot].win->on_key = terminal_on_key;
     terminals[slot].used = true;
     
     term_clear(&terminals[slot]);
@@ -1886,7 +1906,11 @@ static void flux_launch_space(flux_node_id_t node) {
         focused_term = &terminals[0];
     } else if (node == NODE_SYSMON) {
         flux_notify("System Monitor", "Analizando hardware...", FLUX_ACCENT_AMBER);
-        if (!win_sysinfo) win_sysinfo = wm_create_window(0, 0, 800, 600, "System Info"); 
+        if (!win_sysinfo) {
+             win_sysinfo = wm_create_window(0, 0, 800, 600, "System Info");
+             win_sysinfo->on_paint = sysinfo_on_paint;
+             win_sysinfo->on_mouse = sysinfo_on_mouse;
+        }
         win_sysinfo->active = true;
         focused_space = win_sysinfo;
     } else if (node == NODE_MATRIX) {
@@ -1900,22 +1924,39 @@ static void flux_launch_space(flux_node_id_t node) {
         focused_space = win_matrix;
     } else if (node == NODE_SETTINGS) {
          flux_notify("Settings", "Configuracion de usuario cargada.", 0xFFFFFF);
-         if (!win_settings) win_settings = wm_create_window(0, 0, 800, 600, "Configuracion");
+         if (!win_settings) {
+             win_settings = wm_create_window(0, 0, 800, 600, "Configuracion");
+             win_settings->on_paint = settings_on_paint;
+             win_settings->on_mouse = settings_on_mouse;
+         }
          win_settings->active = true;
          focused_space = win_settings;
     } else if (node == NODE_FILES) {
          flux_notify("Files", "Sistema de Archivos en linea", FLUX_ACCENT_AMBER);
-         if (!win_files) win_files = wm_create_window(0, 0, 800, 600, "Archivos");
+         if (!win_files) {
+             win_files = wm_create_window(0, 0, 800, 600, "Archivos");
+             win_files->on_paint = files_on_paint;
+             win_files->on_mouse = files_on_mouse;
+         }
          win_files->active = true;
          focused_space = win_files;
     } else if (node == NODE_SANTITRAVEL) {
          flux_notify("SantiTravel", "Preparando motores...", 0x55AAFF);
-         if (!win_santitravel) win_santitravel = wm_create_window(0, 0, 800, 600, "SantiTravel");
+         if (!win_santitravel) {
+             win_santitravel = wm_create_window(0, 0, 800, 600, "SantiTravel");
+             win_santitravel->on_paint = travel_on_paint;
+             win_santitravel->on_mouse = travel_on_mouse;
+         }
          win_santitravel->active = true;
          focused_space = win_santitravel;
     } else if (node == NODE_BROWSER) {
          flux_notify("Navegador", "Cargando recurso local (Test)...", 0x44FFFF);
-         if (!win_browser) win_browser = wm_create_window(50, 50, 800, 600, "Navegador");
+         if (!win_browser) {
+             win_browser = wm_create_window(50, 50, 800, 600, "Navegador");
+             win_browser->on_paint = browser_on_paint;
+             win_browser->on_mouse = browser_on_mouse;
+             win_browser->on_key = browser_on_key;
+         }
          win_browser->active = true;
          focused_space = win_browser;
          
@@ -1925,12 +1966,18 @@ static void flux_launch_space(flux_node_id_t node) {
          }
     } else if (node == NODE_DEVMAN) {
           flux_notify("Admin Dispositivos", "Escaneando hardware...", FLUX_ACCENT_AMBER);
-          if (!win_devman) win_devman = wm_create_window(0, 0, 800, 600, "Dispositivos");
+          if (!win_devman) {
+              win_devman = wm_create_window(0, 0, 800, 600, "Dispositivos");
+              win_devman->on_paint = devman_on_paint;
+          }
           win_devman->active = true;
           focused_space = win_devman;
     } else if (node == NODE_DOOM) {
           flux_notify("DOOM", "Rip and Tear...", 0xFF0000);
-          if (!win_doom) win_doom = wm_create_window(0, 0, 1024, 768, "DOOM");
+          if (!win_doom) {
+              win_doom = wm_create_window(0, 0, 1024, 768, "DOOM");
+              win_doom->on_paint = doom_on_paint;
+          }
           win_doom->active = true;
           focused_space = win_doom;
           if (!doom_running) {
@@ -2629,294 +2676,204 @@ static ui_event_t ui_event_queue[UI_EVENT_QUEUE_SIZE];
 static volatile int ui_event_head = 0;
 static volatile int ui_event_tail = 0;
 
-/* Internal push logic */
-static void ui_queue_push_impl(ui_event_t evt) {
-    int next = (ui_event_head + 1) % UI_EVENT_QUEUE_SIZE;
-    if (next != ui_event_tail) {
-        ui_event_queue[ui_event_head] = evt;
-        ui_event_head = next;
-    }
-}
+/* ========================================================================= */
+/* New Window Manager Integration Wrappers                                   */
+/* ========================================================================= */
 
-/* Called from ISR (Mouse) - Interrupts assumed disabled */
-static void ui_push_event_isr(ui_event_t evt) {
-    ui_queue_push_impl(evt);
-}
+static window_t* desktop_win = NULL;
+static window_t* taskbar_win = NULL;
+static window_t* hub_win = NULL;
 
-/* Called from Thread (Keyboard) - Protected */
-static void ui_push_event(ui_event_t evt) {
-    hal_interrupts_disable();
-    ui_queue_push_impl(evt);
-    hal_interrupts_enable();
-}
-
-/* Thread-safe pop (called from Main) */
-static bool ui_pop_event(ui_event_t* evt) {
-    bool result = false;
-    hal_interrupts_disable();
-    if (ui_event_head != ui_event_tail) {
-        *evt = ui_event_queue[ui_event_tail];
-        ui_event_tail = (ui_event_tail + 1) % UI_EVENT_QUEUE_SIZE;
-        result = true;
-    }
-    hal_interrupts_enable();
-    return result;
-}
-
-static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
-    ui_event_t evt;
-    evt.type = UI_EVENT_MOUSE_PACKET;
-    evt.dx = dx;
-    evt.dy = dy;
-    evt.buttons = buttons;
-    evt.key = 0;
-    
-    ui_push_event_isr(evt);
-}
-
-void gui_demo_run(void) {
-    serial_write_string("[GUI] Starting GUI...\n");
-    
-    /* Reset state on launch/re-launch */
-    desktop_running = true;
-    serial_write_string("[GUI] Initializing terminals...\n");
-    term_init_all();
-
-    serial_write_string("[GUI] Initializing WM...\n");
-    wm_init();
-    omni_init();
-    
-    /* serial_write_string("[GUI] Creating terminal window...\n");
-    term_create(); */ 
-    
-    /* Re-enable Double Buffer for flicker-free rendering - DISABLED TEMPORARILY */
-    framebuffer_enable_double_buffer();
-    
-    mouse_set_callback(on_mouse_event);
-
-    /* 4. External Server Simulation - BACKGROUND TASK */
-    /* task_create("ext_server", server_external_task); */
-    
-    /* Init Apps */
-    /* term_init_all(); -- Removed duplicate call */
-
-    
-    /* Init Apps */
-    /* term_init_all(); -- Removed duplicate call */
-    
-    /* Force State */
-    current_zoom = FLUX_MACRO;
-    target_zoom = FLUX_MACRO;
-    zoom_progress = 0;
-    
-    /* Initial Draw */
-    serial_write_string("[GUI] Initial Draw...\n");
+/* Desktop Callbacks */
+static void desktop_on_paint(window_t* win) {
+    (void)win;
     draw_constellation();
-    wm_draw_all();
-    
-    serial_write_string("[GUI] Entering Main Loop...\n");
-    
-    desktop_running = true;
-    static uint64_t last_frame_ticks = 0;
 
-    while (desktop_running) {
-        /* ⚡ BOLT: Intelligent Frame Refresh (Cap at ~100 FPS if resolution is 10ms) */
-        uint64_t current_ticks = timer_get_ticks();
-        if (current_ticks == last_frame_ticks) {
-            task_sleep(1); /* ⚡ BOLT: Real sleep to cool down the CPU */
-            continue;
+    /* Layer 3: System Notifications (Always on top of desktop) */
+    draw_notifications();
+
+    /* Ripple Effect */
+    draw_ripple_effect();
+}
+
+static void desktop_on_mouse(window_t* win, int x, int y, int buttons) {
+    (void)win;
+    /* Update globals for existing logic */
+    mouse_x = x;
+    mouse_y = y;
+
+    bool new_left = (buttons & 1);
+    if (new_left && !mouse_left_btn) {
+        /* Click */
+        mouse_left_btn = true;
+        handle_flux_click();
+
+        /* Trigger Ripple */
+        click_ripple.x = mouse_x;
+        click_ripple.y = mouse_y;
+        click_ripple.radius = 5;
+        click_ripple.active = true;
+    }
+    mouse_left_btn = new_left;
+}
+
+/* Taskbar Callbacks */
+static void taskbar_on_paint(window_t* win) {
+    (void)win;
+    draw_global_status_bar();
+}
+
+static void taskbar_on_mouse(window_t* win, int x, int y, int buttons) {
+    (void)win;
+    mouse_x = x;
+    mouse_y = y;
+
+    bool new_left = (buttons & 1);
+    if (new_left && !mouse_left_btn) {
+        mouse_left_btn = true;
+        /* Handle Hub Toggle if click is in corner */
+        if (x < 100) {
+            hub_active = !hub_active;
+            if (hub_win) hub_win->active = hub_active;
         }
-        last_frame_ticks = current_ticks;
+    }
+    mouse_left_btn = new_left;
+}
 
+/* Hub Callbacks */
+static void hub_on_paint(window_t* win) {
+    (void)win;
+    draw_flux_hub();
+}
 
+static void hub_on_key(window_t* win, char key) {
+    (void)win;
+    handle_hub_input(key);
+    if (!hub_active && hub_win) {
+        hub_win->active = false;
+    }
+}
 
-        /* --- 1. POLL KEYBOARD DRIVER --- */
-        while (keyboard_has_input()) {
-            char c = keyboard_getchar();
-            ui_event_t evt = {0};
-            evt.type = UI_EVENT_KEY_PRESS;
-            evt.key = c;
-            ui_push_event(evt);
+/* App Wrappers */
+static void terminal_on_paint(window_t* win) {
+    /* Find which terminal instance this is?
+       For now, just draw focused_term if it matches.
+       Ideally, we store instance pointer in win->user_data.
+       But window_t doesn't have user_data yet.
+       We will use the existing logic which draws based on 'focused_term' or loop.
+    */
+    /* Currently draw_terminal_content takes a term instance */
+    /* We need to find the term instance that owns this window */
+    for(int i=0; i<MAX_TERMINALS; i++) {
+        if(terminals[i].win == win) {
+            draw_terminal_content(&terminals[i]);
+            return;
         }
+    }
+}
 
-        /* --- 2. COMPOSITOR EVENT LOOP (Async Processing) --- */
-        ui_event_t evt;
-        while (ui_pop_event(&evt)) {
-            gui_needs_redraw = true; /* Any hardware event wakes up the UI */
-            if (evt.type == UI_EVENT_MOUSE_PACKET) {
-                /* Update Mouse Position */
-                mouse_x += evt.dx;
-                mouse_y += evt.dy;
-                /* Clamp */
-                if (mouse_x < 0) mouse_x = 0;
-                if (mouse_y < 0) mouse_y = 0;
-                if (mouse_x >= 1024) mouse_x = 1023;
-                if (mouse_y >= 768) mouse_y = 767;
+static void terminal_on_key(window_t* win, char key) {
+    for(int i=0; i<MAX_TERMINALS; i++) {
+        if(terminals[i].win == win) {
+            term_handle_key(&terminals[i], key);
+            return;
+        }
+    }
+}
 
-                /* Handle Click (Rising Edge) */
-                bool new_left = (evt.buttons & 1);
-                if (new_left && !mouse_left_btn) {
-                    /* Click Detected */
-                    handle_flux_click();
+/* Generic App Wrappers */
+static void sysinfo_on_paint(window_t* win) { (void)win; draw_sysinfo_content(); }
+static void sysinfo_on_mouse(window_t* win, int x, int y, int b) {
+    (void)win; (void)b; handle_sysinfo_click(x, y);
+}
 
-                    /* Trigger Ripple */
-                    click_ripple.x = mouse_x;
-                    click_ripple.y = mouse_y;
-                    click_ripple.radius = 5;
-                    click_ripple.active = true;
-                }
-                mouse_left_btn = new_left;
+static void settings_on_paint(window_t* win) { (void)win; draw_settings_content(); }
+static void settings_on_mouse(window_t* win, int x, int y, int b) {
+    (void)win; (void)b; handle_settings_click(x, y);
+}
 
-            } else if (evt.type == UI_EVENT_KEY_PRESS) {
-                char c = evt.key;
-                gui_needs_redraw = true; /* Key triggers redraw */
+static void files_on_paint(window_t* win) { (void)win; draw_files_content(); }
+static void files_on_mouse(window_t* win, int x, int y, int b) {
+    (void)win; (void)b; handle_files_click(x, y);
+}
 
-                 /* Global Navigation Hotkeys */
-                 if (c == 27) { /* ESC */
-                     if (hub_active) {
-                         hub_active = false;
-                     } else if (current_zoom == FLUX_MACRO) {
-                         desktop_running = false;
-                     } else {
-                         target_zoom = FLUX_MACRO;
-                         flux_set_zoom(FLUX_MACRO, NODE_TERMINAL);
-                     }
-                 } else if (hub_active) {
-                     handle_hub_input(c);
-                 } else {
-                     /* Browser Input Intercept (Special Case) */
-                     if (current_zoom == FLUX_FOCUS && focused_space == win_browser && browser_url_active) {
-                        if (c == '\n') {
-                            browser_url_active = false;
-                            sys_net_fetch(browser_url);
-                        } else if (c == '\b') {
-                            int len = strlen(browser_url);
-                            if (len > 0) browser_url[len-1] = 0;
-                        } else {
-                            int len = strlen(browser_url);
-                            if (len < (int)sizeof(browser_url)-1) {
-                                browser_url[len] = c;
-                                browser_url[len+1] = 0;
-                            }
-                        }
-                     } else {
-                         /* Standard Navigation */
-                         bool typing_in_term = (current_zoom == FLUX_FOCUS && focused_term != NULL);
+static void travel_on_paint(window_t* win) { (void)win; draw_santitravel_content(); }
+static void travel_on_mouse(window_t* win, int x, int y, int b) {
+    (void)win; (void)b; handle_santitravel_click(x, y);
+}
 
-                          if (!typing_in_term) {
-                              if ((unsigned char)c == KEY_UP) { /* UP Arrow */
-                                  if (current_zoom == FLUX_MACRO && target_zoom == FLUX_MACRO) {
-                                      flux_set_zoom(FLUX_FOCUS, NODE_TERMINAL);
-                                      flux_launch_space(NODE_TERMINAL);
-                                  }
-                              }
-                              else if ((unsigned char)c == KEY_DOWN) { /* DOWN Arrow */
-                                  if (current_zoom == FLUX_FOCUS || target_zoom == FLUX_FOCUS) {
-                                      target_zoom = FLUX_MACRO;
-                                  }
-                              }
-                          }
-
-                         /* Pass input to terminal if focused */
-                         if (current_zoom == FLUX_FOCUS && focused_term != NULL) {
-                             if (focused_term->win && focused_term->win->active) {
-                                 term_handle_key(focused_term, c);
-                             }
-                         }
-                         /* Pass input to Doom if focused */
-                         /* if (current_zoom == FLUX_FOCUS && zooming_node == NODE_DOOM) {
-                             doom_handle_input((int)c, 1);
-                         } */
-                     }
-                }
+static void browser_on_paint(window_t* win) { (void)win; draw_browser_content(); }
+static void browser_on_mouse(window_t* win, int x, int y, int b) {
+    (void)win; (void)b; handle_browser_click(x, y);
+}
+static void browser_on_key(window_t* win, char key) {
+    (void)win;
+    if (browser_url_active) {
+        if (key == '\n') {
+            browser_url_active = false;
+            sys_net_fetch(browser_url);
+        } else if (key == '\b') {
+            int len = strlen(browser_url);
+            if (len > 0) browser_url[len-1] = 0;
+        } else {
+            int len = strlen(browser_url);
+            if (len < (int)sizeof(browser_url)-1) {
+                browser_url[len] = key;
+                browser_url[len+1] = 0;
             }
         }
+    }
+}
 
-        /* Update Logic */
-        if (target_zoom != current_zoom || zoom_progress > 0 || hub_active || current_zoom == FLUX_FOCUS) {
-            gui_needs_redraw = true;
+static void devman_on_paint(window_t* win) { (void)win; draw_devman_content(); }
+static void doom_on_paint(window_t* win) { (void)win; draw_doom_content(); }
+/* static void doom_on_key(window_t* win, char key) { (void)win; doom_handle_input((int)key, 1); } */
+
+void gui_demo_run(void) {
+    serial_write_string("[GUI] Starting GUI (WM Mode)...\n");
+    
+    desktop_running = true;
+    term_init_all();
+    wm_init();
+    omni_init();
+    framebuffer_enable_double_buffer();
+    
+    /* Create Desktop Window (Bottom) */
+    desktop_win = wm_create_window(0, 0, 1024, 768, "Desktop");
+    desktop_win->bg_color = 0x000000;
+    desktop_win->on_paint = desktop_on_paint;
+    desktop_win->on_mouse = desktop_on_mouse;
+    
+    /* Create Taskbar (Top) */
+    taskbar_win = wm_create_window(0, 0, 1024, 32, "Taskbar");
+    taskbar_win->bg_color = 0x000000; // Handled by draw
+    taskbar_win->on_paint = taskbar_on_paint;
+    taskbar_win->on_mouse = taskbar_on_mouse;
+    
+    /* Create Hub (Hidden) */
+    hub_win = wm_create_window(0, 0, 1024, 768, "Hub");
+    hub_win->active = false;
+    hub_win->on_paint = hub_on_paint;
+    hub_win->on_key = hub_on_key; /* Hub needs focus to type */
+    
+    /* Reset State */
+    current_zoom = FLUX_MACRO;
+    
+    serial_write_string("[GUI] Entering WM Event Loop...\n");
+    
+    while (desktop_running) {
+        /* Pump Events */
+        wm_pump_events();
+        
+        /* Check Hub State Sync */
+        if (hub_active && !hub_win->active) {
+            hub_win->active = true;
+            wm_bring_to_front(hub_win);
+        } else if (!hub_active && hub_win->active) {
+            hub_win->active = false;
         }
         
-        flux_update_zoom();
-        
-        if (!gui_needs_redraw) {
-            task_sleep(10); /* ⚡ BOLT: Extreme power saving mode */
-            continue;
-        }
-
-        /* ⚡ OMNI v2.0: Begin frame - cache buffer pointer once */
-        omni_begin_frame();
-
-        /* Capa 0: Deep Void (Premium Dark) */
-        
-        if ((int)current_zoom == -1) {
-             /* Transitioning: Clearing is handled inside draw_zoom_transition (localized) */
-        } else {
-             omni_fill_rect(0, 0, omni_get_width(), omni_get_height(), 0x000000);
-        }
-        
-        /* GUI state is now consistent with last events, reset for next tick */
-        gui_needs_redraw = false;
-        
-        if (current_zoom == FLUX_MACRO) {
-            draw_constellation();
-        } else if (current_zoom == FLUX_FOCUS) {
-            draw_focus_mode();
-        } else {
-             /* Transitioning */
-             draw_zoom_transition();
-        }
-        
-        /* Layer 3: System Notifications (Always on top) */
-        draw_notifications();
-        
-        /* Status Bar (Always Visible) */
-        draw_global_status_bar();
-        
-        /* Click Ripple Effect */
-        draw_ripple_effect();
-
-        /* Flux Hub Overlay (Modal) */
-        draw_flux_hub();
-
-        /* Cursor: Neural Orb (Reactive) */
-        uint32_t cursor_col = (current_zoom == FLUX_FOCUS) ? FLUX_ACCENT_CYAN : FLUX_TEXT_PRIMARY;
-        
-        /* Glow Effect (Steady, no pulse) */
-        /* ⚡ BOLT OPTIMIZATION: Use block rects instead of 81 putpixel calls */
-        omni_fill_rect(mouse_x - 3, mouse_y - 1, 7, 3, 0x303030);
-        omni_fill_rect(mouse_x - 1, mouse_y - 3, 3, 7, 0x303030);
-        omni_fill_rect(mouse_x - 2, mouse_y - 2, 5, 5, 0x404040);
-        
-        /* Core Orb (Tactile Click Feedback) */
-        if (mouse_left_btn) {
-            /* Pressed: Smaller, Amber Core */
-            omni_fill_rect(mouse_x - 1, mouse_y - 1, 2, 2, FLUX_ACCENT_AMBER);
-        } else {
-            /* Hover: Standard 4x4 Core */
-            omni_fill_rect(mouse_x - 2, mouse_y - 2, 4, 4, cursor_col);
-        }
-        
-        /* 🚀 EFFICIENCY OPTIMIZATION: Only flush what actually changed */
-        int32_t dx, dy, dw, dh;
-        omni_get_dirty_rect(&dx, &dy, &dw, &dh);
-        
-        /* Ensure the mouse cursor region is always included in the flush */
-        /* (since the cursor itself doesn't mark dirty in the draw logic usually) */
-        int mk_x = mouse_x - 10; if (mk_x < 0) mk_x = 0;
-        int mk_y = mouse_y - 10; if (mk_y < 0) mk_y = 0;
-        /* framebuffer_flush_rect handles merging if we call it twice, 
-           but here we just do one optimized flush or two small ones. */
-           
-        if (dw == 1024 && dh == 768) {
-            framebuffer_flush(); /* Full flush if screen was cleared */
-        } else {
-            framebuffer_flush_rect(dx, dy, dw, dh);
-            framebuffer_flush_rect(mk_x, mk_y, 20, 20); /* Flush mouse */
-        }
-
-        /* Smoother loop: Unlocked framerate (Yield to scheduler) */
-        task_yield(); 
+        task_yield();
     }
     
     terminal_initialize(NULL);
