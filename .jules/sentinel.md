@@ -12,3 +12,8 @@
 **Vulnerability:** System calls like `read`, `write`, and `open` accepted raw user-space pointers and dereferenced them directly without checking if they pointed to valid user memory. A malicious user program could pass a kernel address (e.g., `0xFFFFFFFF...`) to `sys_read` to overwrite kernel code or `sys_write` to leak kernel data.
 **Learning:** In a monolithic kernel running in Ring 0, the CPU does not automatically prevent the kernel from accessing kernel memory on behalf of a user. The kernel must explicitly validate that pointers provided by the user actually point to the user's address space.
 **Prevention:** Implement a `validate_user_buffer` function that walks the page tables to verify `PAGE_USER` permissions for the entire buffer range, and use it in every syscall entry point that accepts a pointer.
+
+## 2025-05-18 - [IP Parsing Overflow]
+**Vulnerability:** Integer overflow in `ip_aton` allowed bypassing IP filters or connecting to unintended hosts (e.g., 300.2.3.4 becoming valid).
+**Learning:** Custom parsing logic often misses standard boundary checks present in libc functions like `inet_aton`.
+**Prevention:** Always validate numeric inputs against their logical bounds (0-255 for octets) during parsing.

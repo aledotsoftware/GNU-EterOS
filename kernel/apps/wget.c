@@ -41,10 +41,14 @@ uint32_t ip_aton(const char* cp) {
         uint32_t part = 0;
         while (*cp >= '0' && *cp <= '9') {
             part = part * 10 + (*cp - '0');
+            if (part > 255) return 0; /* Invalid IP part */
             cp++;
         }
         val |= (part << (i * 8));
-        if (*cp == '.') cp++;
+        if (i < 3) {
+            if (*cp == '.') cp++;
+            else return 0; /* Invalid format */
+        }
     }
     return val;
 }
