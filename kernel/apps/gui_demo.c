@@ -835,17 +835,53 @@ static void draw_files_content(void) {
     wm_print_at(win_files, 20, 48, current_path);
     int start_y = 90;
     int item_h = 30;
-    #define DRAW_ITEM(y, icon, name) \
-        wm_print_at(win_files, 20, y, icon); \
-        wm_print_at(win_files, 50, y, name); \
-        wm_fill_rect(win_files, (rect_t){20, y + 25, w - 40, 1}, 0x404040);
+
+    /* 🎨 Palette: Flux Hover Logic */
+    typedef struct { const char* icon; const char* name; } flux_file_t;
+    flux_file_t items[4];
+    int count = 0;
 
     if (strcmp(current_path, "/") == 0) {
-        DRAW_ITEM(start_y, "[DIR]", "home");
-        DRAW_ITEM(start_y + item_h, "[DIR]", "etc");
+        items[0] = (flux_file_t){"[DIR]", "home"};
+        items[1] = (flux_file_t){"[DIR]", "etc"};
+        count = 2;
     } else {
-        DRAW_ITEM(start_y, "[..]", "..");
-        DRAW_ITEM(start_y + item_h, "[FILE]", "config.sys");
+        items[0] = (flux_file_t){"[..]", ".."};
+        items[1] = (flux_file_t){"[FILE]", "config.sys"};
+        count = 2;
+    }
+
+    for (int i = 0; i < count; i++) {
+        int ry = start_y + (i * item_h);
+
+        /* Global Hit Test */
+        int global_x = win_files->bounds.x + 20;
+        int global_y = win_files->bounds.y + TITLE_BAR_HEIGHT + ry;
+        bool hover = (mouse_x >= global_x && mouse_x < global_x + (w - 40) &&
+                      mouse_y >= global_y && mouse_y < global_y + item_h);
+
+        uint32_t bg_col = hover ? 0x3A4555 : 0x202020;
+        uint32_t txt_col = hover ? FLUX_ACCENT_CYAN : win_files->fg_color;
+
+        /* Draw Highlight BG */
+        wm_fill_rect(win_files, (rect_t){20, ry, w - 40, item_h}, bg_col);
+
+        /* Context Switch for Text Rendering (Anti-aliasing background match) */
+        uint32_t old_fg = win_files->fg_color;
+        uint32_t old_bg = win_files->bg_color;
+
+        win_files->fg_color = txt_col;
+        win_files->bg_color = bg_col;
+
+        wm_print_at(win_files, 20, ry + 8, items[i].icon);
+        wm_print_at(win_files, 60, ry + 8, items[i].name);
+
+        /* Restore Context */
+        win_files->fg_color = old_fg;
+        win_files->bg_color = old_bg;
+
+        /* Separator */
+        wm_fill_rect(win_files, (rect_t){20, ry + item_h - 1, w - 40, 1}, 0x404040);
     }
 }
 
