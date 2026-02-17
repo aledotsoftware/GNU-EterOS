@@ -16,6 +16,7 @@
 #include <vga.h>
 #include <gui_demo.h>
 #include <net/socket.h>
+#include <net/defs.h>
 
 #ifndef htons
 #define htons(x) ((((x) & 0xff) << 8) | (((x) & 0xff00) >> 8))
@@ -1169,7 +1170,6 @@ static void system_net_dispatcher_task(void) {
     if (strcmp(host_buf, "tudexgames.com") == 0) target_ip = 0x288C43AC;
     else if (strcmp(host_buf, "google.com") == 0) target_ip = 0x4850fa8e;
     else {
-        extern uint32_t ip_aton(const char* cp);
         target_ip = ip_aton(host_buf);
     }
 
