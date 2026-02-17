@@ -44,8 +44,8 @@ void* memset(void* dest, int c, size_t n) {
 #ifdef __x86_64__
     void* original_dest = dest;
     uint64_t val = (uint8_t)c;
-    uint64_t pattern = val | (val << 8) | (val << 16) | (val << 24) |
-                       (val << 32) | (val << 40) | (val << 48) | (val << 56);
+    /* ⚡ BOLT Optimization: Use multiplication for pattern generation (faster/smaller than 7 shifts/ORs) */
+    uint64_t pattern = val * 0x0101010101010101ULL;
     
     size_t qwords = n / 8;
     size_t remainder = n % 8;
