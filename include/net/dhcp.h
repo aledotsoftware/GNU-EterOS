@@ -43,4 +43,16 @@ void dhcp_discover(void);
  */
 int dhcp_parse_offer(const uint8_t* buffer, size_t len, uint32_t xid, const struct dhcp_packet** out_dhcp);
 
+/**
+ * Parses DHCP options safely.
+ *
+ * @param dhcp Pointer to the DHCP packet struct (already validated by parse_offer).
+ * @param packet_len Total length of the received packet buffer.
+ * @param out_mask Pointer to store Subnet Mask (0 if not found).
+ * @param out_gw Pointer to store Gateway IP (0 if not found).
+ * @param out_dns Pointer to store DNS IP (0 if not found).
+ * @return 0 on success (even if options are missing), -1 on critical parsing error.
+ */
+int dhcp_parse_options(const struct dhcp_packet* dhcp, size_t packet_len, uint32_t* out_mask, uint32_t* out_gw, uint32_t* out_dns);
+
 #endif /* ETEROS_NET_DHCP_H */

@@ -110,26 +110,15 @@ void dhcp_discover(void) {
             if (dhcp_parse_offer(rx_buffer, len, xid, &r_dhcp) == 0) {
                  hal_console_write("[DHCP] Oferta Recibida!\n");
 
-                 /* Parse Options for Mask, Gateway, DNS */
+                 /* Parse Options safely */
                  uint32_t mask = 0;
                  uint32_t gw = 0;
                  uint32_t dns = 0;
 
-                 const uint8_t* opt = r_dhcp->options;
-                 while (*opt != 255 && (opt - r_dhcp->options) < 308) {
-                     uint8_t type = *opt++;
-                     if (type == 0) continue; /* Padding */
-                     uint8_t slen = *opt++;
-                     
-                     if (type == 1) { /* Subnet Mask */
-                         memcpy(&mask, opt, 4);
-                     } else if (type == 3) { /* Router/Gateway */
-                         memcpy(&gw, opt, 4);
-                     } else if (type == 6) { /* DNS */
-                         memcpy(&dns, opt, 4);
-                     }
-                     opt += slen;
-                 }
+                 /* Calculate actual DHCP packet length remaining in the buffer */
+                 size_t packet_remaining = (size_t)((const uint8_t*)rx_buffer + len - (const uint8_t*)r_dhcp);
+
+                 dhcp_parse_options(r_dhcp, packet_remaining, &mask, &gw, &dns);
 
                  /* Print Offered IP (yiaddr) */
                  const uint8_t* ip = (const uint8_t*)&r_dhcp->yiaddr;

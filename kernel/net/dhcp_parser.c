@@ -1,6 +1,7 @@
 #include "../../include/net/dhcp.h"
 #include "../../include/net/defs.h"
 #include "../../include/types.h"
+#include "../../include/string.h"
 
 /**
  * Parses a DHCP offer packet from a raw buffer.
@@ -99,5 +100,72 @@ int dhcp_parse_offer(const uint8_t* buffer, size_t len, uint32_t xid, const stru
     }
 
     *out_dhcp = dhcp;
+    return 0;
+}
+
+int dhcp_parse_options(const struct dhcp_packet* dhcp, size_t packet_len, uint32_t* out_mask, uint32_t* out_gw, uint32_t* out_dns) {
+    if (dhcp == NULL) return -1;
+
+    /* Initialize outputs */
+    if (out_mask) *out_mask = 0;
+    if (out_gw) *out_gw = 0;
+    if (out_dns) *out_dns = 0;
+
+    /* Calculate bounds */
+    /* dhcp points to the start of DHCP header. packet_len is the number of valid bytes starting at dhcp. */
+    const uint8_t* start = (const uint8_t*)dhcp;
+    const uint8_t* end = start + packet_len;
+
+    /* Ensure we at least have the fixed header */
+    size_t fixed_size = sizeof(struct dhcp_packet) - 308;
+    if (packet_len < fixed_size) {
+        return -1;
+    }
+
+    /* Start parsing options */
+    const uint8_t* opt = dhcp->options;
+
+    while (opt < end) {
+        /* Check if we can read the type byte */
+        if (opt >= end) break;
+
+        uint8_t type = *opt;
+
+        if (type == 255) { /* End */
+            break;
+        }
+
+        if (type == 0) { /* Pad */
+            opt++;
+            continue;
+        }
+
+        /* Check if we can read the length byte */
+        if (opt + 1 >= end) {
+            break; /* Truncated */
+        }
+
+        uint8_t len = *(opt + 1);
+
+        /* Check if the value is within bounds */
+        if (opt + 2 + len > end) {
+            break; /* Truncated value */
+        }
+
+        const uint8_t* val = opt + 2;
+
+        /* Parse interest options */
+        if (type == 1 && len == 4) { /* Subnet Mask */
+            if (out_mask) memcpy(out_mask, val, 4);
+        } else if (type == 3 && len >= 4) { /* Router/Gateway */
+            if (out_gw && *out_gw == 0) memcpy(out_gw, val, 4);
+        } else if (type == 6 && len >= 4) { /* DNS */
+            if (out_dns && *out_dns == 0) memcpy(out_dns, val, 4);
+        }
+
+        /* Advance */
+        opt += 2 + len;
+    }
+
     return 0;
 }
