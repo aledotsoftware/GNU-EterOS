@@ -90,4 +90,7 @@ struct pseudo_header {
 /* Checksum helper (implemented in stack.c) */
 uint16_t net_checksum(void* vdata, size_t length);
 
+/* IP Utils (kernel/net/ip_utils.c) */
+uint32_t ip_aton(const char* cp);
+
 #endif /* ETEROS_NET_DEFS_H */
