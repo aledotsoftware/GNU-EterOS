@@ -25,3 +25,7 @@
 ## 2026-05-30 - [Living Focus States]
 **Learning:** A slow, breathing pulse (2s period) for focus states communicates "active/ready" without the cognitive load of rapid blinking. It aligns with the "Influence Field" metaphor of Flux UI.
 **Action:** Use smooth alpha modulation for focus indicators instead of on/off blinking.
+
+## 2026-06-05 - [Connectivity Status Visibility]
+**Learning:** In a connected OS, users expect immediate feedback on network status. Hiding connectivity details inside a "Settings" app adds friction. A simple status bar icon with a tooltip (showing IP or "Offline") provides reassurance and quick diagnostics without clutter.
+**Action:** Ensure critical system states (Network, Battery, Audio) are always visible in the global status bar with detailed tooltips.

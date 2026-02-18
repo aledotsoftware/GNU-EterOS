@@ -1765,6 +1765,61 @@ static void draw_global_status_bar(void) {
         /* Text */
         omni_draw_string(NULL, tip_x + 5, tip_y + 4, date_buf, 0xFFFFFF, 0x252525);
     }
+
+    /* Update margin after clock */
+    right_margin -= (clock_w + 20);
+
+    /* Network Status Icon */
+    int net_w = 20;
+    int net_h = 12;
+    int net_x = right_margin - net_w;
+    int net_y = (bar_h - net_h) / 2;
+
+    bool connected = (my_ip != 0);
+    uint32_t net_col = connected ? FLUX_ACCENT_CYAN : 0x444444;
+
+    /* Draw 3 Signal Bars */
+    /* Bar 1 (Small) */
+    omni_fill_rect(net_x, net_y + 8, 4, 4, net_col);
+    /* Bar 2 (Medium) */
+    omni_fill_rect(net_x + 6, net_y + 4, 4, 8, connected ? net_col : 0x444444);
+    /* Bar 3 (Full) */
+    omni_fill_rect(net_x + 12, net_y, 4, 12, connected ? net_col : 0x444444);
+
+    /* Tooltip: IP Address on Hover */
+    if (mouse_x >= net_x - 5 && mouse_x <= net_x + net_w + 5 && mouse_y <= 32) {
+        char net_tip[32];
+        if (!connected) {
+            strlcpy(net_tip, "Offline", 32);
+        } else {
+            uint8_t* ip = (uint8_t*)&my_ip;
+            char num[4];
+            strlcpy(net_tip, "IP: ", 32);
+            itoa_s(ip[0], num, 4, 10); strlcat(net_tip, num, 32); strlcat(net_tip, ".", 32);
+            itoa_s(ip[1], num, 4, 10); strlcat(net_tip, num, 32); strlcat(net_tip, ".", 32);
+            itoa_s(ip[2], num, 4, 10); strlcat(net_tip, num, 32); strlcat(net_tip, ".", 32);
+            itoa_s(ip[3], num, 4, 10); strlcat(net_tip, num, 32);
+        }
+
+        int tip_w = strlen(net_tip) * 8 + 10;
+        int tip_h = 20;
+        int tip_x = net_x + (net_w - tip_w) / 2;
+        if (tip_x + tip_w > (int)screen_w) tip_x = screen_w - tip_w - 2;
+        int tip_y = 36;
+
+        /* Shadow */
+        omni_fill_rect(tip_x + 2, tip_y + 2, tip_w, tip_h, 0x000000);
+        /* Bg */
+        omni_fill_rect(tip_x, tip_y, tip_w, tip_h, 0x252525);
+        /* Border */
+        omni_fill_rect(tip_x, tip_y, tip_w, 1, 0x555555);
+        omni_fill_rect(tip_x, tip_y + tip_h - 1, tip_w, 1, 0x555555);
+        omni_fill_rect(tip_x, tip_y, 1, tip_h, 0x555555);
+        omni_fill_rect(tip_x + tip_w - 1, tip_y, 1, tip_h, 0x555555);
+
+        /* Text */
+        omni_draw_string(NULL, tip_x + 5, tip_y + 4, net_tip, 0xFFFFFF, 0x252525);
+    }
 }
 
 static void draw_browser_preview(int x, int y, int w, int h) {
