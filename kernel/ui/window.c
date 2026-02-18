@@ -155,6 +155,17 @@ void wm_draw_window_frame(window_t* win) {
     
     /* Border */
     omni_draw_rect(win->bounds.x, win->bounds.y, win->bounds.w, win->bounds.h, 0x505050);
+
+    /* Close Button (Red) */
+    int btn_x = win->bounds.x + win->bounds.w - 20;
+    int btn_y = win->bounds.y + 8;
+    omni_fill_rect(btn_x, btn_y, 12, 12, 0xFF5555);
+
+    /* Maximize Button (Green) */
+    omni_fill_rect(btn_x - 16, btn_y, 12, 12, 0x55FF55);
+
+    /* Minimize Button (Yellow) */
+    omni_fill_rect(btn_x - 32, btn_y, 12, 12, 0xFFFF55);
 }
 
 void wm_draw_all(void) {
