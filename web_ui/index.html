@@ -19,13 +19,13 @@
                 <span class="active-app-name">Escritorio</span>
                 <!-- System Menu Dropdown -->
                 <div class="eter-menu" id="eter-menu">
-                    <div class="menu-item" onclick="spawnAbout()">Acerca de Eter OS</div>
+                    <div class="menu-item" role="button" tabindex="0" aria-label="Acerca de Eter OS" onclick="spawnAbout()" onkeydown="if(event.key==='Enter') this.click()">Acerca de Eter OS</div>
                     <div class="menu-divider"></div>
-                    <div class="menu-item" onclick="spawnSettings()">Configuración del Sistema...</div>
-                    <div class="menu-item">App Store...</div>
+                    <div class="menu-item" role="button" tabindex="0" aria-label="Configuración del Sistema" onclick="spawnSettings()" onkeydown="if(event.key==='Enter') this.click()">Configuración del Sistema...</div>
+                    <div class="menu-item" role="button" tabindex="0" aria-label="Abrir App Store" onkeydown="if(event.key==='Enter') this.click()">App Store...</div>
                     <div class="menu-divider"></div>
-                    <div class="menu-item">Reiniciar</div>
-                    <div class="menu-item">Apagar</div>
+                    <div class="menu-item" role="button" tabindex="0" aria-label="Reiniciar sistema" onkeydown="if(event.key==='Enter') this.click()">Reiniciar</div>
+                    <div class="menu-item" role="button" tabindex="0" aria-label="Apagar sistema" onkeydown="if(event.key==='Enter') this.click()">Apagar</div>
                 </div>
             </div>
             <div class="status-right" role="button" tabindex="0" aria-label="Abrir centro de control" onclick="toggleControlCenter(event)" onkeydown="if(event.key==='Enter') toggleControlCenter(event)">
@@ -118,90 +118,90 @@
             </div>
             <div class="launcher-grid" id="launcher-grid">
                 <!-- Linux Apps -->
-                <div class="launcher-item" onclick="spawnApp('GIMP', 'linux')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar GIMP (Linux)" onclick="spawnApp('GIMP', 'linux')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/gimp.png"
-                            width="40"></div>
+                            width="40" alt="Icono de GIMP"></div>
                     <span>GIMP</span>
                     <span class="tag lin-tag">Linux</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('VS Code', 'linux')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar VS Code (Linux)" onclick="spawnApp('VS Code', 'linux')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img
-                            src="https://img.icons8.com/ios-filled/50/ffffff/visual-studio-code-2019.png" width="40">
+                            src="https://img.icons8.com/ios-filled/50/ffffff/visual-studio-code-2019.png" width="40" alt="Icono de VS Code">
                     </div>
                     <span>VS Code</span>
                     <span class="tag lin-tag">Linux</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('LibreOffice', 'linux')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar LibreOffice (Linux)" onclick="spawnApp('LibreOffice', 'linux')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/libreoffice.png"
-                            width="40"></div>
+                            width="40" alt="Icono de LibreOffice"></div>
                     <span>LibreOffice</span>
                     <span class="tag lin-tag">Linux</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('Terminal', 'linux')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar Terminal (Linux)" onclick="spawnApp('Terminal', 'linux')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/console.png"
-                            width="40"></div>
+                            width="40" alt="Icono de Terminal"></div>
                     <span>Terminal</span>
                     <span class="tag lin-tag">Linux</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('Firefox', 'linux')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar Firefox (Linux)" onclick="spawnApp('Firefox', 'linux')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/firefox.png"
-                            width="40"></div>
+                            width="40" alt="Icono de Firefox"></div>
                     <span>Firefox</span>
                     <span class="tag lin-tag">Linux</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('VLC Player', 'linux')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar VLC Player (Linux)" onclick="spawnApp('VLC Player', 'linux')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/vlc.png"
-                            width="40"></div>
+                            width="40" alt="Icono de VLC Player"></div>
                     <span>VLC Player</span>
                     <span class="tag lin-tag">Linux</span>
                 </div>
 
                 <!-- Android Apps -->
-                <div class="launcher-item" onclick="spawnApp('Spotify', 'android')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar Spotify (Android)" onclick="spawnApp('Spotify', 'android')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/spotify.png"
-                            width="40"></div>
+                            width="40" alt="Icono de Spotify"></div>
                     <span>Spotify</span>
                     <span class="tag and-tag">Android</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('Chrome', 'android')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar Chrome (Android)" onclick="spawnApp('Chrome', 'android')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/color/48/000000/google-chrome.png"
-                            width="40"></div>
+                            width="40" alt="Icono de Chrome"></div>
                     <span>Chrome</span>
                     <span class="tag and-tag">Android</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('Play Store', 'android')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar Play Store (Android)" onclick="spawnApp('Play Store', 'android')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/color/48/000000/google-play.png"
-                            width="40"></div>
+                            width="40" alt="Icono de Play Store"></div>
                     <span>Play Store</span>
                     <span class="tag and-tag">Android</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('Instagram', 'android')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar Instagram (Android)" onclick="spawnApp('Instagram', 'android')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/instagram-new.png"
-                            width="40"></div>
+                            width="40" alt="Icono de Instagram"></div>
                     <span>Instagram</span>
                     <span class="tag and-tag">Android</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('WhatsApp', 'android')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar WhatsApp (Android)" onclick="spawnApp('WhatsApp', 'android')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/ios-filled/50/ffffff/whatsapp.png"
-                            width="40"></div>
+                            width="40" alt="Icono de WhatsApp"></div>
                     <span>WhatsApp</span>
                     <span class="tag and-tag">Android</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('Gmail', 'android')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar Gmail (Android)" onclick="spawnApp('Gmail', 'android')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/color/48/000000/gmail-new.png"
-                            width="40"></div>
+                            width="40" alt="Icono de Gmail"></div>
                     <span>Gmail</span>
                     <span class="tag and-tag">Android</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('Maps', 'android')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar Maps (Android)" onclick="spawnApp('Maps', 'android')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/color/48/000000/google-maps-new.png"
-                            width="40"></div>
+                            width="40" alt="Icono de Maps"></div>
                     <span>Maps</span>
                     <span class="tag and-tag">Android</span>
                 </div>
-                <div class="launcher-item" onclick="spawnApp('YouTube', 'android')">
+                <div class="launcher-item" role="button" tabindex="0" aria-label="Lanzar YouTube (Android)" onclick="spawnApp('YouTube', 'android')" onkeydown="if(event.key==='Enter') this.click()">
                     <div class="launcher-icon"><img src="https://img.icons8.com/color/48/000000/youtube-play.png"
-                            width="40"></div>
+                            width="40" alt="Icono de YouTube"></div>
                     <span>YouTube</span>
                     <span class="tag and-tag">Android</span>
                 </div>
