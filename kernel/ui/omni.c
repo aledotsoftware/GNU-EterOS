@@ -519,6 +519,9 @@ void omni_fill_gradient_v(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
         int32_t g_step = (((int32_t)bg - (int32_t)tg) << 16) / h;
         int32_t b_step = (((int32_t)bb - (int32_t)tb) << 16) / h;
 
+        /* ⚡ BOLT Optimization: Hoist row pointer calculation to avoid multiplication per row. */
+        uint32_t* row = omni_fb + (y * omni_pitch_div4) + x;
+
         for (int i = 0; i < h; i++) {
             uint32_t r = (uint32_t)(r_val >> 16);
             uint32_t g = (uint32_t)(g_val >> 16);
@@ -526,8 +529,9 @@ void omni_fill_gradient_v(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
 
             uint32_t color = 0xFF000000 | (r << 16) | (g << 8) | b;
             
-            uint32_t* row = omni_fb + ((y + i) * omni_pitch_div4) + x;
             memset32(row, color, w);
+
+            row += omni_pitch_div4;
 
             r_val += r_step;
             g_val += g_step;
