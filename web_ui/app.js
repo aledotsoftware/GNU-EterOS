@@ -1,0 +1,570 @@
+function toggleEterMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('eter-menu');
+    menu.classList.toggle('active');
+    // Hide other panels
+    document.getElementById('control-center').classList.remove('active');
+    document.getElementById('launcher').classList.remove('active');
+}
+
+function spawnAbout() {
+    spawnApp("Acerca de Eter OS", "native", `
+        <div style="text-align: center; padding: 40px;">
+            <div style="width: 80px; height: 80px; background: var(--accent-glow); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                <span style="font-size: 30px; font-weight: bold;">E</span>
+            </div>
+            <h2>Eter OS</h2>
+            <p style="opacity: 0.6;">Versión 1.0 "Convergencia"</p>
+            <p style="margin-top: 20px; font-size: 14px;">El primer sistema operativo conceptual diseñado para unir la web, Android y Linux en una sola experiencia premium.</p>
+        </div>
+    `);
+    document.getElementById('eter-menu').classList.remove('active');
+}
+
+function spawnSettings() {
+    spawnApp("Configuración del Sistema", "native", `
+        <div class="settings-container">
+            <div class="settings-sidebar">
+                <div class="menu-item active">🎨 Apariencia</div>
+                <div class="menu-item">🖥️ Pantalla</div>
+                <div class="menu-item">🔊 Sonido</div>
+                <div class="menu-item">🌐 Red</div>
+                <div class="menu-item">💾 Disco</div>
+                <div class="menu-item">⚡ Multitarea</div>
+                <div class="menu-item">🔒 Seguridad</div>
+                <div class="menu-item">ℹ️ Acerca de</div>
+            </div>
+            <div class="settings-main">
+                <div class="settings-group">
+                    <h3>Personalización de Eter OS</h3>
+                    <div class="settings-item">
+                        <div>
+                            <span>Tema Global</span>
+                            <p style="font-size: 11px; opacity: 0.5;">Cambia el aspecto de todo el sistema.</p>
+                        </div>
+                        <select style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; cursor: pointer;">
+                            <option>Oscuro Profundo (Default)</option>
+                            <option>Gris Espacial</option>
+                            <option>Azul Medianoche</option>
+                        </select>
+                    </div>
+...
+                    <div class="settings-item">
+                        <span>Acento de Eter</span>
+                        <div style="display: flex; gap: 12px;">
+                            <div style="width: 28px; height: 28px; background: #38bdf8; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px var(--accent-glow);"></div>
+                            <div style="width: 28px; height: 28px; background: #a855f7; border-radius: 50%;"></div>
+                            <div style="width: 28px; height: 28px; background: #22c55e; border-radius: 50%;"></div>
+                            <div style="width: 28px; height: 28px; background: #f59e0b; border-radius: 50%;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3>Subsistemas de Convergencia</h3>
+                    <div class="settings-item">
+                        <div>
+                            <span>Modo Tableta Dinámico</span>
+                            <p style="font-size: 11px; opacity: 0.5;">Optimiza los controles para touch automáticamente.</p>
+                        </div>
+                        <input type="checkbox" checked style="width: 20px; height: 20px; accent-color: var(--accent);">
+                    </div>
+                    <div class="settings-item">
+                        <span>Núcleo Linux (Eter-Core)</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 8px; height: 8px; background: #22c55e; border-radius: 50%;"></div>
+                            <span style="color: #22c55e; font-size: 13px;">Ejecutando (Wayland)</span>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <span>Servicios Android</span>
+                        <span style="color: #94a3b8; font-size: 13px;">Servicios de Google Play activos</span>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h3>Multidispotivo</h3>
+                    <div class="settings-item">
+                        <span>Eter-Drop (Airdrop clone)</span>
+                        <input type="checkbox" checked>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    document.getElementById('eter-menu').classList.remove('active');
+}
+
+function updateClock() {
+    const now = new Date();
+    const clock = document.getElementById('clock');
+    clock.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+function toggleLauncher() {
+    const launcher = document.getElementById('launcher');
+    launcher.classList.toggle('active');
+
+    if (launcher.classList.contains('active')) {
+        document.getElementById('launcher-search').focus();
+    } else {
+        // Clear search on close
+        document.getElementById('launcher-search').value = '';
+        filterApps();
+    }
+
+    // Hide CC if opening launcher
+    document.getElementById('control-center').classList.remove('active');
+}
+
+function filterApps() {
+    const query = document.getElementById('launcher-search').value.toLowerCase();
+    const items = document.querySelectorAll('.launcher-item');
+
+    items.forEach(item => {
+        const name = item.querySelector('span').innerText.toLowerCase();
+        const tag = item.querySelector('.tag').innerText.toLowerCase();
+        if (name.includes(query) || tag.includes(query)) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+function toggleControlCenter(e) {
+    if (e) e.stopPropagation();
+    const cc = document.getElementById('control-center');
+    cc.classList.toggle('active');
+    // Hide launcher if opening CC
+    document.getElementById('launcher').classList.remove('active');
+}
+
+// App Switcher Logic
+let isSwitcherActive = false;
+let switcherIndex = 0;
+let openWindows = [];
+
+document.addEventListener('keydown', (e) => {
+    // Escape standard Alt+Tab by using Alt+Q (Quick Switch)
+    if (e.altKey && e.key.toLowerCase() === 'q') {
+        e.preventDefault();
+
+        if (!isSwitcherActive) {
+            showSwitcher();
+        } else {
+            cycleSwitcher();
+        }
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.key === 'Alt') {
+        if (isSwitcherActive) {
+            confirmSwitcherSelection();
+        }
+    }
+});
+
+function showSwitcher() {
+    const windows = Array.from(document.querySelectorAll('.window'));
+    if (windows.length === 0) return;
+
+    openWindows = windows;
+    isSwitcherActive = true;
+    switcherIndex = 0;
+
+    const switcher = document.getElementById('switcher');
+    const list = document.getElementById('switcher-list');
+    list.innerHTML = '';
+
+    openWindows.forEach((win, index) => {
+        const title = win.querySelector('.window-title').innerText;
+        let type = 'unknown';
+        let iconSrc = '';
+
+        if (win.classList.contains('linux-app')) {
+            type = 'linux';
+            iconSrc = 'https://img.icons8.com/ios-filled/50/ffffff/console.png';
+        } else if (win.classList.contains('android-app')) {
+            type = 'android';
+            iconSrc = 'https://img.icons8.com/color/48/000000/google-play.png';
+        } else if (win.classList.contains('native-app')) {
+            type = 'native';
+            iconSrc = 'https://img.icons8.com/ios-filled/50/ffffff/settings.png'; // Example icon for native apps
+        }
+
+        const card = document.createElement('div');
+        card.className = `switcher-card ${index === 0 ? 'selected' : ''}`;
+        card.innerHTML = `
+            <img src="${iconSrc}" width="64">
+            <span>${title}</span>
+        `;
+        card.onclick = () => {
+            switcherIndex = index;
+            confirmSwitcherSelection();
+        };
+        list.appendChild(card);
+    });
+
+    switcher.classList.add('active');
+}
+
+function cycleSwitcher() {
+    switcherIndex = (switcherIndex + 1) % openWindows.length;
+    const cards = document.querySelectorAll('.switcher-card');
+    cards.forEach((card, index) => {
+        card.classList.toggle('selected', index === switcherIndex);
+    });
+}
+
+function confirmSwitcherSelection() {
+    const selectedWin = openWindows[switcherIndex];
+    if (selectedWin) {
+        selectedWin.classList.remove('minimized');
+        selectedWin.style.zIndex = ++zIndexCounter;
+    }
+
+    document.getElementById('switcher').classList.remove('active');
+    isSwitcherActive = false;
+}
+
+// Close overlays when clicking on workspace
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.control-center') && !e.target.closest('.status-right')) {
+        document.getElementById('control-center').classList.remove('active');
+    }
+});
+
+let zIndexCounter = 100;
+
+function spawnApp(name, type, customContent = null) {
+    // Check if app is already open (to restore if minimized)
+    const existingWins = document.querySelectorAll('.window');
+    for (let win of existingWins) {
+        if (win.querySelector('.window-title').innerText.includes(name)) {
+            if (win.classList.contains('minimized')) {
+                win.classList.remove('minimized');
+                win.style.zIndex = ++zIndexCounter;
+            } else {
+                win.style.zIndex = ++zIndexCounter;
+            }
+            document.getElementById('launcher').classList.remove('active');
+            return;
+        }
+    }
+
+    const workspace = document.getElementById('workspace');
+
+    // Close launcher
+    document.getElementById('launcher').classList.remove('active');
+
+    // Basic app window structure
+    const win = document.createElement('div');
+    win.className = `window ${type}-app`;
+    win.style.top = '60px'; // Spawn below status bar
+    win.style.left = '100px';
+    win.style.width = type === 'native' ? '800px' : '600px';
+    win.style.height = type === 'native' ? '500px' : '400px';
+    win.style.zIndex = ++zIndexCounter;
+
+    // Handle focus
+    win.onmousedown = () => {
+        if (!win.classList.contains('minimized')) {
+            win.style.zIndex = ++zIndexCounter;
+        }
+    };
+
+    win.innerHTML = `
+        <div class="window-header">
+            <span class="window-title">${name} ${customContent ? '' : '(' + type.toUpperCase() + ')'}</span>
+            <div class="window-controls">
+                <div class="control focus" title="Modo Focus" role="button" aria-label="Cambiar a modo enfoque" tabindex="0" onclick="toggleFocusMode(this)" onkeydown="if(event.key==='Enter') toggleFocusMode(this)"></div>
+                <div class="control minimize" role="button" aria-label="Minimizar ventana" tabindex="0" onclick="minimizeWindow(this)" onkeydown="if(event.key==='Enter') minimizeWindow(this)"></div>
+                <div class="control maximize" role="button" aria-label="Maximizar ventana" tabindex="0" onmouseover="showSnapOverlay(this)" onclick="maximizeWindow(this)" onkeydown="if(event.key==='Enter') maximizeWindow(this)">
+                    <div class="snap-menu">
+                        <div class="snap-option layout-split" role="button" aria-label="Dividir izquierda 50%" tabindex="0" onclick="snapWindow(this, 'left-50', event)" onkeydown="if(event.key==='Enter') snapWindow(this, 'left-50', event)">
+                            <div class="snap-box"></div><div class="snap-box"></div>
+                        </div>
+                        <div class="snap-option layout-split" role="button" aria-label="Dividir derecha 50%" tabindex="0" onclick="snapWindow(this, 'right-50', event)" onkeydown="if(event.key==='Enter') snapWindow(this, 'right-50', event)">
+                            <div class="snap-box"></div><div class="snap-box"></div>
+                        </div>
+                        <div class="snap-option layout-quad" role="button" aria-label="Cuadrante superior izquierdo" tabindex="0" onclick="snapWindow(this, 'tl-25', event)" onkeydown="if(event.key==='Enter') snapWindow(this, 'tl-25', event)">
+                            <div class="snap-box"></div><div class="snap-box"></div>
+                            <div class="snap-box"></div><div class="snap-box"></div>
+                        </div>
+                        <div class="snap-option layout-70-30" role="button" aria-label="Dividir izquierda 70%" tabindex="0" onclick="snapWindow(this, 'left-70', event)" onkeydown="if(event.key==='Enter') snapWindow(this, 'left-70', event)">
+                            <div class="snap-box"></div><div class="snap-box"></div>
+                        </div>
+                        <div class="snap-option layout-3-col" role="button" aria-label="Tres columnas" tabindex="0" onclick="snapWindow(this, 'mid-33', event)" onkeydown="if(event.key==='Enter') snapWindow(this, 'mid-33', event)">
+                            <div class="snap-box"></div><div class="snap-box"></div><div class="snap-box"></div>
+                        </div>
+                        <div class="snap-option layout-quad" role="button" aria-label="Cuadrante superior derecho" tabindex="0" onclick="snapWindow(this, 'tr-25', event)" onkeydown="if(event.key==='Enter') snapWindow(this, 'tr-25', event)">
+                            <div class="snap-box"></div><div class="snap-box"></div>
+                            <div class="snap-box"></div><div class="snap-box"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="control close" role="button" aria-label="Cerrar ventana" tabindex="0" onclick="closeWindow(this)" onkeydown="if(event.key==='Enter') closeWindow(this)"></div>
+            </div>
+        </div>
+        <div class="window-content" style="height: calc(100% - 40px); overflow: hidden;">
+            ${customContent || `
+            <div style="padding: 20px; color: #94a3b8; font-family: monospace;">
+                Initializing ${name} subsystem...<br>
+                > Loading shared libraries for ${type} kernel...<br>
+                > Mounting filesystem...<br>
+                > GUI handoff complete.<br><br>
+                <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+                    <strong>${name} Interface</strong><br>
+                    Concepto de convergencia: ${type === 'linux' ? 'Desktop Linux Application' : 'Android APK Runtime'}
+                </div>
+            </div>
+            `}
+        </div>
+        <!-- Resize Handles -->
+        <div class="resizer resizer-r"></div>
+        <div class="resizer resizer-b"></div>
+        <div class="resizer resizer-l"></div>
+        <div class="resizer resizer-t"></div>
+        <div class="resizer resizer-rb"></div>
+        <div class="resizer resizer-lb"></div>
+        <div class="resizer resizer-rt"></div>
+        <div class="resizer resizer-lt"></div>
+    `;
+
+    workspace.appendChild(win);
+
+    // Simple drag logic (basic concept)
+    makeDraggable(win);
+    makeResizable(win);
+}
+
+// Resizing Logic
+function makeResizable(win) {
+    const resizers = win.querySelectorAll('.resizer');
+    let isResizing = false;
+
+    resizers.forEach(resizer => {
+        resizer.onmousedown = (e) => {
+            isResizing = true;
+            e.preventDefault();
+            e.stopPropagation();
+
+            const startWidth = win.offsetWidth;
+            const startHeight = win.offsetHeight;
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startTop = win.offsetTop;
+            const startLeft = win.offsetLeft;
+
+            const handleResize = (e) => {
+                if (!isResizing) return;
+
+                if (resizer.classList.contains('resizer-r')) {
+                    win.style.width = startWidth + (e.clientX - startX) + 'px';
+                } else if (resizer.classList.contains('resizer-b')) {
+                    win.style.height = startHeight + (e.clientY - startY) + 'px';
+                } else if (resizer.classList.contains('resizer-l')) {
+                    const newWidth = startWidth - (e.clientX - startX);
+                    if (newWidth > 200) {
+                        win.style.width = newWidth + 'px';
+                        win.style.left = startLeft + (e.clientX - startX) + 'px';
+                    }
+                } else if (resizer.classList.contains('resizer-t')) {
+                    const newHeight = startHeight - (e.clientY - startY);
+                    if (newHeight > 100) {
+                        win.style.height = newHeight + 'px';
+                        win.style.top = startTop + (e.clientY - startY) + 'px';
+                    }
+                } else if (resizer.classList.contains('resizer-rb')) {
+                    win.style.width = startWidth + (e.clientX - startX) + 'px';
+                    win.style.height = startHeight + (e.clientY - startY) + 'px';
+                } else if (resizer.classList.contains('resizer-lb')) {
+                    const newWidth = startWidth - (e.clientX - startX);
+                    if (newWidth > 200) {
+                        win.style.width = newWidth + 'px';
+                        win.style.left = startLeft + (e.clientX - startX) + 'px';
+                    }
+                    win.style.height = startHeight + (e.clientY - startY) + 'px';
+                } else if (resizer.classList.contains('resizer-rt')) {
+                    win.style.width = startWidth + (e.clientX - startX) + 'px';
+                    const newHeight = startHeight - (e.clientY - startY);
+                    if (newHeight > 100) {
+                        win.style.height = newHeight + 'px';
+                        win.style.top = startTop + (e.clientY - startY) + 'px';
+                    }
+                } else if (resizer.classList.contains('resizer-lt')) {
+                    const newWidth = startWidth - (e.clientX - startX);
+                    const newHeight = startHeight - (e.clientY - startY);
+                    if (newWidth > 200) {
+                        win.style.width = newWidth + 'px';
+                        win.style.left = startLeft + (e.clientX - startX) + 'px';
+                    }
+                    if (newHeight > 100) {
+                        win.style.height = newHeight + 'px';
+                        win.style.top = startTop + (e.clientY - startY) + 'px';
+                    }
+                }
+            };
+
+            const stopResize = () => {
+                isResizing = false;
+                window.removeEventListener('mousemove', handleResize);
+                window.removeEventListener('mouseup', stopResize);
+            };
+
+            window.addEventListener('mousemove', handleResize);
+            window.addEventListener('mouseup', stopResize);
+        };
+    });
+}
+
+function closeWindow(btn) {
+    btn.closest('.window').remove();
+}
+
+function maximizeWindow(btn) {
+    const win = btn.closest('.window');
+    const shell = document.querySelector('.os-shell');
+    const appNameDisplay = document.querySelector('.active-app-name');
+    const appTitle = win.querySelector('.window-title').innerText.split('(')[0].trim();
+
+    win.classList.remove('snapped');
+    win.classList.toggle('maximized');
+
+    if (win.classList.contains('maximized')) {
+        shell.classList.add('window-full');
+        appNameDisplay.innerHTML = `<span style="opacity:0.25; margin: 0 12px; font-weight: 300;">|</span> ${appTitle}`;
+        appNameDisplay.style.color = 'var(--accent)';
+        win.style.zIndex = 9005; // Below status text (10000)
+    } else {
+        shell.classList.remove('window-full');
+        appNameDisplay.innerText = 'Escritorio';
+        appNameDisplay.style.color = 'white';
+        win.style.zIndex = ++zIndexCounter;
+    }
+}
+
+function minimizeWindow(btn) {
+    const win = btn.closest('.window');
+    win.classList.add('minimized');
+    console.log("Window minimized. Restoration via Dock enabled.");
+}
+
+function toggleFocusMode(btn) {
+    const win = btn.closest('.window');
+    const shell = document.querySelector('.os-shell');
+
+    win.classList.toggle('focus-mode');
+    shell.classList.toggle('hide-chrome');
+
+    // If entering focus mode, make it top-most
+    if (win.classList.contains('focus-mode')) {
+        win.style.zIndex = 9999;
+    } else {
+        win.style.zIndex = ++zIndexCounter;
+    }
+}
+
+function showSnapOverlay(btn) {
+    // CSS handle the hover
+}
+
+function snapWindow(btn, region, e) {
+    if (e) e.stopPropagation();
+    const win = btn.closest('.window');
+    win.classList.add('snapped');
+    win.classList.remove('maximized');
+
+    const sb = 40; // Status bar approx
+
+    switch (region) {
+        case 'left-50':
+            win.style.top = sb + 'px';
+            win.style.left = '0';
+            win.style.width = '50vw';
+            win.style.height = `calc(100vh - ${sb}px - 64px)`;
+            break;
+        case 'right-50':
+            win.style.top = sb + 'px';
+            win.style.left = '50vw';
+            win.style.width = '50vw';
+            win.style.height = `calc(100vh - ${sb}px - 64px)`;
+            break;
+        case 'tl-25':
+            win.style.top = sb + 'px';
+            win.style.left = '0';
+            win.style.width = '50vw';
+            win.style.height = `calc(50vh - ${sb / 2}px - 32px)`;
+            break;
+        case 'tr-25':
+            win.style.top = sb + 'px';
+            win.style.left = '50vw';
+            win.style.width = '50vw';
+            win.style.height = `calc(50vh - ${sb / 2}px - 32px)`;
+            break;
+        case 'left-70':
+            win.style.top = sb + 'px';
+            win.style.left = '0';
+            win.style.width = '70vw';
+            win.style.height = `calc(100vh - ${sb}px - 64px)`;
+            break;
+        case 'mid-33':
+            win.style.top = sb + 'px';
+            win.style.left = '33.33vw';
+            win.style.width = '33.33vw';
+            win.style.height = `calc(100vh - ${sb}px - 64px)`;
+            break;
+    }
+
+    // Auto maximize if clicked the icon part? No, just snap.
+}
+
+function makeDraggable(el) {
+    const header = el.querySelector('.window-header');
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+    header.onmousedown = dragMouseDown;
+    header.ontouchstart = dragMouseDown;
+
+    function dragMouseDown(e) {
+        if (el.classList.contains('maximized') || el.classList.contains('focus-mode')) return;
+
+        e = e || window.event;
+        // Handle both mouse and touch events
+        const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+        const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+
+        pos3 = clientX;
+        pos4 = clientY;
+
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+
+        document.ontouchend = closeDragElement;
+        document.ontouchmove = elementDrag;
+    }
+
+    function elementDrag(e) {
+        e = e || window.event;
+
+        const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+        const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+
+        pos1 = pos3 - clientX;
+        pos2 = pos4 - clientY;
+        pos3 = clientX;
+        pos4 = clientY;
+
+        el.style.top = (el.offsetTop - pos2) + "px";
+        el.style.left = (el.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+        document.ontouchend = null;
+        document.ontouchmove = null;
+    }
+}
