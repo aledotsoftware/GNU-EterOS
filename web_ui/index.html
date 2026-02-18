@@ -15,7 +15,7 @@
     <div class="os-shell">
         <header class="status-bar">
             <div class="status-left">
-                <span class="os-logo" onclick="toggleEterMenu(event)">Eter OS</span>
+                <span class="os-logo" role="button" tabindex="0" aria-label="Abrir menú principal" onclick="toggleEterMenu(event)" onkeydown="if(event.key==='Enter') toggleEterMenu(event)">Eter OS</span>
                 <span class="active-app-name">Escritorio</span>
                 <!-- System Menu Dropdown -->
                 <div class="eter-menu" id="eter-menu">
@@ -28,7 +28,7 @@
                     <div class="menu-item">Apagar</div>
                 </div>
             </div>
-            <div class="status-right" onclick="toggleControlCenter(event)">
+            <div class="status-right" role="button" tabindex="0" aria-label="Abrir centro de control" onclick="toggleControlCenter(event)" onkeydown="if(event.key==='Enter') toggleControlCenter(event)">
                 <span class="net">WiFi 6</span>
                 <span class="battery">88%</span>
                 <span class="time" id="clock">20:38</span>
@@ -42,23 +42,23 @@
                 <span class="cc-date" id="cc-date">Martes, 17 Feb</span>
             </div>
             <div class="cc-grid">
-                <div class="cc-tile active"><img src="https://img.icons8.com/ios-filled/50/ffffff/wifi.png"
+                <div class="cc-tile active" role="button" tabindex="0" aria-label="Activar WiFi" aria-pressed="true" onclick="this.classList.toggle('active'); this.setAttribute('aria-pressed', this.classList.contains('active'))" onkeydown="if(event.key==='Enter') this.click()"><img src="https://img.icons8.com/ios-filled/50/ffffff/wifi.png"
                         width="24"><span>WiFi</span></div>
-                <div class="cc-tile active"><img src="https://img.icons8.com/ios-filled/50/ffffff/bluetooth.png"
+                <div class="cc-tile active" role="button" tabindex="0" aria-label="Activar Bluetooth" aria-pressed="true" onclick="this.classList.toggle('active'); this.setAttribute('aria-pressed', this.classList.contains('active'))" onkeydown="if(event.key==='Enter') this.click()"><img src="https://img.icons8.com/ios-filled/50/ffffff/bluetooth.png"
                         width="24"><span>BT</span></div>
-                <div class="cc-tile"><img src="https://img.icons8.com/ios-filled/50/ffffff/airplane-mode-on.png"
+                <div class="cc-tile" role="button" tabindex="0" aria-label="Modo avión" aria-pressed="false" onclick="this.classList.toggle('active'); this.setAttribute('aria-pressed', this.classList.contains('active'))" onkeydown="if(event.key==='Enter') this.click()"><img src="https://img.icons8.com/ios-filled/50/ffffff/airplane-mode-on.png"
                         width="24"><span>Avión</span></div>
-                <div class="cc-tile"><img src="https://img.icons8.com/ios-filled/50/ffffff/moon.png"
+                <div class="cc-tile" role="button" tabindex="0" aria-label="Modo noche" aria-pressed="false" onclick="this.classList.toggle('active'); this.setAttribute('aria-pressed', this.classList.contains('active'))" onkeydown="if(event.key==='Enter') this.click()"><img src="https://img.icons8.com/ios-filled/50/ffffff/moon.png"
                         width="24"><span>Noche</span></div>
             </div>
             <div class="cc-sliders">
                 <div class="cc-slider-group">
-                    <img src="https://img.icons8.com/ios-filled/50/ffffff/sun.png" width="16">
-                    <input type="range" class="cc-slider" value="80">
+                    <img src="https://img.icons8.com/ios-filled/50/ffffff/sun.png" width="16" alt="Brillo">
+                    <input type="range" class="cc-slider" value="80" aria-label="Brillo">
                 </div>
                 <div class="cc-slider-group">
-                    <img src="https://img.icons8.com/ios-filled/50/ffffff/high-volume.png" width="16">
-                    <input type="range" class="cc-slider" value="60">
+                    <img src="https://img.icons8.com/ios-filled/50/ffffff/high-volume.png" width="16" alt="Volumen">
+                    <input type="range" class="cc-slider" value="60" aria-label="Volumen">
                 </div>
             </div>
             <div class="cc-notifications">
