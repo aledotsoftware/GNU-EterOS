@@ -13,6 +13,14 @@ extern uint16_t net_checksum(void* vdata, size_t length);
 /* Pseudo Header for Checksum */
 static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, int flags) {
     uint8_t buffer[1514];
+    size_t headers_len = sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct tcp_header);
+
+    /* Bounds check to prevent stack buffer overflow */
+    if (len < 0 || (size_t)len > sizeof(buffer) - headers_len) {
+        hal_console_write("[TCP] Error: Packet too large\n");
+        return -1;
+    }
+
     struct ethernet_header* eth = (struct ethernet_header*)buffer;
     struct ip_header* ip = (struct ip_header*)(buffer + sizeof(struct ethernet_header));
     struct tcp_header* tcp = (struct tcp_header*)(buffer + sizeof(struct ethernet_header) + sizeof(struct ip_header));
@@ -176,7 +184,9 @@ int tcp_send(socket_entry_t* sock, const void* data, int len) {
     if (sock->state != SOCKET_STATE_ESTABLISHED) return -1;
 
     /* Simple Send: PSH+ACK */
-    tcp_send_packet(sock, data, len, TCP_PSH | TCP_ACK);
+    if (tcp_send_packet(sock, data, len, TCP_PSH | TCP_ACK) < 0) {
+        return -1;
+    }
     sock->seq_num += len;
 
     return len;

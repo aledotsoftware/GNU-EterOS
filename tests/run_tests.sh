@@ -45,6 +45,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_crypto.c kernel/crypto/sha256.c 
 ./tests/test_crypto
 rm tests/test_crypto
 
+# Test TCP Security
+echo "---------------------------------------------------"
+echo "Running test_tcp_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_tcp_security.c -o tests/test_tcp_security
+./tests/test_tcp_security
+rm tests/test_tcp_security
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 
