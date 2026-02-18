@@ -149,13 +149,32 @@ void* memmove(void* dest, const void* src, size_t n) {
             : : "memory"
         );
     } else {
-        s += n - 1;
-        d += n - 1;
-        __asm__ volatile (
-            "std; rep movsb; cld"
-            : "+S"(s), "+D"(d), "+c"(n)
-            : : "memory"
-        );
+        /* ⚡ BOLT Optimization: Use rep movsq (64-bit) for backward copy. */
+        size_t qwords = n / 8;
+        size_t remainder = n % 8;
+
+        s += n;
+        d += n;
+
+        if (remainder) {
+            const uint8_t* rsi = s - 1;
+            uint8_t* rdi = d - 1;
+            __asm__ volatile (
+                "std; rep movsb; cld"
+                : "+S"(rsi), "+D"(rdi), "+c"(remainder)
+                : : "memory"
+            );
+        }
+
+        if (qwords) {
+            const uint8_t* rsi = s - remainder - 8;
+            uint8_t* rdi = d - remainder - 8;
+            __asm__ volatile (
+                "std; rep movsq; cld"
+                : "+S"(rsi), "+D"(rdi), "+c"(qwords)
+                : : "memory"
+            );
+        }
     }
     return dest;
 #else
