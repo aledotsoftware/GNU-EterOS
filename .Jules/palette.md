@@ -29,3 +29,7 @@
 ## 2026-06-05 - [Connectivity Status Visibility]
 **Learning:** In a connected OS, users expect immediate feedback on network status. Hiding connectivity details inside a "Settings" app adds friction. A simple status bar icon with a tooltip (showing IP or "Offline") provides reassurance and quick diagnostics without clutter.
 **Action:** Ensure critical system states (Network, Battery, Audio) are always visible in the global status bar with detailed tooltips.
+
+## 2026-06-18 - [The Unseen Launchpad]
+**Learning:** Static lists of icons (like a launcher grid) are often overlooked in keyboard navigation flows because they "feel" like decorative galleries. Without `tabindex` and focus styles, a keyboard user is trapped in the search bar, unable to launch anything.
+**Action:** Always treat icon grids as button groups: verify `tabindex`, `role="button"`, and ensure visible focus states match the hover effects.
