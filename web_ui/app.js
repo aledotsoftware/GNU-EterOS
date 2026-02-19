@@ -523,7 +523,13 @@ function snapWindow(btn, region, e) {
 
 function makeDraggable(el) {
     const header = el.querySelector('.window-header');
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    let startX = 0, startY = 0;
+    let initialLeft = 0, initialTop = 0;
+    let rafId = null;
+
+    // Track current drag state for RAF
+    let currentLeft = 0;
+    let currentTop = 0;
 
     header.onmousedown = dragMouseDown;
     header.ontouchstart = dragMouseDown;
@@ -536,8 +542,14 @@ function makeDraggable(el) {
         const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
         const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
 
-        pos3 = clientX;
-        pos4 = clientY;
+        startX = clientX;
+        startY = clientY;
+        initialLeft = el.offsetLeft;
+        initialTop = el.offsetTop;
+
+        // Initialize current position
+        currentLeft = initialLeft;
+        currentTop = initialTop;
 
         document.onmouseup = closeDragElement;
         document.onmousemove = elementDrag;
@@ -552,16 +564,29 @@ function makeDraggable(el) {
         const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
         const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
 
-        pos1 = pos3 - clientX;
-        pos2 = pos4 - clientY;
-        pos3 = clientX;
-        pos4 = clientY;
+        // Calculate new position based on delta
+        const dx = clientX - startX;
+        const dy = clientY - startY;
 
-        el.style.top = (el.offsetTop - pos2) + "px";
-        el.style.left = (el.offsetLeft - pos1) + "px";
+        currentLeft = initialLeft + dx;
+        currentTop = initialTop + dy;
+
+        if (!rafId) {
+            rafId = requestAnimationFrame(updatePosition);
+        }
+    }
+
+    function updatePosition() {
+        el.style.top = currentTop + "px";
+        el.style.left = currentLeft + "px";
+        rafId = null;
     }
 
     function closeDragElement() {
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
         document.onmouseup = null;
         document.onmousemove = null;
         document.ontouchend = null;
