@@ -13,6 +13,14 @@ extern uint16_t net_checksum(void* vdata, size_t length);
 /* Pseudo Header for Checksum */
 static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, int flags) {
     uint8_t buffer[1514];
+    size_t header_len = sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct tcp_header);
+
+    /* Security Fix: Check for buffer overflow */
+    if (len < 0 || (size_t)len > (sizeof(buffer) - header_len)) {
+        hal_console_write("[TCP] Error: Payload too large, dropping packet.\n");
+        return -1;
+    }
+
     struct ethernet_header* eth = (struct ethernet_header*)buffer;
     struct ip_header* ip = (struct ip_header*)(buffer + sizeof(struct ethernet_header));
     struct tcp_header* tcp = (struct tcp_header*)(buffer + sizeof(struct ethernet_header) + sizeof(struct ip_header));
