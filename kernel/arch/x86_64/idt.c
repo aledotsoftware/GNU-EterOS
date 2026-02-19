@@ -114,6 +114,27 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
         if (vmm_handle_page_fault(cr2, error_code)) {
             return; /* Handled */
         }
+
+        /* Check for Kernel Mode access to User Space (Bad User Pointer) */
+        /* If we are in Kernel Mode (CS&3 == 0) and accessing a User Address, */
+        /* it means copy_from_user/validate failed (e.g. unmapped page). */
+        /* We should kill the task instead of panicking. */
+        if ((frame->cs & 3) == 0 && cr2 >= USER_BASE && cr2 <= USER_LIMIT) {
+            serial_write_string("\n[EXCEPTION] Kernel Page Fault on User Address. Bad pointer?\n");
+
+            task_t* current = task_get_current();
+            if (current) {
+                char buf[32];
+                serial_write_string("    Terminating PID: ");
+                itoa_s(current->id, buf, sizeof(buf), 10);
+                serial_write_string(buf);
+                serial_write_string("\n");
+
+                task_kill(current->id);
+                schedule();
+                /* Should not return */
+            }
+        }
     }
 
     /* Check if exception happened in User Mode (CS & 3 == 3) */
@@ -267,6 +288,7 @@ extern void isr_stub_timer(void);
 extern void isr_stub_keyboard(void);
 extern void isr_stub_serial(void);
 extern void isr_stub_mouse(void);
+extern void isr_stub_network(void);
 
 /* ========================================================================= */
 /* IRQ Handlers (Funciones C llamadas por los Stubs ASM)                     */
@@ -365,11 +387,12 @@ void idt_init(void) {
     
     idt_set_gate(IRQ_BASE + 1,  (void*)isr_stub_keyboard, IDT_GATE_INTERRUPT);
     idt_set_gate(IRQ_BASE + 4,  (void*)isr_stub_serial,   IDT_GATE_INTERRUPT);
+    idt_set_gate(IRQ_BASE + 11, (void*)isr_stub_network,  IDT_GATE_INTERRUPT);
     idt_set_gate(IRQ_BASE + 12, (void*)isr_stub_mouse,    IDT_GATE_INTERRUPT);
 
     /* IRQs restantes: handler por defecto */
     for (int i = 2; i < 16; i++) {
-        if (i == 4 || i == 12) continue;
+        if (i == 4 || i == 11 || i == 12) continue;
         idt_set_gate(IRQ_BASE + i, (void*)irq_default, IDT_GATE_INTERRUPT);
     }
 

@@ -20,6 +20,9 @@ typedef void (*open_type_t)(struct fs_node*);
 typedef void (*close_type_t)(struct fs_node*);
 typedef struct dirent * (*readdir_type_t)(struct fs_node*, uint32_t);
 typedef struct fs_node * (*finddir_type_t)(struct fs_node*, char *name);
+typedef int (*create_type_t)(struct fs_node*, char*, uint16_t);
+typedef int (*mkdir_type_t)(struct fs_node*, char*, uint16_t);
+typedef int (*unlink_type_t)(struct fs_node*, char*);
 
 typedef struct fs_node {
     char name[128];
@@ -39,6 +42,9 @@ typedef struct fs_node {
     close_type_t close;
     readdir_type_t readdir;
     finddir_type_t finddir;
+    create_type_t create;
+    mkdir_type_t mkdir;
+    unlink_type_t unlink;
     struct fs_node *ptr; /* Used by mountpoints and symlinks */
     uint32_t ref_count;   /* Reference counting for shared nodes */
     spinlock_t lock;      /* SMP lock for this node */
@@ -59,6 +65,9 @@ void open_fs(fs_node_t *node, uint8_t read, uint8_t write);
 void close_fs(fs_node_t *node);
 struct dirent *readdir_fs(fs_node_t *node, uint32_t index);
 fs_node_t *finddir_fs(fs_node_t *node, char *name);
+int create_fs(fs_node_t *parent, char *name, uint16_t permission);
+int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission);
+int unlink_fs(fs_node_t *parent, char *name);
 
 /**
  * Resolves a path to a filesystem node.

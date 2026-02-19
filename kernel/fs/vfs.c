@@ -62,6 +62,24 @@ fs_node_t *finddir_fs(fs_node_t *node, char *name) {
     return 0;
 }
 
+int create_fs(fs_node_t *parent, char *name, uint16_t permission) {
+    if ((parent->flags & 0x7) == FS_DIRECTORY && parent->create != 0)
+        return parent->create(parent, name, permission);
+    return -1;
+}
+
+int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) {
+    if ((parent->flags & 0x7) == FS_DIRECTORY && parent->mkdir != 0)
+        return parent->mkdir(parent, name, permission);
+    return -1;
+}
+
+int unlink_fs(fs_node_t *parent, char *name) {
+    if ((parent->flags & 0x7) == FS_DIRECTORY && parent->unlink != 0)
+        return parent->unlink(parent, name);
+    return -1;
+}
+
 /**
  * Resolves a path to a filesystem node.
  *

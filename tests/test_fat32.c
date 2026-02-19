@@ -2,20 +2,19 @@
 #define __ETEROS_HOST_TEST__
 #endif
 
-#include <stdio.h>
-/* Since -Iinclude shadows system headers, we might miss standard declarations */
-void exit(int status);
-char *strcpy(char *dest, const char *src);
-int strcmp(const char *s1, const char *s2);
-void *memset(void *s, int c, size_t n);
-void *memcpy(void *dest, const void *src, size_t n);
+/* Fix for conflict between kernel headers and system headers during test */
+typedef __builtin_va_list __gnuc_va_list;
 
-#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <assert.h>
+#include <stdint.h>
 
 /* Mock types */
 #include "../include/types.h"
 #include "../include/fs/fat32.h"
+#include "../include/fs/vfs.h"
 #include "../include/mm.h"
 #include "../include/hal.h"
 
@@ -41,6 +40,12 @@ void* kmalloc(size_t size) {
 void kfree(void* ptr) {
     (void)ptr;
 }
+
+/* Mock VFS globals if needed by fat32.c (it includes vfs.h) */
+fs_node_t *fs_root = NULL;
+
+/* Include string implementation */
+#include "../kernel/string.c"
 
 /* Include source under test */
 #include "../kernel/fs/fat32.c"
@@ -98,7 +103,7 @@ void setup_disk() {
 
     // File Content (Sector 35 - Cluster 3)
     char* file_data = (char*)&disk_image[35 * SECTOR_SIZE];
-    strcpy(file_data, "Hello, FAT32!");
+    strlcpy(file_data, "Hello, FAT32!", SECTOR_SIZE);
 }
 
 void test_fat32_read() {
@@ -247,6 +252,82 @@ void test_fat32_mkdir() {
     printf("PASSED\n");
 }
 
+void test_fat32_vfs() {
+    printf("Running test_fat32_vfs...\n");
+    setup_disk();
+    fat32_volume_t vol;
+    fat32_init(&vol, mock_read_sector, mock_write_sector, 0);
+
+    // Mount
+    fs_node_t* root = fat32_mount(&vol);
+    if (!root) {
+        printf("FAILED: fat32_mount returned NULL\n");
+        exit(1);
+    }
+
+    // Lookup existing file
+    fs_node_t* file = fat32_finddir_fs(root, "TEST.TXT");
+    if (!file) {
+        printf("FAILED: fat32_finddir_fs could not find TEST.TXT\n");
+        exit(1);
+    }
+
+    // Read FS
+    char buffer[100];
+    memset(buffer, 0, sizeof(buffer));
+    uint32_t bytes = fat32_read_fs(file, 0, 100, (uint8_t*)buffer);
+    if (bytes != 13) {
+        printf("FAILED: fat32_read_fs returned %d\n", bytes);
+        exit(1);
+    }
+    if (strcmp(buffer, "Hello, FAT32!") != 0) {
+        printf("FAILED: Content mismatch\n");
+        exit(1);
+    }
+    kfree(file);
+
+    // Create via VFS
+    int res = fat32_create_fs(root, "VFS.TXT", 0);
+    if (res != 0) {
+        printf("FAILED: fat32_create_fs returned %d\n", res);
+        exit(1);
+    }
+
+    // Find and Write via VFS
+    file = fat32_finddir_fs(root, "VFS.TXT");
+    if (!file) {
+        printf("FAILED: Could not find VFS.TXT\n");
+        exit(1);
+    }
+
+    const char* data = "VFS Write Test";
+    bytes = fat32_write_fs(file, 0, strlen(data), (uint8_t*)data);
+    if (bytes != strlen(data)) {
+        printf("FAILED: fat32_write_fs returned %d\n", bytes);
+        exit(1);
+    }
+
+    // Check file size in node updated?
+    if (file->length != strlen(data)) {
+        printf("FAILED: Node length not updated (%d)\n", file->length);
+        exit(1);
+    }
+    kfree(file);
+
+    // Verify Read back
+    file = fat32_finddir_fs(root, "VFS.TXT");
+    memset(buffer, 0, sizeof(buffer));
+    fat32_read_fs(file, 0, 100, (uint8_t*)buffer);
+    if (strcmp(buffer, data) != 0) {
+        printf("FAILED: Read back mismatch: %s\n", buffer);
+        exit(1);
+    }
+    kfree(file);
+    kfree(root);
+
+    printf("PASSED\n");
+}
+
 int main() {
     test_fat32_read();
     test_fat32_not_found();
@@ -254,6 +335,7 @@ int main() {
     test_fat32_create_write_read();
     test_fat32_delete();
     test_fat32_mkdir();
+    test_fat32_vfs();
     printf("All FAT32 tests passed!\n");
     return 0;
 }

@@ -7,8 +7,10 @@
 #include <vga.h>
 #include <mm.h>
 #include <hal.h>
+#include <sem.h>
 
 /* Global Network Info */
+sem_t net_sem;
 uint32_t my_ip = 0;
 uint32_t gateway_ip = 0;
 uint32_t dns_ip = 0;
@@ -44,6 +46,7 @@ uint16_t net_checksum(void* vdata, size_t length) {
 int net_init(void) {
     memset(socket_table, 0, sizeof(socket_table));
     network_ready = 0;
+    sem_init(&net_sem, 0);
     return 0;
 }
 
