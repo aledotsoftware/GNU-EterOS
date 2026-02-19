@@ -404,6 +404,54 @@ void omni_draw_char_transparent(int32_t x, int32_t y, char c, uint32_t fg) {
 
 void omni_draw_string(const rect_t* clip, int32_t x, int32_t y, const char* str, uint32_t fg, uint32_t bg) {
     if (!str) return;
+
+    /* ⚡ BOLT Optimization: Fast path for unclipped/fully visible text using Row-Major rendering */
+    /* This changes memory access pattern from vertical strips to horizontal contiguous writes */
+    if (omni_bpp == 32) {
+        size_t len = strlen(str);
+        int32_t w = (int32_t)len * 8;
+        int32_t h = 16;
+
+        bool fits = false;
+        if (clip) {
+            fits = (x >= clip->x && x + w <= clip->x + clip->w &&
+                    y >= clip->y && y + h <= clip->y + clip->h);
+        } else {
+            fits = (x >= 0 && y >= 0 && (uint32_t)(x + w) <= omni_width && (uint32_t)(y + h) <= omni_height);
+        }
+
+        if (fits) {
+            dirty_mark(x, y, w, h);
+
+            uint32_t* fb_row = omni_fb + (y * omni_pitch_div4) + x;
+            const uint8_t* font_base = font8x16;
+
+            for (int row = 0; row < 16; row++) {
+                uint32_t* p = fb_row;
+                const char* s = str;
+                while (*s) {
+                    unsigned char c = (unsigned char)*s++;
+                    uint8_t bits = font_base[c * 16 + row];
+
+                    /* Unroll 8 pixels */
+                    p[0] = (bits & 0x80) ? fg : bg;
+                    p[1] = (bits & 0x40) ? fg : bg;
+                    p[2] = (bits & 0x20) ? fg : bg;
+                    p[3] = (bits & 0x10) ? fg : bg;
+                    p[4] = (bits & 0x08) ? fg : bg;
+                    p[5] = (bits & 0x04) ? fg : bg;
+                    p[6] = (bits & 0x02) ? fg : bg;
+                    p[7] = (bits & 0x01) ? fg : bg;
+
+                    p += 8;
+                }
+                fb_row += omni_pitch_div4;
+            }
+            return;
+        }
+    }
+
+    /* Slow path: Per-char clipping / bounds checking */
     int32_t cx = x;
     while (*str) {
         if (clip) {
@@ -422,6 +470,45 @@ void omni_draw_string(const rect_t* clip, int32_t x, int32_t y, const char* str,
 /* Optimized string with transparent background */
 void omni_draw_string_transparent(int32_t x, int32_t y, const char* str, uint32_t fg) {
     if (!str) return;
+
+    /* ⚡ BOLT Optimization: Fast path for unclipped/fully visible text using Row-Major rendering */
+    if (omni_bpp == 32) {
+        size_t len = strlen(str);
+        int32_t w = (int32_t)len * 8;
+        int32_t h = 16;
+
+        /* Check screen bounds */
+        if (x >= 0 && y >= 0 && (uint32_t)(x + w) <= omni_width && (uint32_t)(y + h) <= omni_height) {
+            dirty_mark(x, y, w, h);
+
+            uint32_t* fb_row = omni_fb + (y * omni_pitch_div4) + x;
+            const uint8_t* font_base = font8x16;
+
+            for (int row = 0; row < 16; row++) {
+                uint32_t* p = fb_row;
+                const char* s = str;
+                while (*s) {
+                    unsigned char c = (unsigned char)*s++;
+                    uint8_t bits = font_base[c * 16 + row];
+
+                    if (bits) { /* Optimization: skip entire byte if 0 */
+                        if (bits & 0x80) p[0] = fg;
+                        if (bits & 0x40) p[1] = fg;
+                        if (bits & 0x20) p[2] = fg;
+                        if (bits & 0x10) p[3] = fg;
+                        if (bits & 0x08) p[4] = fg;
+                        if (bits & 0x04) p[5] = fg;
+                        if (bits & 0x02) p[6] = fg;
+                        if (bits & 0x01) p[7] = fg;
+                    }
+                    p += 8;
+                }
+                fb_row += omni_pitch_div4;
+            }
+            return;
+        }
+    }
+
     int32_t cx = x;
     while (*str) {
         omni_draw_char_transparent(cx, y, *str, fg);
