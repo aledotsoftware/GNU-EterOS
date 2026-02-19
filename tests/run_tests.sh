@@ -45,6 +45,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_crypto.c kernel/crypto/sha256.c 
 ./tests/test_crypto
 rm tests/test_crypto
 
+# Test ELF Security
+echo "---------------------------------------------------"
+echo "Running test_elf_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_security.c kernel/string.c -o tests/test_elf_security
+./tests/test_elf_security
+rm tests/test_elf_security
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 

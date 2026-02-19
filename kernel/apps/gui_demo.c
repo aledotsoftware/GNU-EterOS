@@ -1543,53 +1543,17 @@ void gui_draw_boot_logo(void) {
     /* 2. Draw Logo from File (logo.raw) */
     int img_w = 200;
     int img_h = 200;
-    omni_draw_image_from_path("logo.png", (sw - img_w) / 2, (sh - img_h) / 2 - 40);
+    /* 🎨 Palette: Center the logo perfectly (no text offset) */
+    omni_draw_image_from_path("logo.png", (sw - img_w) / 2, (sh - img_h) / 2);
 
-    /* 3. Draw Text (Dark Grey) */
-    const char* title = "ETEROS GENESIS";
-    int title_w = strlen(title) * 8;
-    omni_draw_string(NULL, (sw - title_w) / 2, sh / 2 + 60, title, 0x333333, 0xFFFFFF);
-    
-    const char* sub = "Cargando subsistemas...";
-    int sub_w = strlen(sub) * 8;
-    omni_draw_string(NULL, (sw - sub_w) / 2, sh / 2 + 80, sub, 0x666666, 0xFFFFFF);
-    
-    /* 4. Progress Bar (Light Grey Track, Cyan Fill) */
-    int bw = 300;
-    int bx = (sw - bw) / 2;
-    int by = sh / 2 + 110;
-    omni_fill_rect(bx, by, bw, 4, 0xEEEEEE);
+    /* 🎨 Palette: Minimalist look (Windows/Android style) - No text or progress bar */
     
     framebuffer_flush();
     
-    /* Fake Progress Animation (approx 2 seconds) */
-    /* Smooth Progress Animation (Time-based ~2 seconds) */
-    uint32_t start_tick = timer_get_ticks();
-    uint32_t duration_ticks = 200; /* 2 seconds @ 100Hz */
+    /* Wait for 2 seconds to let the user appreciate the logo */
+    task_sleep(200); /* 2 seconds @ 100Hz */
     
-    while (1) {
-        uint32_t current = timer_get_ticks();
-        if (current - start_tick > duration_ticks) break;
-        
-        int progress = ((current - start_tick) * 100) / duration_ticks;
-        int fill_w = (bw * progress) / 100;
-        
-        omni_fill_rect(bx, by, fill_w, 4, 0x00AAAA);
-        
-        /* Partial flush for speed! */
-        framebuffer_flush_rect(bx, by, bw, 4);
-        
-        /* Yield to CPU, but wake up fast */
-        task_sleep(10); 
-    }
-    
-    /* Ensure 100% at end */
-    omni_fill_rect(bx, by, bw, 4, 0x00AAAA);
-    framebuffer_flush_rect(bx, by, bw, 4);
-    
-    /* Final pause (1 second) */
     terminal_set_silent(true);
-    task_sleep(50);
 
     /* Fade to Black Transition */
     for (int alpha = 0; alpha <= 255; alpha += 8) {
