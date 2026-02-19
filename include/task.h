@@ -21,6 +21,9 @@
 #define SCHEDULER_HZ     10    /* Switch cada 10 ticks (100ms a 100Hz PIT) */
 #define MAX_FD           16    /* Máximo de descriptores de archivo por tarea */
 
+#define KERNEL_STACK_BASE       0xFFFFFF0000000000ULL
+#define KERNEL_STACK_GUARD_SIZE 4096  /* 4KB Guard Page */
+
 /**
  * Inicializa el scheduler para un Application Processor (AP).
  * Crea una tarea idle específica para este núcleo.
