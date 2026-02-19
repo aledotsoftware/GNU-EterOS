@@ -464,7 +464,8 @@ body {
 
 .maximize:focus-within .snap-menu,
 .maximize:hover .snap-menu,
-.snap-menu:hover {
+.snap-menu:hover,
+.maximize:focus-within .snap-menu {
     opacity: 1;
     pointer-events: all;
     transform: translateY(0);
