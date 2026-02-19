@@ -11,6 +11,7 @@
 #include "../../include/mm.h"
 #include "../../include/serial.h"
 #include "../../include/pmm.h" /* Para PAGE_ALIGN_UP y PAGE_SIZE */
+#include "../../include/lock.h"
 
 /* ========================================================================= */
 /* Configuración del Heap                                                    */
@@ -41,6 +42,8 @@ static block_header_t* heap_start = NULL;
 static block_header_t* last_alloc = NULL; /* Puntero para Next-Fit strategy */
 static size_t memory_used = 0;
 static size_t memory_total = 0;
+
+static spinlock_t heap_lock = 0;
 
 /* ========================================================================= */
 /* Helpers                                                                   */
@@ -154,7 +157,7 @@ void mm_init(boot_info_t* boot_info) {
     serial_write_string(" MB\n");
 }
 
-void* kmalloc(size_t size) {
+static void* _kmalloc(size_t size) {
     if (size == 0) return NULL;
     if (!heap_start) return NULL; /* Heap no inicializado */
 
@@ -215,7 +218,14 @@ void* kmalloc(size_t size) {
     return NULL;
 }
 
-void kfree(void* ptr) {
+void* kmalloc(size_t size) {
+    spin_lock(&heap_lock);
+    void* ptr = _kmalloc(size);
+    spin_unlock(&heap_lock);
+    return ptr;
+}
+
+static void _kfree(void* ptr) {
     if (!ptr) return;
     if (!heap_start) return;
 
@@ -274,9 +284,16 @@ void kfree(void* ptr) {
     }
 }
 
+void kfree(void* ptr) {
+    spin_lock(&heap_lock);
+    _kfree(ptr);
+    spin_unlock(&heap_lock);
+}
+
 void* kcalloc(size_t num, size_t size) {
     if (num > 0 && size > SIZE_MAX / num) return NULL;
     size_t total = num * size;
+    /* kmalloc already locks, so this is safe */
     void* ptr = kmalloc(total);
     if (ptr) memset(ptr, 0, total);
     return ptr;
@@ -284,8 +301,12 @@ void* kcalloc(size_t num, size_t size) {
 
 void* krealloc(void* ptr, size_t size) {
     if (!ptr) return kmalloc(size);
+
+    spin_lock(&heap_lock);
+
     if (size == 0) {
-        kfree(ptr);
+        _kfree(ptr);
+        spin_unlock(&heap_lock);
         return NULL;
     }
 
@@ -295,27 +316,32 @@ void* krealloc(void* ptr, size_t size) {
     /* Sanity check */
     if (block->magic != HEAP_MAGIC) {
         serial_write_string("[MM] Error: krealloc of invalid address\n");
+        spin_unlock(&heap_lock);
         return NULL;
     }
 
     /* If current block is large enough, return it (we don't split for now) */
     /* Alignment is already handled in allocation size, so block->size is usable */
     if (block->size >= size) {
+        spin_unlock(&heap_lock);
         return ptr;
     }
 
-    /* Allocate new block */
-    void* new_ptr = kmalloc(size);
-    if (!new_ptr) return NULL;
+    /* Allocate new block using internal unlocked allocator */
+    void* new_ptr = _kmalloc(size);
+    if (!new_ptr) {
+        spin_unlock(&heap_lock);
+        return NULL;
+    }
 
     /* Copy old data */
-    /* We copy only the data we had (block->size) or the new size, whichever is smaller? */
-    /* Since we are expanding, we copy block->size. */
+    /* We copy only the data we had (block->size) */
     memcpy(new_ptr, ptr, block->size);
 
-    /* Free old block */
-    kfree(ptr);
+    /* Free old block using internal unlocked deallocator */
+    _kfree(ptr);
 
+    spin_unlock(&heap_lock);
     return new_ptr;
 }
 

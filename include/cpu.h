@@ -56,6 +56,10 @@ typedef struct {
     void* current_task;               /* Pointer to current task_t */
     void* idle_task;                  /* Pointer to idle task_t */
     uint32_t sched_ticks;             /* Per-CPU scheduler tick counter */
+
+    /* Per-CPU GDT/TSS */
+    void* gdt;                        /* struct gdt_entry* */
+    void* tss;                        /* struct tss_struct* */
     
     /* Scheduler Local */
     /* Aquí irían las colas de ejecución locales (runqueues) */

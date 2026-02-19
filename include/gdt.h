@@ -2,6 +2,7 @@
 #define ETEROS_GDT_H
 
 #include "types.h"
+#include "cpu.h"
 
 /**
  * Inicializa la Global Descriptor Table (GDT) y el Task State Segment (TSS).
@@ -18,5 +19,15 @@ void gdt_init(void);
  * @param rsp0 Dirección del tope del stack de kernel (stack top).
  */
 void tss_set_rsp0(uint64_t rsp0);
+
+/**
+ * Inicializa estructuras GDT/TSS para un Application Processor.
+ */
+void gdt_init_ap(cpu_info_t* cpu);
+
+/**
+ * Carga la GDT y TSS específicas del CPU actual.
+ */
+void gdt_load_for_cpu(cpu_info_t* cpu);
 
 #endif /* ETEROS_GDT_H */

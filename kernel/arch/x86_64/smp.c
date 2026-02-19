@@ -12,6 +12,7 @@
 #include <apic.h>
 #include <vmm.h>
 #include <task.h>
+#include <gdt.h>
 
 /* Symbols from trampoline.asm */
 extern char trampoline_start[];
@@ -106,6 +107,9 @@ void smp_init(void) {
         *(uint64_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_stack)) = cpu->kernel_stack_top;
         *(uint32_t*)(TRAMPOLINE_BASE + TRAMPOLINE_OFFSET(trampoline_cpu_index)) = i;
 
+        /* Initialize Per-CPU GDT/TSS */
+        gdt_init_ap(cpu);
+
         cpu->state = CPU_STATE_BOOTING;
 
         /* INIT IPI */
@@ -138,6 +142,10 @@ void cpu_init_ap(int index) {
     __asm__ volatile("cli");
     
     cpu_info_t* cpu = &cpus[index];
+
+    /* Load Per-CPU GDT/TSS */
+    /* This will reset GS Base to 0, so we must do it BEFORE setting MSR_GS_BASE */
+    gdt_load_for_cpu(cpu);
     
     /* Configurar GS Base */
     wrmsr(MSR_GS_BASE, (uint64_t)cpu);

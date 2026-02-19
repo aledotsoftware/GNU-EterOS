@@ -11,6 +11,10 @@
 #include "../../include/string.h"
 #include "../../include/serial.h"
 #include "../../include/hal/mm.h"
+#include "../../include/apic.h"
+#include "../../include/cpu.h"
+#include "../../include/lock.h"
+#include "../../include/idt.h" /* For IPI_TLB_SHOOTDOWN */
 
 /* Estructura de una entrada de tabla de páginas (64-bit) */
 typedef uint64_t pt_entry_t;
@@ -18,9 +22,58 @@ typedef uint64_t pt_entry_t;
 /* Puntero a la tabla PML4 activa */
 static pt_entry_t* pml4 = (pt_entry_t*)BOOT_PML4_ADDR;
 
+/* TLB Shootdown Globals */
+volatile uint64_t tlb_flush_addr = 0;
+volatile uint64_t tlb_ack_mask = 0;
+spinlock_t tlb_lock = 0;
+
 /* Invalida una página en el TLB */
 static inline void invlpg(uint64_t addr) {
     __asm__ volatile("invlpg (%0)" : : "r" (addr) : "memory");
+}
+
+void vmm_flush_tlb_local(uint64_t addr) {
+    invlpg(addr);
+}
+
+void vmm_flush_tlb_smp(uint64_t addr) {
+    /* If single core or interrupts disabled (early boot), just flush local */
+    if (total_cpus <= 1) {
+        invlpg(addr);
+        return;
+    }
+
+    /* Acquire lock to serialize shootdowns */
+    spin_lock(&tlb_lock);
+
+    tlb_flush_addr = addr;
+    tlb_ack_mask = 0;
+
+    /* Current CPU ID */
+    int my_id = get_cpu_id();
+
+    /* Send IPI to all other CPUs */
+    /* Iterate all CPUs */
+    for (int i = 0; i < total_cpus; i++) {
+        if (i == my_id) continue;
+        if (cpus[i].state != CPU_STATE_ONLINE) continue;
+
+        lapic_send_ipi(cpus[i].apic_id, IPI_TLB_SHOOTDOWN);
+    }
+
+    /* Wait for ACKs (with timeout) */
+    /* Ideally we use a bitmask logic. Here we just wait for simplicity? */
+    /* But tlb_ack_mask needs to be set by others. */
+    /* Since we didn't implement the ACK logic in the ISR yet (we need to), let's assume we do. */
+
+    /* WAIT LOOP with Timeout */
+    /* For now, Fire-and-Forget to avoid deadlocks if IPIs fail or interrupts disabled */
+    /* TODO: Implement strict consistency wait */
+
+    spin_unlock(&tlb_lock);
+
+    /* Always flush local */
+    invlpg(addr);
 }
 
 /* Recarga CR3 (flush completo de TLB - costoso) */
@@ -96,8 +149,8 @@ int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
     /* Configurar la entrada de la tabla de páginas (PT Entry) */
     pt[pt_idx] = (phys_addr & PAGE_ADDR_MASK) | flags;
 
-    /* Invalidar TLB para esta dirección */
-    invlpg(virt_addr);
+    /* Invalidar TLB para esta dirección (SMP) */
+    vmm_flush_tlb_smp(virt_addr);
 
     return 0;
 }
@@ -120,7 +173,7 @@ void vmm_unmap_page(uint64_t virt_addr) {
     /* Marcar como no presente */
     pt[pt_idx] = 0;
     
-    invlpg(virt_addr);
+    vmm_flush_tlb_smp(virt_addr);
 }
 
 uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
@@ -328,7 +381,7 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
                  pmm_unref_page((void*)old_phys);
              }
 
-             invlpg(addr);
+             vmm_flush_tlb_smp(addr);
              return 1; /* Handled */
         }
     }

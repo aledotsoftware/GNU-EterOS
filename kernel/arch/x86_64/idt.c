@@ -23,6 +23,7 @@
 #include "../../../include/timer.h"
 #include "../../../include/task.h"
 #include "../../../include/vmm.h"
+#include "../../../include/apic.h"
 
 /* ========================================================================= */
 /* Tabla IDT (256 entradas × 16 bytes = 4 KB)                               */
@@ -321,6 +322,16 @@ static void irq_default(struct interrupt_frame *frame) {
     outb(PIC1_COMMAND, PIC_EOI);
 }
 
+/* --- IPI Handlers --- */
+extern volatile uint64_t tlb_flush_addr;
+
+__attribute__((interrupt))
+static void isr_tlb_shootdown(struct interrupt_frame *frame) {
+    (void)frame;
+    vmm_flush_tlb_local(tlb_flush_addr);
+    lapic_eoi();
+}
+
 void idt_init(void) {
     /* Limpiar toda la tabla */
     memset(idt, 0, sizeof(idt));
@@ -361,6 +372,9 @@ void idt_init(void) {
         if (i == 4 || i == 12) continue;
         idt_set_gate(IRQ_BASE + i, (void*)irq_default, IDT_GATE_INTERRUPT);
     }
+
+    /* --- IPI Handlers --- */
+    idt_set_gate(IPI_TLB_SHOOTDOWN, (void*)isr_tlb_shootdown, IDT_GATE_INTERRUPT);
 
     /* --- Cargar la IDT --- */
     idtr.limit = sizeof(idt) - 1;

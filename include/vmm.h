@@ -89,4 +89,8 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code);
  */
 int vmm_is_user_page(uint64_t virt_addr);
 
+/* TLB Shootdown Helpers */
+void vmm_flush_tlb_local(uint64_t addr);
+void vmm_flush_tlb_smp(uint64_t addr);
+
 #endif /* ETEROS_VMM_H */
