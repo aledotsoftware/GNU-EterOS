@@ -94,8 +94,45 @@ void user_loader_entry(void) {
 
     uint64_t user_stack_top = user_stack_virt + PAGE_SIZE;
 
+    /* Push arguments to stack (argc, argv) */
+    char* sp = (char*)user_stack_top;
+
+    /* 1. Push strings */
+    const char* argv0_str = "test.elf";
+    size_t len = strlen(argv0_str) + 1;
+    sp -= len;
+    memcpy(sp, argv0_str, len);
+    char* argv0_ptr = sp;
+
+    /* 2. Align stack to 16 bytes for pointer array */
+    /* pointers are 8 bytes. array is argc(8) + argv0(8) + argv1(8) + envp0(8) = 32 bytes */
+    /* if sp is now X. */
+    /* we want sp_final % 16 == 0. */
+    /* sp_final = sp - padding - 32. */
+    /* (sp - padding - 32) % 16 == 0 => (sp - padding) % 16 == 0. */
+    /* So align sp down to 16 bytes. */
+
+    uintptr_t current_sp = (uintptr_t)sp;
+    current_sp &= ~0xF; // Align down to 16 bytes
+    sp = (char*)current_sp;
+
+    /* 3. Push pointers */
+    uint64_t* stack_ptr = (uint64_t*)sp;
+
+    /* envp[0] = NULL */
+    *(--stack_ptr) = 0;
+
+    /* argv[1] = NULL */
+    *(--stack_ptr) = 0;
+
+    /* argv[0] = ptr */
+    *(--stack_ptr) = (uint64_t)argv0_ptr;
+
+    /* argc = 1 */
+    *(--stack_ptr) = 1;
+
     serial_write_string("[USER] Jumping to Ring 3...\n");
-    enter_user_mode((void*)entry_point, (void*)user_stack_top);
+    enter_user_mode((void*)entry_point, (void*)stack_ptr);
 
     /* Should never return here */
     serial_write_string("[USER] Error: Returned from Ring 3 (unexpected)\n");

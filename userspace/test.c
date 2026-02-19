@@ -5,9 +5,23 @@
 #include <string.h>
 
 int main(int argc, char **argv) {
-    (void)argc; (void)argv;
-
     printf("Hello from Userspace Libc!\n");
+
+    printf("Received argc: %d\n", argc);
+    if (argc > 0 && argv != NULL) {
+        for (int i = 0; i < argc; i++) {
+            printf("argv[%d] = '%s'\n", i, argv[i]);
+        }
+
+        /* Verify argv termination */
+        if (argv[argc] == NULL) {
+            printf("argv[%d] is NULL (Correct)\n", argc);
+        } else {
+            printf("argv[%d] is NOT NULL (Incorrect)\n", argc);
+        }
+    } else {
+        printf("Error: argv is NULL or argc <= 0\n");
+    }
 
     int pid = getpid();
     printf("My PID is: %d\n", pid);
@@ -24,13 +38,12 @@ int main(int argc, char **argv) {
         printf("Closed /dev/tty.\n");
     }
 
+    /*
     printf("Testing signal handling (Segfault)...\n");
-
-    /* This should cause SIGSEGV and task termination by kernel */
-    // volatile int *p = (int*)0;
-    // *p = 42;
-
+    volatile int *p = (int*)0;
+    *p = 42;
     printf("This should NOT be printed if Segfault works.\n");
+    */
 
     return 0;
 }
