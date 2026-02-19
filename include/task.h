@@ -47,6 +47,8 @@ typedef enum {
 /* ========================================================================= */
 /* Estructura de Tarea                                                       */
 /* ========================================================================= */
+struct semaphore; /* Forward declaration */
+
 typedef struct task {
     uint64_t       rsp;                     /* Stack pointer guardado */
     uint8_t*       stack_base;              /* Base del stack alocado */
@@ -55,6 +57,7 @@ typedef struct task {
     uint32_t       id;                      /* Task ID único */
     task_state_t   state;                   /* Estado actual */
     uint64_t       wake_tick;               /* Tick para despertar si duerme */
+    struct semaphore* waiting_sem;          /* Semaphore waiting on (if blocked) */
     char           name[32];                /* Nombre descriptivo */
 
     /* POSIX Compatibility */

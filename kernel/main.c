@@ -30,9 +30,11 @@
 #include <acpi.h>
 #include <apic.h>
 #include <futex.h>
+#include <sem.h>
 
 /* Compatibility for legacy apps */
 extern int network_ready;
+extern sem_t net_sem;
 
 
 /* Forward declarations for non-HAL kernel services */
@@ -59,7 +61,13 @@ extern void net_poll(void);
 extern uint32_t my_ip;
 
 static void network_task(void) {
+    /* Process any pending packets before entering loop */
+    net_poll();
+
     while(1) {
+        /* Wait for network interrupt (packet received) */
+        sem_wait(&net_sem);
+
         net_poll();
 
         /* Update status */
@@ -67,8 +75,6 @@ static void network_task(void) {
             network_ready = 1;
             hal_console_write("  [NET]  DHCP Bound! IP assigned.\n");
         }
-
-        task_yield();
     }
 }
 
