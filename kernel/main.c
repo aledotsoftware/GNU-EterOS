@@ -13,6 +13,7 @@
 #include <hal.h>
 #include <klog.h>
 #include <string.h>
+#include <stdio.h>
 #include <io.h>
 #include <boot.h>
 #include <mouse.h>
@@ -227,21 +228,8 @@ static void kernel_print_banner(void) {
     hal_console_write("  ========================================\n");
     
     /* Versión y codename */
-    hal_console_write("    Version ");
-    
-    char version_str[32];
-    itoa_s(ETEROS_VERSION_MAJOR, version_str, sizeof(version_str), 10);
-    hal_console_write(version_str);
-    hal_console_write(".");
-    itoa_s(ETEROS_VERSION_MINOR, version_str, sizeof(version_str), 10);
-    hal_console_write(version_str);
-    hal_console_write(".");
-    itoa_s(ETEROS_VERSION_PATCH, version_str, sizeof(version_str), 10);
-    hal_console_write(version_str);
-    
-    hal_console_write(" (\"");
-    hal_console_write(ETEROS_CODENAME);
-    hal_console_write("\")\n");
+    kprintf("    Version %d.%d.%d (\"%s\")\n",
+            ETEROS_VERSION_MAJOR, ETEROS_VERSION_MINOR, ETEROS_VERSION_PATCH, ETEROS_CODENAME);
 
     /* Copyright */
     hal_console_write("    (c) 2026 Tudex Networks\n");
@@ -254,11 +242,8 @@ static void kernel_print_banner(void) {
  * Muestra información básica del sistema.
  */
 static void kernel_print_sysinfo(void) {
-    hal_console_write("  [INFO] Arquitectura: ");
-    hal_console_write(ETEROS_ARCH_NAME);
-    hal_console_write("\n");
-
-    hal_console_write("  [INFO] Board/Target: Generic\n");
+    kprintf("  [INFO] Arquitectura: %s\n", ETEROS_ARCH_NAME);
+    kprintf("  [INFO] Board/Target: Generic\n");
 }
 
 /**
