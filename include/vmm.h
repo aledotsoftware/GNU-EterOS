@@ -89,4 +89,11 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code);
  */
 int vmm_is_user_page(uint64_t virt_addr);
 
+/**
+ * Libera todo el espacio de usuario (PML4 entry 0).
+ * Libera las tablas de paginación y las páginas físicas asociadas.
+ * Deja el espacio de usuario limpio para execve().
+ */
+void vmm_free_user_space(void);
+
 #endif /* ETEROS_VMM_H */

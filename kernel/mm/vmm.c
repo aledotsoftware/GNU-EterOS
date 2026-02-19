@@ -382,3 +382,45 @@ int vmm_is_user_page(uint64_t virt_addr) {
 
     return 1;
 }
+
+static void free_pt_recursive(pt_entry_t* table, int level) {
+    for (int i = 0; i < 512; i++) {
+        if (!(table[i] & PAGE_PRESENT)) continue;
+
+        uint64_t phys = table[i] & PAGE_ADDR_MASK;
+
+        if (level > 1) {
+            /* Recursively free child table */
+            free_pt_recursive((pt_entry_t*)phys, level - 1);
+
+            /* Free the table page itself */
+            pmm_free_page((void*)phys);
+        } else {
+            /* Level 1 (PT): Free the content page */
+            pmm_free_page((void*)phys);
+        }
+    }
+}
+
+void vmm_free_user_space(void) {
+    uint64_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    pt_entry_t* pml4 = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);
+
+    /* User space is located at PML4 Index 0 (0 - 512GB) */
+    if (pml4[0] & PAGE_PRESENT) {
+        uint64_t pdpt_phys = pml4[0] & PAGE_ADDR_MASK;
+
+        /* Recursively free the hierarchy starting from PDPT (Level 3) */
+        free_pt_recursive((pt_entry_t*)pdpt_phys, 3);
+
+        /* Free the PDPT page itself */
+        pmm_free_page((void*)pdpt_phys);
+
+        /* Clear the PML4 entry */
+        pml4[0] = 0;
+
+        /* Flush TLB */
+        __asm__ volatile("mov %0, %%cr3" : : "r"(cr3) : "memory");
+    }
+}

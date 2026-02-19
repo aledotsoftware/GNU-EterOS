@@ -145,4 +145,16 @@ void syscall_init(void);
  */
 void syscall_handler(struct syscall_regs* regs);
 
+/**
+ * Carga un ejecutable ELF en el espacio de usuario actual (reemplazando la imagen).
+ *
+ * @param path Ruta al archivo ELF (Kernel Buffer).
+ * @param argv Argumentos (vector de punteros Kernel, terminado en NULL).
+ * @param envp Variables de entorno (vector de punteros Kernel, terminado en NULL).
+ * @param out_entry Puntero para retornar el Entry Point.
+ * @param out_rsp Puntero para retornar el User Stack Pointer.
+ * @return 0 en éxito, negativo en error (-errno).
+ */
+int execve_load(const char* path, char** argv, char** envp, uint64_t* out_entry, uint64_t* out_rsp);
+
 #endif /* ETEROS_SYSCALL_H */

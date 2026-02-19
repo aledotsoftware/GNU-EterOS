@@ -42,6 +42,12 @@ int open(const char *pathname, int flags) {
     return (int)ret;
 }
 
+int execve(const char *pathname, char *const argv[], char *const envp[]) {
+    long ret = syscall3(SYS_execve, (long)pathname, (long)argv, (long)envp);
+    if (ret < 0) { errno = -ret; return -1; }
+    return (int)ret;
+}
+
 int close(int fd) {
     long ret = syscall1(SYS_close, fd);
     if (ret < 0) { errno = -ret; return -1; }

@@ -22,6 +22,7 @@
 #include <timer.h>
 #include <vmm.h>
 #include <futex.h>
+#include <vmm.h>
 
 extern void syscall_entry(void);
 
@@ -234,6 +235,255 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     }
 
     return virt;
+}
+
+int execve_load(const char* kpath, char** kargv, char** kenvp, uint64_t* out_entry, uint64_t* out_rsp) {
+    /* 1. Verify existence (Quick check before committing) */
+    fs_node_t* node = vfs_lookup(fs_root, kpath);
+    if (!node) {
+        return -ENOENT;
+    }
+    kfree(node);
+
+    /* 2. Count Args and Env */
+    int argc = 0;
+    if (kargv) {
+        while (kargv[argc]) argc++;
+    }
+
+    int envc = 0;
+    if (kenvp) {
+        while (kenvp[envc]) envc++;
+    }
+
+    /* 3. Commit: Wipe User Space */
+    vmm_free_user_space();
+
+    /* 4. Load ELF */
+    uint64_t entry = elf_load_file(kpath, 0);
+    if (entry == 0) {
+        serial_write_string("[EXEC] Failed to load ELF after wipe. Exiting task.\n");
+        task_exit();
+    }
+
+    /* 5. Setup Stack */
+    /* Map stack pages at top of user space (0x7FFFFFFFF000) */
+    uint64_t stack_top = 0x7FFFFFFFF000;
+
+    /* Alloc stack pages (16KB) */
+    for (int i = 0; i < 4; i++) {
+        uint64_t addr = stack_top - (i * PAGE_SIZE);
+        void* phys = pmm_alloc_page();
+        if (!phys) {
+             serial_write_string("[EXEC] OOM Allocating Stack\n");
+             task_exit();
+        }
+        hal_mem_map((uint64_t)phys, addr, HAL_MEM_USER | HAL_MEM_READ | HAL_MEM_WRITE);
+        memset((void*)addr, 0, PAGE_SIZE);
+    }
+
+    uint64_t rsp = stack_top + PAGE_SIZE;
+
+    /* Push Strings */
+    uint64_t* argv_ptrs = (uint64_t*)kmalloc(sizeof(uint64_t) * (argc + 1));
+    uint64_t* envp_ptrs = (uint64_t*)kmalloc(sizeof(uint64_t) * (envc + 1));
+
+    /* Push Envp Strings */
+    for (int i = envc - 1; i >= 0; i--) {
+        size_t len = strlen(kenvp[i]) + 1;
+        rsp -= len;
+        memcpy((void*)rsp, kenvp[i], len);
+        envp_ptrs[i] = rsp;
+    }
+
+    /* Push Argv Strings */
+    for (int i = argc - 1; i >= 0; i--) {
+        size_t len = strlen(kargv[i]) + 1;
+        rsp -= len;
+        memcpy((void*)rsp, kargv[i], len);
+        argv_ptrs[i] = rsp;
+    }
+
+    /* Align RSP to 16 bytes */
+    rsp &= ~0xF;
+
+    /* Push Auxv / NULL */
+    rsp -= 8;
+    *(uint64_t*)rsp = 0;
+
+    /* Push Envp Pointers */
+    rsp -= 8; /* NULL terminator */
+    *(uint64_t*)rsp = 0;
+
+    for (int i = envc - 1; i >= 0; i--) {
+        rsp -= 8;
+        *(uint64_t*)rsp = envp_ptrs[i];
+    }
+
+    /* Push Argv Pointers */
+    rsp -= 8; /* NULL terminator */
+    *(uint64_t*)rsp = 0;
+
+    for (int i = argc - 1; i >= 0; i--) {
+        rsp -= 8;
+        *(uint64_t*)rsp = argv_ptrs[i];
+    }
+
+    /* Push Argc */
+    rsp -= 8;
+    *(uint64_t*)rsp = (uint64_t)argc;
+
+    /* 6. Update Process Name */
+    task_t* current = task_get_current();
+    const char* name = kpath;
+    for (int i = 0; kpath[i]; i++) {
+        if (kpath[i] == '/') name = &kpath[i + 1];
+    }
+    strlcpy(current->name, name, 32);
+
+    kfree(argv_ptrs);
+    kfree(envp_ptrs);
+
+    *out_entry = entry;
+    *out_rsp = rsp;
+    return 0;
+}
+
+static int64_t sys_execve(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) {
+    /* 1. Validate & Capture Path */
+    if (!validate_user_string(path)) return -EFAULT;
+    char* kpath = (char*)kmalloc(PAGE_SIZE);
+    if (!kpath) return -ENOMEM;
+    strlcpy(kpath, path, PAGE_SIZE);
+
+    /* 2. Capture Argv */
+    int argc = 0;
+    char** kargv = NULL;
+    if (argv) {
+        /* Count argc */
+        while (argc < 128) {
+            char* ptr = argv[argc];
+            /* TODO: Validate ptr in user space properly */
+            if (!ptr) break;
+            argc++;
+        }
+        if (argc > 0) {
+            kargv = (char**)kmalloc(sizeof(char*) * (argc + 1));
+            if (!kargv) { kfree(kpath); return -ENOMEM; }
+            for (int i = 0; i < argc; i++) {
+                /* Validate and Copy string */
+                if (!validate_user_string(argv[i])) {
+                    /* Cleanup previously allocated args */
+                    for(int j=0; j<i; j++) kfree(kargv[j]);
+                    kfree(kargv);
+                    kfree(kpath);
+                    return -EFAULT;
+                }
+                int len = strlen(argv[i]);
+                kargv[i] = (char*)kmalloc(len + 1);
+                if (!kargv[i]) {
+                    /* Cleanup */
+                    for(int j=0; j<i; j++) kfree(kargv[j]);
+                    kfree(kargv);
+                    kfree(kpath);
+                    return -ENOMEM;
+                }
+                strlcpy(kargv[i], argv[i], len + 1);
+            }
+            kargv[argc] = NULL;
+        }
+    }
+
+    /* 3. Capture Envp */
+    int envc = 0;
+    char** kenvp = NULL;
+    if (envp) {
+        while (envc < 128) {
+            char* ptr = envp[envc];
+            /* TODO: Validate array pointer itself */
+            if (!ptr) break;
+            envc++;
+        }
+        if (envc > 0) {
+            kenvp = (char**)kmalloc(sizeof(char*) * (envc + 1));
+            if (!kenvp) {
+                /* Cleanup Argv */
+                if (kargv) {
+                    for(int i=0; i<argc; i++) kfree(kargv[i]);
+                    kfree(kargv);
+                }
+                kfree(kpath);
+                return -ENOMEM;
+            }
+            for (int i = 0; i < envc; i++) {
+                if (!validate_user_string(envp[i])) {
+                    /* Cleanup Envp */
+                    for(int j=0; j<i; j++) kfree(kenvp[j]);
+                    kfree(kenvp);
+                    /* Cleanup Argv */
+                    if (kargv) {
+                        for(int j=0; j<argc; j++) kfree(kargv[j]);
+                        kfree(kargv);
+                    }
+                    kfree(kpath);
+                    return -EFAULT;
+                }
+                int len = strlen(envp[i]);
+                kenvp[i] = (char*)kmalloc(len + 1);
+                if (!kenvp[i]) {
+                    /* Cleanup All */
+                    for(int j=0; j<i; j++) kfree(kenvp[j]);
+                    kfree(kenvp);
+                    if (kargv) {
+                        for(int j=0; j<argc; j++) kfree(kargv[j]);
+                        kfree(kargv);
+                    }
+                    kfree(kpath);
+                    return -ENOMEM;
+                }
+                strlcpy(kenvp[i], envp[i], len + 1);
+            }
+            kenvp[envc] = NULL;
+        }
+    }
+
+    /* 4. Call Kernel Implementation */
+    uint64_t entry, rsp;
+    int ret = execve_load(kpath, kargv, kenvp, &entry, &rsp);
+
+    /* 5. Cleanup Kernel Memory */
+    kfree(kpath);
+    if (kargv) {
+        for(int i = 0; i < argc; i++) kfree(kargv[i]);
+        kfree(kargv);
+    }
+    if (kenvp) {
+        for(int i = 0; i < envc; i++) kfree(kenvp[i]);
+        kfree(kenvp);
+    }
+
+    /* 6. Update Regs */
+    if (ret == 0) {
+        regs->rcx = entry; /* RIP */
+        regs->r11 = 0x202; /* RFLAGS */
+
+        /* Update RSP for syscall return */
+        task_t* current = task_get_current();
+        if (current) {
+            current->user_rsp = rsp;
+        }
+
+        cpu_info_t* cpu = get_current_cpu();
+        if (cpu) {
+            cpu->user_stack_scratch = rsp;
+        }
+
+        regs->rdi = 0; regs->rsi = 0; regs->rdx = 0;
+        regs->rax = 0; regs->rbp = 0;
+        regs->r8 = 0;  regs->r9 = 0;  regs->r10 = 0;
+    }
+
+    return ret;
 }
 
 static int64_t sys_pipe(int* pipefd) {
@@ -926,6 +1176,8 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_mmap((void*)regs->rdi, (size_t)regs->rsi, (int)regs->rdx, (int)regs->r10, (int)regs->r8, (int64_t)regs->r9);
     } else if (regs->rax == SYS_brk) {
         ret = (uint64_t)sys_brk((uint64_t)regs->rdi);
+    } else if (regs->rax == SYS_execve) {
+        ret = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
     } else if (regs->rax == SYS_fork) {
         ret = (uint64_t)task_fork((void*)regs);
     } else if (regs->rax == 158) { /* SYS_arch_prctl is 158 */

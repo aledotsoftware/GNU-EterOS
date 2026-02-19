@@ -169,7 +169,14 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/net/ip_utils.c \
               $(KERNEL_DIR)/net/stack.c \
               $(KERNEL_DIR)/apps/wget.c \
-              $(KERNEL_DIR)/apps/doom_stub.c
+              $(KERNEL_DIR)/apps/doom_stub.c \
+              $(KERNEL_DIR)/shell/cmd_exec.c \
+              $(KERNEL_DIR)/drivers/net/e1000.c \
+              $(KERNEL_DIR)/net/tcp.c \
+              $(KERNEL_DIR)/net/dhcp.c \
+              $(KERNEL_DIR)/net/dhcp_parser.c \
+              $(KERNEL_DIR)/stdio.c \
+              $(KERNEL_DIR)/futex.c
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
@@ -231,8 +238,10 @@ dirs:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/video
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/shell
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/serial
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/input
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/net
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64/boot
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/xtensa
@@ -293,6 +302,7 @@ userspace:
 	$(MAKE) -C userspace
 	@mkdir -p $(INITRD_DIR)
 	cp userspace/test.elf $(INITRD_DIR)/
+	cp userspace/exec_test.elf $(INITRD_DIR)/
 
 # ---- Initrd ----
 initrd: userspace $(INITRD_IMG)

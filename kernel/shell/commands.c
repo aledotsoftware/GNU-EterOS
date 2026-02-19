@@ -41,6 +41,7 @@ static const shell_command_t commands[] = {
     { "date",     "Muestra fecha y hora (UTC / Argentina)",      cmd_date    },
     { "reboot",   "Reinicia el sistema",                         cmd_reboot  },
     { "halt",     "Detiene la CPU",                              cmd_halt    },
+    { "exec",     "Ejecutar binario ELF",                        cmd_exec    },
 };
 
 #define NUM_COMMANDS  (sizeof(commands) / sizeof(commands[0]))
