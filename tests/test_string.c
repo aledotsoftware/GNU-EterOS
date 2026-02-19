@@ -549,6 +549,36 @@ int main() {
         printf("strcmp tests passed\n");
     }
 
+    /* Test strncmp */
+    {
+        /* Equality */
+        assert(strncmp("Hello", "Hello", 5) == 0);
+        assert(strncmp("Hello", "Hello", 10) == 0);
+        assert(strncmp("", "", 0) == 0);
+        assert(strncmp("", "", 1) == 0);
+
+        /* Inequality */
+        assert(strncmp("Hello", "World", 5) < 0);
+        assert(strncmp("World", "Hello", 5) > 0);
+
+        /* Prefix */
+        assert(strncmp("Hello", "Hello World", 5) == 0);
+        assert(strncmp("Hello World", "Hello", 5) == 0);
+
+        /* Length limit */
+        assert(strncmp("Hello", "Hello World", 6) < 0); /* '\0' < ' ' */
+        assert(strncmp("Hello World", "Hello", 6) > 0); /* ' ' > '\0' */
+
+        /* Empty strings */
+        assert(strncmp("", "A", 1) < 0);
+        assert(strncmp("A", "", 1) > 0);
+
+        /* Zero n */
+        assert(strncmp("A", "B", 0) == 0);
+
+        printf("strncmp tests passed\n");
+    }
+
     /* Test strnlen */
     {
         /* Test 1: Normal string, maxlen > len */
