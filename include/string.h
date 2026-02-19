@@ -21,6 +21,7 @@
 #define strlcpy eteros_strlcpy
 #define strnlen eteros_strnlen
 #define strcmp eteros_strcmp
+#define strncmp eteros_strncmp
 #define explicit_bzero eteros_explicit_bzero
 #endif
 

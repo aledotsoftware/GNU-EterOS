@@ -143,18 +143,28 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
         if (rlen > 40) {
             struct ip_header* rip = (struct ip_header*)(rx + 14);
             if (rip->proto == IP_PROTO_TCP && rip->src == target_ip) {
-                struct tcp_header* rtcp = (struct tcp_header*)(rx + 14 + 20);
-                int data_off = (ntohs(rtcp->flags) >> 12) * 4;
-                int data_len = ntohs(rip->len) - 20 - data_off;
+                int ip_hl = (rip->ver_ihl & 0x0F) * 4;
+                if (ip_hl < 20 || rlen < 14 + ip_hl + 20) continue;
+
+                struct tcp_header* rtcp = (struct tcp_header*)(rx + 14 + ip_hl);
+                int tcp_hl = (ntohs(rtcp->flags) >> 12) * 4;
+                if (tcp_hl < 20 || rlen < 14 + ip_hl + tcp_hl) continue;
+
+                int total_len = ntohs(rip->len);
+                int ip_payload_len = total_len - ip_hl - tcp_hl;
+                int captured_len = rlen - 14 - ip_hl - tcp_hl;
+
+                int data_len = (ip_payload_len < captured_len) ? ip_payload_len : captured_len;
+
                 if (data_len > 0) {
                     size_t u_data_len = (size_t)data_len;
                     size_t copy_len = (u_data_len < max_len - 1) ? u_data_len : max_len - 1;
-                    memcpy(response_buf, rx + 14 + 20 + data_off, copy_len);
+                    memcpy(response_buf, rx + 14 + ip_hl + tcp_hl, copy_len);
                     response_buf[copy_len] = 0;
                     return (int)copy_len;
                 }
                 /* Also check for FIN */
-                if (ntohs(rtcp->flags) & 0x0001) break;
+                if (ntohs(rtcp->flags) & TCP_FIN) break;
             }
         }
         task_yield();
