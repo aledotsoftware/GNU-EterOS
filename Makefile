@@ -122,7 +122,13 @@ DOOM_SRCS = $(DOOM_CORE_SRCS) $(DOOM_ETEROS_SRCS)
 
 KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/string.c             \
-              $(KERNEL_DIR)/shell.c              \
+              $(KERNEL_DIR)/shell/shell.c        \
+              $(KERNEL_DIR)/shell/commands.c     \
+              $(KERNEL_DIR)/shell/history.c      \
+              $(KERNEL_DIR)/shell/cmd_system.c   \
+              $(KERNEL_DIR)/shell/cmd_net.c      \
+              $(KERNEL_DIR)/shell/cmd_task.c     \
+              $(KERNEL_DIR)/shell/cmd_misc.c     \
               $(KERNEL_DIR)/drivers/video/vga.c  \
               $(KERNEL_DIR)/drivers/serial/serial.c \
               $(KERNEL_DIR)/drivers/input/keyboard.c \
