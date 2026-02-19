@@ -358,58 +358,80 @@ function makeResizable(win) {
             const startTop = win.offsetTop;
             const startLeft = win.offsetLeft;
 
-            const handleResize = (e) => {
+            let rafId = null;
+            let currentX = 0;
+            let currentY = 0;
+
+            const updateLayout = () => {
                 if (!isResizing) return;
 
+                const dx = currentX - startX;
+                const dy = currentY - startY;
+
                 if (resizer.classList.contains('resizer-r')) {
-                    win.style.width = startWidth + (e.clientX - startX) + 'px';
+                    win.style.width = startWidth + dx + 'px';
                 } else if (resizer.classList.contains('resizer-b')) {
-                    win.style.height = startHeight + (e.clientY - startY) + 'px';
+                    win.style.height = startHeight + dy + 'px';
                 } else if (resizer.classList.contains('resizer-l')) {
-                    const newWidth = startWidth - (e.clientX - startX);
+                    const newWidth = startWidth - dx;
                     if (newWidth > 200) {
                         win.style.width = newWidth + 'px';
-                        win.style.left = startLeft + (e.clientX - startX) + 'px';
+                        win.style.left = startLeft + dx + 'px';
                     }
                 } else if (resizer.classList.contains('resizer-t')) {
-                    const newHeight = startHeight - (e.clientY - startY);
+                    const newHeight = startHeight - dy;
                     if (newHeight > 100) {
                         win.style.height = newHeight + 'px';
-                        win.style.top = startTop + (e.clientY - startY) + 'px';
+                        win.style.top = startTop + dy + 'px';
                     }
                 } else if (resizer.classList.contains('resizer-rb')) {
-                    win.style.width = startWidth + (e.clientX - startX) + 'px';
-                    win.style.height = startHeight + (e.clientY - startY) + 'px';
+                    win.style.width = startWidth + dx + 'px';
+                    win.style.height = startHeight + dy + 'px';
                 } else if (resizer.classList.contains('resizer-lb')) {
-                    const newWidth = startWidth - (e.clientX - startX);
+                    const newWidth = startWidth - dx;
                     if (newWidth > 200) {
                         win.style.width = newWidth + 'px';
-                        win.style.left = startLeft + (e.clientX - startX) + 'px';
+                        win.style.left = startLeft + dx + 'px';
                     }
-                    win.style.height = startHeight + (e.clientY - startY) + 'px';
+                    win.style.height = startHeight + dy + 'px';
                 } else if (resizer.classList.contains('resizer-rt')) {
-                    win.style.width = startWidth + (e.clientX - startX) + 'px';
-                    const newHeight = startHeight - (e.clientY - startY);
+                    win.style.width = startWidth + dx + 'px';
+                    const newHeight = startHeight - dy;
                     if (newHeight > 100) {
                         win.style.height = newHeight + 'px';
-                        win.style.top = startTop + (e.clientY - startY) + 'px';
+                        win.style.top = startTop + dy + 'px';
                     }
                 } else if (resizer.classList.contains('resizer-lt')) {
-                    const newWidth = startWidth - (e.clientX - startX);
-                    const newHeight = startHeight - (e.clientY - startY);
+                    const newWidth = startWidth - dx;
+                    const newHeight = startHeight - dy;
                     if (newWidth > 200) {
                         win.style.width = newWidth + 'px';
-                        win.style.left = startLeft + (e.clientX - startX) + 'px';
+                        win.style.left = startLeft + dx + 'px';
                     }
                     if (newHeight > 100) {
                         win.style.height = newHeight + 'px';
-                        win.style.top = startTop + (e.clientY - startY) + 'px';
+                        win.style.top = startTop + dy + 'px';
                     }
+                }
+                rafId = null;
+            };
+
+            const handleResize = (e) => {
+                if (!isResizing) return;
+                currentX = e.clientX;
+                currentY = e.clientY;
+
+                if (!rafId) {
+                    rafId = requestAnimationFrame(updateLayout);
                 }
             };
 
             const stopResize = () => {
                 isResizing = false;
+                if (rafId) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
                 window.removeEventListener('mousemove', handleResize);
                 window.removeEventListener('mouseup', stopResize);
             };
