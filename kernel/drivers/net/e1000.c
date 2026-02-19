@@ -14,6 +14,10 @@
 #include "../../../include/pmm.h"
 #include "../../../include/io.h"
 #include "../../../include/timer.h"
+#include "../../../include/pic.h"
+#include "../../../include/sem.h"
+
+extern sem_t net_sem;
 
 #define E1000_VENDOR_ID     0x8086
 #define E1000_DEVICE_ID     0x100E  
@@ -196,10 +200,33 @@ int e1000_init(pci_device_t* pci_dev_ptr) {
     uint32_t ctrl = e1000_read_reg(E1000_CTRL);
     e1000_write_reg(E1000_CTRL, ctrl | E1000_CTRL_SLU);
     
-    /* Habilitar Interrupciones (Link Status, RX Timer, Receive Overrun) - Opcional por ahora */
-    // e1000_write_reg(E1000_IMS, (1 << 2) | (1 << 7) | (1 << 6));
+    /* Habilitar Interrupciones (Link Status, RX Timer, Receive Overrun) */
+    /* Bit 2: LSC, Bit 7: RXT0, Bit 6: RXO, Bit 4: RXDMT0 */
+    e1000_write_reg(E1000_IMS, (1 << 2) | (1 << 7) | (1 << 6) | (1 << 4));
+
+    /* Unmask IRQ 11 in PIC (Legacy Mode) */
+    pic_unmask_irq(11);
 
     return 0;
+}
+
+void irq_network_handler(void) {
+    if (!e1000_active) {
+        pic_send_eoi(11);
+        return;
+    }
+
+    /* Read ICR (Interrupt Cause Register) to clear interrupt */
+    volatile uint32_t icr = e1000_read_reg(E1000_ICR);
+    (void)icr; /* Suppress unused variable warning */
+
+    /* If Packet Received (or Link Change), signal network task */
+    /* Checks: RXT0 (Bit 7), RXO (Bit 6), RXDMT0 (Bit 4), LSC (Bit 2) */
+    if (icr & ((1<<7) | (1<<6) | (1<<4) | (1<<2))) {
+        sem_signal(&net_sem);
+    }
+
+    pic_send_eoi(11);
 }
 
 uint8_t* e1000_get_mac(void) {
