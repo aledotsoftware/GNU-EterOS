@@ -980,6 +980,16 @@ body {
     transform: scale(1.1);
 }
 
+.launcher-item:focus-visible {
+    transform: scale(1.1);
+    outline: none;
+}
+
+.launcher-item:focus-visible .launcher-icon {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
 .launcher-icon {
     width: 64px;
     height: 64px;
