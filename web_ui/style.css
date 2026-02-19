@@ -462,6 +462,7 @@ body {
     height: 15px;
 }
 
+.maximize:focus-within .snap-menu,
 .maximize:hover .snap-menu,
 .snap-menu:hover {
     opacity: 1;
