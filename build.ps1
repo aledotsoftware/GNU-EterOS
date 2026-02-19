@@ -213,7 +213,13 @@ $CFLAGS = @(
 $KERNEL_SRCS = @(
     "$KERNEL_DIR\main.c",
     "$KERNEL_DIR\string.c",
-    "$KERNEL_DIR\shell.c",
+    "$KERNEL_DIR\shell\shell.c",
+    "$KERNEL_DIR\shell\commands.c",
+    "$KERNEL_DIR\shell\history.c",
+    "$KERNEL_DIR\shell\cmd_system.c",
+    "$KERNEL_DIR\shell\cmd_task.c",
+    "$KERNEL_DIR\shell\cmd_net.c",
+    "$KERNEL_DIR\shell\cmd_misc.c",
     "$KERNEL_DIR\drivers\video\vga.c",
     "$KERNEL_DIR\drivers\video\framebuffer.c",
     "$KERNEL_DIR\drivers\video\font.c",
@@ -306,6 +312,7 @@ function Initialize-BuildDirs {
         "$BUILD_DIR\$KERNEL_DIR\mm",
         "$BUILD_DIR\$KERNEL_DIR\apps",
         "$BUILD_DIR\$KERNEL_DIR\fs",
+        "$BUILD_DIR\$KERNEL_DIR\shell",
         "$BUILD_DIR\$KERNEL_DIR\ui",
         "$BUILD_DIR\$KERNEL_DIR\arch\$Arch\boot"
     )
