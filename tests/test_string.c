@@ -606,6 +606,111 @@ int main() {
         else assert(res_eteros == 0);
 
         printf("strncmp tests passed\n");
+
+    /* Extended strncmp tests - Focus on Optimization Paths */
+    {
+        /* 1. Long strings (trigger 64-bit loop) */
+        char long_s1[100];
+        char long_s2[100];
+
+        memset(long_s1, 'A', 99); long_s1[99] = '\0';
+        memset(long_s2, 'A', 99); long_s2[99] = '\0';
+
+        /* Equality on long string */
+        assert(strncmp(long_s1, long_s2, 100) == 0);
+
+        /* Difference at the end */
+        long_s2[98] = 'B';
+        assert(strncmp(long_s1, long_s2, 100) < 0);
+
+        /* Difference at the beginning */
+        long_s2[0] = 'B';
+        assert(strncmp(long_s1, long_s2, 100) < 0);
+
+        /* Restore */
+        long_s2[0] = 'A';
+        long_s2[98] = 'A';
+
+        /* Difference in the middle (e.g. at index 50) */
+        long_s2[50] = 'B';
+        assert(strncmp(long_s1, long_s2, 100) < 0);
+
+        /* Check limit before difference */
+        assert(strncmp(long_s1, long_s2, 50) == 0);
+        assert(strncmp(long_s1, long_s2, 51) < 0);
+
+        /* 2. Alignment Tests using malloc */
+        char* buf1 = malloc(128);
+        char* buf2 = malloc(128);
+
+        if (buf1 && buf2) {
+            memset(buf1, 'X', 128);
+            memset(buf2, 'X', 128);
+
+            /* Test offsets 0 to 15 to cover all alignment combinations */
+            for (int i = 0; i < 16; i++) {
+                for (int j = 0; j < 16; j++) {
+                    /* Determine length to compare */
+                    size_t len = 64;
+
+                    /* Ensure we don't go out of bounds */
+                    if (i + len > 128 || j + len > 128) continue;
+
+                    /* Basic equality */
+                    assert(strncmp(buf1 + i, buf2 + j, len) == 0);
+
+                    /* Inject difference at various positions */
+                    /* Start, Middle, End */
+                    size_t diff_positions[] = {0, 1, 7, 8, 30, 63};
+
+                    for (int k = 0; k < 6; k++) {
+                        size_t pos = diff_positions[k];
+                        if (pos >= len) continue;
+
+                        /* Modify buf1 */
+                        (buf1 + i)[pos] = 'Y';
+
+                        /* Should be greater ('Y' > 'X') */
+                        assert(strncmp(buf1 + i, buf2 + j, len) > 0);
+
+                        /* Limit check */
+                        assert(strncmp(buf1 + i, buf2 + j, pos) == 0);
+                        assert(strncmp(buf1 + i, buf2 + j, pos + 1) > 0);
+
+                        /* Restore */
+                        (buf1 + i)[pos] = 'X';
+                    }
+                }
+            }
+
+            /* 3. Null terminator interaction with optimization */
+            /* Ensure it stops at null even if n is large */
+            memset(buf1, 'Z', 32);
+            buf1[10] = '\0';
+            buf1[11] = 'A'; /* Garbage after null */
+
+            memset(buf2, 'Z', 32);
+            buf2[10] = '\0';
+            buf2[11] = 'B'; /* Different garbage */
+
+            /* Should compare equal because they stop at null */
+            assert(strncmp(buf1, buf2, 32) == 0);
+
+            /* Should compare equal up to 10 */
+            assert(strncmp(buf1, buf2, 10) == 0);
+
+            /* If one is shorter */
+            buf2[5] = '\0';
+            /* "ZZZZZ" vs "ZZZZZZZZZZ" */
+            /* buf1[5] is 'Z', buf2[5] is '\0'. 'Z' > '\0' */
+            assert(strncmp(buf1, buf2, 32) > 0);
+
+            free(buf1);
+            free(buf2);
+        }
+
+        printf("Extended strncmp optimization tests passed\n");
+    }
     }
 
     /* Test explicit_bzero */
