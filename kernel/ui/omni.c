@@ -619,6 +619,8 @@ void omni_fill_gradient_v(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
             memset32(row, color, w);
             row += omni_pitch_div4;
 
+            row += omni_pitch_div4;
+
             r_val += r_step;
             g_val += g_step;
             b_val += b_step;
