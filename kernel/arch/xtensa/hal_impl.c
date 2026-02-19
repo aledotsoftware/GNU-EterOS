@@ -36,6 +36,8 @@
 #define UART_CONF1(base)        ((volatile uint32_t*)(base + 0x24))
 
 /* Status Bits */
+#define UART_RXFIFO_CNT_MASK    0x000000FF
+#define UART_RXFIFO_CNT_SHIFT   0
 #define UART_TXFIFO_CNT_MASK    0x00FF0000
 #define UART_TXFIFO_CNT_SHIFT   16
 #define UART_TXFIFO_FULL_THR    126  /* FIFO size is 128 usually */
@@ -125,18 +127,33 @@ void hal_console_clear(void) {
     hal_console_write("\033[2J\033[H");
 }
 
-/* ---- Input (Stub) ---- */
+/* ---- Input (Polling) ---- */
 
 void hal_input_init(void) {
-    /* TODO: Configurar RX interrupt */
+    /*
+     * En modo polling no necesitamos configurar interrupciones RX.
+     * Si usáramos interrupciones, aquí se configuraría UART_INT_ENA
+     * y el handler correspondiente.
+     */
 }
 
 char hal_input_getchar(void) {
-    return 0; /* TODO */
+    /* Esperar hasta que haya un byte disponible */
+    while (!hal_input_available()) {
+        /*
+         * Busy wait. En un sistema multitarea real, esto debería
+         * llamar a yield() o poner la tarea en sleep.
+         */
+    }
+
+    /* Leer del FIFO (misma dirección base, lectura = pop RX) */
+    return (char)(*UART_FIFO(ESP32_UART0_BASE) & 0xFF);
 }
 
 bool hal_input_available(void) {
-    return false; /* TODO */
+    uint32_t status = *UART_STATUS(ESP32_UART0_BASE);
+    uint32_t rx_cnt = (status & UART_RXFIFO_CNT_MASK) >> UART_RXFIFO_CNT_SHIFT;
+    return rx_cnt > 0;
 }
 
 /* ========================================================================= */
