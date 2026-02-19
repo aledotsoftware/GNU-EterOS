@@ -308,11 +308,13 @@ void* kcalloc(size_t num, size_t size) {
 void* krealloc(void* ptr, size_t size) {
     if (!ptr) return kmalloc(size);
 
+    uint64_t flags = irq_save();
     spin_lock(&heap_lock);
 
     if (size == 0) {
-        _kfree(ptr);
+        _kfree_impl(ptr);
         spin_unlock(&heap_lock);
+        irq_restore(flags);
         return NULL;
     }
 
@@ -323,6 +325,7 @@ void* krealloc(void* ptr, size_t size) {
     if (block->magic != HEAP_MAGIC) {
         serial_write_string("[MM] Error: krealloc of invalid address\n");
         spin_unlock(&heap_lock);
+        irq_restore(flags);
         return NULL;
     }
 
@@ -330,13 +333,15 @@ void* krealloc(void* ptr, size_t size) {
     /* Alignment is already handled in allocation size, so block->size is usable */
     if (block->size >= size) {
         spin_unlock(&heap_lock);
+        irq_restore(flags);
         return ptr;
     }
 
     /* Allocate new block using internal unlocked allocator */
-    void* new_ptr = _kmalloc(size);
+    void* new_ptr = _kmalloc_impl(size);
     if (!new_ptr) {
         spin_unlock(&heap_lock);
+        irq_restore(flags);
         return NULL;
     }
 
@@ -345,9 +350,10 @@ void* krealloc(void* ptr, size_t size) {
     memcpy(new_ptr, ptr, block->size);
 
     /* Free old block using internal unlocked deallocator */
-    _kfree(ptr);
+    _kfree_impl(ptr);
 
     spin_unlock(&heap_lock);
+    irq_restore(flags);
     return new_ptr;
 }
 
