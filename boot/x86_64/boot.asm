@@ -22,8 +22,12 @@
 [org 0x7C00]
 
 ; ---- Constantes Globales ----
-STAGE2_SECTORS      equ 16             ; Sectores de Stage 2 (8 KB)
-KERNEL_SECTORS      equ 512            ; Sectores del kernel (256 KB)
+%ifndef STAGE2_SECTORS
+STAGE2_SECTORS      equ 16             ; Sectores de Stage 2 (8 KB default)
+%endif
+%ifndef KERNEL_SECTORS
+KERNEL_SECTORS      equ 512            ; Sectores del kernel (256 KB default)
+%endif
 STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
 KERNEL_LOAD_ADDR    equ 0x10000         ; Dirección donde se carga el kernel
 STACK_TOP           equ 0x7C00          ; El stack crece hacia abajo
@@ -351,7 +355,9 @@ load_kernel:
 ; load_initrd: Carga el Initrd desde disco
 ; -----------------------------------------------------------------------------
 INITRD_LOAD_ADDR    equ 0x40000     ; ⚡ BOLT: Restored to safe sub-1MB zone
-INITRD_SECTORS      equ 512         ; Keep the increased limit
+%ifndef INITRD_SECTORS
+INITRD_SECTORS      equ 512         ; Keep the increased limit (default)
+%endif
 INITRD_START_LBA    equ 1 + STAGE2_SECTORS + KERNEL_SECTORS
 
 load_initrd:
@@ -752,6 +758,6 @@ long_mode_start:
 
 ; =============================================================================
 ; Rellenar Stage 2 hasta completar el tamaño total esperado (MBR + Stage 2)
-; Total = 512 (MBR) + 16 * 512 (Stage 2) = 8704 bytes
+; Total = 512 (MBR) + STAGE2_SECTORS * 512 (Stage 2)
 ; =============================================================================
-times 8704 - ($ - $$) db 0
+times (1 + STAGE2_SECTORS) * 512 - ($ - $$) db 0
