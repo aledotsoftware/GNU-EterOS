@@ -1,100 +1,72 @@
-import struct
-import math
 import os
-import zlib
+import sys
 
-def make_png(width, height, pixels):
-    # pixels is a list of (r,g,b,a) tuples
-    
-    # Header
-    png_sig = b'\x89PNG\r\n\x1a\n'
-    
-    # IHDR: width, height, bit_depth=8, color_type=6 (RGBA), compression=0, filter=0, interlace=0
-    ihdr_data = struct.pack('!IIBBBBB', width, height, 8, 6, 0, 0, 0)
-    ihdr_crc = zlib.crc32(ihdr_data, zlib.crc32(b'IHDR')) & 0xFFFFFFFF
-    ihdr = struct.pack('!I', len(ihdr_data)) + b'IHDR' + ihdr_data + struct.pack('!I', ihdr_crc)
-    
-    # IDAT
-    scanlines = []
-    for y in range(height):
-        # Filter type 0 (None) at start of each scanline
-        line = bytearray([0])
-        for x in range(width):
-            r, g, b, a = pixels[y * width + x]
-            line.append(r)
-            line.append(g)
-            line.append(b)
-            line.append(a)
-        scanlines.append(line)
-    
-    raw_data = b''.join(scanlines)
-    compressed = zlib.compress(raw_data)
-    
-    idat_crc = zlib.crc32(compressed, zlib.crc32(b'IDAT')) & 0xFFFFFFFF
-    idat = struct.pack('!I', len(compressed)) + b'IDAT' + compressed + struct.pack('!I', idat_crc)
-    
-    # IEND
-    iend_crc = zlib.crc32(b'', zlib.crc32(b'IEND')) & 0xFFFFFFFF
-    iend = struct.pack('!I', 0) + b'IEND' + struct.pack('!I', iend_crc)
-    
-    return png_sig + ihdr + idat + iend
+try:
+    from PIL import Image, ImageDraw
+except ImportError:
+    print("Error: Pillow (PIL) is required to generate the logo.")
+    print("Please install it using: pip install Pillow")
+    sys.exit(1)
 
 def generate_logo(output_path):
-    width = 200
-    height = 200
-    # Initialize with transparent
-    pixels = [(0, 0, 0, 0)] * (width * height)
-
-    cx, cy = 100, 100
-    radius = 80
-
-    for y in range(height):
-        for x in range(width):
-            dx = x - cx
-            dy = y - cy
-            dist = math.sqrt(dx*dx + dy*dy)
-            
-            if dist < radius:
-                # Flux Orb Gradient (Premium)
-                ratio = dist / radius
-                
-                if ratio > 0.8:
-                    r, g, b = 0, 176, 176 # Cyan Rim
-                else:
-                    r, g, b = 157, 0, 255 # Violet Body
-                
-                # Simple antialiasing
-                alpha = 255
-                if dist > radius - 2:
-                    alpha = int(255 * (radius - dist) / 2)
-                
-                pixels[y * width + x] = (r, g, b, alpha)
-
-    # Draw stylized 'E'
-    for y in range(60, 141):
-        for x in range(80, 131):
-            is_e = False
-            # Vertical spine
-            if 80 <= x <= 92: is_e = True
-            # Horizontal bars
-            if 60 <= y <= 72 and 80 <= x <= 130: is_e = True
-            if 94 <= y <= 106 and 80 <= x <= 120: is_e = True
-            if 128 <= y <= 140 and 80 <= x <= 130: is_e = True
-            
-            if is_e:
-                pixels[y * width + x] = (255, 255, 255, 255)
-
-    png_data = make_png(width, height, pixels)
+    # Dimensions
+    final_width, final_height = 200, 200
+    scale = 4  # Supersampling for antialiasing
+    width = final_width * scale
+    height = final_height * scale
     
-    with open(output_path, 'wb') as f:
-        f.write(png_data)
+    # Create transparent image
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    
+    # Helper to scale coordinates
+    def s(val):
+        return val * scale
+    
+    cx, cy = s(100), s(100)
+    radius = s(80)
+    
+    # Flux Orb Gradient (Premium) -> Approximated by two circles
+    # Outer Cyan Circle (Rim)
+    # Original logic: ratio > 0.8 -> Cyan. Ratio = dist/radius.
+    # This means the outer ring (from 0.8*R to R) is Cyan.
+    
+    # Draw Cyan Circle (Outer)
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(0, 176, 176))
+    
+    # Inner Violet Circle (Body)
+    # Radius = 0.8 * 80 = 64
+    inner_radius = s(64)
+    draw.ellipse((cx - inner_radius, cy - inner_radius, cx + inner_radius, cy + inner_radius), fill=(157, 0, 255))
+    
+    # Draw stylized 'E'
+    white = (255, 255, 255, 255)
+
+    # Vertical spine: 80..92, 60..140
+    # Original used inclusive ranges: range(80, 131) -> 80..130 inclusive
+    # So we add 1 to the end coordinate to cover the full pixel
+    draw.rectangle((s(80), s(60), s(93), s(141)), fill=white)
+
+    # Top bar: 80..130, 60..72
+    draw.rectangle((s(80), s(60), s(131), s(73)), fill=white)
+
+    # Middle bar: 80..120, 94..106
+    draw.rectangle((s(80), s(94), s(121), s(107)), fill=white)
+
+    # Bottom bar: 80..130, 128..140
+    draw.rectangle((s(80), s(128), s(131), s(141)), fill=white)
+
+    # Resize with high quality downsampling
+    img = img.resize((final_width, final_height), resample=Image.Resampling.LANCZOS)
+    
+    img.save(output_path, "PNG")
 
 if __name__ == "__main__":
     dest_dir = "initrd_root"
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
     
-    # Ensure raw file is cleaned up if it exists, to avoid confusion
+    # Cleanup raw file if it exists (legacy)
     raw_path = os.path.join(dest_dir, "logo.raw")
     if os.path.exists(raw_path):
         os.remove(raw_path)
