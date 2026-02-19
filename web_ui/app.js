@@ -449,7 +449,6 @@ function maximizeWindow(btn) {
 function minimizeWindow(btn) {
     const win = btn.closest('.window');
     win.classList.add('minimized');
-    console.log("Window minimized. Restoration via Dock enabled.");
 }
 
 function toggleFocusMode(btn) {
