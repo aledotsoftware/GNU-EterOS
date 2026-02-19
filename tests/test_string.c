@@ -9,6 +9,7 @@
 static void* (*std_memset)(void*, int, size_t) = memset;
 static int (*std_memcmp)(const void*, const void*, size_t) = memcmp;
 static int (*std_strcmp)(const char*, const char*) = strcmp;
+static int (*std_strncmp)(const char*, const char*, size_t) = strncmp;
 
 /* Define host test mode */
 #ifndef __ETEROS_HOST_TEST__
@@ -547,6 +548,43 @@ int main() {
         assert(strcmp(u1, u2) > 0);
 
         printf("strcmp tests passed\n");
+    }
+
+    /* Test strncmp */
+    {
+        /* Test 1: Equality */
+        assert(strncmp("Hello", "Hello", 5) == 0);
+        assert(strncmp("Hello", "Hello", 10) == 0);
+        assert(strncmp("", "", 5) == 0);
+
+        /* Test 2: Inequality */
+        assert(strncmp("Hello", "World", 5) < 0);
+        assert(strncmp("World", "Hello", 5) > 0);
+
+        /* Test 3: Length limit (n) */
+        /* "Hello" vs "HelloX" */
+        assert(strncmp("Hello", "HelloX", 5) == 0);
+        assert(strncmp("Hello", "HelloX", 6) < 0); /* '\0' < 'X' */
+
+        /* Test 4: Zero n */
+        assert(strncmp("Hello", "World", 0) == 0);
+
+        /* Test 5: Verify against standard strncmp */
+        const char* s1 = "TestString1";
+        const char* s2 = "TestString2";
+
+        int res_std = std_strncmp(s1, s2, 11);
+        int res_eteros = strncmp(s1, s2, 11);
+        if (res_std < 0) assert(res_eteros < 0);
+        else if (res_std > 0) assert(res_eteros > 0);
+        else assert(res_eteros == 0);
+
+        /* Test 6: Verify against standard strncmp (truncated) */
+        res_std = std_strncmp(s1, s2, 10); /* "TestString" vs "TestString" */
+        res_eteros = strncmp(s1, s2, 10);
+        assert(res_eteros == 0);
+
+        printf("strncmp tests passed\n");
     }
 
     /* Test strnlen */
