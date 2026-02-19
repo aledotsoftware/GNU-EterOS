@@ -16,6 +16,7 @@
 # ---- Configuración de Arquitectura ----
 ARCH ?= x86_64
 AS   = nasm
+STAGE2_SECTORS ?= 16
 
 # ---- Directorios ----
 BOOT_DIR    = boot/$(ARCH)
@@ -123,6 +124,8 @@ DOOM_SRCS = $(DOOM_CORE_SRCS) $(DOOM_ETEROS_SRCS)
 KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/klog.c               \
               $(KERNEL_DIR)/string.c             \
+              $(KERNEL_DIR)/stdio.c              \
+              $(KERNEL_DIR)/futex.c              \
               $(KERNEL_DIR)/shell/shell.c        \
               $(KERNEL_DIR)/shell/commands.c     \
               $(KERNEL_DIR)/shell/history.c      \
@@ -144,6 +147,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/apps/sysmon.c          \
               $(KERNEL_DIR)/apps/user_loader.c     \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
+              $(KERNEL_DIR)/drivers/net/e1000.c     \
               $(KERNEL_DIR)/fs/initrd.c            \
               $(KERNEL_DIR)/fs/vfs.c               \
               $(KERNEL_DIR)/fs/devfs.c             \
@@ -168,6 +172,9 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/fs/elf.c \
               $(KERNEL_DIR)/net/ip_utils.c \
               $(KERNEL_DIR)/net/stack.c \
+              $(KERNEL_DIR)/net/dhcp.c \
+              $(KERNEL_DIR)/net/dhcp_parser.c \
+              $(KERNEL_DIR)/net/tcp.c \
               $(KERNEL_DIR)/apps/wget.c \
               $(KERNEL_DIR)/apps/doom_stub.c
 
@@ -230,6 +237,7 @@ endif
 dirs:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/shell
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/video
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/serial
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/input
@@ -258,10 +266,13 @@ dirs:
 # ---- Bootloader (Solo x86_64) ----
 boot: dirs $(BOOT_BIN)
 
-$(BOOT_BIN): $(BOOT_SRC)
+$(BOOT_BIN): $(BOOT_SRC) $(KERNEL_BIN) $(INITRD_IMG)
 ifeq ($(ARCH), x86_64)
-	@echo "[ASM]  $<"
-	$(AS) -f bin $< -o $@
+	@echo "[ASM]  $< (Dynamic Sectors)"
+	@k_sz=$$(python3 -c "import os; print((os.path.getsize('$(KERNEL_BIN)') + 511) // 512)"); \
+	i_sz=$$(python3 -c "import os; print((os.path.getsize('$(INITRD_IMG)') + 511) // 512)"); \
+	echo "Detected: Kernel=$$k_sz sectors, Initrd=$$i_sz sectors"; \
+	$(AS) -f bin -DSTAGE2_SECTORS=$(STAGE2_SECTORS) -DKERNEL_SECTORS=$$k_sz -DINITRD_SECTORS=$$i_sz $< -o $@
 else
 	@echo "[SKIP] Bootloader no necesario para $(ARCH) (o no implementado)"
 endif
@@ -310,11 +321,13 @@ ifeq ($(ARCH), x86_64)
 	dd if=/dev/zero of=$(OS_IMAGE) bs=512 count=2880 2>/dev/null
 	@# Escribir bootloader completo (Stage 1 + Stage 2)
 	dd if=$(BOOT_BIN) of=$(OS_IMAGE) bs=512 conv=notrunc 2>/dev/null
-	@# Escribir kernel después del bootloader
-	@# Stage 1 = 1 sector, Stage 2 = 16 sectores, kernel va en sector 17 (0-indexed seek)
-	dd if=$(KERNEL_BIN) of=$(OS_IMAGE) bs=512 seek=17 conv=notrunc 2>/dev/null
-	@# Escribir Initrd después del kernel (Sector 17 + 512 = 529)
-	dd if=$(INITRD_IMG) of=$(OS_IMAGE) bs=512 seek=529 conv=notrunc 2>/dev/null
+	@# Escribir kernel después del bootloader (Sector dinamico)
+	@boot_sectors=$$(( 1 + $(STAGE2_SECTORS) )); \
+	dd if=$(KERNEL_BIN) of=$(OS_IMAGE) bs=512 seek=$$boot_sectors conv=notrunc 2>/dev/null; \
+	k_sz=$$(python3 -c "import os; print((os.path.getsize('$(KERNEL_BIN)') + 511) // 512)"); \
+	initrd_seek=$$(( $$boot_sectors + $$k_sz )); \
+	echo "Writing Initrd at sector $$initrd_seek (Boot=$$boot_sectors, Kernel=$$k_sz)"; \
+	dd if=$(INITRD_IMG) of=$(OS_IMAGE) bs=512 seek=$$initrd_seek conv=notrunc 2>/dev/null
 	@echo "[IMG]  Imagen generada: $(OS_IMAGE) ($$(wc -c < $(OS_IMAGE)) bytes)"
 else
 	@echo "[IMG]  Generación de imagen para $(ARCH) no implementada."
