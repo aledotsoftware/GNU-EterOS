@@ -2855,6 +2855,7 @@ void gui_demo_run(void) {
     term_init_all();
     wm_init();
     omni_init();
+    gui_draw_boot_logo();
     framebuffer_enable_double_buffer();
     
     /* Create Desktop Window (Bottom) */
