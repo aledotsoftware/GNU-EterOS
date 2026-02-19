@@ -63,7 +63,6 @@ static int32_t mouse_y = 384;
 static bool    mouse_left_btn = false;
 
 /* Performance: Intelligent Redraw */
-static bool gui_needs_redraw = true;
 
 
 
@@ -161,16 +160,8 @@ static void devman_on_paint(window_t* win);
 static void doom_on_paint(window_t* win);
 
 /* Helper Draw Functions */
-static void draw_generic_app_content(window_t* win, const char* title, uint32_t bg_col);
-
-static void draw_clock_content(window_t* win);
 
 /* Animation State Forward Decl (needed for input handling) */
-static int zoom_progress = 0; 
-static flux_zoom_level_t target_zoom = FLUX_MACRO;
-static flux_node_id_t zooming_node = NODE_TERMINAL;
-static rect_t source_rect = {0,0,0,0}; /* Constellation rect */
-static rect_t target_rect = {40, 40, 944, 688}; /* Focus rect */ 
 
 /* Doom Integration Disabled - Engine missing */
 // extern uint32_t* DG_ScreenBuffer;
@@ -1914,7 +1905,6 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
 static void flux_launch_space(flux_node_id_t node) {
     /* Trigger Animation */
     flux_set_zoom(FLUX_FOCUS, node);
-    zooming_node = node;
     // current_zoom = FLUX_FOCUS; /* Removed to allow animation to finish */
     
     /* Trigger Contextual Notification */
@@ -2078,135 +2068,6 @@ static void draw_constellation(void) {
     }
 }
 
-static void draw_focus_mode(void) {
-    if (!focused_space || !focused_space->active) {
-        current_zoom = FLUX_MACRO;
-        return;
-    }
-
-    int margin = 40; 
-    focused_space->bounds.x = margin;
-    focused_space->bounds.y = margin;
-    focused_space->bounds.w = 1024 - (margin * 2);
-    focused_space->bounds.h = 768 - (margin * 2);
-    
-    /* Shadow/Glow (Pulsing) */
-    uint32_t ticks = (uint32_t)timer_get_ticks();
-    int phase = ticks % 200; /* 2 second period */
-    int val = (phase < 100) ? phase : (200 - phase); /* 0..100..0 */
-    /* Alpha between 60 (approx 0x3C) and 180 (approx 0xB4) */
-    uint8_t alpha = 60 + ((val * 120) / 100);
-
-    /* Outer soft glow */
-    /* ⚡ BOLT Optimization: Draw hollow box shadow (Avoid overdraw) */
-    draw_box_shadow(focused_space->bounds.x, focused_space->bounds.y,
-                    focused_space->bounds.w, focused_space->bounds.h, 6, FLUX_ACCENT_CYAN, alpha / 3);
-
-    /* Inner strong glow */
-    draw_box_shadow(focused_space->bounds.x, focused_space->bounds.y,
-                    focused_space->bounds.w, focused_space->bounds.h, 2, FLUX_ACCENT_CYAN, alpha);
-
-    /* Draw Window Frame (Title Bar, Close Button, Background) */
-    wm_draw_window(focused_space);
-                     
-    /* Dispatch Draw Content based on Node ID */
-    if (zooming_node == NODE_TERMINAL) {
-         draw_terminal_content(focused_term);
-    } else if (zooming_node == NODE_SYSMON) {
-         if (focused_space == win_sysinfo) {
-             wm_fill_rect(focused_space, (rect_t){0,0,focused_space->bounds.w, focused_space->bounds.h}, FLUX_CARD_BG);
-             draw_sysinfo_content();
-         }
-    } else if (zooming_node == NODE_MATRIX) {
-         /* Matrix is auto-drawn by tasks, but we can draw overlay here if needed */
-    } else if (zooming_node == NODE_SETTINGS) {
-         draw_settings_content();
-    } else if (zooming_node == NODE_FILES) {
-         draw_files_content();
-    } else if (zooming_node == NODE_SANTITRAVEL) {
-         draw_santitravel_content();
-    } else if (zooming_node == NODE_CLOCK) {
-         draw_clock_content(focused_space);
-    } else if (zooming_node == NODE_BROWSER) {
-         draw_browser_content();
-    } else if (zooming_node == NODE_DEVMAN) {
-         if (focused_space == win_devman) {
-             draw_devman_content();
-         }
-    } else if (zooming_node == NODE_DOOM) {
-         if (focused_space == win_doom) {
-             draw_doom_content();
-         }
-    } else {
-         /* Generic for others */
-         if (zooming_node < sizeof(FLUX_APPS)/sizeof(FLUX_APPS[0])) {
-             draw_generic_app_content(focused_space, FLUX_APPS[zooming_node].title, 0x222222);
-         }
-    }
-
-    /* Flux UX: Close Button Hover Glow (Micro-interaction) - Drawn AFTER content */
-    int btn_size = 20;
-    int btn_margin = (TITLE_BAR_HEIGHT - btn_size) / 2;
-    int btn_x = focused_space->bounds.x + focused_space->bounds.w - btn_size - btn_margin;
-    int btn_y = focused_space->bounds.y + btn_margin;
-
-    if (mouse_x >= btn_x && mouse_x <= btn_x + btn_size &&
-        mouse_y >= btn_y && mouse_y <= btn_y + btn_size) {
-
-        /* Draw Glow (Lighter Red) */
-        omni_fill_rect(btn_x, btn_y, btn_size, btn_size, 0xFF6666);
-
-        /* Redraw X (White) */
-        omni_draw_line(btn_x + 4, btn_y + 4, btn_x + 15, btn_y + 15, 0xFFFFFF);
-        omni_draw_line(btn_x + 15, btn_y + 4, btn_x + 4, btn_y + 15, 0xFFFFFF);
-
-        /* Tooltip: Close */
-        const char* tip = (settings_lang == 0) ? "Cerrar" : "Close";
-        int tip_w = strlen(tip) * 8 + 10;
-        int tip_h = 20;
-        int tip_x = btn_x + (btn_size - tip_w) / 2;
-
-        /* Clamp to screen width */
-        uint32_t screen_w = omni_get_width();
-        if (screen_w == 0) screen_w = 1024;
-        if (tip_x + tip_w > (int)screen_w) tip_x = screen_w - tip_w - 5;
-
-        int tip_y = btn_y + btn_size + 5;
-
-        /* Shadow */
-        omni_fill_rect(tip_x + 2, tip_y + 2, tip_w, tip_h, 0x000000);
-        /* Bg */
-        omni_fill_rect(tip_x, tip_y, tip_w, tip_h, 0x252525);
-        /* Border */
-        omni_draw_rect(tip_x, tip_y, tip_w, tip_h, 0x555555);
-        /* Text */
-        omni_draw_string(NULL, tip_x + 5, tip_y + 4, tip, 0xFFFFFF, 0x252525);
-    }
-    
-    /* Capa 2: Controles de Navegación (Reactive Bottom Bar) */
-    /* Check Hover */
-    bool hover_bottom = (mouse_y > 720);
-    
-    int bar_h = hover_bottom ? 8 : 4;
-    int bar_w = hover_bottom ? 240 : 180; /* Expands on hover */
-    uint32_t bar_col = hover_bottom ? FLUX_ACCENT_CYAN : 0x404040;
-    
-    int bar_x = (1024 - bar_w) / 2;
-    int bar_y = 768 - 15;
-    
-    omni_fill_rect(bar_x, bar_y, bar_w, bar_h, bar_col);
-
-    /* UX: Home label on hover - guides user back to Constellation */
-    if (hover_bottom) {
-        const char* hint = "<- CONSTELACION";
-        int hint_w = strlen(hint) * 8;
-        int hint_x = (1024 - hint_w) / 2;
-        int hint_y = bar_y - 20;
-        /* Glassmorphism tooltip bg */
-        omni_fill_rect_alpha(hint_x - 8, hint_y - 4, hint_w + 16, 18, 0x0A0A0A, 0xD0);
-        omni_draw_string(NULL, hint_x, hint_y, hint, FLUX_ACCENT_CYAN, 0x0A0A0A);
-    }
-}
 
 /* Input Handling for Flux */
 static void handle_flux_click(void) {
@@ -2287,7 +2148,7 @@ static void handle_flux_click(void) {
         /* Check Bottom Home gesture (Bottom 10% of screen) */
         int gesture_zone = screen_h - 48;
         if (mouse_y > gesture_zone) {
-            target_zoom = FLUX_MACRO;
+            current_zoom = FLUX_MACRO;
             return;
         }
         
@@ -2303,7 +2164,7 @@ static void handle_flux_click(void) {
 
              if (mouse_x >= btn_x && mouse_x <= btn_x + btn_size &&
                  mouse_y >= btn_y && mouse_y <= btn_y + btn_size) {
-                 target_zoom = FLUX_MACRO;
+                 current_zoom = FLUX_MACRO;
                  return;
              }
 
@@ -2342,105 +2203,9 @@ typedef struct {
 
 static flux_ripple_t click_ripple = {0};
 
-/* Physics State */
-static int zoom_velocity = 0;
-
 static void flux_set_zoom(flux_zoom_level_t level, flux_node_id_t node) {
-    target_zoom = level;
-    if (level == FLUX_FOCUS) {
-        zooming_node = node;
-        /* Calculate source rect for the node */
-        /* Calculate source rect for the node using 4x4 Grid */
-        int card_w = 180;
-        int card_h = 140;
-        int gap_x = 30;
-        int gap_y = 30;
-        int total_w = (card_w * 4) + (gap_x * 3);
-        int start_x = (1024 - total_w) / 2;
-        int start_y = 120;
-
-        int i = (int)node;
-        int col = i % 4;
-        int row = i / 4;
-        
-        int x = start_x + col * (card_w + gap_x);
-        int y = start_y + row * (card_h + gap_y);
-        
-        source_rect = (rect_t){x, y, card_w, card_h};
-    }
-}
-
-static void flux_update_zoom(void) {
-    /* Fixed-Point Spring Physics (1000 = 1.0) */
-    int target = (target_zoom == FLUX_FOCUS) ? 1000 : 0;
-    int tension = 250; /* Faster snap (was 180) */
-    int friction = 700; /* Less friction (was 750) */
-    
-    int dist = target - zoom_progress;
-    int force = (dist * tension) / 1000;
-    
-    /* Minimum push to overcome integer division floor */
-    if (dist > 0 && force == 0) force = 2;
-    if (dist < 0 && force == 0) force = -2;
-
-    zoom_velocity += force;
-    zoom_velocity = (zoom_velocity * friction) / 1000;
-    zoom_progress += zoom_velocity;
-    
-    /* Stronger Snap */
-    if (target == 1000 && zoom_progress > 950) {
-        zoom_progress = 1000;
-        zoom_velocity = 0;
-    }
-    if (target == 0 && zoom_progress < 50) {
-        zoom_progress = 0;
-        zoom_velocity = 0;
-    }
-
-    /* Update State */
-    if (zoom_progress == 1000) current_zoom = FLUX_FOCUS;
-    else if (zoom_progress == 0) current_zoom = FLUX_MACRO;
-    else current_zoom = -1; /* Transitioning */
-}
-
-static rect_t draw_zoom_transition(void) {
-    /* Optimization: Clear only the potential area of the window (Target Rect) */
-    /* This allows us to keep the rest of the screen static (Constellation) */
-    /* and drastically reduces bandwidth by flushing only this area. */
-    
-    /* Clear Maximum Bounds (Target Rect) to Black to erase trails */
-    /* We use a slightly larger area to be safe? No, target_rect is the max size. */
-    /* But if we are shrinking, we start at target_rect and go to source_rect. */
-    /* So wiping target_rect is always safe to clear trails. */
-    
-    /* However, wiping Target Rect (big) every frame is costlier than necessary if small */
-    /* But standard rect fill is very fast. The bottleneck is FLUSH (PCI bus). */
-    /* So we fill big rect, draw small rect, flush big rect. */
-    
-    /* Determine bounds */
-    int bx = (source_rect.x < target_rect.x) ? source_rect.x : target_rect.x;
-    int by = (source_rect.y < target_rect.y) ? source_rect.y : target_rect.y;
-    int bw = (source_rect.w > target_rect.w) ? source_rect.w : target_rect.w;
-    int bh = (source_rect.h > target_rect.h) ? source_rect.h : target_rect.h;
-    
-    /* Align to bounds union */
-    omni_fill_rect(bx, by, bw, bh, 0x000000);
-
-    /* Draw Expanding Card */
-    rect_t r;
-    r.x = source_rect.x + ((target_rect.x - source_rect.x) * zoom_progress) / 1000;
-    r.y = source_rect.y + ((target_rect.y - source_rect.y) * zoom_progress) / 1000;
-    r.w = source_rect.w + ((target_rect.w - source_rect.w) * zoom_progress) / 1000;
-    r.h = source_rect.h + ((target_rect.h - source_rect.h) * zoom_progress) / 1000;
-    
-    omni_fill_rect(r.x, r.y, r.w, r.h, FLUX_CARD_BG);
-    omni_fill_rect(r.x, r.y, r.w, 4, FLUX_ACCENT_CYAN);
-    
-    if (zoom_progress > 900) {
-         omni_draw_string(NULL, r.x + 20, r.y + 20, "Materializando...", FLUX_TEXT_SECONDARY, FLUX_CARD_BG);
-    }
-    
-    return (rect_t){bx, by, bw, bh};
+    (void)node;
+    current_zoom = level;
 }
 
 static void draw_ripple_effect(void) {
@@ -2485,47 +2250,6 @@ static void draw_ripple_effect(void) {
     }
 }
 
-static void draw_generic_app_content(window_t* win, const char* title, uint32_t bg_col) {
-    if (!win) return;
-    wm_fill_rect(win, (rect_t){0, 0, win->bounds.w, win->bounds.h}, bg_col);
-    wm_print_at(win, 20, 20, title);
-    wm_print_at(win, 20, 40, "Aplicacion en construccion...");
-}
-
-
-
-static void draw_clock_content(window_t* win) {
-    if (!win) return;
-    wm_fill_rect(win, (rect_t){0, 0, win->bounds.w, win->bounds.h}, 0x101020);
-    
-    static char cached_time_str[32] = "--:--:--";
-    static uint32_t last_clock_update = 0;
-    
-    if (timer_get_ticks() - last_clock_update > 50 || last_clock_update == 0) {
-        uint32_t ticks = timer_get_ticks();
-        int sec = (ticks / 100) % 60;
-        int min = (ticks / 6000) % 60;
-        int hour = (ticks / 360000) % 24;
-
-        char buf[8];
-        itoa_s(hour, buf, sizeof(buf), 10);
-        strlcpy(cached_time_str, buf, sizeof(cached_time_str));
-        strlcat(cached_time_str, ":", sizeof(cached_time_str));
-        itoa_s(min, buf, sizeof(buf), 10);
-        if(min<10) strlcat(cached_time_str, "0", sizeof(cached_time_str));
-        strlcat(cached_time_str, buf, sizeof(cached_time_str));
-        strlcat(cached_time_str, ":", sizeof(cached_time_str));
-        itoa_s(sec, buf, sizeof(buf), 10);
-        if(sec<10) strlcat(cached_time_str, "0", sizeof(cached_time_str));
-        strlcat(cached_time_str, buf, sizeof(cached_time_str));
-
-        last_clock_update = timer_get_ticks();
-    }
-    
-    /* Big Text (Fake implementation) */
-    wm_print_at(win, 60, 60, "HORA DEL SISTEMA");
-    wm_print_at(win, 80, 90, cached_time_str);
-}
 
 
 
@@ -2673,27 +2397,6 @@ static void handle_hub_input(char c) {
     }
 }
 
-/* ========================================================================= */
-/* UI Event Queue (Reactive Input System)                                    */
-/* ========================================================================= */
-
-typedef enum {
-    UI_EVENT_MOUSE_PACKET,
-    UI_EVENT_KEY_PRESS
-} ui_event_type_t;
-
-typedef struct {
-    ui_event_type_t type;
-    int32_t dx;
-    int32_t dy;
-    uint8_t buttons;
-    char key;
-} ui_event_t;
-
-#define UI_EVENT_QUEUE_SIZE 128
-static ui_event_t ui_event_queue[UI_EVENT_QUEUE_SIZE];
-static volatile int ui_event_head = 0;
-static volatile int ui_event_tail = 0;
 
 /* ========================================================================= */
 /* New Window Manager Integration Wrappers                                   */

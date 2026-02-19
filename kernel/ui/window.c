@@ -243,7 +243,6 @@ void wm_pump_events(void) {
 
             /* Dispatch to Top-Most Window under cursor */
             window_t* target = windows_tail; /* Start at top */
-            bool handled = false;
 
             while (target) {
                 if (target->active &&
@@ -263,7 +262,6 @@ void wm_pump_events(void) {
                         target->on_mouse(target, mouse_x - target->bounds.x, mouse_y - target->bounds.y, mouse_buttons);
                     }
 
-                    handled = true;
                     break;
                 }
                 target = target->prev;
