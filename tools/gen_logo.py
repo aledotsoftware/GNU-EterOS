@@ -4,7 +4,7 @@ import os
 import zlib
 
 def make_png(width, height, pixels):
-    # pixels is a list of (r,g,b,a) tuples
+    # pixels is a flat bytearray with RGBA data
     
     # Header
     png_sig = b'\x89PNG\r\n\x1a\n'
@@ -16,15 +16,13 @@ def make_png(width, height, pixels):
     
     # IDAT
     scanlines = []
+    stride = width * 4
     for y in range(height):
         # Filter type 0 (None) at start of each scanline
-        line = bytearray([0])
-        for x in range(width):
-            r, g, b, a = pixels[y * width + x]
-            line.append(r)
-            line.append(g)
-            line.append(b)
-            line.append(a)
+        row_start = y * stride
+        row_end = row_start + stride
+        # Prepend filter byte to the row data
+        line = b'\x00' + pixels[row_start:row_end]
         scanlines.append(line)
     
     raw_data = b''.join(scanlines)
@@ -42,19 +40,33 @@ def make_png(width, height, pixels):
 def generate_logo(output_path):
     width = 200
     height = 200
-    # Initialize with transparent
-    pixels = [(0, 0, 0, 0)] * (width * height)
+    # Initialize with transparent (all zeros)
+    # Using bytearray is much faster and memory efficient than list of tuples
+    pixels = bytearray(width * height * 4)
 
     cx, cy = 100, 100
     radius = 80
+    radius_sq = radius * radius
 
-    for y in range(height):
-        for x in range(width):
+    # Optimize: Iterate only within the bounding box of the circle
+    # Original loop was 0..height, 0..width.
+    # Bounding box is [cy-radius, cy+radius] and [cx-radius, cx+radius]
+    min_y = max(0, cy - radius)
+    max_y = min(height, cy + radius + 1)
+    min_x = max(0, cx - radius)
+    max_x = min(width, cx + radius + 1)
+
+    for y in range(min_y, max_y):
+        dy = y - cy
+        dy_sq = dy * dy
+        y_offset = y * width * 4
+
+        for x in range(min_x, max_x):
             dx = x - cx
-            dy = y - cy
-            dist = math.sqrt(dx*dx + dy*dy)
+            dist_sq = dx*dx + dy_sq
             
-            if dist < radius:
+            if dist_sq < radius_sq:
+                dist = math.sqrt(dist_sq)
                 # Flux Orb Gradient (Premium)
                 ratio = dist / radius
                 
@@ -68,10 +80,15 @@ def generate_logo(output_path):
                 if dist > radius - 2:
                     alpha = int(255 * (radius - dist) / 2)
                 
-                pixels[y * width + x] = (r, g, b, alpha)
+                idx = y_offset + (x * 4)
+                pixels[idx] = r
+                pixels[idx+1] = g
+                pixels[idx+2] = b
+                pixels[idx+3] = alpha
 
     # Draw stylized 'E'
     for y in range(60, 141):
+        y_offset = y * width * 4
         for x in range(80, 131):
             is_e = False
             # Vertical spine
@@ -82,7 +99,11 @@ def generate_logo(output_path):
             if 128 <= y <= 140 and 80 <= x <= 130: is_e = True
             
             if is_e:
-                pixels[y * width + x] = (255, 255, 255, 255)
+                idx = y_offset + (x * 4)
+                pixels[idx] = 255
+                pixels[idx+1] = 255
+                pixels[idx+2] = 255
+                pixels[idx+3] = 255
 
     png_data = make_png(width, height, pixels)
     
