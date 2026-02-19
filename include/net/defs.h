@@ -8,6 +8,7 @@
 #define ETEROS_NET_DEFS_H
 
 #include "../types.h"
+#include <sem.h>
 
 /* Network Constants */
 #define ETHERNET_TYPE_IP  0x0800
@@ -92,5 +93,16 @@ uint16_t net_checksum(void* vdata, size_t length);
 
 /* IP Utils (kernel/net/ip_utils.c) */
 uint32_t ip_aton(const char* cp);
+
+/* Global Network State (kernel/net/stack.c) */
+extern uint32_t my_ip;
+extern uint32_t gateway_ip;
+extern uint32_t dns_ip;
+extern uint8_t gateway_mac[6];
+extern int network_ready;
+extern sem_t net_sem;
+
+/* Network Utilities */
+int net_arp_lookup(uint32_t target_ip);
 
 #endif /* ETEROS_NET_DEFS_H */

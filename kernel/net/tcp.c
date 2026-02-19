@@ -6,10 +6,6 @@
 #include <task.h>
 #include <hal.h>
 
-extern uint32_t my_ip;
-extern uint8_t gateway_mac[6];
-extern uint16_t net_checksum(void* vdata, size_t length);
-
 /* Pseudo Header for Checksum */
 static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, int flags) {
     uint8_t buffer[1514];
@@ -171,7 +167,6 @@ int tcp_connect(socket_entry_t* sock, uint32_t dest_ip, uint16_t dest_port) {
            and calling net_poll is safe (it just checks e1000),
            we can call it.
         */
-        extern void net_poll(void);
         net_poll();
         task_yield();
     }

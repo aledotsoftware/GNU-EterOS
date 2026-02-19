@@ -168,6 +168,11 @@ int task_fork(void* regs);
  */
 task_t* task_get_by_id(uint32_t id);
 
+/**
+ * Obtiene la carga actual de la CPU (estimación 0-100%).
+ */
+int task_get_cpu_load(void);
+
 /* ========================================================================= */
 /* Context Switch (definido en context_switch.asm)                           */
 /* ========================================================================= */

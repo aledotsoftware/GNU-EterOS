@@ -27,15 +27,12 @@
 #include <cpu.h>
 
 #include <net/e1000.h>
+#include <net/defs.h>
+#include <net/dhcp.h>
 #include <acpi.h>
 #include <apic.h>
 #include <futex.h>
 #include <sem.h>
-
-/* Compatibility for legacy apps */
-extern int network_ready;
-extern sem_t net_sem;
-
 
 /* Forward declarations for non-HAL kernel services */
 void pmm_init(void);
@@ -57,9 +54,6 @@ static void kernel_print_sysinfo(void);
 
 static void kernel_halt(void);
 
-extern void net_poll(void);
-extern uint32_t my_ip;
-
 static void network_task(void) {
     /* Process any pending packets before entering loop */
     net_poll();
@@ -77,8 +71,6 @@ static void network_task(void) {
         }
     }
 }
-
-extern void dhcp_discover(void);
 
 static void init_network(void) {
     net_init();

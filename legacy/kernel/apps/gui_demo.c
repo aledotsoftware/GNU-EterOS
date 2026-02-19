@@ -35,10 +35,6 @@
 #include <syscall.h>
 #include <hal.h>
 
-extern int task_get_cpu_load(void);
-extern int task_kill(uint32_t pid);
-extern uint32_t my_ip; // Defined in stack.c
-
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
 /* ========================================================================= */

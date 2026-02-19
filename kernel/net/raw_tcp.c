@@ -6,11 +6,6 @@
 #include <vga.h>
 #include <hal.h>
 
-extern uint32_t my_ip, gateway_ip;
-extern uint8_t gateway_mac[6];
-extern int net_arp_lookup(uint32_t target_ip);
-extern uint16_t net_checksum(void* vdata, size_t length);
-
 /* 172.67.140.40 is tudexgames.com (Cloudflare) */
 #define TUDEX_IP 0x288C43AC 
 
