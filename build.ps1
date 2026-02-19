@@ -248,6 +248,9 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\apps\user_loader.c",
     "$KERNEL_DIR\apps\wget.c",
     "$KERNEL_DIR\task.c",
+    "$KERNEL_DIR\futex.c",
+    "$KERNEL_DIR\klog.c",
+    "$KERNEL_DIR\stdio.c",
     "$KERNEL_DIR\fs\initrd.c",
     "$KERNEL_DIR\fs\vfs.c",
     "$KERNEL_DIR\fs\devfs.c",
@@ -373,8 +376,11 @@ function Invoke-KernelBuild {
         $objFiles += $obj
 
         Write-Step "CC" $src
-        & $CC @CFLAGS -c $src -o $obj
-        if ($LASTEXITCODE -ne 0) {
+        $ErrorActionPreference = "Continue"
+        & $CC @CFLAGS -c $src -o $obj 2>&1
+        $ccExit = $LASTEXITCODE
+        $ErrorActionPreference = "Stop"
+        if ($ccExit -ne 0) {
             Write-Step "ERR" "Fallo al compilar $src"
             exit 1
         }

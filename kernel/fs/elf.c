@@ -3,6 +3,7 @@
 #include <fs/vfs.h>
 #include <hal.h>
 #include <pmm.h>
+#include <mm.h>
 #include <string.h>
 #include <serial.h>
 #include <task.h>
