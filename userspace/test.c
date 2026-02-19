@@ -38,12 +38,58 @@ int main(int argc, char **argv) {
         printf("Closed /dev/tty.\n");
     }
 
-    /*
-    printf("Testing signal handling (Segfault)...\n");
-    volatile int *p = (int*)0;
-    *p = 42;
-    printf("This should NOT be printed if Segfault works.\n");
-    */
+    /* --- File I/O Tests --- */
+    printf("\n=== Testing stdio File I/O ===\n");
+
+    FILE *f = fopen("test.txt", "w");
+    if (!f) {
+        printf("Failed to open test.txt for writing (errno=%d)\n", errno);
+    } else {
+        printf("Opened test.txt for writing.\n");
+        const char *text = "Hello, File!\n";
+        size_t written = fwrite(text, 1, strlen(text), f);
+        printf("Written %d bytes.\n", (int)written);
+        fclose(f);
+        printf("Closed file.\n");
+
+        /* Read back */
+        f = fopen("test.txt", "r");
+        if (!f) {
+            printf("Failed to open test.txt for reading (errno=%d)\n", errno);
+        } else {
+            printf("Opened test.txt for reading.\n");
+            char buffer[32];
+            memset(buffer, 0, sizeof(buffer));
+            size_t read_bytes = fread(buffer, 1, sizeof(buffer)-1, f);
+            printf("Read %d bytes: '%s'\n", (int)read_bytes, buffer);
+            fclose(f);
+        }
+    }
+
+    printf("\n=== Testing fseek/ftell ===\n");
+    f = fopen("test_seek.txt", "w+");
+    if (f) {
+        fputs("1234567890", f);
+        long pos = ftell(f);
+        printf("Current pos after write: %ld (expected 10)\n", pos);
+
+        fseek(f, 5, SEEK_SET);
+        printf("Seek to 5.\n");
+        fputc('X', f);
+
+        fseek(f, 0, SEEK_SET); // rewind
+        char buf[16];
+        memset(buf, 0, 16);
+        if (fgets(buf, 16, f)) {
+            printf("Read back: '%s' (expected 12345X7890)\n", buf);
+        } else {
+            printf("fgets failed.\n");
+        }
+
+        fclose(f);
+    } else {
+         printf("Failed to open test_seek.txt (errno=%d)\n", errno);
+    }
 
     return 0;
 }
