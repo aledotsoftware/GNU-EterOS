@@ -63,6 +63,7 @@ void syscall_init(void) {
 #define O_RDONLY    00000000
 #define O_WRONLY    00000001
 #define O_RDWR      00000002
+#define O_CREAT     0x00000040
 
 typedef struct {
     uint8_t* buffer;
@@ -188,6 +189,35 @@ static int validate_user_string(const char* str) {
     return 0; /* Too long */
 }
 
+/* Helper to split path into parent and name */
+static int split_path(const char* path, char* parent, char* name) {
+    int len = strlen(path);
+    int last_slash = -1;
+    for (int i = 0; i < len; i++) {
+        if (path[i] == '/') last_slash = i;
+    }
+
+    if (last_slash == -1) {
+        // No slash, parent is current (unsupported yet) or root if absolute?
+        // Assuming path is relative to some CWD, but for now everything is absolute or relative to root?
+        // The VFS lookup handles root if path starts with /.
+        // If path is "file.txt" and we are at root...
+        // Let's assume root.
+        strlcpy(parent, "/", 128);
+        strlcpy(name, path, 128);
+    } else {
+        if (last_slash == 0) {
+            strlcpy(parent, "/", 128);
+        } else {
+            if (last_slash >= 128) return -1;
+            memcpy(parent, path, last_slash);
+            parent[last_slash] = 0;
+        }
+        strlcpy(name, path + last_slash + 1, 128);
+    }
+    return 0;
+}
+
 static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
     (void)fd; (void)offset;
     if (len == 0) return -EINVAL;
@@ -295,11 +325,6 @@ static int64_t sys_pipe(int* pipefd) {
 
     return 0;
 }
-
-#define O_ACCMODE   00000003
-#define O_RDONLY    00000000
-#define O_WRONLY    00000001
-#define O_RDWR      00000002
 
 #define ARCH_SET_GS 0x1001
 #define ARCH_SET_FS 0x1002
@@ -437,7 +462,28 @@ static int64_t sys_open(const char* path, int flags, int mode) {
 
     /* Lookup path */
     fs_node_t* node = vfs_lookup(fs_root, path);
-    if (!node) return -ENOENT;
+
+    if (!node) {
+        if (flags & O_CREAT) {
+            char parent_path[128];
+            char filename[128];
+            if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+
+            fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+            if (!parent) return -ENOENT;
+
+            if (create_fs(parent, filename, (uint16_t)mode) != 0) {
+                kfree(parent);
+                return -EACCES;
+            }
+
+            node = vfs_lookup(fs_root, path);
+            kfree(parent);
+            if (!node) return -ENOENT;
+        } else {
+            return -ENOENT;
+        }
+    }
 
     uint8_t read_mode = 0;
     uint8_t write_mode = 0;
@@ -470,6 +516,36 @@ static int64_t sys_close(int fd) {
     current->fd_table[fd].node = NULL;
 
     return 0;
+}
+
+static int64_t sys_mkdir(const char* path, int mode) {
+    if (!validate_user_string(path)) return -EFAULT;
+
+    char parent_path[128];
+    char filename[128];
+    if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+
+    fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) return -ENOENT;
+
+    int res = mkdir_fs(parent, filename, (uint16_t)mode);
+    kfree(parent);
+    return res;
+}
+
+static int64_t sys_unlink(const char* path) {
+    if (!validate_user_string(path)) return -EFAULT;
+
+    char parent_path[128];
+    char filename[128];
+    if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+
+    fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) return -ENOENT;
+
+    int res = unlink_fs(parent, filename);
+    kfree(parent);
+    return res;
 }
 
 static int64_t sys_lseek(int fd, int64_t offset, int whence) {
@@ -998,6 +1074,10 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_clock_gettime((int)regs->rdi, (struct timespec*)regs->rsi);
     } else if (regs->rax == 231) { /* SYS_exit_group */
         ret = (uint64_t)sys_exit_group((int)regs->rdi);
+    } else if (regs->rax == SYS_mkdir) {
+        ret = (uint64_t)sys_mkdir((const char*)regs->rdi, (int)regs->rsi);
+    } else if (regs->rax == SYS_unlink) {
+        ret = (uint64_t)sys_unlink((const char*)regs->rdi);
     } else if (regs->rax == 0xCAFEBABE) {
         ret = 0;
     } else {
