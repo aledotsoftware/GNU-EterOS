@@ -7,6 +7,7 @@
 #include <string.h>
 #include <serial.h>
 #include <task.h>
+#include <vmm.h>
 
 uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
     serial_write_string("[ELF] Loading file: ");
@@ -126,55 +127,44 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             uint64_t start_page = PAGE_ALIGN_DOWN(vaddr);
             uint64_t end_page   = PAGE_ALIGN_UP(vaddr + mem_size);
 
-            /* Pass 1: Map pages as RW (Read/Write) to allow loading content */
-            for (uint64_t addr = start_page; addr < end_page; addr += PAGE_SIZE) {
-                /* We check if mapped. If mapped by kernel (huge pages), we can't easily overwrite without splitting. */
-                /* Assuming vaddr >= 4GB, it should be unmapped initially. */
-                if (hal_mem_get_phys(addr) == 0) {
-                     void* phys = pmm_alloc_page();
-                     if (!phys) {
-                         serial_write_string("[ELF] OOM during loading.\n");
-                         kfree(node);
-                         return 0;
-                     }
-                     /* Always map as USER | WRITE initially for loading */
-                     /* Note: HAL_MEM_READ is implicit with map */
-                     hal_mem_map((uint64_t)phys, addr, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER);
-
-                     /* Zero the page content initially */
-                     memset((void*)addr, 0, PAGE_SIZE);
+            /* Create VMA for Demand Paging */
+            if (current) {
+                vm_area_t* vma = (vm_area_t*)kmalloc(sizeof(vm_area_t));
+                if (!vma) {
+                     serial_write_string("[ELF] OOM Allocating VMA\n");
+                     kfree(node);
+                     return 0;
                 }
-            }
+                vma->start = start_page;
+                vma->end   = end_page;
+                vma->node  = node;
 
-            /* Now copy data (while pages are RW) */
-            if (file_size > 0) {
-                if (read_fs(node, file_offset, file_size, (uint8_t*)vaddr) != file_size) {
-                     serial_write_string("[ELF] Failed to read segment data.\n");
+                /* Adjust offset to align with start_page */
+                uint64_t diff = vaddr - start_page;
+                if (file_offset >= diff) {
+                     vma->offset = file_offset - diff;
+                } else {
+                     vma->offset = 0;
                 }
-            }
 
-            /* Pass 2: Remap pages with strict permissions (W^X) */
-            for (uint64_t addr = start_page; addr < end_page; addr += PAGE_SIZE) {
-                 uint32_t page_flags = final_flags;
+                vma->file_size = file_size + diff;
+                vma->flags = final_flags;
 
-                 /* Handle shared/misaligned pages: */
-                 /* If segment starts mid-page, that page is shared with previous segment. */
-                 /* If segment ends mid-page, that page is shared with next segment. */
-                 /* We MUST keep Write permission on shared pages to avoid breaking adjacent data segments. */
+                /* Increment node refcount */
+                if (node->ref_count == 0) node->ref_count = 1;
+                node->ref_count++;
 
-                 bool is_shared = false;
-                 if (addr == start_page && (vaddr & (PAGE_SIZE - 1))) is_shared = true;
-                 if (addr == end_page - PAGE_SIZE && ((vaddr + mem_size) & (PAGE_SIZE - 1))) is_shared = true;
+                /* Add to list */
+                vma->next = current->mmap_list;
+                current->mmap_list = vma;
 
-                 if (is_shared) {
-                     page_flags |= HAL_MEM_WRITE;
-                 }
+                /* Map as Demand Paging */
+                for (uint64_t addr = start_page; addr < end_page; addr += PAGE_SIZE) {
+                     uint64_t vmm_flags = PAGE_USER;
+                     if (final_flags & HAL_MEM_WRITE) vmm_flags |= PAGE_WRITE;
 
-                 /* Apply new flags (e.g. adding EXEC or removing WRITE) */
-                 uint64_t phys = hal_mem_get_phys(addr);
-                 if (phys) {
-                     hal_mem_map(phys, addr, page_flags);
-                 }
+                     vmm_map_demand_page(addr, vmm_flags);
+                }
             }
         }
     }
@@ -188,6 +178,9 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         serial_write_string("\n");
     }
 
-    kfree(node);
+    if (node->ref_count > 0) node->ref_count--;
+    if (node->ref_count == 0) {
+        kfree(node);
+    }
     return header.e_entry + load_offset;
 }

@@ -108,6 +108,7 @@ void scheduler_init(void) {
     tasks[0].fs_base = 0;
     tasks[0].gs_base = 0;
     tasks[0].mmap_base = 0x700000000000ULL;
+    tasks[0].mmap_list = NULL;
 
     task_count = 1;
     current_task = 0;
@@ -190,6 +191,7 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].fs_base = 0;
     tasks[slot].gs_base = 0;
     tasks[slot].mmap_base = 0x700000000000ULL;
+    tasks[slot].mmap_list = NULL;
 
     /*
      * Preparar el stack para que context_switch pueda "entrar" por primera vez.
@@ -390,6 +392,19 @@ void task_exit(void) {
     serial_write_string(tasks[current_task].name);
     serial_write_string("\n");
 
+    /* Cleanup Resources */
+    /* Free VMA List */
+    vm_area_t* node = tasks[current_task].mmap_list;
+    while (node) {
+        vm_area_t* next = node->next;
+        if (node->node) {
+             if (node->node->ref_count > 0) node->node->ref_count--;
+        }
+        kfree(node);
+        node = next;
+    }
+    tasks[current_task].mmap_list = NULL;
+
     /* Marcar como muerta */
     tasks[current_task].state = TASK_DEAD;
     
@@ -521,10 +536,9 @@ int task_fork(void* regs_ptr) {
     /* 4. Clone Address Space (CoW) */
     /* Use current task's CR3, not necessarily kernel's CR3 */
     /*
-     * NOTE: VMM CoW handler is incomplete/unreliable. We use Deep Copy (0)
-     * instead of CoW (1) to prevent memory corruption and crashes on write.
+     * Enable CoW (1) now that VMM supports it.
      */
-    tasks[slot].cr3 = vmm_clone_pml4(0);
+    tasks[slot].cr3 = vmm_clone_pml4(1);
 
     /* 5. Copy Task Struct Fields */
     task_t* parent = task_get_current();
@@ -548,6 +562,22 @@ int task_fork(void* regs_ptr) {
     tasks[slot].os_abi = parent->os_abi;
     tasks[slot].user_rsp = parent->user_rsp; /* Saved from syscall entry */
     tasks[slot].mmap_base = parent->mmap_base;
+    tasks[slot].mmap_list = NULL;
+
+    /* Deep Copy VMA List */
+    vm_area_t* node = parent->mmap_list;
+    vm_area_t** current_ptr = &tasks[slot].mmap_list;
+    while (node) {
+        vm_area_t* new_node = (vm_area_t*)kmalloc(sizeof(vm_area_t));
+        if (new_node) {
+             memcpy(new_node, node, sizeof(vm_area_t));
+             new_node->next = NULL;
+             if (new_node->node) new_node->node->ref_count++;
+             *current_ptr = new_node;
+             current_ptr = &new_node->next;
+        }
+        node = node->next;
+    }
 
     /* 6. Setup Child Stack for Return */
     /* We need to copy `regs` to child stack top */

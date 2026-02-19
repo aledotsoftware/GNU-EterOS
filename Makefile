@@ -230,6 +230,7 @@ endif
 dirs:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/shell
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/video
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/serial
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/input

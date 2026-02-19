@@ -13,6 +13,7 @@
 #define PAGE_USER       0x4
 #define PAGE_HUGE       0x80
 #define PAGE_COW        0x200 /* Bit 9: Copy-on-Write (OS Available) */
+#define PAGE_DEMAND     0x400 /* Bit 10: Demand Paging (OS Available) */
 #define PAGE_NO_EXEC    0x8000000000000000
 
 /* Máscara para obtener la dirección física de una entrada (bits 12-51) */
@@ -49,6 +50,15 @@ void vmm_init(void);
  * @return 0 en éxito, -1 si falla (ej. sin memoria física para tablas)
  */
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags);
+
+/**
+ * Mapea una página virtual como Demand Paging (Not Present).
+ *
+ * @param virt_addr Dirección virtual (debe estar alineada a 4KB)
+ * @param flags Flags de página (PAGE_USER | PAGE_WRITE, etc.)
+ * @return 0 en éxito, -1 si falla
+ */
+int vmm_map_demand_page(uint64_t virt_addr, uint64_t flags);
 
 /**
  * Desmapea una página virtual (la marca como no presente).

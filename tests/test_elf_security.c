@@ -35,11 +35,23 @@ typedef int32_t  int32_t;
 typedef int64_t  int64_t;
 typedef size_t   size_t;
 
+/* Mock vm_area_t */
+typedef struct vm_area {
+    uint64_t start;
+    uint64_t end;
+    struct fs_node* node;
+    uint64_t offset;
+    uint64_t file_size;
+    uint32_t flags;
+    struct vm_area* next;
+} vm_area_t;
+
 /* Types from task.h */
 typedef struct {
     char name[32];
     uint64_t os_abi;
     uint64_t brk;
+    vm_area_t* mmap_list;
 } task_t;
 
 /* Types from fs/vfs.h */
@@ -48,6 +60,7 @@ typedef struct fs_node {
     uint32_t flags;
     uint32_t length;
     uint32_t impl;
+    uint32_t ref_count;
 } fs_node_t;
 
 fs_node_t* fs_root = NULL;
@@ -132,6 +145,7 @@ fs_node_t* vfs_lookup(fs_node_t* root, const char* path) {
     if (strcmp(path, "/malicious_elf") == 0) {
         static fs_node_t node;
         memset(&node, 0, sizeof(node));
+        node.ref_count = 1;
         return &node;
     }
     return NULL;
@@ -160,8 +174,22 @@ uint32_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffe
     return 0;
 }
 
+void* kmalloc(size_t size) {
+    return malloc(size);
+}
+
 void kfree(void* ptr) {
     (void)ptr;
+    /* In this test, we don't track allocations strictly,
+       but for VMA we used malloc, so we should free if possible,
+       but kfree here is also used for 'node' which is static in vfs_lookup.
+       So we can't just free(ptr).
+       Since it's a short-lived test, leaking VMA memory is acceptable. */
+}
+
+int vmm_map_demand_page(uint64_t virt, uint64_t flags) {
+    (void)virt; (void)flags;
+    return 0;
 }
 
 /* Now include the code under test */

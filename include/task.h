@@ -34,6 +34,19 @@ typedef struct file_descriptor {
 } file_descriptor_t;
 
 /* ========================================================================= */
+/* Virtual Memory Area (VMA)                                                 */
+/* ========================================================================= */
+typedef struct vm_area {
+    uint64_t start;             /* Dirección virtual de inicio (alineada) */
+    uint64_t end;               /* Dirección virtual final (alineada) */
+    struct fs_node* node;       /* Archivo subyacente (NULL si anonimo/heap) */
+    uint64_t offset;            /* Offset en el archivo */
+    uint64_t file_size;         /* Tamaño de los datos en el archivo (para BSS handling) */
+    uint32_t flags;             /* Flags de VMM (RWX) */
+    struct vm_area* next;       /* Lista enlazada */
+} vm_area_t;
+
+/* ========================================================================= */
 /* Estados de Tarea                                                          */
 /* ========================================================================= */
 typedef enum {
@@ -70,6 +83,7 @@ typedef struct task {
     uint8_t        os_abi;                  /* ABI (0=SysV/Native, 3=Linux) */
     uint64_t       user_rsp;                /* User Stack Pointer (saved during syscall) */
     uint64_t       mmap_base;               /* Base address for mmap allocator */
+    vm_area_t*     mmap_list;               /* Lista de áreas de memoria mapeadas (Demand Paging) */
 
     void           (*entry)(void);          /* Entry point for task_entry_wrapper */
 } task_t;

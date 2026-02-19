@@ -11,12 +11,21 @@
 #include "../../include/string.h"
 #include "../../include/serial.h"
 #include "../../include/hal/mm.h"
+#include "../../include/task.h" /* For Demand Paging (vm_area_t) */
 
 /* Estructura de una entrada de tabla de páginas (64-bit) */
 typedef uint64_t pt_entry_t;
 
 /* Puntero a la tabla PML4 activa */
-static pt_entry_t* pml4 = (pt_entry_t*)BOOT_PML4_ADDR;
+/* DEPRECATED: Use read_cr3() to get active table */
+/* static pt_entry_t* pml4 = (pt_entry_t*)BOOT_PML4_ADDR; */
+
+/* Reads current CR3 value (PML4 physical address) */
+static inline uint64_t read_cr3(void) {
+    uint64_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    return cr3 & PAGE_ADDR_MASK;
+}
 
 /* Invalida una página en el TLB */
 static inline void invlpg(uint64_t addr) {
@@ -79,6 +88,9 @@ void vmm_init(void) {
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
     /* Navegar la jerarquía: PML4 -> PDPT -> PD -> PT */
     
+    /* Use current active PML4 */
+    pt_entry_t* pml4 = (pt_entry_t*)read_cr3();
+
     uint64_t pml4_idx = PML4_INDEX(virt_addr);
     uint64_t pdpt_idx = PDPT_INDEX(virt_addr);
     uint64_t pd_idx   = PD_INDEX(virt_addr);
@@ -102,7 +114,34 @@ int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
     return 0;
 }
 
+int vmm_map_demand_page(uint64_t virt_addr, uint64_t flags) {
+    /* Use current active PML4 */
+    pt_entry_t* pml4 = (pt_entry_t*)read_cr3();
+
+    uint64_t pml4_idx = PML4_INDEX(virt_addr);
+    uint64_t pdpt_idx = PDPT_INDEX(virt_addr);
+    uint64_t pd_idx   = PD_INDEX(virt_addr);
+    uint64_t pt_idx   = PT_INDEX(virt_addr);
+
+    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 1);
+    if (!pdpt) return -1;
+    pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 1);
+    if (!pd) return -1;
+    pt_entry_t* pt = get_next_table(pd, pd_idx, 1);
+    if (!pt) return -1;
+
+    /* Entry = 0 (No Phys Address) | Flags | PAGE_DEMAND */
+    /* Ensure PAGE_PRESENT is NOT set */
+    pt[pt_idx] = (flags & ~PAGE_PRESENT) | PAGE_DEMAND;
+
+    invlpg(virt_addr);
+    return 0;
+}
+
 void vmm_unmap_page(uint64_t virt_addr) {
+    /* Use current active PML4 */
+    pt_entry_t* pml4 = (pt_entry_t*)read_cr3();
+
     uint64_t pml4_idx = PML4_INDEX(virt_addr);
     uint64_t pdpt_idx = PDPT_INDEX(virt_addr);
     uint64_t pd_idx   = PD_INDEX(virt_addr);
@@ -124,6 +163,9 @@ void vmm_unmap_page(uint64_t virt_addr) {
 }
 
 uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
+    /* Use current active PML4 */
+    pt_entry_t* pml4 = (pt_entry_t*)read_cr3();
+
     uint64_t pml4_idx = PML4_INDEX(virt_addr);
     uint64_t pdpt_idx = PDPT_INDEX(virt_addr);
     uint64_t pd_idx   = PD_INDEX(virt_addr);
@@ -189,12 +231,19 @@ uint64_t hal_mem_get_phys(uint64_t virt_addr) {
 }
 
 uint64_t vmm_get_pml4(void) {
-    return (uint64_t)pml4;
+    return read_cr3();
 }
 
 static void clone_pt_recursive(pt_entry_t* dest, pt_entry_t* src, int level, int cow) {
     for (int i = 0; i < 512; i++) {
-        if (!(src[i] & PAGE_PRESENT)) continue;
+        /* Handle Not Present Entries */
+        if (!(src[i] & PAGE_PRESENT)) {
+            /* If Demand Paging (PAGE_DEMAND set), clone it */
+            if (src[i] & PAGE_DEMAND) {
+                dest[i] = src[i];
+            }
+            continue;
+        }
 
         /* Check for Shared Kernel Regions */
         /* Level 4 (PML4), Index != 0 -> Shared Kernel (Higher Half) */
@@ -234,16 +283,29 @@ static void clone_pt_recursive(pt_entry_t* dest, pt_entry_t* src, int level, int
             }
 
             if (cow) {
-                /* CoW Logic */
-                /* Update Source: Read-Only, CoW */
-                src[i] |= PAGE_COW;
-                src[i] &= ~PAGE_WRITE;
+                /* Check Refcount Limit */
+                /* If > 250, safer to Deep Copy to avoid overflow */
+                if (pmm_get_ref_count((void*)phys) >= 250) {
+                     /* Fallback to Deep Copy */
+                     void* new_page = pmm_alloc_page();
+                     if (new_page) {
+                        /* CAUTION: Assumes Identity Map for phys and new_page! */
+                        /* If this fails (high memory), we need a better copy mechanism. */
+                        memcpy(new_page, (void*)phys, PAGE_SIZE);
+                        dest[i] = (uint64_t)new_page | flags;
+                     }
+                } else {
+                    /* CoW Logic */
+                    /* Update Source: Read-Only, CoW */
+                    src[i] |= PAGE_COW;
+                    src[i] &= ~PAGE_WRITE;
 
-                /* Dest: Same phys, same flags */
-                dest[i] = src[i];
+                    /* Dest: Same phys, same flags */
+                    dest[i] = src[i];
 
-                /* Increment Ref */
-                pmm_ref_page((void*)phys);
+                    /* Increment Ref */
+                    pmm_ref_page((void*)phys);
+                }
             } else {
                 /* Deep Copy */
                 void* new_page = pmm_alloc_page();
@@ -257,17 +319,23 @@ static void clone_pt_recursive(pt_entry_t* dest, pt_entry_t* src, int level, int
 }
 
 uint64_t vmm_clone_pml4(int cow) {
+    /* Use static BOOT_PML4_ADDR as source for cloning the base kernel mappings? */
+    /* No, we should clone the CURRENT pml4 (src)? */
+    /* But current pml4 might contain User mappings. */
+    /* Usually fork clones Current User Mappings. */
+    /* So src should be read_cr3(). */
+
+    pt_entry_t* src_pml4 = (pt_entry_t*)read_cr3();
     pt_entry_t* new_pml4 = (pt_entry_t*)pmm_alloc_page();
     if (!new_pml4) return 0;
     memset(new_pml4, 0, PAGE_SIZE);
 
     /* Start recursion from Level 4 */
-    clone_pt_recursive(new_pml4, pml4, 4, cow);
+    clone_pt_recursive(new_pml4, src_pml4, 4, cow);
 
     /* If we modified current tables (CoW), we must flush TLB */
     if (cow) {
-        uint64_t current_cr3;
-        __asm__ volatile("mov %%cr3, %0" : "=r"(current_cr3));
+        uint64_t current_cr3 = (uint64_t)src_pml4;
         __asm__ volatile("mov %0, %%cr3" : : "r"(current_cr3) : "memory");
     }
 
@@ -284,6 +352,96 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
     int present = error_code & 1;
     int write   = error_code & 2;
     int user    = error_code & 4;
+
+    /* Use current active PML4 */
+    pt_entry_t* pml4 = (pt_entry_t*)read_cr3();
+
+    /* Handle Demand Paging: Not Present */
+    if (!present) {
+        /* Walk to find the entry */
+        uint64_t pml4_idx = PML4_INDEX(addr);
+        uint64_t pdpt_idx = PDPT_INDEX(addr);
+        uint64_t pd_idx   = PD_INDEX(addr);
+        uint64_t pt_idx   = PT_INDEX(addr);
+
+        pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
+        if (!pdpt) return 0;
+        pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
+        if (!pd) return 0;
+        pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
+        if (!pt) return 0;
+
+        /* Check if entry is marked Demand Paging */
+        if (pt[pt_idx] & PAGE_DEMAND) {
+              /* Demand Paging Fault */
+              /* Enable interrupts to allow IO */
+              __asm__ volatile("sti");
+
+              task_t* current = task_get_current();
+              if (current && current->mmap_list) {
+                  vm_area_t* vma = current->mmap_list;
+                  while (vma) {
+                      if (addr >= vma->start && addr < vma->end) {
+                           /* Found VMA */
+                           void* new_phys = pmm_alloc_page();
+                           if (!new_phys) { /* OOM */
+                               __asm__ volatile("cli");
+                               return 0;
+                           }
+
+                           uint64_t map_flags = PAGE_PRESENT | PAGE_USER;
+                           if (vma->flags & HAL_MEM_WRITE) map_flags |= PAGE_WRITE;
+
+                           /* Map temporarily as WRITE to allow loading content */
+                           uint64_t temp_flags = map_flags | PAGE_WRITE;
+
+                           /* Disable interrupts to update PT atomically */
+                           __asm__ volatile("cli");
+
+                           /* Map first! */
+                           pt[pt_idx] = (uint64_t)new_phys | temp_flags;
+                           invlpg(addr);
+
+                           /* Enable interrupts for IO */
+                           __asm__ volatile("sti");
+
+                           /* Use Virtual Address to access page */
+                           uint64_t page_virt = addr & PAGE_ADDR_MASK;
+
+                           /* Clean page */
+                           memset((void*)page_virt, 0, PAGE_SIZE);
+
+                           /* Read from file */
+                           uint64_t page_offset_in_vma = page_virt - vma->start;
+                           uint64_t page_file_offset = vma->offset + page_offset_in_vma;
+
+                           if (page_file_offset < vma->file_size) {
+                               uint64_t remaining = vma->file_size - page_file_offset;
+                               uint64_t read_len = (remaining > PAGE_SIZE) ? PAGE_SIZE : remaining;
+
+                               if (vma->node) {
+                                    /* Read into Virtual Address */
+                                    read_fs(vma->node, page_file_offset, read_len, (uint8_t*)page_virt);
+                               }
+                           }
+
+                           /* Restore correct flags if needed (e.g. remove WRITE) */
+                           if (!(map_flags & PAGE_WRITE)) {
+                               __asm__ volatile("cli");
+                               pt[pt_idx] = (uint64_t)new_phys | map_flags;
+                               invlpg(addr);
+                           } else {
+                               __asm__ volatile("cli");
+                           }
+
+                           return 1;
+                      }
+                      vma = vma->next;
+                  }
+              }
+              __asm__ volatile("cli");
+        }
+    }
 
     /* Handle CoW: Write + Present + User */
     if (present && write && user) {
@@ -319,10 +477,38 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
                  }
 
                  /* Copy content */
-                 memcpy(new_phys, (void*)old_phys, PAGE_SIZE);
+                 /* Issue: accessing old_phys and new_phys directly. */
+                 /* We are in Page Fault. 'addr' is valid (it faulted because of permissions). */
+                 /* So we can read from 'addr' (Virtual) which points to 'old_phys'. */
+                 /* But we need to write to 'new_phys'. 'new_phys' is NOT mapped yet at 'addr'. */
 
-                 /* Remap */
+                 /* Strategy:
+                    1. Read 'addr' into a temp buffer (stack? 4KB is big for kernel stack).
+                    2. Map 'new_phys' to 'addr'.
+                    3. Write temp buffer to 'addr'.
+                 */
+                 /* Or rely on Identity Map if available. If high memory, unsafe. */
+
+                 /* Better Strategy (without temp buffer):
+                    1. Map 'new_phys' to a temporary virtual address (e.g. some reserved slot).
+                    2. memcpy(temp_virt, addr, PAGE_SIZE).
+                    3. Unmap temp_virt.
+                    4. Remap 'addr' to 'new_phys'.
+                 */
+
+                 /* Since we don't have a sophisticated temp map system, and 4KB on stack is risky (stack size 4KB? kernel stack is 4KB per task). */
+                 /* task_create allocs 32KB stack (TASK_STACK_SIZE). */
+                 /* So 4KB on stack IS safe! */
+
+                 uint8_t buffer[PAGE_SIZE];
+                 memcpy(buffer, (void*)(addr & PAGE_ADDR_MASK), PAGE_SIZE);
+
+                 /* Now map new page */
                  pt[pt_idx] = (uint64_t)new_phys | (flags & ~PAGE_COW) | PAGE_WRITE;
+                 invlpg(addr);
+
+                 /* Write back */
+                 memcpy((void*)(addr & PAGE_ADDR_MASK), buffer, PAGE_SIZE);
 
                  /* Decrement old ref */
                  pmm_unref_page((void*)old_phys);
@@ -336,12 +522,8 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
 }
 
 int vmm_is_user_page(uint64_t virt_addr) {
-    /* Read CR3 to get current PML4 physical address */
-    uint64_t cr3;
-    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
-
-    /* In Identity Mapping, Phys == Virt */
-    pt_entry_t* pml4 = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);
+    /* Use current active PML4 */
+    pt_entry_t* pml4 = (pt_entry_t*)read_cr3();
 
     uint64_t pml4_idx = PML4_INDEX(virt_addr);
     uint64_t pdpt_idx = PDPT_INDEX(virt_addr);
