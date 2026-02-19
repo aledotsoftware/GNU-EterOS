@@ -33,3 +33,7 @@
 ## 2026-10-24 - [Keyboard Accessibility for Iconic Launchers]
 **Learning:** A grid of app icons without keyboard support (tabindex/role) completely blocks keyboard-only users. Adding simple focus styles (scale + glow) and standard keyboard events transforms a "touch-first" launcher into a fully accessible desktop experience.
 **Action:** Always ensure interactive grids (like launchers or galleries) support arrow/tab navigation and have clear `:focus-visible` states.
+
+## 2026-11-15 - [The Invisible Tab Trap]
+**Learning:** Placing interactive elements inside a container that is only revealed on hover creates a "black hole" for keyboard users. They tab into the container, focus disappears, and they are trapped in invisible controls.
+**Action:** Use `:focus-within` on the parent container to reveal hidden interactive children, ensuring keyboard users can see what they are navigating.
