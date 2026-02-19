@@ -218,7 +218,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\drivers\video\framebuffer.c",
     "$KERNEL_DIR\drivers\video\font.c",
 
-    "$KERNEL_DIR\ui\window.c",
+
     "$KERNEL_DIR\drivers\serial\serial.c",
     "$KERNEL_DIR\drivers\input\keyboard.c",
     "$KERNEL_DIR\drivers\input\mouse.c",
@@ -238,7 +238,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\libgcc.c",
     "$KERNEL_DIR\apps\santitravel.c",
     "$KERNEL_DIR\apps\sysmon.c",
-    "$KERNEL_DIR\apps\gui_demo.c",
+
     "$KERNEL_DIR\apps\user_loader.c",
     "$KERNEL_DIR\apps\wget.c",
     "$KERNEL_DIR\task.c",
@@ -246,9 +246,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\fs\vfs.c",
     "$KERNEL_DIR\fs\devfs.c",
     "$KERNEL_DIR\fs\procfs.c",
-    "$KERNEL_DIR\ui\image.c",
-    "$KERNEL_DIR\ui\upng.c",
-    "$KERNEL_DIR\ui\omni.c",
+
     "$KERNEL_DIR\drivers\disk\partition.c",
     "$KERNEL_DIR\fs\elf.c"
 )

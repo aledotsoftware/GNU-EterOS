@@ -28,7 +28,7 @@
 #include "../include/net/e1000.h"
 #include "../include/net/dhcp.h"
 #include "../include/task.h"
-#include "../include/gui_demo.h"
+
 #include "../include/rtc.h"
 #include "../include/rtc.h"
 #include "../include/user_mode.h"
@@ -120,7 +120,6 @@ typedef struct {
 static const app_entry_t apps[] = {
     { "santitravel", "Aventuras con Santi",     "1.1", santitravel_run },
     { "etermon",     "Monitor del Sistema",     "1.0", sysmon_run      },
-    { "flux",        "Flux UI Multitask Demo",  "0.1", gui_demo_run    },
 };
 
 #define NUM_APPS  (sizeof(apps) / sizeof(apps[0]))
