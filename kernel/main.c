@@ -11,6 +11,7 @@
 
 #include <types.h>
 #include <hal.h>
+#include <klog.h>
 #include <string.h>
 #include <io.h>
 #include <boot.h>
@@ -91,8 +92,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* Esto configura relojes, interrupciones, consola, timer, etc. */
     hal_init();
     
-    hal_console_write("\n");
-    hal_debug_write("[eterOS] HAL Inicializada.\n");
+    klog(KLOG_INFO, "HAL Initialized.\n");
 
     /* ---- 2. Obtener Info del Bootloader (si aplica) ---- */
     /* En x86, esto está en 0xA000. En ARM, puede ser NULL o DTB. */
@@ -175,8 +175,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     kernel_print_banner();
 
     /* ---- Log de depuración ---- */
-    hal_debug_write("[eterOS] Kernel cargado.\n");
-    hal_debug_write("[eterOS] (c) 2026 Tudex Networks\n");
+    klog(KLOG_INFO, "Kernel loaded.\n");
+    klog(KLOG_INFO, "(c) 2026 Tudex Networks\n");
 
     /* ---- 6. Información del sistema ---- */
     kernel_print_sysinfo();
