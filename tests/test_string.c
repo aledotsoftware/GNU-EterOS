@@ -549,6 +549,66 @@ int main() {
         printf("strcmp tests passed\n");
     }
 
+    /* Test strncmp */
+    {
+        /* Test 1: Equality up to n */
+        assert(strncmp("Hello", "Hello", 5) == 0);
+        assert(strncmp("Hello", "Hello", 10) == 0); /* n > len */
+        assert(strncmp("Hello", "Hello", 3) == 0);  /* n < len */
+
+        /* Test 2: Inequality */
+        assert(strncmp("Hello", "World", 5) < 0);
+        assert(strncmp("World", "Hello", 5) > 0);
+
+        /* Test 3: Inequality but equal up to n */
+        assert(strncmp("Hello", "Helxx", 3) == 0);
+        assert(strncmp("Helxx", "Hello", 3) == 0);
+
+        /* Test 4: Mismatch at n-1 */
+        assert(strncmp("Hello", "Hellx", 5) != 0);
+
+        /* Test 5: Null termination */
+        assert(strncmp("Hello", "Hello\0x", 6) == 0); /* Both null terminated */
+        assert(strncmp("Hello\0x", "Hello\0y", 8) == 0); /* Stop at null */
+
+        /* Test 6: Empty strings */
+        assert(strncmp("", "", 5) == 0);
+        assert(strncmp("A", "", 1) > 0);
+        assert(strncmp("", "A", 1) < 0);
+
+        /* Test 7: n=0 */
+        assert(strncmp("Hello", "World", 0) == 0);
+
+        /* Test 8: Large n (force SWAR loop) */
+        char large1[100];
+        char large2[100];
+        memset(large1, 'A', 100);
+        memset(large2, 'A', 100);
+        large1[99] = '\0';
+        large2[99] = '\0';
+        assert(strncmp(large1, large2, 100) == 0);
+
+        large2[50] = 'B';
+        assert(strncmp(large1, large2, 100) < 0); /* 'A' < 'B' */
+
+        /* Test 9: Alignment edge cases */
+        /* Aligned s1, unaligned s2 */
+        char buf1[32] __attribute__((aligned(8)));
+        char buf2[32] __attribute__((aligned(8)));
+        strcpy(buf1, "012345678901234");
+        strcpy(buf2, "012345678901234");
+
+        /* s1 aligned (offset 0), s2 unaligned (offset 1) */
+        /* This forces fallback to byte loop in our implementation */
+        assert(strncmp(buf1, buf2 + 1, 10) != 0); /* different content */
+
+        /* Same content, unaligned offsets */
+        strcpy(buf2 + 1, "0123456789");
+        assert(strncmp(buf1, buf2 + 1, 10) == 0);
+
+        printf("strncmp tests passed\n");
+    }
+
     /* Test strnlen */
     {
         /* Test 1: Normal string, maxlen > len */

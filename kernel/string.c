@@ -425,6 +425,54 @@ char* strchr(const char *s, int c) {
 }
 
 int strncmp(const char* s1, const char* s2, size_t n) {
+#ifdef __x86_64__
+    /* Optimization: Compare 8 bytes at a time if pointers are aligned */
+    typedef uint64_t __attribute__((__may_alias__)) u64_alias;
+
+    /* Align s1 to 8 bytes */
+    while (n > 0 && ((uintptr_t)s1 & 7) != 0) {
+        if (*s1 != *s2) {
+            return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+        }
+        if (*s1 == '\0') {
+            return 0;
+        }
+        s1++;
+        s2++;
+        n--;
+    }
+
+    /* If s2 is also aligned and we have enough bytes, do 64-bit comparison */
+    if (n >= 8 && ((uintptr_t)s2 & 7) == 0) {
+        const u64_alias* ls1 = (const u64_alias*)s1;
+        const u64_alias* ls2 = (const u64_alias*)s2;
+        uint64_t v1, v2;
+
+        while (n >= 8) {
+            v1 = *ls1;
+            v2 = *ls2;
+
+            /* Check for null terminator in v1 using standard bit trick:
+             * (v1 - 0x01...) & ~v1 & 0x80... detects zero byte.
+             * Also check if words differ.
+             */
+            if (((v1 - 0x0101010101010101ULL) & ~v1 & 0x8080808080808080ULL) || (v1 != v2)) {
+                /* Mismatch or null terminator found.
+                 * Break to byte loop to find exact location. */
+                break;
+            }
+
+            ls1++;
+            ls2++;
+            n -= 8;
+        }
+
+        /* Update pointers for the fallback loop */
+        s1 = (const char*)ls1;
+        s2 = (const char*)ls2;
+    }
+#endif
+
     while (n > 0 && *s1 && (*s1 == *s2)) {
         s1++;
         s2++;
