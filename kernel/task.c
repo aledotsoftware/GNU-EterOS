@@ -24,9 +24,39 @@
 #include "../include/msr.h"
 #include "../include/lock.h"
 #include "../include/vmm.h"
+#include "../include/pmm.h"
 #include "../include/syscall.h"
 
 extern void fork_return(void);
+
+/* ========================================================================= */
+/* Helper de Stack de Kernel                                                 */
+/* ========================================================================= */
+
+static void* alloc_kernel_stack(int slot) {
+    uint64_t base = KERNEL_STACK_BASE + (uint64_t)slot * (TASK_STACK_SIZE + KERNEL_STACK_GUARD_SIZE);
+    uint64_t stack_start = base + KERNEL_STACK_GUARD_SIZE;
+    uint64_t stack_end = stack_start + TASK_STACK_SIZE;
+
+    /* Check reuse (if first page is mapped) */
+    if (vmm_virt_to_phys(stack_start)) {
+        memset((void*)stack_start, 0, TASK_STACK_SIZE);
+        return (void*)stack_start;
+    }
+
+    /* Allocate and Map */
+    for (uint64_t addr = stack_start; addr < stack_end; addr += PAGE_SIZE) {
+        void* phys = pmm_alloc_page();
+        if (!phys) {
+            /* TODO: Rollback previous pages if OOM */
+            return NULL;
+        }
+        vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE);
+    }
+
+    memset((void*)stack_start, 0, TASK_STACK_SIZE);
+    return (void*)stack_start;
+}
 
 /* ========================================================================= */
 /* Estado Global del Scheduler                                               */
@@ -154,14 +184,14 @@ int task_create(const char* name, void (*entry)(void)) {
         return -1;
     }
 
-    /* Alocar stack para la nueva tarea */
-    uint8_t* stack = (uint8_t*)kmalloc(TASK_STACK_SIZE);
+    /* Alocar stack para la nueva tarea (con Guard Page) */
+    uint8_t* stack = (uint8_t*)alloc_kernel_stack(slot);
     if (!stack) {
         serial_write_string("[SCHED] Error: No hay memoria para el stack\n");
         spin_unlock(&sched_lock);
         return -1;
     }
-    memset(stack, 0, TASK_STACK_SIZE);
+    /* Note: alloc_kernel_stack already memsets to 0 */
 
     /* Configurar la tarea */
     tasks[slot].id = next_id++;
@@ -504,13 +534,13 @@ int task_fork(void* regs_ptr) {
         return -1;
     }
 
-    /* 2. Alloc Stack */
-    uint8_t* stack = (uint8_t*)kmalloc(TASK_STACK_SIZE);
+    /* 2. Alloc Stack (con Guard Page) */
+    uint8_t* stack = (uint8_t*)alloc_kernel_stack(slot);
     if (!stack) {
         spin_unlock(&sched_lock);
         return -1;
     }
-    memset(stack, 0, TASK_STACK_SIZE);
+    /* Note: alloc_kernel_stack already memsets to 0 */
 
     /* 3. Setup Child Task */
     tasks[slot].id = next_id++;
