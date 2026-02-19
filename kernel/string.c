@@ -345,14 +345,15 @@ char* strncpy(char* dest, const char* src, size_t n) {
 }
 
 size_t strlcpy(char* dest, const char* src, size_t size) {
-    size_t i;
+    /* ⚡ BOLT Optimization: Use optimized strlen (SWAR) + memcpy (rep movsq)
+       instead of slow byte-by-byte copy loop. */
+    size_t len = strlen(src);
     if (size > 0) {
-        for (i = 0; i < size - 1 && src[i] != '\0'; i++) {
-            dest[i] = src[i];
-        }
-        dest[i] = '\0';
+        size_t to_copy = (len >= size) ? size - 1 : len;
+        memcpy(dest, src, to_copy);
+        dest[to_copy] = '\0';
     }
-    return strlen(src);
+    return len;
 }
 
 size_t strlcat(char* dest, const char* src, size_t size) {
