@@ -30,6 +30,10 @@
 /* Tamaño de las tablas de paginación iniciales (24 KB = PML4 + PDPT + 4*PD) */
 #define BOOT_PAGE_TABLE_SIZE 0x6000
 
+/* Límites del Espacio de Usuario (User Space) */
+#define USER_BASE       0x200000000UL        /* Inicio en 8 GB */
+#define USER_LIMIT      0x00007FFFFFFFFFFFUL /* Fin del espacio canónico inferior */
+
 /* ========================================================================= */
 /* API VMM                                                                   */
 /* ========================================================================= */
@@ -88,5 +92,15 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code);
  * @return 1 si es accesible por usuario (PAGE_USER set en todos los niveles), 0 si no.
  */
 int vmm_is_user_page(uint64_t virt_addr);
+
+/**
+ * Valida un puntero de usuario (y su longitud) mediante chequeo de rangos.
+ * Reemplaza la iteración de páginas para evitar DoS.
+ *
+ * @param addr Dirección de inicio del buffer.
+ * @param size Tamaño del buffer.
+ * @return 1 si es válido (dentro del rango de usuario), 0 si no.
+ */
+int vmm_validate_user_ptr(const void* addr, size_t size);
 
 #endif /* ETEROS_VMM_H */

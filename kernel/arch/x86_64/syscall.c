@@ -166,31 +166,24 @@ static void pipe_open(fs_node_t* node) {
 }
 
 static int validate_user_buffer(const void* addr, size_t size) {
-    uint64_t start = (uint64_t)addr;
-    uint64_t end = start + size;
-
-    if (end < start) return 0; /* Overflow */
-
-    uint64_t page_start = start & ~0xFFF;
-    uint64_t page_end = (end + 0xFFF) & ~0xFFF;
-
-    for (uint64_t p = page_start; p < page_end; p += PAGE_SIZE) {
-        if (!vmm_is_user_page(p)) return 0;
-    }
-    return 1;
+    return vmm_validate_user_ptr(addr, size);
 }
 
 static int validate_user_string(const char* str) {
     if (!str) return 0;
-    uint64_t ptr = (uint64_t)str;
 
-    for (int i = 0; i < 4096; i++) {
-        if ((ptr & 0xFFF) == 0 || i == 0) {
-             if (!vmm_is_user_page(ptr & ~0xFFF)) return 0;
-        }
+    /* Validate start pointer. Length unknown, check at least 1 byte. */
+    if (!vmm_validate_user_ptr(str, 1)) return 0;
 
-        if (*(char*)ptr == '\0') return 1;
-        ptr++;
+    /* Scan for null terminator within limit. */
+    /* Ensure we don't cross into non-canonical space (triggering #GP) */
+    uint64_t ptr_val = (uint64_t)str;
+    uint64_t remaining = USER_LIMIT - ptr_val + 1; /* Bytes until limit (inclusive) */
+    uint64_t max_scan = (remaining < 4096) ? remaining : 4096;
+
+    /* We rely on Page Fault Handler to catch unmapped pages during scan. */
+    for (uint64_t i = 0; i < max_scan; i++) {
+        if (str[i] == '\0') return 1;
     }
     return 0; /* Too long */
 }

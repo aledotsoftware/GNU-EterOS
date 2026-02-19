@@ -382,3 +382,17 @@ int vmm_is_user_page(uint64_t virt_addr) {
 
     return 1;
 }
+
+int vmm_validate_user_ptr(const void* addr, size_t size) {
+    uint64_t start = (uint64_t)addr;
+    uint64_t end = start + size;
+
+    /* Check for overflow (end < start) */
+    if (end < start) return 0;
+
+    /* Check bounds: [start, end) must be within [USER_BASE, USER_LIMIT] */
+    if (start < USER_BASE) return 0;
+    if (end > (USER_LIMIT + 1)) return 0;
+
+    return 1;
+}
