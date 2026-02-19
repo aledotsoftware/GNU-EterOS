@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 
 int main(int argc, char **argv) {
     (void)argc; (void)argv;
@@ -18,7 +19,7 @@ int main(int argc, char **argv) {
     } else {
         printf("Writing to /dev/tty (FD=%d)...\n", fd);
         const char *msg = "This is written to /dev/tty via syscall!\n";
-        write(fd, msg, 42); /* Length hardcoded for simplicity */
+        write(fd, msg, strlen(msg));
         close(fd);
         printf("Closed /dev/tty.\n");
     }
