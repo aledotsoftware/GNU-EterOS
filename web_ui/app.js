@@ -534,16 +534,25 @@ function makeDraggable(el) {
     header.onmousedown = dragMouseDown;
     header.ontouchstart = dragMouseDown;
 
+    function getClientPos(e) {
+        if (e.type.startsWith('touch')) {
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            return { x: 0, y: 0 };
+        }
+        return { x: e.clientX, y: e.clientY };
+    }
+
     function dragMouseDown(e) {
         if (el.classList.contains('maximized') || el.classList.contains('focus-mode')) return;
 
         e = e || window.event;
-        // Handle both mouse and touch events
-        const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-        const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
 
-        startX = clientX;
-        startY = clientY;
+        const pos = getClientPos(e);
+        startX = pos.x;
+        startY = pos.y;
+
         initialLeft = el.offsetLeft;
         initialTop = el.offsetTop;
 
@@ -561,12 +570,11 @@ function makeDraggable(el) {
     function elementDrag(e) {
         e = e || window.event;
 
-        const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-        const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+        const pos = getClientPos(e);
 
         // Calculate new position based on delta
-        const dx = clientX - startX;
-        const dy = clientY - startY;
+        const dx = pos.x - startX;
+        const dy = pos.y - startY;
 
         currentLeft = initialLeft + dx;
         currentTop = initialTop + dy;
