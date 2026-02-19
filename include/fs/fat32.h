@@ -114,7 +114,6 @@ typedef struct {
     uint32_t sectors_per_cluster;
     uint16_t bytes_per_sector;
     uint32_t fat_size;          // in sectors
-    uint32_t total_clusters;
 } fat32_volume_t;
 
 /**
