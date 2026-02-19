@@ -122,6 +122,7 @@ DOOM_SRCS = $(DOOM_CORE_SRCS) $(DOOM_ETEROS_SRCS)
 
 KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/string.c             \
+              $(KERNEL_DIR)/stdio.c              \
               $(KERNEL_DIR)/shell.c              \
               $(KERNEL_DIR)/drivers/video/vga.c  \
               $(KERNEL_DIR)/drivers/serial/serial.c \
@@ -162,9 +163,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/net/ip_utils.c \
               $(KERNEL_DIR)/net/stack.c \
               $(KERNEL_DIR)/apps/wget.c \
-              $(KERNEL_DIR)/apps/doom_stub.c \
-              $(LWIP_SRCS) \
-              $(DOOM_SRCS)
+              $(KERNEL_DIR)/apps/doom_stub.c
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
