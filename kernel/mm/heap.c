@@ -11,6 +11,8 @@
 #include "../../include/mm.h"
 #include "../../include/serial.h"
 #include "../../include/pmm.h" /* Para PAGE_ALIGN_UP y PAGE_SIZE */
+#include "../../include/lock.h"
+#include "../../include/io.h"
 
 /* ========================================================================= */
 /* Configuración del Heap                                                    */
@@ -41,6 +43,9 @@ static block_header_t* heap_start = NULL;
 static block_header_t* last_alloc = NULL; /* Puntero para Next-Fit strategy */
 static size_t memory_used = 0;
 static size_t memory_total = 0;
+
+/* Spinlock para proteger el heap en entornos SMP */
+static spinlock_t heap_lock = 0;
 
 /* ========================================================================= */
 /* Helpers                                                                   */
@@ -154,7 +159,7 @@ void mm_init(boot_info_t* boot_info) {
     serial_write_string(" MB\n");
 }
 
-void* kmalloc(size_t size) {
+static void* _kmalloc_impl(size_t size) {
     if (size == 0) return NULL;
     if (!heap_start) return NULL; /* Heap no inicializado */
 
@@ -215,7 +220,17 @@ void* kmalloc(size_t size) {
     return NULL;
 }
 
-void kfree(void* ptr) {
+void* kmalloc(size_t size) {
+    if (size == 0) return NULL;
+    uint64_t flags = irq_save();
+    spin_lock(&heap_lock);
+    void* ptr = _kmalloc_impl(size);
+    spin_unlock(&heap_lock);
+    irq_restore(flags);
+    return ptr;
+}
+
+static void _kfree_impl(void* ptr) {
     if (!ptr) return;
     if (!heap_start) return;
 
@@ -269,9 +284,16 @@ void kfree(void* ptr) {
         if (block->next) {
             block->next->prev = block->prev;
         }
-        /* block is now merged into prev, so we don't need to update block pointer
-           for subsequent operations as we are done. */
     }
+}
+
+void kfree(void* ptr) {
+    if (!ptr) return;
+    uint64_t flags = irq_save();
+    spin_lock(&heap_lock);
+    _kfree_impl(ptr);
+    spin_unlock(&heap_lock);
+    irq_restore(flags);
 }
 
 void* kcalloc(size_t num, size_t size) {

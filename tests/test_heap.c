@@ -19,6 +19,10 @@ static void* (*std_memcpy)(void*, const void*, size_t) = memcpy;
 #undef PAGE_SIZE
 #endif
 
+/* Mock IRQ functions for spinlock support */
+uint64_t irq_save(void) { return 0; }
+void irq_restore(uint64_t flags) { (void)flags; }
+
 /* Mock kernel end symbol */
 uint8_t _kernel_end = 0;
 
