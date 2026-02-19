@@ -29,3 +29,7 @@
 ## 2026-06-05 - [Connectivity Status Visibility]
 **Learning:** In a connected OS, users expect immediate feedback on network status. Hiding connectivity details inside a "Settings" app adds friction. A simple status bar icon with a tooltip (showing IP or "Offline") provides reassurance and quick diagnostics without clutter.
 **Action:** Ensure critical system states (Network, Battery, Audio) are always visible in the global status bar with detailed tooltips.
+
+## 2026-06-12 - [Keyboard Accessible Grids]
+**Learning:** Grids of clickable items (like app launchers) are completely invisible to keyboard users without `tabindex` and focus styles. Adding simple `aria-label` and `onkeydown` (Enter/Space) handlers transforms a "mouse-only" toy into a usable tool.
+**Action:** Always ensure grid items have `role="button"`, `tabindex="0"`, and visible `:focus-visible` styles.

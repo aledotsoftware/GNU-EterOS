@@ -980,6 +980,12 @@ body {
     transform: scale(1.1);
 }
 
+.launcher-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+    border-radius: 8px;
+}
+
 .launcher-icon {
     width: 64px;
     height: 64px;
