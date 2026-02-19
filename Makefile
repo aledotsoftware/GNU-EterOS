@@ -234,6 +234,7 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/shell
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/video
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/serial
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/shell
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/input
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/arch/x86_64/boot

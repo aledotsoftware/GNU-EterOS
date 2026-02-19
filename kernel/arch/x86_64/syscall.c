@@ -372,23 +372,36 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
         /* Stdin -> Keyboard */
         char* cbuf = (char*)buf;
         size_t i = 0;
+        task_t* current = task_get_current();
+
         while (i < count) {
-            char c = keyboard_getchar();
-            
-            /* Echo the character to serial and terminal */
-            serial_putchar(c);
-            terminal_putchar(c);
-            
-            if (c == '\b') {
-                if (i > 0) i--;
-                continue;
+            /* Check for signals */
+            if (current->signal_pending & ~current->signal_mask) {
+                if (i > 0) return i; /* Return partial read */
+                return -EINTR;
             }
-            
-            cbuf[i++] = c;
-            if (c == '\n' || c == '\r') {
-                /* Normalize newline */
-                if (c == '\r') cbuf[i-1] = '\n';
-                return i;
+
+            if (keyboard_has_input()) {
+                char c = keyboard_getchar();
+
+                /* Echo the character to serial and terminal */
+                serial_putchar(c);
+                terminal_putchar(c);
+
+                if (c == '\b') {
+                    if (i > 0) i--;
+                    continue;
+                }
+
+                cbuf[i++] = c;
+                if (c == '\n' || c == '\r') {
+                    /* Normalize newline */
+                    if (c == '\r') cbuf[i-1] = '\n';
+                    return i;
+                }
+            } else {
+                /* Wait for interrupt */
+                __asm__ volatile("hlt");
             }
         }
         return i;
@@ -511,6 +524,12 @@ static int64_t sys_kill(int pid, int sig) {
 
     /* Set the signal pending bit (if not masked) */
     target->signal_pending |= (1u << sig);
+
+    /* Wake up if blocked */
+    if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) {
+        target->state = TASK_READY;
+    }
+
     serial_write_string("[SIGNAL] Queued signal on task\n");
     return 0;
 }
