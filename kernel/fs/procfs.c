@@ -116,6 +116,7 @@ static fs_node_t *procfs_finddir(fs_node_t *node, char *name) {
     fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!fnode) return 0;
     memset(fnode, 0, sizeof(fs_node_t));
+    fnode->ref_count = 1;
     fnode->flags = FS_FILE;
 
     if (strcmp(name, "version") == 0) {
@@ -142,6 +143,7 @@ fs_node_t* procfs_init(void) {
     if (!procfs_root) return NULL;
 
     memset(procfs_root, 0, sizeof(fs_node_t));
+    procfs_root->ref_count = 1;
     strlcpy(procfs_root->name, "proc", sizeof(procfs_root->name));
     procfs_root->flags = FS_DIRECTORY;
     procfs_root->readdir = procfs_readdir;

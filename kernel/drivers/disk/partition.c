@@ -204,6 +204,7 @@ static fs_node_t *create_partition_node(int index) {
     if (!node) return NULL;
 
     memset(node, 0, sizeof(fs_node_t));
+    node->ref_count = 1;
 
     partition_t *part = &partitions[index];
 

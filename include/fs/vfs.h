@@ -39,6 +39,7 @@ typedef struct fs_node {
     readdir_type_t readdir;
     finddir_type_t finddir;
     struct fs_node *ptr; /* Used by mountpoints and symlinks */
+    uint32_t ref_count;   /* Reference counting for shared nodes */
 } fs_node_t;
 
 struct dirent {

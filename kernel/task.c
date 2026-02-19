@@ -529,7 +529,12 @@ int task_fork(void* regs_ptr) {
 
     /* POSIX/Linux Fields */
     memcpy(tasks[slot].fd_table, parent->fd_table, sizeof(parent->fd_table));
-    /* NOTE: VFS nodes are shared pointers! Refcounting needed but missing. */
+    /* VFS nodes are shared pointers! Refcounting handled here. */
+    for (int i = 0; i < MAX_FD; i++) {
+        if (tasks[slot].fd_table[i].node) {
+            tasks[slot].fd_table[i].node->ref_count++;
+        }
+    }
 
     tasks[slot].signal_mask = parent->signal_mask;
     memcpy(tasks[slot].signal_handlers, parent->signal_handlers, sizeof(parent->signal_handlers));

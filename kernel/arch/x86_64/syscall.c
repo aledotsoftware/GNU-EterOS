@@ -270,6 +270,8 @@ static int64_t sys_pipe(int* pipefd) {
     fs_node_t* writer = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     memset(reader, 0, sizeof(fs_node_t));
     memset(writer, 0, sizeof(fs_node_t));
+    reader->ref_count = 1;
+    writer->ref_count = 1;
 
     strlcpy(reader->name, "pipe_r", 32);
     reader->flags = FS_PIPE;
@@ -451,10 +453,17 @@ static int64_t sys_close(int fd) {
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
 
-    close_fs(current->fd_table[fd].node);
+    fs_node_t* node = current->fd_table[fd].node;
+    if (node->ref_count > 0) {
+        node->ref_count--;
+    }
 
-    /* Free the node memory (vfs_lookup allocates it) */
-    kfree(current->fd_table[fd].node);
+    if (node->ref_count == 0) {
+        close_fs(node);
+        /* Free the node memory (vfs_lookup allocates it) */
+        kfree(node);
+    }
+
     current->fd_table[fd].node = NULL;
 
     return 0;
@@ -677,13 +686,13 @@ static int64_t sys_dup2(int oldfd, int newfd) {
     /* We should share the file description (offset + node).
        But our current architecture stores offset in fd_table directly.
        We will copy state, meaning offsets diverge. This is a known limitation.
-       We MUST clone the node to avoid double-free on close, unless we implement refcounting.
+       We share the node and use refcounting to avoid double-free.
     */
-    fs_node_t* new_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    if (!new_node) return -ENOMEM;
-    memcpy(new_node, current->fd_table[oldfd].node, sizeof(fs_node_t));
+    current->fd_table[newfd].node = current->fd_table[oldfd].node;
+    if (current->fd_table[newfd].node) {
+        current->fd_table[newfd].node->ref_count++;
+    }
 
-    current->fd_table[newfd].node = new_node;
     current->fd_table[newfd].offset = current->fd_table[oldfd].offset;
     current->fd_table[newfd].flags = current->fd_table[oldfd].flags;
 

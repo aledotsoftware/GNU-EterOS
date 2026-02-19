@@ -75,7 +75,10 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
     if (strcmp(name, "dev") == 0) {
         if (devfs_root_node) {
             fs_node_t* copy = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-            if (copy) memcpy(copy, devfs_root_node, sizeof(fs_node_t));
+            if (copy) {
+                memcpy(copy, devfs_root_node, sizeof(fs_node_t));
+                copy->ref_count = 1;
+            }
             return copy;
         }
         return 0;
@@ -83,7 +86,10 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
     if (strcmp(name, "proc") == 0) {
         if (procfs_root_node) {
             fs_node_t* copy = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-            if (copy) memcpy(copy, procfs_root_node, sizeof(fs_node_t));
+            if (copy) {
+                memcpy(copy, procfs_root_node, sizeof(fs_node_t));
+                copy->ref_count = 1;
+            }
             return copy;
         }
         return 0;
@@ -93,6 +99,7 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
         fs_node_t* fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
         if (!fnode) return 0;
         memset(fnode, 0, sizeof(fs_node_t));
+        fnode->ref_count = 1;
         strlcpy(fnode->name, "sys", sizeof(fnode->name));
         fnode->flags = FS_DIRECTORY;
         return fnode;
@@ -103,6 +110,7 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
              fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
              if (!fnode) return 0;
              memset(fnode, 0, sizeof(fs_node_t));
+             fnode->ref_count = 1;
              strlcpy(fnode->name, file_headers[i].name, sizeof(fnode->name));
              fnode->inode = i;
              fnode->flags = FS_FILE;
@@ -159,6 +167,7 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
         return NULL;
     }
     memset(initrd_root, 0, sizeof(fs_node_t));
+    initrd_root->ref_count = 1;
     strlcpy(initrd_root->name, "initrd", sizeof(initrd_root->name));
     initrd_root->mask = initrd_root->uid = initrd_root->gid = initrd_root->inode = initrd_root->length = 0;
     initrd_root->flags = FS_DIRECTORY;

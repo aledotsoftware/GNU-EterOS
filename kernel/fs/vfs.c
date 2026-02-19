@@ -46,7 +46,10 @@ fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
     /* Handle root path specially */
     if (path[0] == '/' && path[1] == '\0') {
         fs_node_t* clone = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-        if (clone) memcpy(clone, root, sizeof(fs_node_t));
+        if (clone) {
+            memcpy(clone, root, sizeof(fs_node_t));
+            clone->ref_count = 1;
+        }
         return clone;
     }
 
@@ -55,7 +58,10 @@ fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
     if (!path[0]) {
         /* Duplicate of handle root path case but for safety */
         fs_node_t* clone = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-        if (clone) memcpy(clone, root, sizeof(fs_node_t));
+        if (clone) {
+            memcpy(clone, root, sizeof(fs_node_t));
+            clone->ref_count = 1;
+        }
         return clone;
     }
 

@@ -139,6 +139,7 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
     fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!fnode) return 0;
     memset(fnode, 0, sizeof(fs_node_t));
+    fnode->ref_count = 1;
     fnode->flags = FS_CHARDEVICE;
 
     if (strcmp(name, "null") == 0) {
@@ -178,6 +179,7 @@ fs_node_t* devfs_init(void) {
     if (!devfs_root) return NULL;
 
     memset(devfs_root, 0, sizeof(fs_node_t));
+    devfs_root->ref_count = 1;
     strlcpy(devfs_root->name, "dev", sizeof(devfs_root->name));
     devfs_root->flags = FS_DIRECTORY;
     devfs_root->readdir = devfs_readdir;
