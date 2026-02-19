@@ -9,6 +9,7 @@
 static void* (*std_memset)(void*, int, size_t) = memset;
 static int (*std_memcmp)(const void*, const void*, size_t) = memcmp;
 static int (*std_strcmp)(const char*, const char*) = strcmp;
+static int (*std_strncmp)(const char*, const char*, size_t) = strncmp;
 
 /* Define host test mode */
 #ifndef __ETEROS_HOST_TEST__
@@ -572,6 +573,39 @@ int main() {
         assert(strnlen(buffer, 3) == 3);
 
         printf("strnlen tests passed\n");
+    }
+
+    /* Test strncmp */
+    {
+        /* Test 1: Equality */
+        assert(strncmp("Hello", "Hello", 5) == 0);
+        assert(strncmp("Hello", "Hello", 10) == 0);
+        assert(strncmp("", "", 0) == 0);
+        assert(strncmp("", "", 1) == 0);
+
+        /* Test 2: Inequality */
+        assert(strncmp("Hello", "World", 5) < 0);
+        assert(strncmp("World", "Hello", 5) > 0);
+
+        /* Test 3: Limit n */
+        assert(strncmp("Hello World", "Hello There", 5) == 0);
+        assert(strncmp("Hello World", "Hello There", 6) == 0);
+        assert(strncmp("Hello World", "Hello There", 7) != 0);
+
+        /* Test 4: n=0 */
+        assert(strncmp("A", "B", 0) == 0);
+
+        /* Test 5: Verify against standard strncmp */
+        const char* s1 = "TestString1";
+        const char* s2 = "TestString2";
+        int res_std = std_strncmp(s1, s2, 10);
+        int res_eteros = strncmp(s1, s2, 10);
+
+        if (res_std < 0) assert(res_eteros < 0);
+        else if (res_std > 0) assert(res_eteros > 0);
+        else assert(res_eteros == 0);
+
+        printf("strncmp tests passed\n");
     }
 
     /* Test explicit_bzero */

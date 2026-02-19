@@ -35,24 +35,6 @@ static uint16_t parse_url(const char* url, char* host, size_t host_size, char* p
     return port;
 }
 
-uint32_t ip_aton(const char* cp) {
-    uint32_t val = 0;
-    for (int i = 0; i < 4; i++) {
-        uint32_t part = 0;
-        while (*cp >= '0' && *cp <= '9') {
-            part = part * 10 + (*cp - '0');
-            if (part > 255) return 0; /* Invalid IP part */
-            cp++;
-        }
-        val |= (part << (i * 8));
-        if (i < 3) {
-            if (*cp == '.') cp++;
-            else return 0; /* Invalid format */
-        }
-    }
-    return val;
-}
-
 void wget_run(const char* url_in) {
     char host[256];
     char path[256];
@@ -67,6 +49,7 @@ void wget_run(const char* url_in) {
         terminal_write_string("[WGET] Warning: TLS (HTTPS) no implementado. Conectando via TCP plano.\n");
     }
     
+    /* Use safe ip_aton from kernel/net/ip_utils.c (via net/defs.h) */
     uint32_t ip = ip_aton(host);
     if (ip == 0) {
         /* Simple hardcoded resolution for testing if not an IP */
@@ -96,14 +79,25 @@ void wget_run(const char* url_in) {
         return;
     }
     
-    char request[512];
-    strlcpy(request, "GET ", sizeof(request));
-    strlcat(request, path, sizeof(request));
-    strlcat(request, " HTTP/1.0\r\nHost: ", sizeof(request));
-    strlcat(request, host, sizeof(request));
-    strlcat(request, "\r\nUser-Agent: eterOS/0.1\r\nConnection: close\r\n\r\n", sizeof(request));
+    /* Increased buffer size to 1024 and added truncation checks */
+    char request[1024];
+    size_t req_size = sizeof(request);
+
+    if (strlcpy(request, "GET ", req_size) >= req_size) goto trunc;
+    if (strlcat(request, path, req_size) >= req_size) goto trunc;
+    if (strlcat(request, " HTTP/1.0\r\nHost: ", req_size) >= req_size) goto trunc;
+    if (strlcat(request, host, req_size) >= req_size) goto trunc;
+    if (strlcat(request, "\r\nUser-Agent: eterOS/0.1\r\nConnection: close\r\n\r\n", req_size) >= req_size) goto trunc;
     
     net_send(sock, request, strlen(request), 0);
+    goto receive;
+
+trunc:
+    terminal_write_string("[WGET] Error: Request buffer overflow or URL too long.\n");
+    net_close(sock);
+    return;
+
+receive:
     
     terminal_write_string("[WGET] Finalizado el envio de cabeceras. Recibiendo datos...\n\n");
     

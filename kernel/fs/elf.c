@@ -89,6 +89,12 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
                 max_vaddr = vaddr + mem_size;
             }
 
+            /* Security Check: Prevent buffer overflow if file size exceeds memory size */
+            if (file_size > mem_size) {
+                serial_write_string("[ELF] Error: p_filesz > p_memsz (Buffer Overflow Risk). Load rejected.\n");
+                return 0;
+            }
+
             /* Security Check: Ensure segment is in User Space */
             if (vaddr >= 0x0000800000000000 || (vaddr + mem_size) >= 0x0000800000000000) {
                 serial_write_string("[ELF] Error: Segment violates User Space boundaries.\n");

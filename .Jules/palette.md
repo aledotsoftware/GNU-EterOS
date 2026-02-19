@@ -29,3 +29,7 @@
 ## 2026-06-05 - [Connectivity Status Visibility]
 **Learning:** In a connected OS, users expect immediate feedback on network status. Hiding connectivity details inside a "Settings" app adds friction. A simple status bar icon with a tooltip (showing IP or "Offline") provides reassurance and quick diagnostics without clutter.
 **Action:** Ensure critical system states (Network, Battery, Audio) are always visible in the global status bar with detailed tooltips.
+
+## 2026-10-24 - [Keyboard Accessibility for Iconic Launchers]
+**Learning:** A grid of app icons without keyboard support (tabindex/role) completely blocks keyboard-only users. Adding simple focus styles (scale + glow) and standard keyboard events transforms a "touch-first" launcher into a fully accessible desktop experience.
+**Action:** Always ensure interactive grids (like launchers or galleries) support arrow/tab navigation and have clear `:focus-visible` states.

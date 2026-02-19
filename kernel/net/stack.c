@@ -86,21 +86,47 @@ void net_poll(void) {
     uint8_t buffer[1514];
     int len = e1000_receive(buffer, sizeof(buffer));
     if (len > 0) {
+        /* Security Check: Ethernet Header */
+        if ((size_t)len < sizeof(struct ethernet_header)) return;
+
         struct ethernet_header* eth = (struct ethernet_header*)buffer;
         uint16_t type = ntohs(eth->type);
 
         if (type == ETHERNET_TYPE_ARP) {
+            if ((size_t)len < sizeof(struct ethernet_header) + sizeof(struct arp_packet)) return;
             struct arp_packet* arp = (struct arp_packet*)(buffer + sizeof(struct ethernet_header));
             handle_arp(eth, arp);
         } else if (type == ETHERNET_TYPE_IP) {
+            /* Security Check: IP Header presence */
+            if ((size_t)len < sizeof(struct ethernet_header) + sizeof(struct ip_header)) return;
+
             struct ip_header* ip = (struct ip_header*)(buffer + sizeof(struct ethernet_header));
+
+            /* Security Check: IP IHL */
+            int ip_hdr_len = (ip->ver_ihl & 0xF) * 4;
+            if (ip_hdr_len < 20 || (size_t)len < sizeof(struct ethernet_header) + ip_hdr_len) return;
 
             /* Basic IP Checks: Allow if addressed to us, or if broadcast, or if we don't have an IP yet */
             if (ip->dest == my_ip || ip->dest == 0xFFFFFFFF || my_ip == 0) {
                 if (ip->proto == IP_PROTO_TCP) {
-                    struct tcp_header* tcp = (struct tcp_header*)((uint8_t*)ip + ((ip->ver_ihl & 0xF) * 4));
-                    int ip_hdr_len = (ip->ver_ihl & 0xF) * 4;
-                    int tcp_len = ntohs(ip->len) - ip_hdr_len;
+                    /* Security Check: TCP Header presence */
+                    if ((size_t)len < sizeof(struct ethernet_header) + ip_hdr_len + sizeof(struct tcp_header)) return;
+
+                    struct tcp_header* tcp = (struct tcp_header*)((uint8_t*)ip + ip_hdr_len);
+
+                    /* Security Check: Payload Length Validation */
+                    /* Calculate payload length based on IP Total Length field */
+                    int total_ip_len = ntohs(ip->len);
+                    int ip_payload_len = total_ip_len - ip_hdr_len;
+
+                    /* Calculate actual available data in the received buffer */
+                    int available_len = len - sizeof(struct ethernet_header) - ip_hdr_len;
+
+                    /* Use the smaller of the two to avoid over-read */
+                    int tcp_len = (ip_payload_len < available_len) ? ip_payload_len : available_len;
+
+                    /* Ensure tcp_len covers at least the TCP header */
+                    if (tcp_len < (int)sizeof(struct tcp_header)) return;
 
                     /* Find Socket */
                     for (int i = 0; i < MAX_SOCKETS; i++) {

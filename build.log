@@ -1,0 +1,106 @@
+[CC]   kernel/main.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/main.c -o build/kernel/main.o
+[CC]   kernel/string.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/string.c -o build/kernel/string.o
+[CC]   kernel/shell.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/shell.c -o build/kernel/shell.o
+[CC]   kernel/drivers/video/vga.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/video/vga.c -o build/kernel/drivers/video/vga.o
+[CC]   kernel/drivers/serial/serial.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/serial/serial.c -o build/kernel/drivers/serial/serial.o
+[CC]   kernel/drivers/input/keyboard.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/input/keyboard.c -o build/kernel/drivers/input/keyboard.o
+[CC]   kernel/arch/x86_64/hal_impl.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/hal_impl.c -o build/kernel/arch/x86_64/hal_impl.o
+[CC]   kernel/arch/x86_64/idt.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/idt.c -o build/kernel/arch/x86_64/idt.o
+[CC]   kernel/arch/x86_64/pic.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/pic.c -o build/kernel/arch/x86_64/pic.o
+[CC]   kernel/drivers/timer/pit.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/timer/pit.c -o build/kernel/drivers/timer/pit.o
+[CC]   kernel/drivers/rtc/rtc.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/rtc/rtc.c -o build/kernel/drivers/rtc/rtc.o
+[CC]   kernel/arch/x86_64/boot/nvram.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/boot/nvram.c -o build/kernel/arch/x86_64/boot/nvram.o
+[CC]   kernel/mm/heap.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/mm/heap.c -o build/kernel/mm/heap.o
+[CC]   kernel/apps/santitravel.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/apps/santitravel.c -o build/kernel/apps/santitravel.o
+[CC]   kernel/apps/sysmon.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/apps/sysmon.c -o build/kernel/apps/sysmon.o
+[CC]   kernel/apps/user_loader.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/apps/user_loader.c -o build/kernel/apps/user_loader.o
+[CC]   kernel/drivers/pci/pci.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/pci/pci.c -o build/kernel/drivers/pci/pci.o
+[CC]   kernel/fs/initrd.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/fs/initrd.c -o build/kernel/fs/initrd.o
+[CC]   kernel/fs/vfs.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/fs/vfs.c -o build/kernel/fs/vfs.o
+[CC]   kernel/fs/devfs.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/fs/devfs.c -o build/kernel/fs/devfs.o
+[CC]   kernel/fs/procfs.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/fs/procfs.c -o build/kernel/fs/procfs.o
+[CC]   kernel/apps/gui_demo.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/apps/gui_demo.c -o build/kernel/apps/gui_demo.o
+kernel/apps/gui_demo.c:2730:19: warning: ‘ui_event_queue’ defined but not used [-Wunused-variable]
+ 2730 | static ui_event_t ui_event_queue[UI_EVENT_QUEUE_SIZE];
+      |                   ^~~~~~~~~~~~~~
+kernel/apps/gui_demo.c:2442:15: warning: ‘draw_zoom_transition’ defined but not used [-Wunused-function]
+ 2442 | static rect_t draw_zoom_transition(void) {
+      |               ^~~~~~~~~~~~~~~~~~~~
+kernel/apps/gui_demo.c:2409:13: warning: ‘flux_update_zoom’ defined but not used [-Wunused-function]
+ 2409 | static void flux_update_zoom(void) {
+      |             ^~~~~~~~~~~~~~~~
+kernel/apps/gui_demo.c:2117:13: warning: ‘draw_focus_mode’ defined but not used [-Wunused-function]
+ 2117 | static void draw_focus_mode(void) {
+      |             ^~~~~~~~~~~~~~~
+kernel/apps/gui_demo.c:66:13: warning: ‘gui_needs_redraw’ defined but not used [-Wunused-variable]
+   66 | static bool gui_needs_redraw = true;
+      |             ^~~~~~~~~~~~~~~~
+[CC]   kernel/task.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/task.c -o build/kernel/task.o
+[CC]   kernel/ui/omni.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/ui/omni.c -o build/kernel/ui/omni.o
+[CC]   kernel/ui/window.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/ui/window.c -o build/kernel/ui/window.o
+kernel/ui/window.c: In function ‘wm_pump_events’:
+kernel/ui/window.c:246:18: warning: variable ‘handled’ set but not used [-Wunused-but-set-variable]
+  246 |             bool handled = false;
+      |                  ^~~~~~~
+[CC]   kernel/ui/image.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/ui/image.c -o build/kernel/ui/image.o
+[CC]   kernel/ui/upng.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/ui/upng.c -o build/kernel/ui/upng.o
+[CC]   kernel/drivers/video/framebuffer.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/video/framebuffer.c -o build/kernel/drivers/video/framebuffer.o
+[CC]   kernel/drivers/video/font.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/video/font.c -o build/kernel/drivers/video/font.o
+[CC]   kernel/mm/pmm.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/mm/pmm.c -o build/kernel/mm/pmm.o
+[CC]   kernel/mm/vmm.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/mm/vmm.c -o build/kernel/mm/vmm.o
+[CC]   kernel/drivers/input/mouse.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/input/mouse.c -o build/kernel/drivers/input/mouse.o
+[CC]   kernel/arch/x86_64/gdt.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/gdt.c -o build/kernel/arch/x86_64/gdt.o
+[CC]   kernel/arch/x86_64/acpi.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/acpi.c -o build/kernel/arch/x86_64/acpi.o
+[CC]   kernel/arch/x86_64/smp.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/smp.c -o build/kernel/arch/x86_64/smp.o
+[CC]   kernel/arch/x86_64/apic.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/apic.c -o build/kernel/arch/x86_64/apic.o
+[CC]   kernel/arch/x86_64/syscall.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/arch/x86_64/syscall.c -o build/kernel/arch/x86_64/syscall.o
+[CC]   kernel/drivers/disk/partition.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/drivers/disk/partition.c -o build/kernel/drivers/disk/partition.o
+[CC]   kernel/fs/elf.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/fs/elf.c -o build/kernel/fs/elf.o
+[CC]   kernel/net/ip_utils.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/net/ip_utils.c -o build/kernel/net/ip_utils.o
+[CC]   kernel/net/stack.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/net/stack.c -o build/kernel/net/stack.o
+[CC]   kernel/apps/wget.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/apps/wget.c -o build/kernel/apps/wget.o
+[CC]   kernel/apps/doom_stub.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/apps/doom_stub.c -o build/kernel/apps/doom_stub.o
+make: *** No rule to make target 'build/kernel/net/lwip/src/core/init.o', needed by 'build/kernel.bin'.  Stop.

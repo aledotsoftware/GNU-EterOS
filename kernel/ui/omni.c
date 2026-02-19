@@ -404,6 +404,54 @@ void omni_draw_char_transparent(int32_t x, int32_t y, char c, uint32_t fg) {
 
 void omni_draw_string(const rect_t* clip, int32_t x, int32_t y, const char* str, uint32_t fg, uint32_t bg) {
     if (!str) return;
+
+    /* ⚡ BOLT Optimization: Fast path for unclipped/fully visible text using Row-Major rendering */
+    /* This changes memory access pattern from vertical strips to horizontal contiguous writes */
+    if (omni_bpp == 32) {
+        size_t len = strlen(str);
+        int32_t w = (int32_t)len * 8;
+        int32_t h = 16;
+
+        bool fits = false;
+        if (clip) {
+            fits = (x >= clip->x && x + w <= clip->x + clip->w &&
+                    y >= clip->y && y + h <= clip->y + clip->h);
+        } else {
+            fits = (x >= 0 && y >= 0 && (uint32_t)(x + w) <= omni_width && (uint32_t)(y + h) <= omni_height);
+        }
+
+        if (fits) {
+            dirty_mark(x, y, w, h);
+
+            uint32_t* fb_row = omni_fb + (y * omni_pitch_div4) + x;
+            const uint8_t* font_base = font8x16;
+
+            for (int row = 0; row < 16; row++) {
+                uint32_t* p = fb_row;
+                const char* s = str;
+                while (*s) {
+                    unsigned char c = (unsigned char)*s++;
+                    uint8_t bits = font_base[c * 16 + row];
+
+                    /* Unroll 8 pixels */
+                    p[0] = (bits & 0x80) ? fg : bg;
+                    p[1] = (bits & 0x40) ? fg : bg;
+                    p[2] = (bits & 0x20) ? fg : bg;
+                    p[3] = (bits & 0x10) ? fg : bg;
+                    p[4] = (bits & 0x08) ? fg : bg;
+                    p[5] = (bits & 0x04) ? fg : bg;
+                    p[6] = (bits & 0x02) ? fg : bg;
+                    p[7] = (bits & 0x01) ? fg : bg;
+
+                    p += 8;
+                }
+                fb_row += omni_pitch_div4;
+            }
+            return;
+        }
+    }
+
+    /* Slow path: Per-char clipping / bounds checking */
     int32_t cx = x;
     while (*str) {
         if (clip) {
@@ -422,6 +470,45 @@ void omni_draw_string(const rect_t* clip, int32_t x, int32_t y, const char* str,
 /* Optimized string with transparent background */
 void omni_draw_string_transparent(int32_t x, int32_t y, const char* str, uint32_t fg) {
     if (!str) return;
+
+    /* ⚡ BOLT Optimization: Fast path for unclipped/fully visible text using Row-Major rendering */
+    if (omni_bpp == 32) {
+        size_t len = strlen(str);
+        int32_t w = (int32_t)len * 8;
+        int32_t h = 16;
+
+        /* Check screen bounds */
+        if (x >= 0 && y >= 0 && (uint32_t)(x + w) <= omni_width && (uint32_t)(y + h) <= omni_height) {
+            dirty_mark(x, y, w, h);
+
+            uint32_t* fb_row = omni_fb + (y * omni_pitch_div4) + x;
+            const uint8_t* font_base = font8x16;
+
+            for (int row = 0; row < 16; row++) {
+                uint32_t* p = fb_row;
+                const char* s = str;
+                while (*s) {
+                    unsigned char c = (unsigned char)*s++;
+                    uint8_t bits = font_base[c * 16 + row];
+
+                    if (bits) { /* Optimization: skip entire byte if 0 */
+                        if (bits & 0x80) p[0] = fg;
+                        if (bits & 0x40) p[1] = fg;
+                        if (bits & 0x20) p[2] = fg;
+                        if (bits & 0x10) p[3] = fg;
+                        if (bits & 0x08) p[4] = fg;
+                        if (bits & 0x04) p[5] = fg;
+                        if (bits & 0x02) p[6] = fg;
+                        if (bits & 0x01) p[7] = fg;
+                    }
+                    p += 8;
+                }
+                fb_row += omni_pitch_div4;
+            }
+            return;
+        }
+    }
+
     int32_t cx = x;
     while (*str) {
         omni_draw_char_transparent(cx, y, *str, fg);
@@ -519,6 +606,9 @@ void omni_fill_gradient_v(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
         int32_t g_step = (((int32_t)bg - (int32_t)tg) << 16) / h;
         int32_t b_step = (((int32_t)bb - (int32_t)tb) << 16) / h;
 
+        /* ⚡ BOLT Optimization: Calculate row start once and increment pointer */
+        uint32_t* row = omni_fb + (y * omni_pitch_div4) + x;
+
         for (int i = 0; i < h; i++) {
             uint32_t r = (uint32_t)(r_val >> 16);
             uint32_t g = (uint32_t)(g_val >> 16);
@@ -526,8 +616,10 @@ void omni_fill_gradient_v(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t c
 
             uint32_t color = 0xFF000000 | (r << 16) | (g << 8) | b;
             
-            uint32_t* row = omni_fb + ((y + i) * omni_pitch_div4) + x;
             memset32(row, color, w);
+            row += omni_pitch_div4;
+
+            row += omni_pitch_div4;
 
             r_val += r_step;
             g_val += g_step;
@@ -560,44 +652,73 @@ void omni_draw_image_from_path(const char* path, int32_t x, int32_t y) {
                 dirty_mark(x, y, width, height);
 
                 if (omni_bpp == 32) {
-                    for (unsigned py = 0; py < height; py++) {
-                        int dest_y = y + py;
-                        if (dest_y < 0 || (uint32_t)dest_y >= omni_height) continue;
-    
-                        uint32_t* dest_row = omni_fb + (dest_y * omni_pitch_div4);
-    
-                        /* Process entire row at once */
-                        if (format == UPNG_RGBA8) {
-                            const uint8_t* src = buffer + (py * width * 4);
-                            for (unsigned px = 0; px < width; px++) {
-                                int dest_x = x + px;
-                                if (dest_x < 0 || (uint32_t)dest_x >= omni_width) continue;
-                                
-                                uint8_t r = src[px * 4];
-                                uint8_t g = src[px * 4 + 1];
-                                uint8_t b = src[px * 4 + 2];
-                                uint8_t a = src[px * 4 + 3];
-                                
-                                if (a < 10) continue;
-                                
-                                uint32_t color = (0xFF << 24) | (r << 16) | (g << 8) | b;
-                                if (a > 240) {
-                                    dest_row[dest_x] = color;
-                                } else {
-                                    dest_row[dest_x] = _alpha_blend(dest_row[dest_x], color, a);
+                    /* ⚡ BOLT Optimization: Pre-calculate clipping bounds to remove per-pixel checks */
+                    int32_t img_w = (int32_t)width;
+                    int32_t img_h = (int32_t)height;
+
+                    /* Vertical clipping (using int64_t to prevent overflow) */
+                    int32_t start_y = 0;
+                    int32_t end_y = img_h;
+
+                    if (y < 0) start_y = -y;
+
+                    if ((int64_t)y + img_h > omni_height) {
+                        end_y = (int32_t)((int64_t)omni_height - y);
+                    }
+
+                    /* Horizontal clipping */
+                    int32_t start_x = 0;
+                    int32_t end_x = img_w;
+
+                    if (x < 0) start_x = -x;
+
+                    if ((int64_t)x + img_w > omni_width) {
+                        end_x = (int32_t)((int64_t)omni_width - x);
+                    }
+
+                    if (start_y < end_y && start_x < end_x) {
+                        for (int py = start_y; py < end_y; py++) {
+                            int dest_y = y + py;
+                            /* No check needed: dest_y is guaranteed valid */
+
+                            uint32_t* dest_row = omni_fb + (dest_y * omni_pitch_div4);
+
+                            /* Process clipped row */
+                            if (format == UPNG_RGBA8) {
+                                const uint8_t* src_row_start = buffer + (py * width * 4);
+                                for (int px = start_x; px < end_x; px++) {
+                                    int dest_x = x + px;
+                                    /* No check needed: dest_x is guaranteed valid */
+
+                                    const uint8_t* src = src_row_start + (px * 4);
+                                    uint8_t a = src[3];
+
+                                    if (a < 10) continue;
+
+                                    uint8_t r = src[0];
+                                    uint8_t g = src[1];
+                                    uint8_t b = src[2];
+
+                                    uint32_t color = (0xFF << 24) | (r << 16) | (g << 8) | b;
+                                    if (a > 240) {
+                                        dest_row[dest_x] = color;
+                                    } else {
+                                        dest_row[dest_x] = _alpha_blend(dest_row[dest_x], color, a);
+                                    }
                                 }
-                            }
-                        } else if (format == UPNG_RGB8) {
-                            const uint8_t* src = buffer + (py * width * 3);
-                            for (unsigned px = 0; px < width; px++) {
-                                int dest_x = x + px;
-                                if (dest_x < 0 || (uint32_t)dest_x >= omni_width) continue;
-                                
-                                uint32_t color = (0xFF << 24) | 
-                                                 (src[px * 3] << 16) | 
-                                                 (src[px * 3 + 1] << 8) | 
-                                                 src[px * 3 + 2];
-                                dest_row[dest_x] = color;
+                            } else if (format == UPNG_RGB8) {
+                                const uint8_t* src_row_start = buffer + (py * width * 3);
+                                for (int px = start_x; px < end_x; px++) {
+                                    int dest_x = x + px;
+                                    /* No check needed */
+
+                                    const uint8_t* src = src_row_start + (px * 3);
+                                    uint32_t color = (0xFF << 24) |
+                                                     (src[0] << 16) |
+                                                     (src[1] << 8) |
+                                                     src[2];
+                                    dest_row[dest_x] = color;
+                                }
                             }
                         }
                     }
