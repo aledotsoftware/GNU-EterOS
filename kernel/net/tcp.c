@@ -45,6 +45,10 @@ static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, i
 
     /* Copy Payload */
     if (len > 0) {
+        if (sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct tcp_header) + len > sizeof(buffer)) {
+             hal_console_write("[TCP] Error: Payload too large for buffer\n");
+             return -1;
+        }
         memcpy(buffer + sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct tcp_header), payload, len);
     }
 
@@ -176,7 +180,9 @@ int tcp_send(socket_entry_t* sock, const void* data, int len) {
     if (sock->state != SOCKET_STATE_ESTABLISHED) return -1;
 
     /* Simple Send: PSH+ACK */
-    tcp_send_packet(sock, data, len, TCP_PSH | TCP_ACK);
+    if (tcp_send_packet(sock, data, len, TCP_PSH | TCP_ACK) < 0) {
+        return -1;
+    }
     sock->seq_num += len;
 
     return len;
