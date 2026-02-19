@@ -1,7 +1,7 @@
 #ifndef ETEROS_LOCK_H
 #define ETEROS_LOCK_H
 
-#include <types.h>
+#include "types.h"
 
 typedef volatile int spinlock_t;
 

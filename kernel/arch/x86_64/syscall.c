@@ -63,6 +63,7 @@ void syscall_init(void) {
 #define O_RDONLY    00000000
 #define O_WRONLY    00000001
 #define O_RDWR      00000002
+#define O_CREAT     0x00000040
 
 typedef struct {
     uint8_t* buffer;
@@ -166,33 +167,55 @@ static void pipe_open(fs_node_t* node) {
 }
 
 static int validate_user_buffer(const void* addr, size_t size) {
-    uint64_t start = (uint64_t)addr;
-    uint64_t end = start + size;
-
-    if (end < start) return 0; /* Overflow */
-
-    uint64_t page_start = start & ~0xFFF;
-    uint64_t page_end = (end + 0xFFF) & ~0xFFF;
-
-    for (uint64_t p = page_start; p < page_end; p += PAGE_SIZE) {
-        if (!vmm_is_user_page(p)) return 0;
-    }
-    return 1;
+    return vmm_validate_user_ptr(addr, size);
 }
 
 static int validate_user_string(const char* str) {
     if (!str) return 0;
-    uint64_t ptr = (uint64_t)str;
 
-    for (int i = 0; i < 4096; i++) {
-        if ((ptr & 0xFFF) == 0 || i == 0) {
-             if (!vmm_is_user_page(ptr & ~0xFFF)) return 0;
-        }
+    /* Validate start pointer. Length unknown, check at least 1 byte. */
+    if (!vmm_validate_user_ptr(str, 1)) return 0;
 
-        if (*(char*)ptr == '\0') return 1;
-        ptr++;
+    /* Scan for null terminator within limit. */
+    /* Ensure we don't cross into non-canonical space (triggering #GP) */
+    uint64_t ptr_val = (uint64_t)str;
+    uint64_t remaining = USER_LIMIT - ptr_val + 1; /* Bytes until limit (inclusive) */
+    uint64_t max_scan = (remaining < 4096) ? remaining : 4096;
+
+    /* We rely on Page Fault Handler to catch unmapped pages during scan. */
+    for (uint64_t i = 0; i < max_scan; i++) {
+        if (str[i] == '\0') return 1;
     }
     return 0; /* Too long */
+}
+
+/* Helper to split path into parent and name */
+static int split_path(const char* path, char* parent, char* name) {
+    int len = strlen(path);
+    int last_slash = -1;
+    for (int i = 0; i < len; i++) {
+        if (path[i] == '/') last_slash = i;
+    }
+
+    if (last_slash == -1) {
+        // No slash, parent is current (unsupported yet) or root if absolute?
+        // Assuming path is relative to some CWD, but for now everything is absolute or relative to root?
+        // The VFS lookup handles root if path starts with /.
+        // If path is "file.txt" and we are at root...
+        // Let's assume root.
+        strlcpy(parent, "/", 128);
+        strlcpy(name, path, 128);
+    } else {
+        if (last_slash == 0) {
+            strlcpy(parent, "/", 128);
+        } else {
+            if (last_slash >= 128) return -1;
+            memcpy(parent, path, last_slash);
+            parent[last_slash] = 0;
+        }
+        strlcpy(name, path + last_slash + 1, 128);
+    }
+    return 0;
 }
 
 static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
@@ -303,11 +326,6 @@ static int64_t sys_pipe(int* pipefd) {
     return 0;
 }
 
-#define O_ACCMODE   00000003
-#define O_RDONLY    00000000
-#define O_WRONLY    00000001
-#define O_RDWR      00000002
-
 #define ARCH_SET_GS 0x1001
 #define ARCH_SET_FS 0x1002
 
@@ -379,23 +397,36 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
         /* Stdin -> Keyboard */
         char* cbuf = (char*)buf;
         size_t i = 0;
+        task_t* current = task_get_current();
+
         while (i < count) {
-            char c = keyboard_getchar();
-            
-            /* Echo the character to serial and terminal */
-            serial_putchar(c);
-            terminal_putchar(c);
-            
-            if (c == '\b') {
-                if (i > 0) i--;
-                continue;
+            /* Check for signals */
+            if (current->signal_pending & ~current->signal_mask) {
+                if (i > 0) return i; /* Return partial read */
+                return -EINTR;
             }
-            
-            cbuf[i++] = c;
-            if (c == '\n' || c == '\r') {
-                /* Normalize newline */
-                if (c == '\r') cbuf[i-1] = '\n';
-                return i;
+
+            if (keyboard_has_input()) {
+                char c = keyboard_getchar();
+
+                /* Echo the character to serial and terminal */
+                serial_putchar(c);
+                terminal_putchar(c);
+
+                if (c == '\b') {
+                    if (i > 0) i--;
+                    continue;
+                }
+
+                cbuf[i++] = c;
+                if (c == '\n' || c == '\r') {
+                    /* Normalize newline */
+                    if (c == '\r') cbuf[i-1] = '\n';
+                    return i;
+                }
+            } else {
+                /* Wait for interrupt */
+                __asm__ volatile("hlt");
             }
         }
         return i;
@@ -431,7 +462,28 @@ static int64_t sys_open(const char* path, int flags, int mode) {
 
     /* Lookup path */
     fs_node_t* node = vfs_lookup(fs_root, path);
-    if (!node) return -ENOENT;
+
+    if (!node) {
+        if (flags & O_CREAT) {
+            char parent_path[128];
+            char filename[128];
+            if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+
+            fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+            if (!parent) return -ENOENT;
+
+            if (create_fs(parent, filename, (uint16_t)mode) != 0) {
+                kfree(parent);
+                return -EACCES;
+            }
+
+            node = vfs_lookup(fs_root, path);
+            kfree(parent);
+            if (!node) return -ENOENT;
+        } else {
+            return -ENOENT;
+        }
+    }
 
     uint8_t read_mode = 0;
     uint8_t write_mode = 0;
@@ -455,11 +507,7 @@ static int64_t sys_close(int fd) {
     if (!current->fd_table[fd].node) return -EBADF;
 
     fs_node_t* node = current->fd_table[fd].node;
-    if (node->ref_count > 0) {
-        node->ref_count--;
-    }
-
-    if (node->ref_count == 0) {
+    if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
         close_fs(node);
         /* Free the node memory (vfs_lookup allocates it) */
         kfree(node);
@@ -468,6 +516,36 @@ static int64_t sys_close(int fd) {
     current->fd_table[fd].node = NULL;
 
     return 0;
+}
+
+static int64_t sys_mkdir(const char* path, int mode) {
+    if (!validate_user_string(path)) return -EFAULT;
+
+    char parent_path[128];
+    char filename[128];
+    if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+
+    fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) return -ENOENT;
+
+    int res = mkdir_fs(parent, filename, (uint16_t)mode);
+    kfree(parent);
+    return res;
+}
+
+static int64_t sys_unlink(const char* path) {
+    if (!validate_user_string(path)) return -EFAULT;
+
+    char parent_path[128];
+    char filename[128];
+    if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+
+    fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) return -ENOENT;
+
+    int res = unlink_fs(parent, filename);
+    kfree(parent);
+    return res;
 }
 
 static int64_t sys_lseek(int fd, int64_t offset, int whence) {
@@ -518,6 +596,12 @@ static int64_t sys_kill(int pid, int sig) {
 
     /* Set the signal pending bit (if not masked) */
     target->signal_pending |= (1u << sig);
+
+    /* Wake up if blocked */
+    if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) {
+        target->state = TASK_READY;
+    }
+
     serial_write_string("[SIGNAL] Queued signal on task\n");
     return 0;
 }
@@ -689,7 +773,7 @@ static int64_t sys_dup2(int oldfd, int newfd) {
     */
     current->fd_table[newfd].node = current->fd_table[oldfd].node;
     if (current->fd_table[newfd].node) {
-        current->fd_table[newfd].node->ref_count++;
+        __atomic_fetch_add(&current->fd_table[newfd].node->ref_count, 1, __ATOMIC_SEQ_CST);
     }
 
     current->fd_table[newfd].offset = current->fd_table[oldfd].offset;
@@ -990,6 +1074,10 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_clock_gettime((int)regs->rdi, (struct timespec*)regs->rsi);
     } else if (regs->rax == 231) { /* SYS_exit_group */
         ret = (uint64_t)sys_exit_group((int)regs->rdi);
+    } else if (regs->rax == SYS_mkdir) {
+        ret = (uint64_t)sys_mkdir((const char*)regs->rdi, (int)regs->rsi);
+    } else if (regs->rax == SYS_unlink) {
+        ret = (uint64_t)sys_unlink((const char*)regs->rdi);
     } else if (regs->rax == 0xCAFEBABE) {
         ret = 0;
     } else {

@@ -5,39 +5,79 @@
 fs_node_t *fs_root = NULL;
 
 uint32_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    if (node->read != 0)
-        return node->read(node, offset, size, buffer);
+    if (node->read != 0) {
+        spin_lock(&node->lock);
+        uint32_t ret = node->read(node, offset, size, buffer);
+        spin_unlock(&node->lock);
+        return ret;
+    }
     return 0;
 }
 
 uint32_t write_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    if (node->write != 0)
-        return node->write(node, offset, size, buffer);
+    if (node->write != 0) {
+        spin_lock(&node->lock);
+        uint32_t ret = node->write(node, offset, size, buffer);
+        spin_unlock(&node->lock);
+        return ret;
+    }
     return 0;
 }
 
 void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {
-    if (node->open != 0)
+    if (node->open != 0) {
+        spin_lock(&node->lock);
         node->open(node);
+        spin_unlock(&node->lock);
+    }
     (void)read;
     (void)write;
 }
 
 void close_fs(fs_node_t *node) {
-    if (node->close != 0)
+    if (node->close != 0) {
+        spin_lock(&node->lock);
         node->close(node);
+        spin_unlock(&node->lock);
+    }
 }
 
 struct dirent *readdir_fs(fs_node_t *node, uint32_t index) {
-    if ((node->flags & 0x7) == FS_DIRECTORY && node->readdir != 0)
-        return node->readdir(node, index);
+    if ((node->flags & 0x7) == FS_DIRECTORY && node->readdir != 0) {
+        spin_lock(&node->lock);
+        struct dirent* ret = node->readdir(node, index);
+        spin_unlock(&node->lock);
+        return ret;
+    }
     return 0;
 }
 
 fs_node_t *finddir_fs(fs_node_t *node, char *name) {
-    if ((node->flags & 0x7) == FS_DIRECTORY && node->finddir != 0)
-        return node->finddir(node, name);
+    if ((node->flags & 0x7) == FS_DIRECTORY && node->finddir != 0) {
+        spin_lock(&node->lock);
+        fs_node_t* ret = node->finddir(node, name);
+        spin_unlock(&node->lock);
+        return ret;
+    }
     return 0;
+}
+
+int create_fs(fs_node_t *parent, char *name, uint16_t permission) {
+    if ((parent->flags & 0x7) == FS_DIRECTORY && parent->create != 0)
+        return parent->create(parent, name, permission);
+    return -1;
+}
+
+int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) {
+    if ((parent->flags & 0x7) == FS_DIRECTORY && parent->mkdir != 0)
+        return parent->mkdir(parent, name, permission);
+    return -1;
+}
+
+int unlink_fs(fs_node_t *parent, char *name) {
+    if ((parent->flags & 0x7) == FS_DIRECTORY && parent->unlink != 0)
+        return parent->unlink(parent, name);
+    return -1;
 }
 
 /**
@@ -59,6 +99,7 @@ fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
         if (clone) {
             memcpy(clone, root, sizeof(fs_node_t));
             clone->ref_count = 1;
+            clone->lock = 0; /* New handle starts unlocked */
         }
         return clone;
     }
@@ -71,6 +112,7 @@ fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
         if (clone) {
             memcpy(clone, root, sizeof(fs_node_t));
             clone->ref_count = 1;
+            clone->lock = 0; /* New handle starts unlocked */
         }
         return clone;
     }

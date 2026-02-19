@@ -10,6 +10,8 @@
 #include "../../../include/gdt.h"
 #include "../../../include/string.h"
 #include "../../../include/serial.h"
+#include "../../../include/cpu.h"
+#include "../../../include/mm.h"
 
 /* ========================================================================= */
 /* Estructuras de Datos (Internas)                                           */
@@ -96,6 +98,18 @@ static void gdt_set_gate(int num, uint64_t base, uint64_t limit, uint8_t access,
     gdt[num].access      = access;
 }
 
+static void gdt_set_gate_ptr(struct gdt_entry* gdt_base, int num, uint64_t base, uint64_t limit, uint8_t access, uint8_t gran) {
+    gdt_base[num].base_low    = (base & 0xFFFF);
+    gdt_base[num].base_middle = (base >> 16) & 0xFF;
+    gdt_base[num].base_high   = (base >> 24) & 0xFF;
+
+    gdt_base[num].limit_low   = (limit & 0xFFFF);
+    gdt_base[num].granularity = (limit >> 16) & 0x0F;
+
+    gdt_base[num].granularity |= (gran & 0xF0);
+    gdt_base[num].access      = access;
+}
+
 static void write_tss(int num, uint16_t ss0, uint64_t esp0) {
     /* Calcular base y limite del TSS */
     uint64_t base = (uint64_t)&tss;
@@ -106,16 +120,6 @@ static void write_tss(int num, uint16_t ss0, uint64_t esp0) {
     gdt_set_gate(num, base, limit, 0x89, 0x00);
     
     /* Entrada Alta (Index num+1) */
-    /* Usamos un puntero directo a la entrada siguiente para configurar los bits altos de la base */
-    struct gdt_entry* high_entry = &gdt[num + 1];
-    memset(high_entry, 0, sizeof(struct gdt_entry));
-    
-    high_entry->limit_low = (uint16_t)((base >> 32) & 0xFFFF);
-    high_entry->base_low  = (uint16_t)((base >> 48) & 0xFFFF);
-    /* El resto de la entrada alta debe ser 0 para TSS 64-bit standard (Base 63:32 en bytes 0-3 y 7) */
-    /* Wait, struct GDT Entry regular no mapea bien con el descriptor de sistema extendido de 16-bytes parte alta */
-    
-    /* Reimplementando para usar struct tss_entry_struct correctamente sobre las 2 entradas */
     struct tss_entry_struct* tss_desc = (struct tss_entry_struct*)&gdt[num];
     tss_desc->base_upper = (uint32_t)((base >> 32) & 0xFFFFFFFF);
     tss_desc->reserved = 0;
@@ -132,7 +136,7 @@ static void write_tss(int num, uint16_t ss0, uint64_t esp0) {
 }
 
 void gdt_init(void) {
-    serial_write_string("[GDT] Inicializando GDT y TSS...\n");
+    serial_write_string("[GDT] Inicializando GDT y TSS (BSP)...\n");
 
     /* Limpiar GDT explícitamente para asegurar estado conocido */
     memset(gdt, 0, sizeof(gdt));
@@ -141,27 +145,18 @@ void gdt_init(void) {
     gdt_set_gate(0, 0, 0, 0, 0);
 
     /* 1: Kernel Code (0x08) */
-    /* Access: 0x9A (P=1, DPL=0, Type=Code/Exec/Read) */
-    /* Granularity: 0x20 (L=1 Long Mode) */
     gdt_set_gate(1, 0, 0, 0x9A, 0x20);
 
     /* 2: Kernel Data (0x10) */
-    /* Access: 0x92 (P=1, DPL=0, Type=Data/RW) */
     gdt_set_gate(2, 0, 0, 0x92, 0x00);
 
     /* 3: User Data (0x18) */
-    /* Access: 0xF2 (P=1, DPL=3, Type=Data/RW) */
     gdt_set_gate(3, 0, 0, 0xF2, 0x00);
 
     /* 4: User Code (0x20) */
-    /* Access: 0xFA (P=1, DPL=3, Type=Code/Exec/Read) */
-    /* Granularity: 0x20 (L=1 Long Mode) */
     gdt_set_gate(4, 0, 0, 0xFA, 0x20);
 
     /* 5: TSS (0x28) - 16 bytes */
-    /* Usamos el stack actual como RSP0 inicial (temporal, cambiará al scheduling) */
-    /* Pero como estamos en single-core sin multithreading real aún, es seguro. */
-    /* O mejor, usamos un stack conocido si tuviéramos. */
     write_tss(5, 0x10, 0); 
 
     /* Cargar GDTR */
@@ -172,9 +167,67 @@ void gdt_init(void) {
     gdt_flush((uint64_t)&gdtr);
     tss_flush();
 
+    /* Asignar al BSP */
+    cpus[0].gdt = (void*)&gdt;
+    cpus[0].tss = (void*)&tss;
+
     serial_write_string("[GDT] GDT cargada. TSS activa.\n");
 }
 
 void tss_set_rsp0(uint64_t rsp0) {
-    tss.rsp0 = rsp0;
+    cpu_info_t* cpu = get_current_cpu();
+    if (cpu && cpu->tss) {
+        ((struct tss_struct*)cpu->tss)->rsp0 = rsp0;
+    } else {
+        /* Fallback for early boot (BSP only) */
+        tss.rsp0 = rsp0;
+    }
+}
+
+void gdt_init_ap(cpu_info_t* cpu) {
+    if (!cpu) return;
+
+    /* Allocate GDT and TSS for this AP */
+    struct gdt_entry* new_gdt = (struct gdt_entry*)kmalloc(sizeof(struct gdt_entry) * GDT_ENTRIES);
+    struct tss_struct* new_tss = (struct tss_struct*)kmalloc(sizeof(struct tss_struct));
+
+    if (!new_gdt || !new_tss) {
+        serial_write_string("[GDT] Error: OOM allocating AP structures\n");
+        return;
+    }
+
+    /* Initialize GDT: Copy from BSP/template */
+    /* Copy first 5 entries (Null, Kernel Code/Data, User Code/Data) */
+    memcpy(new_gdt, gdt, sizeof(struct gdt_entry) * 5);
+
+    /* Initialize TSS */
+    memset(new_tss, 0, sizeof(struct tss_struct));
+    new_tss->rsp0 = 0; /* Will be set by scheduler later */
+    new_tss->iomap_base = sizeof(struct tss_struct);
+
+    /* Setup TSS Descriptor in new GDT (index 5) */
+    uint64_t base = (uint64_t)new_tss;
+    uint64_t limit = sizeof(struct tss_struct) - 1;
+
+    gdt_set_gate_ptr(new_gdt, 5, base, limit, 0x89, 0x00);
+
+    /* TSS high part */
+    struct tss_entry_struct* tss_desc = (struct tss_entry_struct*)&new_gdt[5];
+    tss_desc->base_upper = (uint32_t)((base >> 32) & 0xFFFFFFFF);
+    tss_desc->reserved = 0;
+
+    /* Save pointers to CPU struct */
+    cpu->gdt = (void*)new_gdt;
+    cpu->tss = (void*)new_tss;
+}
+
+void gdt_load_for_cpu(cpu_info_t* cpu) {
+    if (!cpu || !cpu->gdt) return;
+
+    struct gdt_ptr local_gdtr;
+    local_gdtr.limit = (sizeof(struct gdt_entry) * GDT_ENTRIES) - 1;
+    local_gdtr.base  = (uint64_t)cpu->gdt;
+
+    gdt_flush((uint64_t)&local_gdtr);
+    tss_flush();
 }

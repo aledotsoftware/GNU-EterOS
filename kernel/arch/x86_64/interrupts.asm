@@ -8,11 +8,13 @@ global isr_stub_timer
 global isr_stub_keyboard
 global isr_stub_serial
 global isr_stub_mouse
+global isr_stub_network
 
 extern irq_timer_handler    ; Renombraremos las funciones en C para evitar conflictos
 extern irq_keyboard_handler
 extern irq_serial_handler
 extern irq_mouse_handler
+extern irq_network_handler
 
 section .text
 
@@ -131,4 +133,22 @@ isr_stub_mouse:
     jz .m2
     swapgs
 .m2:
+    iretq
+
+; -----------------------------------------------------------------------------
+; ISR Network (IRQ11)
+; -----------------------------------------------------------------------------
+isr_stub_network:
+    test qword [rsp + 8], 3
+    jz .n1
+    swapgs
+.n1:
+    PUSH_ALL
+    cld
+    call irq_network_handler
+    POP_ALL
+    test qword [rsp + 8], 3
+    jz .n2
+    swapgs
+.n2:
     iretq

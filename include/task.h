@@ -21,6 +21,9 @@
 #define SCHEDULER_HZ     10    /* Switch cada 10 ticks (100ms a 100Hz PIT) */
 #define MAX_FD           16    /* Máximo de descriptores de archivo por tarea */
 
+#define KERNEL_STACK_BASE       0xFFFFFF0000000000ULL
+#define KERNEL_STACK_GUARD_SIZE 4096  /* 4KB Guard Page */
+
 /**
  * Inicializa el scheduler para un Application Processor (AP).
  * Crea una tarea idle específica para este núcleo.
@@ -47,6 +50,8 @@ typedef enum {
 /* ========================================================================= */
 /* Estructura de Tarea                                                       */
 /* ========================================================================= */
+struct semaphore; /* Forward declaration */
+
 typedef struct task {
     uint64_t       rsp;                     /* Stack pointer guardado */
     uint8_t*       stack_base;              /* Base del stack alocado */
@@ -55,6 +60,7 @@ typedef struct task {
     uint32_t       id;                      /* Task ID único */
     task_state_t   state;                   /* Estado actual */
     uint64_t       wake_tick;               /* Tick para despertar si duerme */
+    struct semaphore* waiting_sem;          /* Semaphore waiting on (if blocked) */
     char           name[32];                /* Nombre descriptivo */
 
     /* POSIX Compatibility */

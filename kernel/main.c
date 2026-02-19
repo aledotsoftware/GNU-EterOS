@@ -30,9 +30,11 @@
 #include <acpi.h>
 #include <apic.h>
 #include <futex.h>
+#include <sem.h>
 
 /* Compatibility for legacy apps */
 extern int network_ready;
+extern sem_t net_sem;
 
 
 /* Forward declarations for non-HAL kernel services */
@@ -59,7 +61,13 @@ extern void net_poll(void);
 extern uint32_t my_ip;
 
 static void network_task(void) {
+    /* Process any pending packets before entering loop */
+    net_poll();
+
     while(1) {
+        /* Wait for network interrupt (packet received) */
+        sem_wait(&net_sem);
+
         net_poll();
 
         /* Update status */
@@ -67,8 +75,6 @@ static void network_task(void) {
             network_ready = 1;
             hal_console_write("  [NET]  DHCP Bound! IP assigned.\n");
         }
-
-        task_yield();
     }
 }
 
@@ -111,12 +117,6 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     cpu_init_bsp();
     #endif
 
-    #if defined(ARCH_X86_64)
-    /* ---- 2.7 Inicializar APIC y Despertar Cores ---- */
-    lapic_init();   /* Inicializar Local APIC del core principal */
-    smp_init();     /* Despertar los Application Processors (APs) */
-    #endif
-
     /* ---- 3. Inicializar Memory Managers (Solo Tier 2+) ---- */
     #if ETEROS_TIER >= 2
         /* Memory Management Unit (Paging/MPU) */
@@ -134,7 +134,16 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
         /* Heap Manager (Generic) */
         mm_init(boot_info);
+    #endif
 
+    #if defined(ARCH_X86_64)
+    /* ---- 2.7 Inicializar APIC y Despertar Cores ---- */
+    /* Must happen AFTER heap init so we can allocate per-CPU structures */
+    lapic_init();   /* Inicializar Local APIC del core principal */
+    smp_init();     /* Despertar los Application Processors (APs) */
+    #endif
+
+    #if ETEROS_TIER >= 2
         /* ---- 3.5 Inicializar Initrd ---- */
         #if defined(ARCH_X86_64)
         if (boot_info && boot_info->initrd_addr != 0) {

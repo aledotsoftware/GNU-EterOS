@@ -25,6 +25,9 @@
 /* IRQ base después del remapping del PIC */
 #define IRQ_BASE            32
 
+/* Inter-Processor Interrupts (IPI) */
+#define IPI_TLB_SHOOTDOWN   0xFD
+
 /* ========================================================================= */
 /* Estructuras dependientes de la arquitectura                               */
 /* ========================================================================= */

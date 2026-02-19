@@ -24,19 +24,49 @@
 #include "../include/msr.h"
 #include "../include/lock.h"
 #include "../include/vmm.h"
+#include "../include/pmm.h"
 #include "../include/syscall.h"
 
 extern void fork_return(void);
+
+/* ========================================================================= */
+/* Helper de Stack de Kernel                                                 */
+/* ========================================================================= */
+
+static void* alloc_kernel_stack(int slot) {
+    uint64_t base = KERNEL_STACK_BASE + (uint64_t)slot * (TASK_STACK_SIZE + KERNEL_STACK_GUARD_SIZE);
+    uint64_t stack_start = base + KERNEL_STACK_GUARD_SIZE;
+    uint64_t stack_end = stack_start + TASK_STACK_SIZE;
+
+    /* Check reuse (if first page is mapped) */
+    if (vmm_virt_to_phys(stack_start)) {
+        memset((void*)stack_start, 0, TASK_STACK_SIZE);
+        return (void*)stack_start;
+    }
+
+    /* Allocate and Map */
+    for (uint64_t addr = stack_start; addr < stack_end; addr += PAGE_SIZE) {
+        void* phys = pmm_alloc_page();
+        if (!phys) {
+            /* TODO: Rollback previous pages if OOM */
+            return NULL;
+        }
+        vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE);
+    }
+
+    memset((void*)stack_start, 0, TASK_STACK_SIZE);
+    return (void*)stack_start;
+}
 
 /* ========================================================================= */
 /* Estado Global del Scheduler                                               */
 /* ========================================================================= */
 
 static task_t   tasks[MAX_TASKS] __attribute__((aligned(16)));
-static int      current_task  = 0;    /* Índice de la tarea actual */
+/* static int current_task removed in favor of per-CPU */
 static int      task_count    = 0;    /* Número total de tareas */
 static uint32_t next_id       = 0;    /* Generador de IDs */
-static uint32_t sched_ticks   = 0;    /* Contador para decidir cuándo switchear */
+/* static uint32_t sched_ticks removed in favor of per-CPU */
 static bool     scheduler_active = false; /* El scheduler está inicializado? */
 static spinlock_t sched_lock  = 0;    /* SMP protection */
 
@@ -63,6 +93,9 @@ typedef void (*task_func_t)(void);
 
 /* Almacenamos el entry point en el stack de la tarea */
 static void task_entry_wrapper(void) {
+    /* Release the lock held by the previous task during switch */
+    spin_unlock(&sched_lock);
+
     /* Habilitar interrupciones (estamos en una tarea nueva, el context_switch
        no las habilita automáticamente como haría iretq) */
     __asm__ volatile("sti");
@@ -110,18 +143,20 @@ void scheduler_init(void) {
     tasks[0].mmap_base = 0x700000000000ULL;
 
     task_count = 1;
-    current_task = 0;
+    /* current_task = 0; removed */
     scheduler_active = true;
 
     /* Configurar stack inicial para Task 0 (Boot Stack en 0x90000) */
     kernel_stack_top = 0x90000;
-    tss_set_rsp0(kernel_stack_top);
+    /* tss_set_rsp0(kernel_stack_top); -> Moved to later or per-cpu */
 
     /* Update per-CPU current_task pointer if GS_BASE is valid */
     cpu_info_t* cpu = get_current_cpu();
     if (cpu) {
         cpu->current_task = &tasks[0];
         cpu->sched_ticks = 0;
+        /* Initialize BSP TSS RSP0 */
+        tss_set_rsp0(kernel_stack_top);
     }
 
     serial_write_string("[SCHED] Scheduler Round-Robin inicializado\n");
@@ -133,11 +168,13 @@ void task_init_ap(void) {
 }
 
 int task_create(const char* name, void (*entry)(void)) {
+    __asm__ volatile("cli");
     spin_lock(&sched_lock);
 
     if (task_count >= MAX_TASKS) {
         serial_write_string("[SCHED] Error: Maximo de tareas alcanzado\n");
         spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
         return -1;
     }
 
@@ -151,17 +188,19 @@ int task_create(const char* name, void (*entry)(void)) {
     }
     if (slot == -1) {
         spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
         return -1;
     }
 
-    /* Alocar stack para la nueva tarea */
-    uint8_t* stack = (uint8_t*)kmalloc(TASK_STACK_SIZE);
+    /* Alocar stack para la nueva tarea (con Guard Page) */
+    uint8_t* stack = (uint8_t*)alloc_kernel_stack(slot);
     if (!stack) {
         serial_write_string("[SCHED] Error: No hay memoria para el stack\n");
         spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
         return -1;
     }
-    memset(stack, 0, TASK_STACK_SIZE);
+    /* Note: alloc_kernel_stack already memsets to 0 */
 
     /* Configurar la tarea */
     tasks[slot].id = next_id++;
@@ -225,6 +264,7 @@ int task_create(const char* name, void (*entry)(void)) {
     }
 
     spin_unlock(&sched_lock);
+    __asm__ volatile("sti");
 
     serial_write_string("[SCHED] Tarea creada: ");
     serial_write_string(name);
@@ -235,23 +275,34 @@ int task_create(const char* name, void (*entry)(void)) {
 
 /**
  * Encuentra la siguiente tarea READY usando Round-Robin.
- * @return Índice de la siguiente tarea, o current_task si no hay otra.
+ * @return Puntero a la siguiente tarea, o current_task si no hay otra.
  */
-static int find_next_task(void) {
-    int next = current_task;
+static task_t* find_next_task(task_t* current) {
+    /* We iterate the global array. Using pointer arithmetic or index. */
+    /* Let's use index based on current ID or just scan */
+    /* To keep Round Robin fair, we need to start from current+1 */
+    /* We can find current index by pointer math if `tasks` is contiguous */
+
+    int start_idx = (int)(current - tasks);
+    if (start_idx < 0 || start_idx >= MAX_TASKS) start_idx = 0;
+
+    int next_idx = start_idx;
     for (int i = 0; i < task_count; i++) {
-        next = (next + 1) % task_count;
-        if (tasks[next].state == TASK_READY || tasks[next].state == TASK_RUNNING) {
-            return next;
+        next_idx = (next_idx + 1) % task_count;
+        if (tasks[next_idx].state == TASK_READY || tasks[next_idx].state == TASK_RUNNING) {
+            /* If we found ourselves, only return if we are RUNNING/READY */
+             /* Logic handles this naturally? */
+             /* If loop returns to start, we check below */
+             return &tasks[next_idx];
         }
     }
 
     /* Si la tarea actual también está durmiendo/bloqueada, no podemos retornarla */
-    if (tasks[current_task].state == TASK_READY || tasks[current_task].state == TASK_RUNNING) {
-        return current_task;
+    if (current->state == TASK_READY || current->state == TASK_RUNNING) {
+        return current;
     }
 
-    return -1; /* No hay tareas ejecutables */
+    return NULL; /* No hay tareas ejecutables */
 }
 
 void schedule(void) {
@@ -259,6 +310,19 @@ void schedule(void) {
 
     /* Deshabilitar interrupciones para proteger el estado del scheduler */
     __asm__ volatile("cli");
+
+    /* Acquire Spinlock */
+    spin_lock(&sched_lock);
+
+    cpu_info_t* cpu = get_current_cpu();
+    if (!cpu) {
+        spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
+        return;
+    }
+
+    task_t* current = (task_t*)cpu->current_task;
+    if (!current) current = &tasks[0]; /* Fallback */
 
     /* CPU Load tracking */
     cpu_total_ticks++;
@@ -269,110 +333,112 @@ void schedule(void) {
         cpu_idle_ticks = 0;
     }
 
-    int next = find_next_task();
+    task_t* next_task = find_next_task(current);
 
-    /* Si no hay tareas listas y la actual esta muerta/durmiendo, 
-       debemos esperar hasta el proximo tick (Halt con interrupciones habilitadas) */
-    if (next == -1) {
+    /* Si no hay tareas listas y la actual esta muerta/durmiendo */
+    if (next_task == NULL) {
         cpu_idle_ticks++;
+        spin_unlock(&sched_lock);
         __asm__ volatile("sti");
-        while (1) {
-             __asm__ volatile("hlt");
-             /* El timer interrupt volvera a llamar a schedule() despues del tick */
-             return;
-        }
+        /* Wait for interrupt */
+        __asm__ volatile("hlt");
+        /* Return to retry schedule */
+        return;
     }
 
-    if (next == current_task) {
+    if (next_task == current) {
+        spin_unlock(&sched_lock);
         __asm__ volatile("sti");
         return;
     }
 
     /* Solo switchear cada SCHEDULER_HZ ticks (excepto si la actual murio/bloqueo) */
-    if (tasks[current_task].state == TASK_RUNNING) {
-        sched_ticks++;
-        if (sched_ticks < SCHEDULER_HZ) {
+    if (current->state == TASK_RUNNING) {
+        cpu->sched_ticks++;
+        if (cpu->sched_ticks < SCHEDULER_HZ) {
+            spin_unlock(&sched_lock);
             __asm__ volatile("sti");
             return;
         }
     }
-    sched_ticks = 0;
+    cpu->sched_ticks = 0;
 
     /* Cambiar estado */
-    int old = current_task;
-    
-    if (tasks[old].state == TASK_RUNNING) {
-        tasks[old].state = TASK_READY;
+    if (current->state == TASK_RUNNING) {
+        current->state = TASK_READY;
     }
 
     /* Save current TLS state */
-    tasks[old].fs_base = rdmsr(MSR_FS_BASE);
-    tasks[old].gs_base = rdmsr(MSR_KERNEL_GS_BASE); /* User GS is in KERNEL_GS_BASE while in kernel */
+    current->fs_base = rdmsr(MSR_FS_BASE);
+    current->gs_base = rdmsr(MSR_KERNEL_GS_BASE); /* User GS is in KERNEL_GS_BASE while in kernel */
     
-    tasks[next].state = TASK_RUNNING;
-    current_task = next;
+    next_task->state = TASK_RUNNING;
+    cpu->current_task = next_task;
 
     /* Actualizar TSS RSP0 y Per-CPU Kernel Stack para Syscalls */
-    if (tasks[next].kernel_stack != 0) {
-        tss_set_rsp0(tasks[next].kernel_stack);
-        cpu_info_t* cpu = get_current_cpu();
-        if (cpu) {
-            cpu->kernel_stack_top = tasks[next].kernel_stack;
-            cpu->current_task = &tasks[next];
-            /* Restore User Stack Pointer (for syscall exit / fork_return) */
-            cpu->user_stack_scratch = tasks[next].user_rsp;
-        }
+    if (next_task->kernel_stack != 0) {
+        tss_set_rsp0(next_task->kernel_stack);
+        cpu->kernel_stack_top = next_task->kernel_stack;
+
+        /* Restore User Stack Pointer (for syscall exit / fork_return) */
+        cpu->user_stack_scratch = next_task->user_rsp;
     }
 
     /* Restore TLS state */
-    wrmsr(MSR_FS_BASE, tasks[next].fs_base);
-    wrmsr(MSR_KERNEL_GS_BASE, tasks[next].gs_base);
+    wrmsr(MSR_FS_BASE, next_task->fs_base);
+    wrmsr(MSR_KERNEL_GS_BASE, next_task->gs_base);
 
-    context_switch(&tasks[old].rsp, tasks[next].rsp);
+    /* Context Switch holding the lock! */
+    /* The next task will release it in schedule() return or task_entry_wrapper */
+    context_switch(&current->rsp, next_task->rsp);
 
+    /* We are back in the old task (now current) */
+    spin_unlock(&sched_lock);
     __asm__ volatile("sti");
 }
 
 void task_yield(void) {
     if (!scheduler_active) return;
     
-    /* Forzar un switch inmediato */
-    sched_ticks = SCHEDULER_HZ;
+    cpu_info_t* cpu = get_current_cpu();
+    if (cpu) {
+        /* Forzar un switch inmediato */
+        cpu->sched_ticks = SCHEDULER_HZ;
+    }
     schedule();
 }
 
 void task_sleep(uint64_t ms) {
     if (!scheduler_active) {
-        /* Si no hay scheduler, usar busy-wait */
         timer_wait((uint32_t)ms);
         return;
     }
 
-    /* Convertir ms a ticks */
     uint64_t ticks = ((uint64_t)ms * TIMER_HZ) / 1000;
-    if (ms > 0 && ticks == 0) ticks = 1; /* Minimo 1 tick */
+    if (ms > 0 && ticks == 0) ticks = 1;
 
+    /* Lock to modify state */
+    spin_lock(&sched_lock);
     task_t* current = task_get_current();
     current->wake_tick = timer_get_ticks() + ticks;
     current->state = TASK_SLEEPING;
+    spin_unlock(&sched_lock);
 
     /* Ceder CPU */
     task_yield();
 
-    /* Si somos la única tarea o el scheduler no encontró a nadie más,
-       volveremos aquí inmediatamente pero seguiremos en estado SLEEPING.
-       Debemos esperar (wait for interrupt) hasta que el timer nos despierte. */
     while (current->state == TASK_SLEEPING) {
         __asm__ volatile("hlt");
     }
 
-    /* Restaurar estado a RUNNING si nos despertamos */
     current->state = TASK_RUNNING;
 }
 
 void task_wake_expired(uint64_t current_tick) {
     if (!scheduler_active) return;
 
+    /* Called from timer interrupt, so interrupts are disabled. */
+    spin_lock(&sched_lock);
     for (int i = 0; i < task_count; i++) {
         if (tasks[i].state == TASK_SLEEPING) {
             if (current_tick >= tasks[i].wake_tick) {
@@ -380,49 +446,34 @@ void task_wake_expired(uint64_t current_tick) {
             }
         }
     }
+    spin_unlock(&sched_lock);
 }
 
 void task_exit(void) {
-    /* Disable interrupts — we're destroying this task, no preemption allowed */
     __asm__ volatile("cli");
+    spin_lock(&sched_lock);
 
+    task_t* current = task_get_current();
     serial_write_string("[SCHED] Tarea terminada: ");
-    serial_write_string(tasks[current_task].name);
+    serial_write_string(current->name);
     serial_write_string("\n");
 
-    /* Marcar como muerta */
-    tasks[current_task].state = TASK_DEAD;
+    current->state = TASK_DEAD;
+    spin_unlock(&sched_lock);
+
+    /* Yield forever until switched out */
+    schedule();
     
-    /* Encontrar otra tarea para ejecutar */
-    int next = find_next_task();
-    
-    if (next != -1 && next != current_task) {
-        int old = current_task;
-        tasks[next].state = TASK_RUNNING;
-        current_task = next;
-        
-        /* Actualizar TSS RSP0 y Per-CPU */
-        if (tasks[next].kernel_stack != 0) {
-            tss_set_rsp0(tasks[next].kernel_stack);
-            cpu_info_t* cpu = get_current_cpu();
-            if (cpu) {
-                cpu->kernel_stack_top = tasks[next].kernel_stack;
-                cpu->current_task = &tasks[next];
-            }
-        }
-        
-        /* Context switch — nunca volveremos aquí porque la tarea vieja está DEAD
-           y el scheduler nunca la seleccionará de nuevo */
-        context_switch(&tasks[old].rsp, tasks[next].rsp);
-    }
-    
-    /* Si no hay otra tarea (o context_switch retornó por error), halt forever */
     __asm__ volatile("sti");
     for (;;) { __asm__ volatile("hlt"); }
 }
 
 task_t* task_get_current(void) {
-    return &tasks[current_task];
+    cpu_info_t* cpu = get_current_cpu();
+    if (cpu && cpu->current_task) {
+        return (task_t*)cpu->current_task;
+    }
+    return &tasks[0]; /* Fallback/Boot */
 }
 
 int task_get_count(void) {
@@ -438,20 +489,31 @@ int task_get_count(void) {
 int task_kill(uint32_t pid) {
     if (pid == 0) return -1; /* No matar kernel */
     
+    spin_lock(&sched_lock);
+
+    task_t* current = task_get_current();
+    int killed_self = 0;
+
     for (int i = 1; i < task_count; i++) {
         if (tasks[i].id == pid && tasks[i].state != TASK_DEAD) {
             tasks[i].state = TASK_DEAD;
             serial_write_string("[SCHED] Killed task PID ");
-            /* TODO: Convert PID to string properly */
             serial_write_string("\n");
             
-            if (i == current_task) {
-                schedule(); /* Yield if killing self */
+            if (&tasks[i] == current) {
+                killed_self = 1;
+            }
+
+            spin_unlock(&sched_lock);
+
+            if (killed_self) {
+                schedule();
             }
             return 0;
         }
     }
 
+    spin_unlock(&sched_lock);
     return -1;
 }
 
@@ -485,11 +547,13 @@ int task_get_cpu_load(void) {
 int task_fork(void* regs_ptr) {
     struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;
 
+    __asm__ volatile("cli");
     spin_lock(&sched_lock);
 
     /* 1. Find slot */
     if (task_count >= MAX_TASKS) {
         spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
         return -1;
     }
     int slot = -1;
@@ -501,16 +565,18 @@ int task_fork(void* regs_ptr) {
     }
     if (slot == -1) {
         spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
         return -1;
     }
 
-    /* 2. Alloc Stack */
-    uint8_t* stack = (uint8_t*)kmalloc(TASK_STACK_SIZE);
+    /* 2. Alloc Stack (con Guard Page) */
+    uint8_t* stack = (uint8_t*)alloc_kernel_stack(slot);
     if (!stack) {
         spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
         return -1;
     }
-    memset(stack, 0, TASK_STACK_SIZE);
+    /* Note: alloc_kernel_stack already memsets to 0 */
 
     /* 3. Setup Child Task */
     tasks[slot].id = next_id++;
@@ -536,7 +602,7 @@ int task_fork(void* regs_ptr) {
     /* VFS nodes are shared pointers! Refcounting handled here. */
     for (int i = 0; i < MAX_FD; i++) {
         if (tasks[slot].fd_table[i].node) {
-            tasks[slot].fd_table[i].node->ref_count++;
+            __atomic_fetch_add(&tasks[slot].fd_table[i].node->ref_count, 1, __ATOMIC_SEQ_CST);
         }
     }
 
@@ -580,6 +646,7 @@ int task_fork(void* regs_ptr) {
     if (slot >= task_count) task_count = slot + 1;
 
     spin_unlock(&sched_lock);
+    __asm__ volatile("sti");
 
     serial_write_string("[SCHED] Forked process PID ");
     /* ... log pid ... */

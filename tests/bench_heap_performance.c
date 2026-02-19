@@ -11,6 +11,10 @@
 #define __ETEROS_HOST_TEST__
 #endif
 
+/* Mock IRQ functions for spinlock support */
+uint64_t irq_save(void) { return 0; }
+void irq_restore(uint64_t flags) { (void)flags; }
+
 /* Mock Kernel Symbols */
 uint8_t _kernel_end = 0;
 
