@@ -121,6 +121,7 @@ DOOM_ETEROS_SRCS = $(DOOM_ROOT)/doom_libc.c \
 DOOM_SRCS = $(DOOM_CORE_SRCS) $(DOOM_ETEROS_SRCS)
 
 KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
+              $(KERNEL_DIR)/klog.c               \
               $(KERNEL_DIR)/string.c             \
               $(KERNEL_DIR)/shell/shell.c        \
               $(KERNEL_DIR)/shell/commands.c     \
