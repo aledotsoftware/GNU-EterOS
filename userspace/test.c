@@ -5,6 +5,27 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <sys/wait.h>
+
+void test_fork_exec() {
+    printf("[TEST] Testing fork() and execve()...\n");
+    int pid = fork();
+    if (pid < 0) {
+        printf("[TEST] fork() failed: %d\n", errno);
+    } else if (pid == 0) {
+        printf("[CHILD] In child process. Executing exec_test.elf...\n");
+        char *argv[] = {"exec_test.elf", "arg1", "arg2", NULL};
+        char *envp[] = {NULL};
+        execve("/exec_test.elf", argv, envp);
+        printf("[CHILD] execve failed: %d\n", errno);
+        exit(1);
+    } else {
+        printf("[PARENT] Child PID: %d. Waiting...\n", pid);
+        int status;
+        waitpid(pid, &status, 0);
+        printf("[PARENT] Child finished.\n");
+    }
+}
 
 void test_networking() {
     printf("[TEST] Testing Networking (Userspace Sockets)...\n");
@@ -41,8 +62,10 @@ void test_networking() {
 }
 
 int main(int argc, char* argv[]) {
+    (void)argc; (void)argv;
     printf("userspace test starting...\n");
 
+    test_fork_exec();
     test_networking();
 
     // Original test code preserved if needed, or simplified
