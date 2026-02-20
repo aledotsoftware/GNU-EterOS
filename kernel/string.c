@@ -435,12 +435,63 @@ int strcmp(const char* s1, const char* s2) {
 }
 
 char* strchr(const char *s, int c) {
+#ifdef __x86_64__
+    char ch = (char)c;
+
+    /* Special case: Finding null terminator */
+    if (ch == 0) {
+        return (char*)s + strlen(s);
+    }
+
+    /* Align to 8 bytes */
+    while (((uintptr_t)s & 7) != 0) {
+        if (*s == ch) return (char *)s;
+        if (*s == '\0') return 0;
+        s++;
+    }
+
+    /* Process 8 bytes at a time */
+    const uint64_t* ls = (const uint64_t*)s;
+    uint64_t v;
+    uint64_t ch_pattern = (uint8_t)ch * 0x0101010101010101ULL;
+
+    while (1) {
+        v = *ls;
+
+        /* Check for zero byte (end of string) */
+        uint64_t zero_mask = (v - 0x0101010101010101ULL) & ~v & 0x8080808080808080ULL;
+
+        /* Check for target char */
+        uint64_t xor_v = v ^ ch_pattern;
+        uint64_t match_mask = (xor_v - 0x0101010101010101ULL) & ~xor_v & 0x8080808080808080ULL;
+
+        if (zero_mask | match_mask) {
+            /* Found something. Locate exact position. */
+            s = (const char*)ls;
+            /* Unrolled loop for remainder */
+            if (s[0] == ch) return (char*)s; if (s[0] == 0) return 0;
+            if (s[1] == ch) return (char*)s + 1; if (s[1] == 0) return 0;
+            if (s[2] == ch) return (char*)s + 2; if (s[2] == 0) return 0;
+            if (s[3] == ch) return (char*)s + 3; if (s[3] == 0) return 0;
+            if (s[4] == ch) return (char*)s + 4; if (s[4] == 0) return 0;
+            if (s[5] == ch) return (char*)s + 5; if (s[5] == 0) return 0;
+            if (s[6] == ch) return (char*)s + 6; if (s[6] == 0) return 0;
+            if (s[7] == ch) return (char*)s + 7; if (s[7] == 0) return 0;
+
+            /* Should not reach here if masks were correct */
+            return 0;
+        }
+
+        ls++;
+    }
+#else
     while (*s != (char)c) {
         if (!*s++) {
             return 0;
         }
     }
     return (char *)s;
+#endif
 }
 
 int strncmp(const char* s1, const char* s2, size_t n) {

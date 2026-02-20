@@ -23,6 +23,7 @@
 #define strlcat eteros_strlcat
 #define strnlen eteros_strnlen
 #define strcmp eteros_strcmp
+#define strchr eteros_strchr
 #define strncmp eteros_strncmp
 #define explicit_bzero eteros_explicit_bzero
 #endif

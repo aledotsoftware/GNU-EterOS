@@ -846,6 +846,50 @@ int main() {
         printf("atoi_s tests passed\n");
     }
 
+    /* Test strchr */
+    {
+        const char* str = "Hello World";
+
+        /* Found at start */
+        assert(strchr(str, 'H') == str);
+
+        /* Found in middle */
+        assert(strchr(str, 'o') == str + 4);
+
+        /* Found at end (last char) */
+        assert(strchr(str, 'd') == str + 10);
+
+        /* Found null terminator */
+        assert(strchr(str, '\0') == str + 11);
+
+        /* Not found */
+        assert(strchr(str, 'Z') == 0);
+
+        /* Empty string */
+        const char* empty = "";
+        assert(strchr(empty, '\0') == empty);
+        assert(strchr(empty, 'A') == 0);
+
+        /* Alignment tests */
+        /* Use a buffer with known alignment */
+        char* buf = malloc(32);
+        if (buf) {
+            memset(buf, 'X', 31);
+            buf[31] = '\0';
+
+            /* Place target at various positions */
+            for (int i = 0; i < 31; i++) {
+                buf[i] = 'Y';
+                assert(strchr(buf, 'Y') == buf + i);
+                buf[i] = 'X'; /* Restore */
+            }
+
+            free(buf);
+        }
+
+        printf("strchr tests passed\n");
+    }
+
     printf("All tests passed!\n");
     return 0;
 }
