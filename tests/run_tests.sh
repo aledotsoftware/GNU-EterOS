@@ -66,6 +66,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_ip_aton.c kernel/net/core/ip_uti
 ./tests/test_ip_aton
 rm tests/test_ip_aton
 
+# Test Initrd Overflow
+echo "---------------------------------------------------"
+echo "Running test_initrd_overflow..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_initrd_overflow.c -o tests/test_initrd_overflow
+./tests/test_initrd_overflow
+rm tests/test_initrd_overflow
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 
