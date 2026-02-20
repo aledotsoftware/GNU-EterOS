@@ -248,6 +248,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\apps\user_loader.c",
     "$KERNEL_DIR\apps\wget.c",
     "$KERNEL_DIR\task.c",
+    "$KERNEL_DIR\sem.c",
     "$KERNEL_DIR\futex.c",
     "$KERNEL_DIR\klog.c",
     "$KERNEL_DIR\stdio.c",

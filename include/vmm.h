@@ -66,6 +66,16 @@ int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags);
 void vmm_unmap_page(uint64_t virt_addr);
 
 /**
+ * Invalida una página en el TLB local.
+ */
+void vmm_flush_tlb_local(uint64_t addr);
+
+/**
+ * Invalida una página en el TLB de todos los procesadores (SMP).
+ */
+void vmm_flush_tlb_smp(uint64_t addr);
+
+/**
  * Obtiene la dirección física mapeada a una dirección virtual.
  * @return Dirección física o 0 si no está mapeada.
  */
