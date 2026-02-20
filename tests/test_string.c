@@ -846,6 +846,51 @@ int main() {
         printf("atoi_s tests passed\n");
     }
 
+    /* Test strchr */
+    {
+        /* Basic functionality */
+        char s[] = "Hello World";
+        assert(strchr(s, 'H') == s);
+        assert(strchr(s, 'e') == s + 1);
+        assert(strchr(s, 'W') == s + 6);
+        assert(strchr(s, 'd') == s + 10);
+
+        /* Not found */
+        assert(strchr(s, 'z') == NULL);
+        assert(strchr(s, 'X') == NULL);
+
+        /* Search for null terminator */
+        assert(strchr(s, '\0') == s + 11);
+
+        /* Empty string */
+        assert(strchr("", 'A') == NULL);
+        assert(strchr("", '\0') != NULL);
+
+        /* Extended alignment tests */
+        char* buf = malloc(128);
+        if (buf) {
+            memset(buf, 'X', 127);
+            buf[127] = '\0';
+
+            for (int offset = 0; offset < 16; offset++) {
+                char* ptr = buf + offset;
+
+                /* Test finding char at various relative positions to test 8-byte blocks */
+                for (int pos = 0; pos < 64; pos++) {
+                    ptr[pos] = 'Y';
+                    assert(strchr(ptr, 'Y') == ptr + pos);
+                    ptr[pos] = 'X'; /* Reset */
+                }
+
+                /* Test not found in large block */
+                assert(strchr(ptr, 'Z') == NULL);
+            }
+            free(buf);
+        }
+
+        printf("strchr tests passed\n");
+    }
+
     printf("All tests passed!\n");
     return 0;
 }

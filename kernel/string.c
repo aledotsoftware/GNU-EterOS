@@ -435,7 +435,53 @@ int strcmp(const char* s1, const char* s2) {
 }
 
 char* strchr(const char *s, int c) {
-    while (*s != (char)c) {
+    char ch = (char)c;
+
+#ifdef __x86_64__
+    /* ⚡ BOLT Optimization: Use SWAR to check 8 bytes at a time.
+       Checks for both the target character AND the null terminator simultaneously. */
+
+    /* Align to 8 bytes boundary */
+    while ((uintptr_t)s & 7) {
+        if (*s == ch) return (char *)s;
+        if (!*s) return 0;
+        s++;
+    }
+
+    /* Process 8 bytes at a time */
+    const uint64_t *ls = (const uint64_t *)s;
+    uint64_t v;
+
+    /* Create a pattern of repeated 'ch' bytes */
+    uint64_t pattern = (unsigned char)ch;
+    pattern |= pattern << 8;
+    pattern |= pattern << 16;
+    pattern |= pattern << 32;
+
+    uint64_t lomagic = 0x0101010101010101ULL;
+    uint64_t himagic = 0x8080808080808080ULL;
+
+    while (1) {
+        v = *ls++;
+
+        /* Check for null byte using standard bit trick:
+           (v - 0x01...) & ~v & 0x80... detects zero byte. */
+        uint64_t zero_check = (v - lomagic) & ~v & himagic;
+
+        /* Check for target character match using XOR trick:
+           ((v ^ pattern) - 0x01...) & ~(v ^ pattern) & 0x80... detects zero byte result. */
+        uint64_t match_check = ((v ^ pattern) - lomagic) & ~(v ^ pattern) & himagic;
+
+        if (zero_check || match_check) {
+            /* Found zero terminator OR match.
+               Break to byte loop to find exact position. */
+            s = (const char *)(ls - 1);
+            break;
+        }
+    }
+#endif
+
+    while (*s != ch) {
         if (!*s++) {
             return 0;
         }
