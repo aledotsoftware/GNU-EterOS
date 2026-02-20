@@ -3,10 +3,10 @@ LD = ld
 CFLAGS = -m64 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -Ilibc/include
 LDFLAGS = -T linker.ld -nostdlib -m elf_x86_64
 
-LIBC_SRC = libc/src/start.c libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c
+LIBC_SRC = libc/src/start.c libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/strtok.c
 LIBC_OBJ = $(LIBC_SRC:.c=.o)
 
-all: test.elf
+all: test.elf sh.elf
 
 libc/src/%.o: libc/src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -16,6 +16,12 @@ test.o: test.c
 
 test.elf: $(LIBC_OBJ) test.o
 	$(LD) $(LDFLAGS) -o test.elf $(LIBC_OBJ) test.o
+
+sh.elf: $(LIBC_OBJ) sh.o
+	$(LD) $(LDFLAGS) -o sh.elf $(LIBC_OBJ) sh.o
+
+sh.o: sh.c
+	$(CC) $(CFLAGS) -c sh.c -o sh.o
 
 clean:
 	rm -f *.o *.elf libc/src/*.o

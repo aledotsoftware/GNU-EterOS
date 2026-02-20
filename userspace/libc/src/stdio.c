@@ -10,6 +10,14 @@ struct _IO_FILE {
     int eof;
 };
 
+static FILE __stdin = {0, 0, 0};
+static FILE __stdout = {1, 0, 0};
+static FILE __stderr = {2, 0, 0};
+
+FILE *stdin = &__stdin;
+FILE *stdout = &__stdout;
+FILE *stderr = &__stderr;
+
 static void putc(int fd, char c) {
     write(fd, &c, 1);
 }

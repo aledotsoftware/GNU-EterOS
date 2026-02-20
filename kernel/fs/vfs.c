@@ -80,6 +80,18 @@ int unlink_fs(fs_node_t *parent, char *name) {
     return -1;
 }
 
+int ioctl_fs(fs_node_t *node, int request, void *arg) {
+    if (node->ioctl != 0) {
+        spin_lock(&node->lock);
+        int ret = node->ioctl(node, request, arg);
+        spin_unlock(&node->lock);
+        return ret;
+    }
+    return -1;
+}
+
+extern fs_node_t* tty_create_node(void);
+
 /**
  * Resolves a path to a filesystem node.
  *
@@ -92,6 +104,11 @@ int unlink_fs(fs_node_t *parent, char *name) {
  */
 fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
     if (!root || !path) return 0;
+
+    /* Hack for /dev/tty */
+    if (strcmp(path, "/dev/tty") == 0) {
+        return tty_create_node();
+    }
 
     /* Handle root path specially */
     if (path[0] == '/' && path[1] == '\0') {

@@ -471,16 +471,6 @@ struct stat {
 static int64_t sys_write(int fd, const void* buf, size_t count) {
     if (!validate_user_buffer(buf, count)) return -EFAULT;
 
-    if (fd == 1 || fd == 2) {
-        /* Stdout / Stderr -> Serial + VGA */
-        const char* msg = (const char*)buf;
-        for(size_t i=0; i<count; i++) {
-            serial_putchar(msg[i]);
-            terminal_putchar(msg[i]);
-        }
-        return count;
-    }
-
     /* File Descriptor Write */
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -496,45 +486,6 @@ static int64_t sys_write(int fd, const void* buf, size_t count) {
 
 static int64_t sys_read(int fd, void* buf, size_t count) {
     if (!validate_user_buffer(buf, count)) return -EFAULT;
-
-    if (fd == 0) {
-        /* Stdin -> Keyboard */
-        char* cbuf = (char*)buf;
-        size_t i = 0;
-        task_t* current = task_get_current();
-
-        while (i < count) {
-            /* Check for signals */
-            if (current->signal_pending & ~current->signal_mask) {
-                if (i > 0) return i; /* Return partial read */
-                return -EINTR;
-            }
-
-            if (keyboard_has_input()) {
-                char c = keyboard_getchar();
-
-                /* Echo the character to serial and terminal */
-                serial_putchar(c);
-                terminal_putchar(c);
-
-                if (c == '\b') {
-                    if (i > 0) i--;
-                    continue;
-                }
-
-                cbuf[i++] = c;
-                if (c == '\n' || c == '\r') {
-                    /* Normalize newline */
-                    if (c == '\r') cbuf[i-1] = '\n';
-                    return i;
-                }
-            } else {
-                /* Wait for interrupt */
-                __asm__ volatile("hlt");
-            }
-        }
-        return i;
-    }
 
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -770,10 +721,11 @@ static int64_t sys_uname(struct utsname* buf) {
 }
 
 static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
-    (void)fd; (void)request; (void)arg;
-    /* Determine if it is a TTY */
-    if (fd == 0 || fd == 1 || fd == 2) return 0; // Success for stdio
-    return -ENOTTY;
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    return ioctl_fs(current->fd_table[fd].node, (int)request, arg);
 }
 
 static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
@@ -1189,6 +1141,8 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_open((const char*)regs->rdi, (int)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_close) {
         ret = (uint64_t)sys_close((int)regs->rdi);
+    } else if (regs->rax == SYS_lseek) {
+        ret = (uint64_t)sys_lseek((int)regs->rdi, (int64_t)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_socket) {
         ret = (uint64_t)sys_socket((int)regs->rdi, (int)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_connect) {

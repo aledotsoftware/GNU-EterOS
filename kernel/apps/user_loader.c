@@ -14,21 +14,64 @@ extern void enter_user_mode(void* entry, void* stack);
 void user_loader_entry(void) {
     serial_write_string("[USER] Starting User Mode Loader...\n");
 
+    /* Setup Stdin/Stdout/Stderr to TTY */
+    fs_node_t* tty_node = vfs_lookup(fs_root, "/dev/tty");
+
+    if (tty_node) {
+        task_t* current = task_get_current();
+        /* FD 0: Stdin */
+        current->fd_table[0].node = tty_node;
+        current->fd_table[0].flags = 2; /* O_RDWR */
+        current->fd_table[0].offset = 0;
+        tty_node->ref_count++;
+
+        /* FD 1: Stdout */
+        current->fd_table[1].node = tty_node;
+        current->fd_table[1].flags = 2;
+        current->fd_table[1].offset = 0;
+        tty_node->ref_count++;
+
+        /* FD 2: Stderr */
+        current->fd_table[2].node = tty_node;
+        current->fd_table[2].flags = 2;
+        current->fd_table[2].offset = 0;
+        tty_node->ref_count++;
+
+        /* Decrease initial ref from lookup, as we incremented for each FD */
+        /* Actually vfs_lookup returns a node with ref_count=1 (usually) */
+        /* If we share the same node pointer: */
+        /* FD0 takes ownership. */
+        /* FD1 needs ref inc. */
+        /* FD2 needs ref inc. */
+        /* Original pointer is consumed by FD0. */
+        /* Wait, tty_create_node returns new node. */
+        /* We can assign the same node to all 3 and inc ref count. */
+        /* tty_node->ref_count starts at 1. */
+        /* FD0 uses it. FD1 uses it (ref++). FD2 uses it (ref++). */
+        /* When closed, ref--. When 0, free. */
+        /* So: */
+        /* FD0: tty_node */
+        /* FD1: tty_node; tty_node->ref_count++; */
+        /* FD2: tty_node; tty_node->ref_count++; */
+    } else {
+        serial_write_string("[USER] Warning: Failed to open /dev/tty\n");
+    }
+
     uint64_t entry_point = 0;
 
     /* Try to load ELF from Initrd */
-    /* Note: We assume initrd is mounted at /initrd or root? */
-    /* fs_root is the root of VFS. Usually Initrd is mounted at / or /initrd. */
-    /* Let's try /test.elf first if initrd is root, or /initrd/test.elf if mounted. */
-    /* In kernel/main.c usually initrd is root. */
-    /* Let's try "test.elf" relative to root. */
-
-    /* Load PIE binaries at 0x200000000 to avoid identity map conflicts */
-    entry_point = elf_load_file("test.elf", 0x200000000);
+    /* Load sh.elf */
+    entry_point = elf_load_file("sh.elf", 0x200000000);
 
     if (entry_point == 0) {
-        /* Try /test.elf */
-        entry_point = elf_load_file("/test.elf", 0x200000000);
+        entry_point = elf_load_file("/sh.elf", 0x200000000);
+    }
+
+    /* Fallback to test.elf if sh.elf missing */
+    if (entry_point == 0) {
+         serial_write_string("[USER] sh.elf not found, falling back to test.elf\n");
+         entry_point = elf_load_file("test.elf", 0x200000000);
+         if (entry_point == 0) entry_point = elf_load_file("/test.elf", 0x200000000);
     }
 
     if (entry_point != 0) {
@@ -98,7 +141,7 @@ void user_loader_entry(void) {
     char* sp = (char*)user_stack_top;
 
     /* 1. Push strings */
-    const char* argv0_str = "test.elf";
+    const char* argv0_str = "sh";
     size_t len = strlen(argv0_str) + 1;
     sp -= len;
     memcpy(sp, argv0_str, len);

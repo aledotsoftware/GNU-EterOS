@@ -24,6 +24,7 @@ typedef struct fs_node * (*finddir_type_t)(struct fs_node*, char *name);
 typedef int (*create_type_t)(struct fs_node*, char*, uint16_t);
 typedef int (*mkdir_type_t)(struct fs_node*, char*, uint16_t);
 typedef int (*unlink_type_t)(struct fs_node*, char*);
+typedef int (*ioctl_type_t)(struct fs_node*, int, void*);
 
 typedef struct fs_node {
     char name[128];
@@ -41,6 +42,7 @@ typedef struct fs_node {
     write_type_t write;
     open_type_t open;
     close_type_t close;
+    ioctl_type_t ioctl;
     readdir_type_t readdir;
     finddir_type_t finddir;
     create_type_t create;
@@ -69,6 +71,7 @@ fs_node_t *finddir_fs(fs_node_t *node, char *name);
 int create_fs(fs_node_t *parent, char *name, uint16_t permission);
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission);
 int unlink_fs(fs_node_t *parent, char *name);
+int ioctl_fs(fs_node_t *node, int request, void *arg);
 
 /**
  * Resolves a path to a filesystem node.

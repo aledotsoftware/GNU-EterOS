@@ -43,6 +43,7 @@ int getpid(void);
 int getppid(void);
 int kill(int pid, int sig);
 int fork(void);
+int execve(const char *filename, char *const argv[], char *const envp[]);
 void exit(int status);
 
 /* File Descriptors */
