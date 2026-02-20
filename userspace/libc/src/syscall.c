@@ -65,17 +65,6 @@ int open(const char *pathname, int flags) {
     return (int)ret;
 }
 
-int fork(void) {
-    long ret = syscall0(SYS_fork);
-    if (ret < 0) { errno = -ret; return -1; }
-    return (int)ret;
-}
-
-int execve(const char *filename, char *const argv[], char *const envp[]) {
-    long ret = syscall3(SYS_execve, (long)filename, (long)argv, (long)envp);
-    if (ret < 0) { errno = -ret; return -1; }
-    return (int)ret;
-}
 
 int wait(int *wstatus) {
     long ret = syscall3(SYS_wait4, -1, (long)wstatus, 0);

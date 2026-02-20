@@ -19,6 +19,7 @@
 #define HAL_MEM_CACHE_DISABLE (1 << 4)  /* Disable caching (e.g. for MMIO) */
 #define HAL_MEM_WRITETHROUGH  (1 << 5)  /* Write-through caching */
 #define HAL_MEM_GLOBAL        (1 << 6)  /* Global page (not flushed on context switch) */
+#define HAL_MEM_WRITE_COMBINING (1 << 7) /* Write-Combining (e.g. for Video) */
 
 /* ========================================================================= */
 /* API                                                                       */

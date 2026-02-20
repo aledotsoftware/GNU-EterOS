@@ -1,0 +1,130 @@
+#include <gfx/gfx.h>
+#include <framebuffer.h>
+#include <string.h>
+
+/* Dirty Rectangle global (Union of all dirty areas) */
+static rect_t dirty_rect = {0, 0, 0, 0};
+static int dirty_rect_valid = 0; /* 0 = Empty, 1 = Valid */
+
+/* Helper: Math functions */
+static int32_t abs(int32_t x) { return x < 0 ? -x : x; }
+static int32_t min(int32_t a, int32_t b) { return a < b ? a : b; }
+static int32_t max(int32_t a, int32_t b) { return a > b ? a : b; }
+
+void gfx_init(boot_info_t* boot_info) {
+    /* Initialize low-level framebuffer */
+    framebuffer_init(boot_info);
+
+    /* Enable double buffering immediately */
+    framebuffer_enable_double_buffer();
+
+    /* Invalidate full screen initially */
+    gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());
+}
+
+void gfx_add_dirty_rect(int32_t x, int32_t y, int32_t w, int32_t h) {
+    if (w <= 0 || h <= 0) return;
+
+    /* Clip input rect to screen bounds */
+    int32_t screen_w = (int32_t)framebuffer_get_width();
+    int32_t screen_h = (int32_t)framebuffer_get_height();
+
+    if (x >= screen_w || y >= screen_h) return;
+    if (x + w < 0 || y + h < 0) return;
+
+    /* Clip logic */
+    int32_t x2 = x + w;
+    int32_t y2 = y + h;
+
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x2 > screen_w) x2 = screen_w;
+    if (y2 > screen_h) y2 = screen_h;
+
+    w = x2 - x;
+    h = y2 - y;
+
+    if (!dirty_rect_valid) {
+        dirty_rect.x = x;
+        dirty_rect.y = y;
+        dirty_rect.w = w;
+        dirty_rect.h = h;
+        dirty_rect_valid = 1;
+    } else {
+        /* Union logic: Expand bounding box */
+        int32_t old_x2 = dirty_rect.x + dirty_rect.w;
+        int32_t old_y2 = dirty_rect.y + dirty_rect.h;
+
+        int32_t new_x = min(dirty_rect.x, x);
+        int32_t new_y = min(dirty_rect.y, y);
+        int32_t new_x2 = max(old_x2, x2);
+        int32_t new_y2 = max(old_y2, y2);
+
+        dirty_rect.x = new_x;
+        dirty_rect.y = new_y;
+        dirty_rect.w = new_x2 - new_x;
+        dirty_rect.h = new_y2 - new_y;
+    }
+}
+
+void gfx_present(void) {
+    if (!dirty_rect_valid) return;
+
+    framebuffer_flush_rect(dirty_rect.x, dirty_rect.y, dirty_rect.w, dirty_rect.h);
+
+    /* Reset dirty rect */
+    dirty_rect_valid = 0;
+    dirty_rect.x = 0;
+    dirty_rect.y = 0;
+    dirty_rect.w = 0;
+    dirty_rect.h = 0;
+}
+
+void gfx_put_pixel(int32_t x, int32_t y, uint32_t color) {
+    framebuffer_putpixel((uint32_t)x, (uint32_t)y, color);
+    /* Auto-dirty single pixel? Usually inefficient.
+       Let the caller dirty regions or batch it.
+       BUT the prompt implies automatic tracking?
+       "Interceptar los eventos de la UI para calcular..."
+       Since this is a primitive, we should probably not auto-dirty every pixel for performance unless asked.
+       Wait, "Intercept events...".
+       For now, let's assume primitives DO dirty the area, because otherwise existing code calling primitives won't update.
+    */
+    gfx_add_dirty_rect(x, y, 1, 1);
+}
+
+void gfx_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color) {
+    /* Dirty the bounding box of the line */
+    int32_t min_x = min(x0, x1);
+    int32_t min_y = min(y0, y1);
+    int32_t max_x = max(x0, x1);
+    int32_t max_y = max(y0, y1);
+    gfx_add_dirty_rect(min_x, min_y, (max_x - min_x) + 1, (max_y - min_y) + 1);
+
+    int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy, e2;
+
+    for (;;) {
+        framebuffer_putpixel(x0, y0, color);
+        if (x0 == x1 && y0 == y1) break;
+        e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+}
+
+void gfx_draw_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
+    gfx_draw_line(x, y, x + w - 1, y, color);
+    gfx_draw_line(x + w - 1, y, x + w - 1, y + h - 1, color);
+    gfx_draw_line(x + w - 1, y + h - 1, x, y + h - 1, color);
+    gfx_draw_line(x, y + h - 1, x, y, color);
+}
+
+void gfx_fill_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
+    /* Use optimized framebuffer function */
+    framebuffer_rect((uint32_t)x, (uint32_t)y, (uint32_t)w, (uint32_t)h, color);
+
+    /* Mark dirty */
+    gfx_add_dirty_rect(x, y, w, h);
+}

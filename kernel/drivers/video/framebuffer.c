@@ -2,6 +2,9 @@
 #include <string.h>
 #include <mm.h>
 #include <serial.h>
+#include <hal/mm.h>
+
+#define FB_VIRT_ADDR 0xFFFFFFFFE0000000
 
 static uint32_t* fb_buffer = 0;
 static uint32_t* back_buffer = 0; /* Doble buffer */
@@ -17,16 +20,35 @@ static uint32_t* active_buffer = 0;
 void framebuffer_init(boot_info_t* info) {
     if (!info || !info->fb_addr) return;
 
-    fb_buffer = (uint32_t*)((uint64_t)info->fb_addr);
     fb_width = info->fb_width;
     fb_height = info->fb_height;
     fb_pitch = info->fb_pitch;
     fb_bpp = info->fb_bpp;
-    
     fb_size_bytes = fb_height * fb_pitch;
+
+    /* Map Framebuffer with Write-Combining */
+    uint64_t phys_addr = (uint64_t)info->fb_addr;
+
+    /* Handle alignment */
+    uint64_t phys_base = phys_addr & ~(HAL_PAGE_SIZE - 1);
+    uint64_t offset = phys_addr - phys_base;
+    uint64_t virt_base = FB_VIRT_ADDR;
+
+    size_t total_size = fb_size_bytes + offset;
+    size_t pages = (total_size + HAL_PAGE_SIZE - 1) / HAL_PAGE_SIZE;
+
+    for(size_t i = 0; i < pages; i++) {
+         hal_mem_map(phys_base + i * HAL_PAGE_SIZE,
+                     virt_base + i * HAL_PAGE_SIZE,
+                     HAL_MEM_WRITE | HAL_MEM_WRITE_COMBINING);
+    }
+
+    fb_buffer = (uint32_t*)(virt_base + offset);
     
     char buf[64];
     serial_write_string("[FB] LFB Address: 0x");
+    utoa_hex_s((uint64_t)phys_addr, buf, sizeof(buf));
+    serial_write_string(" mapped to 0x");
     utoa_hex_s((uint64_t)fb_buffer, buf, sizeof(buf));
     serial_write_string(buf);
     serial_write_string("\n");

@@ -127,6 +127,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/string.c             \
               $(KERNEL_DIR)/stdio.c              \
               $(KERNEL_DIR)/futex.c              \
+              $(KERNEL_DIR)/sem.c                \
               $(KERNEL_DIR)/shell/shell.c        \
               $(KERNEL_DIR)/shell/commands.c     \
               $(KERNEL_DIR)/shell/history.c      \
@@ -149,7 +150,6 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/apps/sysmon.c          \
               $(KERNEL_DIR)/apps/user_loader.c     \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
-              $(KERNEL_DIR)/drivers/net/e1000.c     \
               $(KERNEL_DIR)/fs/initrd.c            \
               $(KERNEL_DIR)/fs/vfs.c               \
               $(KERNEL_DIR)/fs/devfs.c             \
@@ -157,12 +157,14 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
+              $(KERNEL_DIR)/gfx/gfx.c              \
               $(KERNEL_DIR)/mm/pmm.c               \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
               $(KERNEL_DIR)/arch/x86_64/gdt.c \
               $(KERNEL_DIR)/arch/x86_64/acpi.c \
               $(KERNEL_DIR)/arch/x86_64/smp.c \
+              $(KERNEL_DIR)/arch/x86_64/pat.c \
               $(KERNEL_DIR)/arch/x86_64/apic.c \
               $(KERNEL_DIR)/arch/x86_64/syscall.c \
               $(KERNEL_DIR)/drivers/disk/partition.c \
@@ -241,6 +243,7 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/shell
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/video
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/gfx
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/serial
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/shell
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/input

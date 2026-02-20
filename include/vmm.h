@@ -11,6 +11,8 @@
 #define PAGE_PRESENT    0x1
 #define PAGE_WRITE      0x2
 #define PAGE_USER       0x4
+#define PAGE_PWT        0x8   /* Page Write Through */
+#define PAGE_PCD        0x10  /* Page Cache Disable */
 #define PAGE_HUGE       0x80
 #define PAGE_COW        0x200 /* Bit 9: Copy-on-Write (OS Available) */
 #define PAGE_NO_EXEC    0x8000000000000000
