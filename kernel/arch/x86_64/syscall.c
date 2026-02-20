@@ -27,6 +27,10 @@
 
 extern void syscall_entry(void);
 
+/* External Declarations for Task Functions */
+extern int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs);
+extern int task_waitpid(int pid, int* status, int options);
+
 /* Definition of per-cpu data removed - handled by smp.c */
 
 void syscall_init(void) {
@@ -1098,8 +1102,7 @@ static int64_t sys_set_tid_address(int* tidptr) {
 }
 
 static int64_t sys_exit_group(int status) {
-    (void)status;
-    task_exit();
+    task_exit(status);
     __builtin_unreachable();
 }
 
@@ -1170,6 +1173,17 @@ static int64_t sys_getcwd(char* buf, size_t size) {
     return (int64_t)buf;
 }
 
+static int64_t sys_execve(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) {
+    /* Validation happens in task_exec */
+    return task_exec(path, argv, envp, regs);
+}
+
+static int64_t sys_wait4(int pid, int* status, int options, void* rusage) {
+    (void)rusage;
+    if (status && !validate_user_buffer(status, sizeof(int))) return -EFAULT;
+    return task_waitpid(pid, status, options);
+}
+
 static void syscall_native_handler(struct syscall_regs* regs) {
     uint64_t ret = (uint64_t)-ENOSYS;
 
@@ -1204,8 +1218,10 @@ static void syscall_native_handler(struct syscall_regs* regs) {
     } else if (regs->rax == SYS_recvfrom) {
         ret = (uint64_t)sys_recvfrom((int)regs->rdi, (void*)regs->rsi, (size_t)regs->rdx, (int)regs->r10, (struct sockaddr*)regs->r8, (int*)regs->r9);
     } else if (regs->rax == SYS_exit) {
-        task_exit();
+        task_exit((int)regs->rdi);
         __builtin_unreachable();
+    } else if (regs->rax == SYS_lseek) {
+        ret = (uint64_t)sys_lseek((int)regs->rdi, (int64_t)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_getpid) {
         ret = (uint64_t)sys_getpid();
     } else if (regs->rax == SYS_kill) {
@@ -1219,6 +1235,10 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_brk((uint64_t)regs->rdi);
     } else if (regs->rax == SYS_fork) {
         ret = (uint64_t)task_fork((void*)regs);
+    } else if (regs->rax == SYS_execve) {
+        ret = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
+    } else if (regs->rax == SYS_wait4) {
+        ret = (uint64_t)sys_wait4((int)regs->rdi, (int*)regs->rsi, (int)regs->rdx, (void*)regs->r10);
     } else if (regs->rax == 158) { /* SYS_arch_prctl is 158 */
         ret = (uint64_t)sys_arch_prctl((int)regs->rdi, (uint64_t)regs->rsi);
     } else if (regs->rax == SYS_uname) {

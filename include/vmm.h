@@ -118,4 +118,10 @@ int vmm_is_user_page(uint64_t virt_addr);
  */
 int vmm_validate_user_ptr(const void* addr, size_t size);
 
+/**
+ * Libera recursivamente un espacio de direcciones (PML4) y sus páginas de usuario.
+ * @param pml4_phys Dirección física del PML4.
+ */
+void vmm_destroy_pml4(uint64_t pml4_phys);
+
 #endif /* ETEROS_VMM_H */
