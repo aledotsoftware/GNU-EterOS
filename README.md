@@ -82,11 +82,6 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 │   │   ├── disk/               # Almacenamiento
 │   │   │   └── partition.c     # Gestor de particiones (MBR) y VFS A/B
 │   │   └── net/e1000.c         # Intel PRO/1000 NIC driver
-│   ├── ui/                     # AetherGraphics (GUI System)
-│   │   ├── window.c            # Window Manager & Compositor
-│   │   ├── omni.c              # Motor Omni v2.0 (Dibujo optimizado)
-│   │   ├── upng.c              # Decodificador PNG nativo
-│   │   └── primitives.c        # Primitivas de dibujo 2D (Legacy)
 │   ├── net/                    # Stack de Red
 │   │   ├── dhcp.c              # Cliente DHCP (Discover/Offer)
 │   │   ├── tcp.c               # Stack TCP minimalista
@@ -98,7 +93,6 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 │   └── apps/                   # Aplicaciones del kernel
 │       ├── santitravel.c       # Juego de texto (aventuras)
 │       ├── sysmon.c            # Monitor del sistema
-│       ├── gui_demo.c          # Flux UI Desktop Environment (16+ Apps)
 │       ├── wget.c              # Downloader de archivos
 │       ├── doomgeneric/        # Port de DOOM (Motor de juego)
 │       └── user_loader.c       # Loader de ejecutables de usuario
@@ -292,12 +286,13 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 
 
 
-### Fase 5: Entorno Gráfico (Flux UI & AetherGraphics) ✅
-- [x] **Motor de Dibujo "Omni":** Primitivas 2D (líneas, rectángulos, fuentes) y **Decodificador PNG Nativo** para iconos y assets (`kernel/ui/upng.c`)
-- [x] **Double Buffering Activo:** Renderizado libre de parpadeo con composicion en RAM antes de flush (`kernel/ui/image.c`)
+### Fase 5: Entorno Gráfico (Flux UI & AetherGraphics) [LEGACY/REMOVED]
+*Nota: Este subsistema ha sido deprecado y eliminado del kernel en favor de una nueva interfaz web (ver `web_ui`).*
+- [x] **Motor de Dibujo "Omni":** Primitivas 2D (líneas, rectángulos, fuentes) y **Decodificador PNG Nativo**.
+- [x] **Double Buffering Activo:** Renderizado libre de parpadeo con composicion en RAM antes de flush.
 - [x] **Event Loop Reactivo:** Sistema de despacho de mensajes (Mouse + Teclado) dirigido a la ventana focalizada.
-- [x] **Compositor de Ventanas:** Gestión de apilamiento (Z-order) y transparencia alfa básica en el kernel (`kernel/ui/window.c`)
-- [x] **Flux UI Experience:** Entorno táctil/estilizado con 16+ aplicaciones integradas:
+- [x] **Compositor de Ventanas:** Gestión de apilamiento (Z-order) y transparencia alfa básica.
+- [x] **Flux UI Experience:** Entorno táctil/estilizado con 16+ aplicaciones integradas (Legacy):
     - 📟 **Terminal Flux:** Integrada con soporte completo para comandos (`ls`, `ps`, `sysinfo`).
     - 📁 **Monitor de Sistema:** Gestión visual de procesos y recursos.
     - 🛠️ **Admin. de Dispositivos:** Inventario de hardware (CPU, RAM, PCI).
@@ -311,7 +306,7 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
     - 🔊 **Reproductor de Música & Galería:** Stubs de medios con interfaz unificada.
 
 
-### Fase 5.1: Optimización del Motor Gráfico (Omni v2.0) ✅
+### Fase 5.1: Optimización del Motor Gráfico (Omni v2.0) [LEGACY/REMOVED]
 - [x] **Motor Omni v2.0:** Refactorización completa del motor de dibujo 2D:
     - ⚡ **Frame Batching:** `omni_begin_frame()` cachea el puntero al framebuffer una vez por frame, eliminando overhead de `get_buffer()` por operación.
     - ⚡ **Dirty Region Tracking:** Sistema de regiones sucias para partial flush, reduciendo hasta un 80% el ancho de banda al bus PCI.
