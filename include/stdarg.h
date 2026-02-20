@@ -1,5 +1,5 @@
-#ifndef _STDARG_H
-#define _STDARG_H
+#ifndef ETEROS_STDARG_H
+#define ETEROS_STDARG_H
 
 #ifdef __ETEROS_HOST_TEST__
 #if defined(__GNUC__) || defined(__clang__)
@@ -16,4 +16,4 @@ typedef __builtin_va_list va_list;
 
 #endif
 
-#endif /* _STDARG_H */
+#endif /* ETEROS_STDARG_H */

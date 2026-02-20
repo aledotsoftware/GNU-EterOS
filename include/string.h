@@ -19,6 +19,7 @@
 #define strlen eteros_strlen
 #define strncpy eteros_strncpy
 #define strlcpy eteros_strlcpy
+#define strlcat eteros_strlcat
 #define strnlen eteros_strnlen
 #define strcmp eteros_strcmp
 #define strncmp eteros_strncmp

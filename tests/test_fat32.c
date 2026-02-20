@@ -44,9 +44,6 @@ void kfree(void* ptr) {
 /* Mock VFS globals if needed by fat32.c (it includes vfs.h) */
 fs_node_t *fs_root = NULL;
 
-/* Include string implementation */
-#include "../kernel/string.c"
-
 /* Include source under test */
 #include "../kernel/fs/fat32.c"
 

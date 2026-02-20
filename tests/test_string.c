@@ -355,6 +355,63 @@ int main() {
         printf("strlcpy null termination guarantee passed\n");
     }
 
+    /* Test strlcat */
+    {
+        char buffer[20];
+        size_t len;
+
+        /* Test 1: Normal concatenation */
+        strcpy(buffer, "Hello");
+        len = strlcat(buffer, " World", sizeof(buffer));
+        assert(len == 11);
+        assert(strcmp(buffer, "Hello World") == 0);
+
+        /* Test 2: Truncation */
+        strcpy(buffer, "Hello");
+        /* "Hello" (5) + " World" (6) = 11. Size limit 8. */
+        /* Should append " Wo" (3 chars) -> "Hello Wo" (8 chars). Wait. */
+        /* Size 8 means buffer can hold 7 chars + null. */
+        /* "Hello" is 5. Space left is 8 - 5 - 1 = 2 chars. */
+        /* So it should append " W". "Hello W" is 7 chars. */
+        len = strlcat(buffer, " World", 8);
+        assert(len == 11); /* Returns expected length (5 + 6) */
+        assert(strcmp(buffer, "Hello W") == 0);
+
+        /* Test 3: Size smaller than dest string (no modification) */
+        strcpy(buffer, "Hello");
+        /* Size 3. Dest "Hello" is 5. */
+        len = strlcat(buffer, " World", 3);
+        assert(len == 3 + 6); /* size + strlen(src) = 3 + 6 = 9 */
+        assert(strcmp(buffer, "Hello") == 0);
+
+        /* Test 4: Size equals dest string (no modification) */
+        strcpy(buffer, "Hello");
+        len = strlcat(buffer, " World", 5);
+        assert(len == 5 + 6); /* 11 */
+        assert(strcmp(buffer, "Hello") == 0);
+
+        /* Test 5: Exact fit */
+        strcpy(buffer, "Hello");
+        /* "Hello" + "!" = 6 chars. Size 7. */
+        len = strlcat(buffer, "!", 7);
+        assert(len == 6);
+        assert(strcmp(buffer, "Hello!") == 0);
+
+        /* Test 6: Empty src */
+        strcpy(buffer, "Hello");
+        len = strlcat(buffer, "", sizeof(buffer));
+        assert(len == 5);
+        assert(strcmp(buffer, "Hello") == 0);
+
+        /* Test 7: Empty dest */
+        buffer[0] = '\0';
+        len = strlcat(buffer, "World", sizeof(buffer));
+        assert(len == 5);
+        assert(strcmp(buffer, "World") == 0);
+
+        printf("strlcat tests passed\n");
+    }
+
     /* Test memset16 */
     {
         uint16_t buffer[16];
