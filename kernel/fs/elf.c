@@ -150,6 +150,8 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             if (file_size > 0) {
                 if (read_fs(node, file_offset, file_size, (uint8_t*)vaddr) != file_size) {
                      serial_write_string("[ELF] Failed to read segment data.\n");
+                     kfree(node);
+                     return 0;
                 }
             }
 

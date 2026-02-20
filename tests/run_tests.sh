@@ -52,6 +52,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_security.c kernel/string.c -
 ./tests/test_elf_security
 rm tests/test_elf_security
 
+# Test ELF Read Failure
+echo "---------------------------------------------------"
+echo "Running test_elf_read_failure..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_read_failure.c -o tests/test_elf_read_failure
+./tests/test_elf_read_failure
+rm tests/test_elf_read_failure
+
 # Test IP Aton
 echo "---------------------------------------------------"
 echo "Running test_ip_aton..."
