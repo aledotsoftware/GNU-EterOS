@@ -11,6 +11,15 @@ int main(int argc, char **argv) {
     if (argc > 0 && argv != NULL) {
         for (int i = 0; i < argc; i++) {
             printf("argv[%d] = '%s'\n", i, argv[i]);
+            if (strcmp(argv[i], "--segfault") == 0) {
+                printf("Testing signal handling (Segfault)...\n");
+
+                /* This should cause SIGSEGV and task termination by kernel */
+                volatile int *p = (int*)0;
+                *p = 42;
+
+                printf("This should NOT be printed if Segfault works.\n");
+            }
         }
 
         /* Verify argv termination */
