@@ -24,6 +24,7 @@
 #include <fs/initrd.h>
 #include <fs/vfs.h>
 #include <vga.h>
+#include <gfx/gfx.h>
 #include <task.h>
 #include <net/defs.h>
 #include <net/socket.h>
@@ -109,6 +110,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     acpi_init();
     /* ---- 2.6 Inicializar SMP (BSP Topology) ---- */
     cpu_init_bsp();
+    /* Inicializar PAT para soportar Write-Combining en video */
+    pat_init();
     #endif
 
     /* ---- 3. Inicializar Memory Managers (Solo Tier 2+) ---- */
@@ -128,6 +131,16 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
         /* Heap Manager (Generic) */
         mm_init(boot_info);
+
+        /* Inicializar Subsistema Gráfico (FrameBuffer + Dirty Rects) */
+        /* Nota: Requiere mm_init para el doble buffer */
+        if (boot_info && boot_info->fb_addr != 0) {
+            gfx_init(boot_info);
+
+            /* Dibujar algo de prueba */
+            gfx_fill_rect(0, 0, 1024, 768, 0x002040); // Fondo azul oscuro
+            gfx_present();
+        }
     #endif
 
     #if defined(ARCH_X86_64)

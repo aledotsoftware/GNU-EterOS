@@ -225,7 +225,14 @@ int hal_mem_map(uint64_t phys_addr, uint64_t virt_addr, uint32_t flags) {
 
     if (flags & HAL_MEM_CACHE_DISABLE) {
         /* PCD (Page Cache Disable) is usually bit 4 */
-        arch_flags |= 0x10;
+        arch_flags |= PAGE_PCD;
+    }
+
+    if (flags & HAL_MEM_WRITE_COMBINING) {
+        /* WC via PAT: Index 1 (PWT=1, PCD=0) */
+        /* We set PWT. We ensure PCD is cleared just in case. */
+        arch_flags |= PAGE_PWT;
+        arch_flags &= ~PAGE_PCD;
     }
 
     /* Call the architecture specific mapper */
