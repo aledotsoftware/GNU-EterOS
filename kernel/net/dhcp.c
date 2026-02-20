@@ -138,8 +138,6 @@ void dhcp_discover(void) {
                  }
 
                  /* Store in Global Stack */
-                 extern uint32_t my_ip, gateway_ip, dns_ip;
-                 extern int network_ready;
                  my_ip = r_dhcp->yiaddr;
                  gateway_ip = (gw != 0) ? gw : ((my_ip & 0x00FFFFFF) | 0x02000000); 
                  dns_ip = (dns != 0) ? dns : 0x08080808; 

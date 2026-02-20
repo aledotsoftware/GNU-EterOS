@@ -37,7 +37,6 @@
 
 extern int task_get_cpu_load(void);
 extern int task_kill(uint32_t pid);
-extern uint32_t my_ip; // Defined in stack.c
 
 /* ========================================================================= */
 /* Constantes y Configuración Visual                                         */
@@ -1118,7 +1117,6 @@ static const char* parse_url_path(const char* url) {
 static void system_net_dispatcher_task(void) {
     strlcpy(browser_status_text, "Network: Iniciando DHCP...", 64);
     
-    extern int network_ready;
     int timeout = 50;
     while (!network_ready && timeout-- > 0) {
         task_sleep(100);

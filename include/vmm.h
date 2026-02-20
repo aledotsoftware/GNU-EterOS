@@ -45,6 +45,11 @@
 void vmm_init(void);
 
 /**
+ * Invalida una dirección en el TLB del procesador actual.
+ */
+void vmm_flush_tlb_local(uint64_t addr);
+
+/**
  * Mapea una página física a una dirección virtual.
  * 
  * @param phys_addr Dirección física (debe estar alineada a 4KB)

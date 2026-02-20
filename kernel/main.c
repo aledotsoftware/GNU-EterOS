@@ -19,10 +19,13 @@
 #include <mouse.h>
 #include <shell.h>
 #include <mm.h>
+#include <pmm.h>
+#include <vmm.h>
 #include <fs/initrd.h>
 #include <fs/vfs.h>
 #include <vga.h>
 #include <task.h>
+#include <net/defs.h>
 #include <net/socket.h>
 #include <cpu.h>
 
@@ -31,15 +34,6 @@
 #include <apic.h>
 #include <futex.h>
 #include <sem.h>
-
-/* Compatibility for legacy apps */
-extern int network_ready;
-extern sem_t net_sem;
-
-
-/* Forward declarations for non-HAL kernel services */
-void pmm_init(void);
-void vmm_init(void);
 
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */

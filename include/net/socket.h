@@ -2,6 +2,7 @@
 #define ETEROS_NET_SOCKET_H
 
 #include "../types.h"
+#include <sem.h>
 
 /* Address Families */
 #define AF_INET     2
@@ -100,6 +101,9 @@ typedef struct {
 /* Global Socket Table */
 #define MAX_SOCKETS 16
 extern socket_entry_t socket_table[MAX_SOCKETS];
+
+/* Global Network Semaphore (stack.c) */
+extern sem_t net_sem;
 
 /* Helper to get socket pointer from ID */
 static inline socket_entry_t* get_socket(socket_t id) {
