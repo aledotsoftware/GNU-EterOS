@@ -3,14 +3,11 @@
 
 #include <stdint.h>
 #include <sys/syscall.h>
+#include <sys/types.h>
 
 #define SEEK_SET 0
 #define SEEK_CUR 1
 #define SEEK_END 2
-
-typedef int32_t ssize_t;
-typedef uint64_t size_t;
-typedef int pid_t;
 
 /* File Descriptors */
 #define STDIN_FILENO  0

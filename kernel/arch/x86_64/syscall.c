@@ -22,6 +22,7 @@
 #include <timer.h>
 #include <vmm.h>
 #include <futex.h>
+#include <net/socket.h>
 
 extern void syscall_entry(void);
 
@@ -58,6 +59,34 @@ void syscall_init(void) {
 /* ========================================================================= */
 /* Syscall Implementations                                                   */
 /* ========================================================================= */
+
+/* --- Socket VFS Wrappers --- */
+
+static uint32_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
+    (void)offset;
+    if ((node->flags & 0x7) != FS_SOCKET) return 0;
+
+    /* node->inode holds the socket ID (see sys_socket) */
+    /* net_recv takes flags. Standard read() implies flags=0 (blocking) */
+    int res = net_recv((int)node->inode, buffer, size, 0);
+    return (res < 0) ? 0 : (uint32_t)res;
+}
+
+static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
+    (void)offset;
+    if ((node->flags & 0x7) != FS_SOCKET) return 0;
+
+    int res = net_send((int)node->inode, buffer, size, 0);
+    return (res < 0) ? 0 : (uint32_t)res;
+}
+
+static void socket_close_fs(fs_node_t* node) {
+    if ((node->flags & 0x7) == FS_SOCKET) {
+        net_close((int)node->inode);
+    }
+}
+
+/* --- End Socket VFS Wrappers --- */
 
 #define O_ACCMODE   00000003
 #define O_RDONLY    00000000
@@ -257,6 +286,80 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     }
 
     return virt;
+}
+
+static int64_t sys_socket(int domain, int type, int protocol) {
+    /* Only AF_INET, SOCK_STREAM, IPPROTO_TCP supported */
+    /* We allow 0 for protocol as default */
+    if (domain != AF_INET) return -EAFNOSUPPORT;
+    if (type != SOCK_STREAM) return -EPROTOTYPE; // Only TCP supported
+    if (protocol != 0 && protocol != IPPROTO_TCP) return -EPROTONOSUPPORT;
+
+    int sock_id = net_socket(domain, type, IPPROTO_TCP);
+    if (sock_id < 0) return -ENOMEM; /* socket_table full */
+
+    task_t* current = task_get_current();
+
+    /* Find free FD */
+    int fd = -1;
+    for (int i = 3; i < MAX_FD; i++) {
+        if (current->fd_table[i].node == NULL) {
+            fd = i;
+            break;
+        }
+    }
+
+    if (fd == -1) {
+        /* Close the socket we just created to prevent leak */
+        net_close(sock_id);
+        return -EMFILE;
+    }
+
+    /* Allocate fs_node_t */
+    fs_node_t* node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!node) {
+        net_close(sock_id);
+        return -ENOMEM;
+    }
+    memset(node, 0, sizeof(fs_node_t));
+
+    strlcpy(node->name, "socket", 32);
+    node->flags = FS_SOCKET;
+    node->inode = (uint32_t)sock_id; /* Store socket ID in inode field */
+    node->read = socket_read_fs;
+    node->write = socket_write_fs;
+    node->close = socket_close_fs;
+    node->ref_count = 1;
+    node->open = NULL; /* No specific open action needed */
+
+    current->fd_table[fd].node = node;
+    current->fd_table[fd].offset = 0;
+    current->fd_table[fd].flags = O_RDWR;
+
+    return fd;
+}
+
+static int64_t sys_connect(int fd, const struct sockaddr* addr, int addrlen) {
+    if (!validate_user_buffer(addr, addrlen)) return -EFAULT;
+    if (addrlen < (int)sizeof(struct sockaddr_in)) return -EINVAL;
+
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
+
+    struct sockaddr_in* sin = (struct sockaddr_in*)addr;
+    if (sin->sin_family != AF_INET) return -EAFNOSUPPORT;
+
+    int res = net_connect((int)node->inode, sin, addrlen);
+    if (res < 0) {
+        /* Map kernel stack errors to errno */
+        if (res == -2) return -ENETUNREACH; /* ARP failed */
+        return -ECONNREFUSED;
+    }
+    return 0;
 }
 
 static int64_t sys_pipe(int* pipefd) {
@@ -782,6 +885,97 @@ static int64_t sys_dup2(int oldfd, int newfd) {
     return newfd;
 }
 
+static int64_t sys_bind(int fd, const struct sockaddr* addr, int addrlen) {
+    if (!validate_user_buffer(addr, addrlen)) return -EFAULT;
+
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
+
+    /* stack.c net_socket initializes local_port to 0.
+       net_connect binds ephemeral if 0.
+       We can set it here if socket is fresh.
+    */
+    struct sockaddr_in* sin = (struct sockaddr_in*)addr;
+    if (sin->sin_family != AF_INET) return -EAFNOSUPPORT;
+
+    socket_entry_t* s = get_socket((int)node->inode);
+    if (!s) return -EBADF;
+
+    if (s->state != SOCKET_STATE_CLOSED) return -EINVAL; /* Already connected/bound? */
+
+    s->local_port = ntohs(sin->sin_port);
+    /* Ignore IP for now (bind to all interfaces/my_ip) */
+
+    return 0;
+}
+
+static int64_t sys_listen(int fd, int backlog) {
+    (void)backlog;
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
+
+    /* Check if socket exists */
+    socket_entry_t* s = get_socket((int)node->inode);
+    if (!s) return -EBADF;
+
+    /* Set state to LISTEN - but stack.c doesn't handle this fully yet */
+    s->state = SOCKET_STATE_LISTEN;
+
+    /* We return success to allow applications to proceed,
+       even if actual connections won't be accepted by stack logic yet. */
+    return 0;
+}
+
+static int64_t sys_accept(int fd, struct sockaddr* addr, int* addrlen) {
+    /* Blocking accept - Not supported by stack.c yet */
+    (void)fd; (void)addr; (void)addrlen;
+    return -ENOSYS;
+}
+
+static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr* dest_addr, int addrlen) {
+    (void)dest_addr; (void)addrlen;
+    /* We ignore dest_addr for TCP (SOCK_STREAM) as it's connection based.
+       If we supported UDP, we'd use it.
+    */
+    if (!validate_user_buffer(buf, len)) return -EFAULT;
+
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
+
+    int res = net_send((int)node->inode, buf, len, flags);
+    if (res < 0) return -EIO;
+    return res;
+}
+
+static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr* src_addr, int* addrlen) {
+    (void)src_addr; (void)addrlen;
+    if (!validate_user_buffer(buf, len)) return -EFAULT;
+
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
+
+    int res = net_recv((int)node->inode, buf, len, flags);
+    if (res < 0) return -EIO; /* Or EAGAIN if nonblocking? */
+    if (res == 0) return 0; /* EOF */
+    return res;
+}
+
 /* ========================================================================= */
 /* Signal Syscalls                                                           */
 /* ========================================================================= */
@@ -994,8 +1188,20 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         ret = (uint64_t)sys_open((const char*)regs->rdi, (int)regs->rsi, (int)regs->rdx);
     } else if (regs->rax == SYS_close) {
         ret = (uint64_t)sys_close((int)regs->rdi);
-    } else if (regs->rax == SYS_lseek) {
-        ret = (uint64_t)sys_lseek((int)regs->rdi, (int64_t)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == SYS_socket) {
+        ret = (uint64_t)sys_socket((int)regs->rdi, (int)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == SYS_connect) {
+        ret = (uint64_t)sys_connect((int)regs->rdi, (const struct sockaddr*)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == SYS_bind) {
+        ret = (uint64_t)sys_bind((int)regs->rdi, (const struct sockaddr*)regs->rsi, (int)regs->rdx);
+    } else if (regs->rax == SYS_listen) {
+        ret = (uint64_t)sys_listen((int)regs->rdi, (int)regs->rsi);
+    } else if (regs->rax == SYS_accept) {
+        ret = (uint64_t)sys_accept((int)regs->rdi, (struct sockaddr*)regs->rsi, (int*)regs->rdx);
+    } else if (regs->rax == SYS_sendto) {
+        ret = (uint64_t)sys_sendto((int)regs->rdi, (const void*)regs->rsi, (size_t)regs->rdx, (int)regs->r10, (const struct sockaddr*)regs->r8, (int)regs->r9);
+    } else if (regs->rax == SYS_recvfrom) {
+        ret = (uint64_t)sys_recvfrom((int)regs->rdi, (void*)regs->rsi, (size_t)regs->rdx, (int)regs->r10, (struct sockaddr*)regs->r8, (int*)regs->r9);
     } else if (regs->rax == SYS_exit) {
         task_exit();
         __builtin_unreachable();
