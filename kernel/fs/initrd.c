@@ -75,7 +75,12 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     if (file_index >= file_count)
         return 1; /* EOF */
 
-    strlcpy(entry->name, file_headers[file_index].name, sizeof(entry->name));
+    /* Safe copy of name */
+    size_t name_len = strnlen(file_headers[file_index].name, sizeof(file_headers[file_index].name));
+    if (name_len >= sizeof(entry->name)) name_len = sizeof(entry->name) - 1;
+    memcpy(entry->name, file_headers[file_index].name, name_len);
+    entry->name[name_len] = '\0';
+
     entry->inode = file_index;
     return 0;
 }
@@ -119,12 +124,22 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
     }
 
     for (uint32_t i = 0; i < file_count; i++) {
-        if (strcmp(name, file_headers[i].name) == 0) {
+        /* Check name length first to avoid over-read and mismatch */
+        size_t file_name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
+        size_t search_len = strlen(name);
+
+        if (search_len == file_name_len && strncmp(name, file_headers[i].name, file_name_len) == 0) {
              fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
              if (!fnode) return 0;
              memset(fnode, 0, sizeof(fs_node_t));
              fnode->ref_count = 1;
-             strlcpy(fnode->name, file_headers[i].name, sizeof(fnode->name));
+
+             /* Safe copy of name */
+             size_t copy_len = file_name_len;
+             if (copy_len >= sizeof(fnode->name)) copy_len = sizeof(fnode->name) - 1;
+             memcpy(fnode->name, file_headers[i].name, copy_len);
+             fnode->name[copy_len] = '\0';
+
              fnode->inode = i;
              fnode->flags = FS_FILE;
              fnode->read = &initrd_read;
@@ -217,7 +232,10 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
 void* initrd_read_file(const char* name, uint32_t* size) {
     if (!initrd_start) return NULL;
     for (uint32_t i = 0; i < file_count; i++) {
-        if (strcmp(file_headers[i].name, name) == 0) {
+        size_t file_name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
+        size_t search_len = strlen(name);
+
+        if (search_len == file_name_len && strncmp(name, file_headers[i].name, file_name_len) == 0) {
             /* Security Check */
             if (file_headers[i].offset >= initrd_image_size) return NULL;
 

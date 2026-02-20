@@ -66,6 +66,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_ip_aton.c kernel/net/core/ip_uti
 ./tests/test_ip_aton
 rm tests/test_ip_aton
 
+# Test Initrd Security
+echo "---------------------------------------------------"
+echo "Running test_initrd_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_initrd_security.c -o tests/test_initrd_security
+./tests/test_initrd_security
+rm tests/test_initrd_security
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 

@@ -54,8 +54,6 @@ void test_initrd_oob_read() {
     heap_idx = 0;
 
     // Create a fake initrd image
-    // [Header] [FileHeaders...] [Data...]
-    // We make it small so we can easily point outside it
     static uint8_t image[4096];
     memset(image, 0, sizeof(image));
 
@@ -70,7 +68,6 @@ void test_initrd_oob_read() {
     file_header->offset = 10000;
 
     // Initialize
-    // Pass size=4096
     fs_node_t* root = initialise_initrd((uint64_t)image, sizeof(image));
     assert(root != NULL);
 
@@ -82,33 +79,79 @@ void test_initrd_oob_read() {
     uint8_t buffer[100];
     memset(buffer, 0xAA, sizeof(buffer));
 
-    // In vulnerable code:
-    // header.offset = 10000
-    // offset = 0
-    // size = 100
-    // header.size = 100
-    // Checks:
-    // offset(0) > header.size(100) -> false
-    // offset(0) + size(100) > header.size(100) -> false
-    // memcpy(buffer, start + 10000, 100)
-    // This will perform a read from image + 10000.
-
-    // We expect this to return 0 after the fix.
     uint32_t read_size = initrd_read(file, 0, 100, buffer);
 
     if (read_size != 0) {
         printf("VULNERABILITY CONFIRMED: Read %d bytes from out-of-bounds offset!\n", read_size);
-        // We exit with 0 to signal that the reproduction was successful (i.e., the vulnerability exists)
-        // Wait, usually tests should fail if vulnerability exists.
-        // But for reproduction step, I want to confirm failure.
-        // Let's make it fail (exit 1) if vulnerability exists so I can see it clearly.
         exit(1);
     }
 
     printf("PASSED: Read correctly blocked.\n");
 }
 
+void test_initrd_name_overflow() {
+    printf("Running test_initrd_name_overflow...\n");
+    heap_idx = 0;
+
+    static uint8_t image[4096];
+    memset(image, 0, sizeof(image));
+
+    initrd_header_t* header = (initrd_header_t*)image;
+    memcpy(header->magic, "INIT", 4);
+    header->count = 1;
+
+    initrd_file_header_t* file_header = (initrd_file_header_t*)(image + sizeof(initrd_header_t));
+
+    // Fill name with 64 'A's (no null terminator)
+    memset(file_header->name, 'A', 64);
+
+    // Fill adjacent memory (size/offset fields) with 'B's to simulate overflow
+    // size (4 bytes) + offset (4 bytes) = 8 bytes
+    memset(&file_header->size, 'B', 4);
+    memset(&file_header->offset, 'B', 4);
+
+    // Initialize
+    fs_node_t* root = initialise_initrd((uint64_t)image, sizeof(image));
+    assert(root != NULL);
+
+    // 1. Test Leakage via Finddir (strcmp overflow)
+    // We search for "A"*64 + "B"*8.
+    // If initrd_finddir uses strcmp, it will read past the 64 'A's in header->name
+    // and match against the 'B's in size/offset fields.
+    char malicious_name[100];
+    memset(malicious_name, 'A', 64);
+    memset(malicious_name + 64, 'B', 8);
+    malicious_name[72] = '\0';
+
+    fs_node_t* file = initrd_finddir(root, malicious_name);
+
+    if (file != NULL) {
+        printf("VULNERABILITY CONFIRMED: Found file using name extended with adjacent memory!\n");
+        printf("  Found name: %s\n", file->name);
+
+        // Also check if fnode->name contains leaked data
+        if (strlen(file->name) > 64) {
+             printf("  fnode->name has leaked data (len=%zu)\n", strlen(file->name));
+        }
+        exit(1);
+    }
+
+    // 2. Test Leakage via Readdir (strlcpy overflow)
+    // Even if finddir is fixed, readdir might leak into dirent->name
+    struct dirent entry;
+    // Index 0,1,2 are virtual (dev, proc, sys). Index 3 is our file.
+    if (initrd_readdir(root, 3, &entry) == 0) {
+        if (strlen(entry.name) > 64) {
+            printf("VULNERABILITY CONFIRMED: Readdir leaked data into dirent->name (len=%zu)!\n", strlen(entry.name));
+            exit(1);
+        }
+    }
+
+    printf("PASSED: Did not find file with over-read name and no leakage in readdir.\n");
+}
+
 int main() {
     test_initrd_oob_read();
+    test_initrd_name_overflow();
     return 0;
 }
