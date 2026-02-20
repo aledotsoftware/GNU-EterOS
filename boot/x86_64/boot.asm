@@ -457,25 +457,33 @@ read_retries: db 0
 ;   Usa 0xB000 para buffers temporales de VBE Mode Info Block
 ; -----------------------------------------------------------------------------
 BOOT_INFO_ADDR      equ 0xA000
+VBE_INFO_BLOCK_ADDR equ 0x9000
 VBE_MODE_INFO_ADDR  equ 0xB000
-VBE_MODE            equ 0x118 | 0x4000  ; 1024x768x32 + Linear Framebuffer (bit 14)
+VBE_DEFAULT_MODE    equ 0x118 | 0x4000  ; 1024x768x32 + LFB
 
 setup_vbe:
     mov si, s2_msg_vbe_init
     call print_16
 
-    ; 1. Obtener información del modo VBE
+    ; 1. Buscar el mejor modo VBE disponible
+    call find_best_vbe_mode
+    mov bx, ax                          ; Guardar modo seleccionado en BX (incluye bit 14 LFB)
+
+    ; 2. Obtener información del modo seleccionado (para llenar BootInfo)
+    push bx
+    and bx, 0x3FFF                      ; Quitar bit LFB para 0x4F01
+    mov cx, bx
     mov ax, 0x4F01
-    mov cx, 0x118                       ; Modo deseado (sin bit LFB para info)
-    mov di, VBE_MODE_INFO_ADDR          ; Buffer destino (ES:DI)
+    mov di, VBE_MODE_INFO_ADDR
     int 0x10
+    pop bx
     
-    cmp ax, 0x004F                      ; Verificar éxito (AL=4F, AH=00)
+    cmp ax, 0x004F
     jne .vbe_fail
 
-    ; 2. Establecer modo VBE con Linear Framebuffer
+    ; 3. Establecer modo VBE
     mov ax, 0x4F02
-    mov bx, VBE_MODE
+    ; BX ya tiene el modo (con bit 0x4000 si lo pusimos en find_best_vbe_mode)
     int 0x10
     
     cmp ax, 0x004F
@@ -543,6 +551,134 @@ setup_vbe:
 .error:
     mov si, s2_msg_mem_err
     call print_16
+    ret
+
+; -----------------------------------------------------------------------------
+; find_best_vbe_mode: Busca 1920x1080 > 1280x720 > 1024x768 (32bpp)
+; Retorna: AX = Modo VBE (con bit 0x4000 activado para LFB)
+; -----------------------------------------------------------------------------
+find_best_vbe_mode:
+    push es
+    push di
+    push si
+    push bx
+    push cx
+    push dx
+
+    ; 1. Obtener VbeInfoBlock
+    mov ax, 0x4F00
+    mov di, VBE_INFO_BLOCK_ADDR
+    mov dword [di], 0x32454256      ; "VBE2" signature hint
+    int 0x10
+    cmp ax, 0x004F
+    jne .fallback
+
+    ; 2. Obtener puntero a lista de modos (Segment:Offset en offset 14)
+    mov fs, [VBE_INFO_BLOCK_ADDR + 16] ; Segmento
+    mov si, [VBE_INFO_BLOCK_ADDR + 14] ; Offset
+
+    ; Variables para guardar el mejor modo encontrado
+    ; Usamos stack o registros fijos? Usaremos DX para guardar el mejor modo. 0 = ninguno.
+    xor dx, dx
+
+.scan_loop:
+    mov ax, fs
+    mov es, ax
+    mov cx, [es:si]                 ; Leer modo de la lista
+    cmp cx, 0xFFFF                  ; Fin de lista?
+    je .end_scan
+
+    add si, 2                       ; Avanzar puntero
+
+    ; 3. Obtener info del modo
+    push cx                         ; Guardar modo original
+    mov ax, 0x4F01
+    ; CX ya tiene el modo
+    mov di, VBE_MODE_INFO_ADDR
+    push es                         ; Guardar ES (segmento lista modos)
+    xor bx, bx
+    mov es, bx                      ; ES = 0 para buffer en 0xB000
+    int 0x10
+    pop es                          ; Restaurar ES
+    pop cx                          ; Recuperar modo original
+
+    cmp ax, 0x004F
+    jne .scan_loop
+
+    ; 4. Verificar atributos
+    ; Offset 0: ModeAttributes (bit 0=Supported, bit 3=Color, bit 4=Graph, bit 7=LFB)
+    mov ax, [VBE_MODE_INFO_ADDR]
+    test ax, 0x0080                 ; Soporta LFB?
+    jz .scan_loop
+    test ax, 0x0001                 ; Soportado por hardware?
+    jz .scan_loop
+    test ax, 0x0010                 ; Modo gráfico?
+    jz .scan_loop
+
+    ; Verificar BPP (Offset 25)
+    cmp byte [VBE_MODE_INFO_ADDR + 25], 32
+    jne .try_24bpp
+    jmp .check_res
+.try_24bpp:
+    ; Aceptamos 32 BPP (preferido) o 24 BPP si no hay 32.
+    ; Por simplicidad, solo buscamos 32 BPP para evitar complicaciones en kernel.
+    jmp .scan_loop
+
+.check_res:
+    mov ax, [VBE_MODE_INFO_ADDR + 18] ; XRes
+    mov bx, [VBE_MODE_INFO_ADDR + 20] ; YRes
+
+    ; Check 1920x1080
+    cmp ax, 1920
+    jne .check_720p
+    cmp bx, 1080
+    jne .scan_loop
+    or cx, 0x4000                   ; Activar LFB
+    mov dx, cx                      ; ¡Encontramos 1080p!
+    jmp .end_scan                   ; Terminar búsqueda (prioridad máxima)
+
+.check_720p:
+    cmp ax, 1280
+    jne .check_768p
+    cmp bx, 720
+    jne .scan_loop
+    or cx, 0x4000
+    ; Si ya tenemos uno mejor guardado, no sobreescribir (1080p salta antes)
+    mov dx, cx
+    jmp .scan_loop
+
+.check_768p:
+    cmp ax, 1024
+    jne .scan_loop
+    cmp bx, 768
+    jne .scan_loop
+    or cx, 0x4000
+    test dx, dx                     ; Si ya tenemos uno mejor (720p), no sobreescribir
+    jnz .scan_loop
+    mov dx, cx                      ; Guardar como candidato
+    jmp .scan_loop
+
+.end_scan:
+    test dx, dx
+    jz .fallback
+    mov ax, dx                      ; Retornar mejor modo
+
+    pop dx
+    pop cx
+    pop bx
+    pop si
+    pop di
+    pop es
+    ret
+
+.fallback:
+    mov ax, VBE_DEFAULT_MODE        ; 1024x768 default
+    pop dx
+    pop cx
+    pop bx
+    pop si
+    pop di
+    pop es
     ret
 
 ; ---- Mensajes de Stage 2 (16-bit) ----

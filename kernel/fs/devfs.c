@@ -5,6 +5,7 @@
 #include <hal.h>
 #include <keyboard.h>
 #include <vga.h>
+#include <input/event.h>
 
 /* Global root node for DevFS */
 static fs_node_t* devfs_root = NULL;
@@ -55,6 +56,20 @@ static uint32_t dev_tty_write(fs_node_t *node, uint32_t offset, uint32_t size, u
         terminal_putchar((char)buffer[i]);
     }
     return size;
+}
+
+/* ========================================================================= */
+/* /dev/input Implementation                                                 */
+/* ========================================================================= */
+static uint32_t dev_input_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset;
+
+    if (size < sizeof(input_event_t)) return 0;
+
+    int count = size / sizeof(input_event_t);
+    int read = input_read((input_event_t*)buffer, count);
+
+    return read * sizeof(input_event_t);
 }
 
 /* ========================================================================= */
@@ -126,6 +141,11 @@ static int devfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) 
         entry->inode = 4;
         return 0;
     }
+    if (index == 5) {
+        strlcpy(entry->name, "input", sizeof(entry->name));
+        entry->inode = 5;
+        return 0;
+    }
     return 1; /* EOF */
 }
 
@@ -164,6 +184,11 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->read = dev_random_read;
         fnode->write = dev_random_write;
         fnode->inode = 4;
+    } else if (strcmp(name, "input") == 0) {
+        strlcpy(fnode->name, "input", sizeof(fnode->name));
+        fnode->read = dev_input_read;
+        fnode->write = NULL;
+        fnode->inode = 5;
     } else {
         kfree(fnode);
         return 0;
