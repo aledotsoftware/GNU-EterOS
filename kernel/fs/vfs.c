@@ -152,6 +152,13 @@ fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
             segment[i++] = *p++;
         }
         segment[i] = 0;
+
+        /* SECURITY FIX: Check for path segment truncation */
+        if (i == 127 && *p && *p != '/') {
+            if (current) kfree(current);
+            return 0;
+        }
+
         if (*p == '/') p++;
 
         if (i == 0) continue;
