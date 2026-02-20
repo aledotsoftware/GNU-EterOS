@@ -106,7 +106,6 @@ typedef enum {
     NODE_BROWSER,
     NODE_CALENDAR,
     NODE_DEVMAN,
-    NODE_DOOM,
     NODE_COUNT
 } flux_node_id_t;
 
@@ -133,7 +132,6 @@ static const flux_app_meta_t FLUX_APPS[] = {
     { NODE_BROWSER,  "Navegador",    0x44FFFF },
     { NODE_CALENDAR, "Calendario",   0xDDAA55 },
     { NODE_DEVMAN,   "Dispositivos", FLUX_ACCENT_AMBER }
-    // { NODE_DOOM,     "DOOM",         0xCC0000 } // Engine missing
 };
 
 
@@ -157,39 +155,10 @@ static void browser_on_paint(window_t* win);
 static void browser_on_mouse(window_t* win, int x, int y, int b);
 static void browser_on_key(window_t* win, char key);
 static void devman_on_paint(window_t* win);
-static void doom_on_paint(window_t* win);
 
 /* Helper Draw Functions */
 
 /* Animation State Forward Decl (needed for input handling) */
-
-/* Doom Integration Disabled - Engine missing */
-// extern uint32_t* DG_ScreenBuffer;
-// extern void doomgeneric_Create(int argc, char **argv);
-// extern void doomgeneric_Tick(void);
-// extern void doom_handle_input(int key, int pressed);
-
-static bool doom_running = false;
-static window_t* win_doom = NULL;
-
-void task_doom_loop(void) {
-    /* char* argv[] = {"doom", "-iwad", "/initrd/doom1.wad", NULL};
-    doomgeneric_Create(3, argv);
-
-    while (1) {
-        doomgeneric_Tick();
-        task_sleep(10);
-    } */
-    task_exit();
-}
-
-static void draw_doom_content(void) {
-    if (!win_doom) return;
-    int w = win_doom->bounds.w;
-    int h = win_doom->bounds.h;
-    wm_fill_rect(win_doom, (rect_t){0, 0, w, h}, 0x000000);
-    wm_print_at(win_doom, 20, 20, "DOOM Engine no encontrado.");
-}
 
 
 /* ========================================================================= */
@@ -1790,11 +1759,6 @@ static void draw_browser_preview(int x, int y, int w, int h) {
     omni_draw_string(NULL, x + w/2 - 20, y + h/2 - 5, "WEB", 0x44FFFF, 0xF0F0F0);
 }
 
-static void draw_doom_preview(int x, int y, int w, int h) {
-    omni_fill_rect(x, y, w, h, 0x000000);
-    omni_draw_string(NULL, x + 20, y + 60, "Doom (No Engine)", 0xCC0000, 0x000000);
-}
-
 static void draw_box_shadow(int x, int y, int w, int h, int thickness, uint32_t color, uint8_t alpha) {
     /* Top Strip */
     omni_fill_rect_alpha(x - thickness, y - thickness, w + thickness * 2, thickness, color, alpha);
@@ -1873,8 +1837,6 @@ static void flux_draw_card(int x, int y, int w, int h, const char* title, uint32
         draw_santitravel_preview(draw_x, draw_y, w, h);
     } else if (node == NODE_BROWSER) {
         draw_browser_preview(draw_x, draw_y, w, h);
-    } else if (node == NODE_DOOM) {
-        draw_doom_preview(draw_x, draw_y, w, h);
     } else {
         /* Generic Preview for new apps */
         omni_fill_rect(draw_x+10, draw_y+40, w-20, h-50, 0x111111);
@@ -1981,18 +1943,6 @@ static void flux_launch_space(flux_node_id_t node) {
           }
           win_devman->active = true;
           focused_space = win_devman;
-    } else if (node == NODE_DOOM) {
-          flux_notify("DOOM", "Rip and Tear...", 0xFF0000);
-          if (!win_doom) {
-              win_doom = wm_create_window(0, 0, 1024, 768, "DOOM");
-              win_doom->on_paint = doom_on_paint;
-          }
-          win_doom->active = true;
-          focused_space = win_doom;
-          if (!doom_running) {
-              doom_running = true;
-              task_create("doom_task", task_doom_loop);
-          }
     }
 }
 
@@ -2548,8 +2498,6 @@ static void browser_on_key(window_t* win, char key) {
 }
 
 static void devman_on_paint(window_t* win) { (void)win; draw_devman_content(); }
-static void doom_on_paint(window_t* win) { (void)win; draw_doom_content(); }
-/* static void doom_on_key(window_t* win, char key) { (void)win; doom_handle_input((int)key, 1); } */
 
 void gui_demo_run(void) {
     serial_write_string("[GUI] Starting GUI (WM Mode)...\n");
