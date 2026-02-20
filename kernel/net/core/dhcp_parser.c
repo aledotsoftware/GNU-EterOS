@@ -1,7 +1,7 @@
-#include "../../include/net/dhcp.h"
-#include "../../include/net/defs.h"
-#include "../../include/types.h"
-#include "../../include/string.h"
+#include <net/dhcp.h>
+#include <net/defs.h>
+#include <types.h>
+#include <string.h>
 
 /**
  * Parses a DHCP offer packet from a raw buffer.

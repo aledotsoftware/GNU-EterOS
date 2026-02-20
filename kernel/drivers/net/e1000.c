@@ -16,6 +16,7 @@
 #include "../../../include/timer.h"
 #include "../../../include/pic.h"
 #include "../../../include/sem.h"
+#include <net/nic.h>
 
 extern sem_t net_sem;
 
@@ -124,6 +125,22 @@ static void e1000_init_tx(void) {
 /* API Pública                                                               */
 /* ========================================================================= */
 
+int e1000_send_packet(const void* data, uint16_t len);
+int e1000_receive(void* buffer, uint16_t max_len);
+uint8_t* e1000_get_mac(void);
+
+static int e1000_init_wrapper(void* dev) {
+    return e1000_init((pci_device_t*)dev);
+}
+
+static nic_driver_t e1000_driver = {
+    .name = "Intel PRO/1000",
+    .init = e1000_init_wrapper,
+    .send = e1000_send_packet,
+    .receive = e1000_receive,
+    .get_mac = e1000_get_mac
+};
+
 int e1000_init(pci_device_t* pci_dev_ptr) {
     pci_device_t dev;
     pci_device_t* pci_dev = pci_dev_ptr;
@@ -206,6 +223,8 @@ int e1000_init(pci_device_t* pci_dev_ptr) {
 
     /* Unmask IRQ 11 in PIC (Legacy Mode) */
     pic_unmask_irq(11);
+
+    nic_register_driver(&e1000_driver);
 
     return 0;
 }

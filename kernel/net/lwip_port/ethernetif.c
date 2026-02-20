@@ -12,7 +12,7 @@
 #include "lwip/snmp.h"
 #include "lwip/ethip6.h"
 #include "netif/etharp.h"
-#include "net/e1000.h"
+#include <net/nic.h>
 #include "ethernetif.h"
 #include <string.h>
 
@@ -44,7 +44,7 @@ low_level_init(struct netif *netif)
   netif->hwaddr_len = ETHARP_HWADDR_LEN;
 
   /* set MAC hardware address */
-  uint8_t* mac = e1000_get_mac();
+  uint8_t* mac = (current_nic) ? current_nic->get_mac() : NULL;
   if (mac) {
       memcpy(netif->hwaddr, mac, ETHARP_HWADDR_LEN);
   } else {
@@ -112,7 +112,7 @@ low_level_output(struct netif *netif, struct pbuf *p)
   }
 
   /* signal that packet should be sent(); */
-  if (e1000_send_packet(tx_temp_buffer, (u16_t)len) != 0) {
+  if (!current_nic || current_nic->send(tx_temp_buffer, (u16_t)len) != 0) {
       return ERR_IF;
   }
 
@@ -144,7 +144,7 @@ low_level_input(struct netif *netif)
 
   /* Obtain the size of the packet and put it into the "len"
      variable. */
-  int received_len = e1000_receive(rx_temp_buffer, sizeof(rx_temp_buffer));
+  int received_len = (current_nic) ? current_nic->receive(rx_temp_buffer, sizeof(rx_temp_buffer)) : 0;
 
   if (received_len <= 0) {
       return NULL;

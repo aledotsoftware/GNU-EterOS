@@ -3,13 +3,13 @@
  * Implementación básica de DHCP Discover -> Offer.
  */
 
-#include "../../include/net/dhcp.h"
-#include "../../include/net/e1000.h"
-#include "../../include/string.h"
-#include "../../include/vga.h"
-#include "../../include/mm.h"
-#include "../../include/timer.h"
-#include "../../include/hal.h"
+#include <net/dhcp.h>
+#include <net/nic.h>
+#include <string.h>
+#include <vga.h>
+#include <mm.h>
+#include <timer.h>
+#include <hal.h>
 
 /* Constants and structs are now in include/net/dhcp.h and include/net/defs.h */
 
@@ -32,10 +32,12 @@ static uint16_t ip_checksum(void* vdata, size_t length) {
 }
 
 void dhcp_discover(void) {
+    if (!current_nic) return;
+
     uint8_t buffer[600]; /* Size enough for DHCP packet */
     memset(buffer, 0, sizeof(buffer));
     
-    uint8_t* mac = e1000_get_mac();
+    uint8_t* mac = current_nic->get_mac();
     
     struct ethernet_header* eth = (struct ethernet_header*)buffer;
     struct ip_header* ip = (struct ip_header*)(buffer + sizeof(struct ethernet_header));
@@ -90,7 +92,7 @@ void dhcp_discover(void) {
     uint16_t total_len = sizeof(struct ethernet_header) + sizeof(struct ip_header) + udp_len;
     
     hal_console_write("[DHCP] Enviando Discover...\n");
-    if (e1000_send_packet(buffer, total_len) < 0) {
+    if (current_nic->send(buffer, total_len) < 0) {
         hal_console_write("[DHCP] Error: No se pudo enviar el paquete.\n");
         return;
     }
@@ -104,7 +106,7 @@ void dhcp_discover(void) {
     uint64_t timeout_ticks = 5 * TIMER_HZ; /* 5 seconds */
     
     while(timer_get_ticks() - start_ticks < timeout_ticks) {
-        int len = e1000_receive(rx_buffer, sizeof(rx_buffer));
+        int len = current_nic->receive(rx_buffer, sizeof(rx_buffer));
         if (len > 0) {
             const struct dhcp_packet* r_dhcp = NULL;
             size_t dhcp_len = 0;

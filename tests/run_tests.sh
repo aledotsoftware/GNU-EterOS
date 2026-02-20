@@ -55,7 +55,7 @@ rm tests/test_elf_security
 # Test IP Aton
 echo "---------------------------------------------------"
 echo "Running test_ip_aton..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_ip_aton.c kernel/net/ip_utils.c -o tests/test_ip_aton
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_ip_aton.c kernel/net/core/ip_utils.c -o tests/test_ip_aton
 ./tests/test_ip_aton
 rm tests/test_ip_aton
 

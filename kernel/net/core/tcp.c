@@ -1,6 +1,6 @@
 #include <net/defs.h>
 #include <net/socket.h>
-#include <net/e1000.h>
+#include <net/nic.h>
 #include <string.h>
 #include <timer.h>
 #include <task.h>
@@ -12,6 +12,8 @@ extern uint16_t net_checksum(void* vdata, size_t length);
 
 /* Pseudo Header for Checksum */
 static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, int flags) {
+    if (!current_nic) return -1;
+
     uint8_t buffer[1514];
     size_t header_len = sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct tcp_header);
 
@@ -29,7 +31,7 @@ static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, i
 
     /* Ethernet */
     memcpy(eth->dest, gateway_mac, 6);
-    memcpy(eth->src, e1000_get_mac(), 6);
+    memcpy(eth->src, current_nic->get_mac(), 6);
     eth->type = htons(ETHERNET_TYPE_IP);
 
     /* IP */
@@ -76,7 +78,7 @@ static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, i
         tcp->checksum = net_checksum(chk_buf, sizeof(ph) + total_len);
     }
 
-    return e1000_send_packet(buffer, sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct tcp_header) + len);
+    return current_nic->send(buffer, sizeof(struct ethernet_header) + sizeof(struct ip_header) + sizeof(struct tcp_header) + len);
 }
 
 void tcp_input(socket_entry_t* sock, struct tcp_header* tcp, int len, uint32_t src_ip) {
