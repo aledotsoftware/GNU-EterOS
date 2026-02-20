@@ -346,11 +346,13 @@ static void irq_default(struct interrupt_frame *frame) {
 
 /* --- IPI Handlers --- */
 extern volatile uint64_t tlb_flush_addr;
+extern volatile uint64_t tlb_ack_count;
 
 __attribute__((interrupt))
 static void isr_tlb_shootdown(struct interrupt_frame *frame) {
     (void)frame;
     vmm_flush_tlb_local(tlb_flush_addr);
+    __sync_fetch_and_add(&tlb_ack_count, 1);
     lapic_eoi();
 }
 

@@ -24,7 +24,7 @@ static pt_entry_t* pml4 = (pt_entry_t*)BOOT_PML4_ADDR;
 
 /* TLB Shootdown Globals */
 volatile uint64_t tlb_flush_addr = 0;
-volatile uint64_t tlb_ack_mask = 0;
+volatile uint64_t tlb_ack_count = 0;
 spinlock_t tlb_lock = 0;
 
 /* Invalida una página en el TLB */
@@ -47,10 +47,11 @@ void vmm_flush_tlb_smp(uint64_t addr) {
     spin_lock(&tlb_lock);
 
     tlb_flush_addr = addr;
-    tlb_ack_mask = 0;
+    tlb_ack_count = 0;
 
     /* Current CPU ID */
     int my_id = get_cpu_id();
+    uint64_t expected_acks = 0;
 
     /* Send IPI to all other CPUs */
     /* Iterate all CPUs */
@@ -59,16 +60,23 @@ void vmm_flush_tlb_smp(uint64_t addr) {
         if (cpus[i].state != CPU_STATE_ONLINE) continue;
 
         lapic_send_ipi(cpus[i].apic_id, IPI_TLB_SHOOTDOWN);
+        expected_acks++;
     }
 
-    /* Wait for ACKs (with timeout) */
-    /* Ideally we use a bitmask logic. Here we just wait for simplicity? */
-    /* But tlb_ack_mask needs to be set by others. */
-    /* Since we didn't implement the ACK logic in the ISR yet (we need to), let's assume we do. */
-
-    /* WAIT LOOP with Timeout */
-    /* For now, Fire-and-Forget to avoid deadlocks if IPIs fail or interrupts disabled */
-    /* TODO: Implement strict consistency wait */
+    /* Wait for ACKs (Strict Consistency) */
+    /* We wait for other cores to acknowledge invalidation. */
+    if (expected_acks > 0) {
+        uint64_t timeout = 10000000; /* ~10ms depends on CPU speed */
+        while (tlb_ack_count < expected_acks) {
+            __asm__ volatile("pause");
+            timeout--;
+            if (timeout == 0) {
+                serial_write_string("[VMM] CRITICAL: TLB Shootdown Timeout! System might be unstable.\n");
+                /* We break to avoid deadlock, but this is a serious error. */
+                break;
+            }
+        }
+    }
 
     spin_unlock(&tlb_lock);
 

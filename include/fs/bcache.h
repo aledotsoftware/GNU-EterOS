@@ -25,4 +25,7 @@ void bcache_write(uint32_t volume_id, uint32_t sector, const uint8_t *buffer);
 /* Invalidate a specific sector in cache */
 void bcache_invalidate(uint32_t volume_id, uint32_t sector);
 
+/* Invalidate all sectors in cache (Panic/OOM cleanup) */
+void bcache_invalidate_all(void);
+
 #endif

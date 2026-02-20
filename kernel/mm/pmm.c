@@ -10,6 +10,7 @@
 #include "../../include/string.h"
 #include "../../include/serial.h"
 #include "../../include/vga.h"
+#include "../../include/fs/bcache.h"
 
 /* ========================================================================= */
 /* Variables Globales                                                        */
@@ -183,7 +184,7 @@ void pmm_init(void) {
     terminal_write_string(" KB\n");
 }
 
-void* pmm_alloc_page(void) {
+static void* pmm_alloc_page_impl(void) {
     /* ⚡ BOLT Optimization: Next-Fit Strategy + Word-wise Scanning
      * Instead of linear bit-by-bit search (O(N)), we scan 64 pages at once
      * and start from the last allocated position.
@@ -279,8 +280,32 @@ check_wrap:
         }
     }
     
-    serial_write_string("[PMM] OOM! No more physical pages.\n");
+    /* serial_write_string("[PMM] OOM! No more physical pages.\n"); */
     return NULL;
+}
+
+void* pmm_alloc_page(void) {
+    void* ptr = pmm_alloc_page_impl();
+    if (ptr) return ptr;
+
+    /* First failure: Try to reclaim memory from caches */
+    /* serial_write_string("[PMM] OOM Warning. Reclaiming caches...\n"); */
+    bcache_invalidate_all();
+
+    /* Retry */
+    ptr = pmm_alloc_page_impl();
+    if (ptr) return ptr;
+
+    /* Critical Failure: Panic Policy */
+    terminal_write_colored("\n[PMM] CRITICAL ERROR: OUT OF MEMORY!\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+    terminal_write_colored("[PMM] System Halted.\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+
+    serial_write_string("\n[PMM] PANIC: OOM. System Halted.\n");
+
+    __asm__ volatile("cli");
+    for(;;) __asm__ volatile("hlt");
+
+    return NULL; /* Unreachable */
 }
 
 void pmm_free_page(void* addr) {

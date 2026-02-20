@@ -95,3 +95,14 @@ void bcache_invalidate(uint32_t volume_id, uint32_t sector) {
     }
     spin_unlock(&bcache_lock);
 }
+
+void bcache_invalidate_all(void) {
+    if (!bcache) return;
+
+    if (spin_trylock(&bcache_lock)) {
+        for (int i = 0; i < BCACHE_SIZE; i++) {
+            bcache[i].valid = 0;
+        }
+        spin_unlock(&bcache_lock);
+    }
+}
