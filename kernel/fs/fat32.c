@@ -60,6 +60,7 @@ int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_s
     vol->read_sector = read_func;
     vol->write_sector = write_func;
     vol->partition_lba = partition_offset;
+    vol->lock = 0;
 
     // Allocate 4096 to be safe for larger sector sizes during init
     uint8_t* buffer = kmalloc(4096);
@@ -345,8 +346,15 @@ static int fat32_get_dirent_loc(fat32_volume_t* vol, const char* filename, uint3
 }
 
 /* Legacy Helpers Wrappers */
-int fat32_find_file(fat32_volume_t* vol, const char* filename, fat32_dir_entry_t* out_entry) {
+static int fat32_find_file_impl(fat32_volume_t* vol, const char* filename, fat32_dir_entry_t* out_entry) {
     return fat32_find_dirent_in_chain(vol, vol->root_cluster, filename, NULL, NULL, out_entry);
+}
+
+int fat32_find_file(fat32_volume_t* vol, const char* filename, fat32_dir_entry_t* out_entry) {
+    spin_lock(&vol->lock);
+    int res = fat32_find_file_impl(vol, filename, out_entry);
+    spin_unlock(&vol->lock);
+    return res;
 }
 
 static int fat32_find_free_dirent(fat32_volume_t* vol, uint32_t* out_sector, uint32_t* out_offset) {
@@ -381,10 +389,19 @@ static uint32_t fat32_seek_cluster(fat32_volume_t* vol, uint32_t first_cluster, 
     return current_cluster;
 }
 
-void fat32_open_fs(fs_node_t *node) { (void)node; }
-void fat32_close_fs(fs_node_t *node) { (void)node; }
+void fat32_open_fs(fs_node_t *node) {
+    fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
+    spin_lock(&vol->lock);
+    spin_unlock(&vol->lock);
+}
 
-uint32_t fat32_read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+void fat32_close_fs(fs_node_t *node) {
+    fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
+    spin_lock(&vol->lock);
+    spin_unlock(&vol->lock);
+}
+
+static uint32_t fat32_read_fs_impl(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
     uint32_t start_cluster = node->inode;
 
@@ -426,7 +443,15 @@ uint32_t fat32_read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t 
     return bytes_read;
 }
 
-uint32_t fat32_write_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+uint32_t fat32_read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
+    spin_lock(&vol->lock);
+    uint32_t res = fat32_read_fs_impl(node, offset, size, buffer);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static uint32_t fat32_write_fs_impl(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
 
     if (node->inode == 0) {
@@ -533,9 +558,17 @@ uint32_t fat32_write_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t
     return bytes_written;
 }
 
+uint32_t fat32_write_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
+    spin_lock(&vol->lock);
+    uint32_t res = fat32_write_fs_impl(node, offset, size, buffer);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
 static struct dirent fat32_dirent;
 
-struct dirent *fat32_readdir_fs(fs_node_t *node, uint32_t index) {
+static struct dirent *fat32_readdir_fs_impl(fs_node_t *node, uint32_t index) {
     fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
     uint32_t current_cluster = node->inode;
 
@@ -580,7 +613,15 @@ struct dirent *fat32_readdir_fs(fs_node_t *node, uint32_t index) {
     return NULL;
 }
 
-fs_node_t *fat32_finddir_fs(fs_node_t *node, char *name) {
+struct dirent *fat32_readdir_fs(fs_node_t *node, uint32_t index) {
+    fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
+    spin_lock(&vol->lock);
+    struct dirent* res = fat32_readdir_fs_impl(node, index);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static fs_node_t *fat32_finddir_fs_impl(fs_node_t *node, char *name) {
     fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
     uint32_t start_cluster = node->inode;
 
@@ -625,7 +666,15 @@ fs_node_t *fat32_finddir_fs(fs_node_t *node, char *name) {
     return child;
 }
 
-int fat32_create_fs(fs_node_t *parent, char *name, uint16_t permission) {
+fs_node_t *fat32_finddir_fs(fs_node_t *node, char *name) {
+    fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
+    spin_lock(&vol->lock);
+    fs_node_t* res = fat32_finddir_fs_impl(node, name);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static int fat32_create_fs_impl(fs_node_t *parent, char *name, uint16_t permission) {
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
@@ -645,7 +694,15 @@ int fat32_create_fs(fs_node_t *parent, char *name, uint16_t permission) {
     return fat32_update_dirent(vol, sector, offset, &entry);
 }
 
-int fat32_mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) {
+int fat32_create_fs(fs_node_t *parent, char *name, uint16_t permission) {
+    fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
+    spin_lock(&vol->lock);
+    int res = fat32_create_fs_impl(parent, name, permission);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permission) {
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
@@ -696,7 +753,15 @@ int fat32_mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) {
     return 0;
 }
 
-int fat32_unlink_fs(fs_node_t *parent, char *name) {
+int fat32_mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) {
+    fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
+    spin_lock(&vol->lock);
+    int res = fat32_mkdir_fs_impl(parent, name, permission);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static int fat32_unlink_fs_impl(fs_node_t *parent, char *name) {
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
     fat32_dir_entry_t entry;
@@ -708,6 +773,14 @@ int fat32_unlink_fs(fs_node_t *parent, char *name) {
 
     entry.name[0] = DIRENT_DELETED;
     return fat32_update_dirent(vol, sector, offset, &entry);
+}
+
+int fat32_unlink_fs(fs_node_t *parent, char *name) {
+    fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
+    spin_lock(&vol->lock);
+    int res = fat32_unlink_fs_impl(parent, name);
+    spin_unlock(&vol->lock);
+    return res;
 }
 
 fs_node_t* fat32_mount(fat32_volume_t* vol) {
@@ -738,8 +811,8 @@ fs_node_t* fat32_mount(fat32_volume_t* vol) {
 
 /* Original functions kept for compatibility/tests */
 
-int fat32_create_file(fat32_volume_t* vol, const char* filename) {
-    if (fat32_find_file(vol, filename, NULL) == 0) return -1;
+static int fat32_create_file_impl(fat32_volume_t* vol, const char* filename) {
+    if (fat32_find_file_impl(vol, filename, NULL) == 0) return -1;
 
     uint32_t sector, offset;
     if (fat32_find_free_dirent(vol, &sector, &offset) != 0) return -2;
@@ -755,9 +828,16 @@ int fat32_create_file(fat32_volume_t* vol, const char* filename) {
     return fat32_update_dirent(vol, sector, offset, &entry);
 }
 
-int fat32_read_file(fat32_volume_t* vol, const char* filename, void* buffer, uint32_t size) {
+int fat32_create_file(fat32_volume_t* vol, const char* filename) {
+    spin_lock(&vol->lock);
+    int res = fat32_create_file_impl(vol, filename);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static int fat32_read_file_impl(fat32_volume_t* vol, const char* filename, void* buffer, uint32_t size) {
     fat32_dir_entry_t entry;
-    if (fat32_find_file(vol, filename, &entry) != 0) {
+    if (fat32_find_file_impl(vol, filename, &entry) != 0) {
         return -1; // File not found
     }
 
@@ -797,7 +877,14 @@ int fat32_read_file(fat32_volume_t* vol, const char* filename, void* buffer, uin
     return bytes_read;
 }
 
-int fat32_write_file(fat32_volume_t* vol, const char* filename, const void* buffer, uint32_t size) {
+int fat32_read_file(fat32_volume_t* vol, const char* filename, void* buffer, uint32_t size) {
+    spin_lock(&vol->lock);
+    int res = fat32_read_file_impl(vol, filename, buffer, size);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static int fat32_write_file_impl(fat32_volume_t* vol, const char* filename, const void* buffer, uint32_t size) {
     fat32_dir_entry_t entry;
     uint32_t dir_sector, dir_offset;
     if (fat32_get_dirent_loc(vol, filename, &dir_sector, &dir_offset, &entry) != 0) {
@@ -882,7 +969,14 @@ int fat32_write_file(fat32_volume_t* vol, const char* filename, const void* buff
     return bytes_written;
 }
 
-int fat32_delete_file(fat32_volume_t* vol, const char* filename) {
+int fat32_write_file(fat32_volume_t* vol, const char* filename, const void* buffer, uint32_t size) {
+    spin_lock(&vol->lock);
+    int res = fat32_write_file_impl(vol, filename, buffer, size);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static int fat32_delete_file_impl(fat32_volume_t* vol, const char* filename) {
     fat32_dir_entry_t entry;
     uint32_t dir_sector, dir_offset;
     if (fat32_get_dirent_loc(vol, filename, &dir_sector, &dir_offset, &entry) != 0) return -1;
@@ -898,8 +992,15 @@ int fat32_delete_file(fat32_volume_t* vol, const char* filename) {
     return fat32_update_dirent(vol, dir_sector, dir_offset, &entry);
 }
 
-int fat32_create_directory(fat32_volume_t* vol, const char* dirname) {
-    if (fat32_find_file(vol, dirname, NULL) == 0) return -1;
+int fat32_delete_file(fat32_volume_t* vol, const char* filename) {
+    spin_lock(&vol->lock);
+    int res = fat32_delete_file_impl(vol, filename);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
+static int fat32_create_directory_impl(fat32_volume_t* vol, const char* dirname) {
+    if (fat32_find_file_impl(vol, dirname, NULL) == 0) return -1;
 
     uint32_t sector, offset;
     if (fat32_find_free_dirent(vol, &sector, &offset) != 0) return -2;
@@ -946,10 +1047,21 @@ int fat32_create_directory(fat32_volume_t* vol, const char* dirname) {
     return 0;
 }
 
+int fat32_create_directory(fat32_volume_t* vol, const char* dirname) {
+    spin_lock(&vol->lock);
+    int res = fat32_create_directory_impl(vol, dirname);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
 void fat32_list_directory(fat32_volume_t* vol) {
+    spin_lock(&vol->lock);
     uint32_t current_cluster = vol->root_cluster;
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return;
+    if (!buffer) {
+        spin_unlock(&vol->lock);
+        return;
+    }
 
     hal_console_write("  [FAT32] Listing Root Directory:\n");
 
@@ -989,4 +1101,5 @@ void fat32_list_directory(fat32_volume_t* vol) {
         current_cluster = fat32_get_next_cluster(vol, current_cluster);
     }
     kfree(buffer);
+    spin_unlock(&vol->lock);
 }
