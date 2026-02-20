@@ -440,15 +440,24 @@ static uint32_t fat32_read_fs_impl(fs_node_t *node, uint32_t offset, uint32_t si
         for (uint32_t i = sector_in_cluster; i < vol->sectors_per_cluster; i++) {
             if (bytes_read >= size) break;
 
-            if (fat32_read_sector_cached(vol, lba + i, sector_buffer) != 0) {
-                kfree(sector_buffer);
-                return bytes_read;
-            }
-
             uint32_t chunk = vol->bytes_per_sector - offset_in_sector;
             if (bytes_read + chunk > size) chunk = size - bytes_read;
 
-            memcpy(buffer + bytes_read, sector_buffer + offset_in_sector, chunk);
+            if (offset_in_sector == 0 && chunk == vol->bytes_per_sector) {
+                /* ⚡ BOLT Optimization: Direct read to user buffer if aligned & full sector.
+                   Avoids intermediate buffer copy. */
+                if (fat32_read_sector_cached(vol, lba + i, buffer + bytes_read) != 0) {
+                    kfree(sector_buffer);
+                    return bytes_read;
+                }
+            } else {
+                if (fat32_read_sector_cached(vol, lba + i, sector_buffer) != 0) {
+                    kfree(sector_buffer);
+                    return bytes_read;
+                }
+                memcpy(buffer + bytes_read, sector_buffer + offset_in_sector, chunk);
+            }
+
             bytes_read += chunk;
             offset_in_sector = 0;
         }
@@ -528,14 +537,18 @@ static uint32_t fat32_write_fs_impl(fs_node_t *node, uint32_t offset, uint32_t s
         for (uint32_t i = sector_in_cluster; i < vol->sectors_per_cluster; i++) {
             if (bytes_written >= size) break;
 
-            if (fat32_read_sector_cached(vol, lba + i, sector_buffer) != 0) break;
-
             uint32_t chunk = vol->bytes_per_sector - offset_in_sector;
             if (bytes_written + chunk > size) chunk = size - bytes_written;
 
-            memcpy(sector_buffer + offset_in_sector, buffer + bytes_written, chunk);
-
-            if (fat32_write_sector_cached(vol, lba + i, sector_buffer) != 0) break;
+            if (offset_in_sector == 0 && chunk == vol->bytes_per_sector) {
+                /* ⚡ BOLT Optimization: Full sector overwrite.
+                   Skip read (RMW) and direct write to save I/O and copy. */
+                if (fat32_write_sector_cached(vol, lba + i, buffer + bytes_written) != 0) break;
+            } else {
+                if (fat32_read_sector_cached(vol, lba + i, sector_buffer) != 0) break;
+                memcpy(sector_buffer + offset_in_sector, buffer + bytes_written, chunk);
+                if (fat32_write_sector_cached(vol, lba + i, sector_buffer) != 0) break;
+            }
 
             bytes_written += chunk;
             offset_in_sector = 0;
