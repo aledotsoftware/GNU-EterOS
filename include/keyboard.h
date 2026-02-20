@@ -18,22 +18,22 @@
 #define KB_STATUS_PORT  0x64
 
 /* Teclas especiales (códigos internos, no ASCII) */
-#define KEY_NONE        0
-#define KEY_ENTER       '\n'
-#define KEY_BACKSPACE   '\b'
-#define KEY_TAB         '\t'
-#define KEY_ESCAPE      27
+#define KB_KEY_NONE        0
+#define KB_KEY_ENTER       '\n'
+#define KB_KEY_BACKSPACE   '\b'
+#define KB_KEY_TAB         '\t'
+#define KB_KEY_ESCAPE      27
 
 /* Teclas extendidas (valores > 127 para no confundir con ASCII) */
-#define KEY_UP          128
-#define KEY_DOWN        129
-#define KEY_LEFT        130
-#define KEY_RIGHT       131
-#define KEY_HOME        132
-#define KEY_END         133
-#define KEY_DELETE      134
-#define KEY_PGUP        135
-#define KEY_PGDOWN      136
+#define KB_KEY_UP          128
+#define KB_KEY_DOWN        129
+#define KB_KEY_LEFT        130
+#define KB_KEY_RIGHT       131
+#define KB_KEY_HOME        132
+#define KB_KEY_END         133
+#define KB_KEY_DELETE      134
+#define KB_KEY_PGUP        135
+#define KB_KEY_PGDOWN      136
 
 /* ========================================================================= */
 /* API                                                                       */
