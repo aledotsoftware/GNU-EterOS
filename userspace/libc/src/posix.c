@@ -5,6 +5,7 @@
 
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <sys/wait.h>
 #include <errno.h>
 
 extern int errno;
@@ -34,6 +35,13 @@ static inline long _syscall3(long n, long a1, long a2, long a3) {
     return ret;
 }
 
+static inline long _syscall4(long n, long a1, long a2, long a3, long a4) {
+    long ret;
+    register long r10 __asm__("r10") = a4;
+    __asm__ volatile ("syscall" : "=a"(ret) : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10) : "rcx", "r11", "memory");
+    return ret;
+}
+
 static inline long _syscall6(long n, long a1, long a2, long a3, long a4, long a5, long a6) {
     long ret;
     register long r10 __asm__("r10") = a4;
@@ -49,6 +57,20 @@ int fork(void) {
     long ret = _syscall0(SYS_fork);
     if (ret < 0) { errno = (int)(-ret); return -1; }
     return (int)ret;
+}
+
+/* execve() */
+int execve(const char *pathname, char *const argv[], char *const envp[]) {
+    long ret = _syscall3(SYS_execve, (long)pathname, (long)argv, (long)envp);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return (int)ret;
+}
+
+/* waitpid() */
+pid_t waitpid(pid_t pid, int *status, int options) {
+    long ret = _syscall4(SYS_wait4, pid, (long)status, options, 0);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return (pid_t)ret;
 }
 
 /* pipe() */

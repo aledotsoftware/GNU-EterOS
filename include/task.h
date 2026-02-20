@@ -13,6 +13,8 @@
 #include "types.h"
 #include <fs/vfs.h>
 
+struct syscall_regs;
+
 /* ========================================================================= */
 /* Configuración                                                             */
 /* ========================================================================= */
@@ -58,6 +60,7 @@ typedef struct task {
     uint64_t       kernel_stack;            /* Tope del stack de kernel (para TSS RSP0) */
     uint64_t       cr3;                     /* Directorio de páginas (PML4) */
     uint32_t       id;                      /* Task ID único */
+    uint32_t       parent_id;               /* Parent Task ID */
     task_state_t   state;                   /* Estado actual */
     uint64_t       wake_tick;               /* Tick para despertar si duerme */
     struct semaphore* waiting_sem;          /* Semaphore waiting on (if blocked) */
@@ -78,6 +81,7 @@ typedef struct task {
     uint64_t       mmap_base;               /* Base address for mmap allocator */
 
     void           (*entry)(void);          /* Entry point for task_entry_wrapper */
+    int            exit_code;               /* Exit status code */
 } task_t;
 
 /* ========================================================================= */
@@ -124,7 +128,7 @@ void task_wake_expired(uint64_t current_tick);
 /**
  * Termina la tarea actual.
  */
-void task_exit(void);
+void task_exit(int status);
 
 /**
  * Obtiene la tarea actual.
@@ -161,6 +165,25 @@ int task_kill(uint32_t pid);
  * @return PID del hijo al padre, 0 al hijo.
  */
 int task_fork(void* regs);
+
+/**
+ * Reemplaza la imagen del proceso actual por una nueva (Exec).
+ * @param path Ruta al ejecutable ELF.
+ * @param argv Argumentos.
+ * @param envp Variables de entorno.
+ * @param regs Registros del syscall (para modificar RIP/RSP).
+ * @return -1 en error, no retorna en éxito.
+ */
+int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs);
+
+/**
+ * Espera a que un proceso hijo termine.
+ * @param pid PID del hijo (-1 para cualquiera).
+ * @param status Puntero donde guardar el estado de salida.
+ * @param options Opciones (WNOHANG, etc).
+ * @return PID del hijo recolectado, o -1/0.
+ */
+int task_waitpid(int pid, int* status, int options);
 
 /**
  * Busca una tarea por su ID único.

@@ -26,6 +26,8 @@
 #include "../include/vmm.h"
 #include "../include/pmm.h"
 #include "../include/syscall.h"
+#include "../include/elf.h"
+#include "../include/errno.h"
 
 extern void fork_return(void);
 
@@ -106,7 +108,7 @@ static void task_entry_wrapper(void) {
     }
 
     /* Si la función retorna, terminamos la tarea */
-    task_exit();
+    task_exit(0);
 }
 
 /* ========================================================================= */
@@ -118,6 +120,7 @@ void scheduler_init(void) {
 
     /* Tarea 0: Representa el hilo de ejecución actual (kernel/shell) */
     tasks[0].id = next_id++;
+    tasks[0].parent_id = 0;
     tasks[0].state = TASK_RUNNING;
     tasks[0].stack_base = NULL;  /* El kernel ya tiene su stack */
     tasks[0].rsp = 0;            /* Se llenará en el primer context_switch */
@@ -204,6 +207,7 @@ int task_create(const char* name, void (*entry)(void)) {
 
     /* Configurar la tarea */
     tasks[slot].id = next_id++;
+    tasks[slot].parent_id = 0;
     tasks[slot].state = TASK_READY;
     tasks[slot].stack_base = stack;
 
@@ -449,7 +453,7 @@ void task_wake_expired(uint64_t current_tick) {
     spin_unlock(&sched_lock);
 }
 
-void task_exit(void) {
+void task_exit(int status) {
     __asm__ volatile("cli");
     spin_lock(&sched_lock);
 
@@ -459,6 +463,7 @@ void task_exit(void) {
     serial_write_string("\n");
 
     current->state = TASK_DEAD;
+    current->exit_code = status;
     spin_unlock(&sched_lock);
 
     /* Yield forever until switched out */
@@ -580,6 +585,7 @@ int task_fork(void* regs_ptr) {
 
     /* 3. Setup Child Task */
     tasks[slot].id = next_id++;
+    tasks[slot].parent_id = task_get_current()->id;
     tasks[slot].state = TASK_READY;
     tasks[slot].stack_base = stack;
     tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
@@ -652,4 +658,254 @@ int task_fork(void* regs_ptr) {
     /* ... log pid ... */
 
     return tasks[slot].id;
+}
+
+int task_waitpid(int pid, int* status, int options) {
+    task_t* current = task_get_current();
+    if (!current) return -1;
+
+    while (1) {
+        int found_child = 0;
+        int found_zombie = 0;
+        int zombie_pid = 0;
+        int zombie_status = 0;
+        int zombie_slot = -1;
+
+        __asm__ volatile("cli");
+        spin_lock(&sched_lock);
+
+        for (int i = 0; i < MAX_TASKS; i++) {
+             if (tasks[i].id == 0 && tasks[i].state == 0) continue; /* Empty slot */
+             if (tasks[i].id == current->id) continue; /* Self */
+
+             if (tasks[i].parent_id == current->id) {
+                 /* Is it the one we are looking for? */
+                 if (pid == -1 || (int)tasks[i].id == pid) {
+                     found_child = 1;
+                     if (tasks[i].state == TASK_DEAD) {
+                         found_zombie = 1;
+                         zombie_pid = tasks[i].id;
+                         zombie_status = tasks[i].exit_code;
+                         zombie_slot = i;
+                         break;
+                     }
+                 }
+             }
+        }
+
+        if (found_zombie) {
+             /* Clean up zombie */
+             task_t* zombie = &tasks[zombie_slot];
+             for (int j=0; j<MAX_FD; j++) {
+                 if (zombie->fd_table[j].node) {
+                      fs_node_t* node = zombie->fd_table[j].node;
+                      if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+                          close_fs(node);
+                          kfree(node);
+                      }
+                      zombie->fd_table[j].node = NULL;
+                 }
+             }
+
+             /* Free CR3 if it's not kernel's */
+             if (zombie->cr3 != tasks[0].cr3) {
+                 vmm_destroy_pml4(zombie->cr3);
+             }
+
+             zombie->id = 0;
+             zombie->state = 0; /* Unused */
+             zombie->name[0] = 0;
+
+             spin_unlock(&sched_lock);
+             __asm__ volatile("sti");
+
+             if (status) {
+                 *status = (zombie_status & 0xFF) << 8;
+             }
+             return zombie_pid;
+        }
+
+        if (!found_child) {
+             spin_unlock(&sched_lock);
+             __asm__ volatile("sti");
+             /* ECHILD = 10 */
+             return -10;
+        }
+
+        if (options & 1) { /* WNOHANG */
+             spin_unlock(&sched_lock);
+             __asm__ volatile("sti");
+             return 0;
+        }
+
+        spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
+
+        task_sleep(100); /* Poll every 100ms */
+    }
+}
+
+int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) {
+    /* 1. Validate */
+    if (!vmm_validate_user_ptr(path, 1)) return -EFAULT;
+
+    char kpath[256];
+    strlcpy(kpath, path, 256);
+
+    int argc = 0;
+    char* kargv[32];
+    if (argv) {
+        if (!vmm_validate_user_ptr(argv, sizeof(char*))) return -EFAULT;
+        for (int i=0; i<32; i++) {
+            char* ptr = argv[i];
+            if (!ptr) break;
+            if (!vmm_validate_user_ptr(ptr, 1)) return -EFAULT;
+            kargv[argc] = (char*)kmalloc(128);
+            strlcpy(kargv[argc], ptr, 128);
+            argc++;
+        }
+    }
+    kargv[argc] = NULL;
+
+    int envc = 0;
+    char* kenvp[32];
+    if (envp) {
+        if (!vmm_validate_user_ptr(envp, sizeof(char*))) return -EFAULT;
+        for (int i=0; i<32; i++) {
+            char* ptr = envp[i];
+            if (!ptr) break;
+            if (!vmm_validate_user_ptr(ptr, 1)) return -EFAULT;
+            kenvp[envc] = (char*)kmalloc(128);
+            strlcpy(kenvp[envc], ptr, 128);
+            envc++;
+        }
+    }
+    kenvp[envc] = NULL;
+
+    /* 2. New Address Space */
+    task_t* current = task_get_current();
+    uint64_t old_cr3 = current->cr3;
+
+    uint64_t new_cr3_phys = (uint64_t)pmm_alloc_page();
+    if (!new_cr3_phys) return -ENOMEM;
+    uint64_t* new_pml4 = (uint64_t*)new_cr3_phys;
+    memset(new_pml4, 0, PAGE_SIZE);
+
+    /* Copy Kernel Mappings (Higher Half) */
+    uint64_t* kernel_pml4 = (uint64_t*)tasks[0].cr3;
+    for (int i = 256; i < 512; i++) {
+        new_pml4[i] = kernel_pml4[i];
+    }
+
+    /* Copy Identity Map (Index 0) - Need deep copy of PDPT to separate User Space */
+    uint64_t new_pdpt_phys = (uint64_t)pmm_alloc_page();
+    if (!new_pdpt_phys) return -ENOMEM;
+    uint64_t* new_pdpt = (uint64_t*)new_pdpt_phys;
+    memset(new_pdpt, 0, PAGE_SIZE);
+
+    uint64_t kernel_pdpt_phys = kernel_pml4[0] & PAGE_ADDR_MASK;
+    uint64_t* kernel_pdpt = (uint64_t*)kernel_pdpt_phys;
+
+    /* Copy first 8 entries (Identity Map 0-8GB) */
+    for (int i = 0; i < 8; i++) {
+        new_pdpt[i] = kernel_pdpt[i];
+    }
+
+    /* Link PDPT to PML4[0] */
+    new_pml4[0] = new_pdpt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+
+    /* 3. Switch CR3 */
+    __asm__ volatile("mov %0, %%cr3" : : "r"(new_cr3_phys) : "memory");
+    current->cr3 = new_cr3_phys;
+
+    /* 4. Load ELF */
+    current->brk = 0;
+    current->mmap_base = 0x700000000000ULL;
+
+    uint64_t entry_point = elf_load_file(kpath, 0);
+    if (entry_point == 0) {
+        /* Failed: Restore old CR3 and abort */
+        __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+        current->cr3 = old_cr3;
+        return -ENOEXEC;
+    }
+
+    /* 5. Setup Stack */
+    /* Start at 128TB - 4KB */
+    uint64_t stack_top = USER_LIMIT - 4096;
+    /* Map 128KB stack */
+    for (uint64_t addr = stack_top - (128*1024); addr < stack_top; addr += PAGE_SIZE) {
+         void* phys = pmm_alloc_page();
+         vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+         memset((void*)addr, 0, PAGE_SIZE);
+    }
+
+    /* Push strings to top of stack */
+    uint64_t rsp = stack_top;
+
+    uint64_t uargv[33];
+    uint64_t uenvp[33];
+
+    /* Push Envp Strings */
+    for (int i = envc - 1; i >= 0; i--) {
+        int len = strlen(kenvp[i]) + 1;
+        rsp -= len;
+        memcpy((void*)rsp, kenvp[i], len);
+        uenvp[i] = rsp;
+    }
+    uenvp[envc] = 0;
+
+    /* Push Argv Strings */
+    for (int i = argc - 1; i >= 0; i--) {
+        int len = strlen(kargv[i]) + 1;
+        rsp -= len;
+        memcpy((void*)rsp, kargv[i], len);
+        uargv[i] = rsp;
+    }
+    uargv[argc] = 0;
+
+    /* Align Stack (16 bytes) */
+    rsp &= ~0xF;
+
+    /* Push Auxv (NULL) */
+    rsp -= 8;
+    *(uint64_t*)rsp = 0;
+
+    /* Push Envp Pointers */
+    rsp -= (envc + 1) * 8;
+    for (int i = 0; i <= envc; i++) {
+        ((uint64_t*)rsp)[i] = uenvp[i];
+    }
+
+    /* Push Argv Pointers */
+    rsp -= (argc + 1) * 8;
+    for (int i = 0; i <= argc; i++) {
+        ((uint64_t*)rsp)[i] = uargv[i];
+    }
+
+    /* Push Argc */
+    rsp -= 8;
+    *(uint64_t*)rsp = (uint64_t)argc;
+
+    /* 6. Cleanup Kernel Buffers */
+    for (int i=0; i<argc; i++) kfree(kargv[i]);
+    for (int i=0; i<envc; i++) kfree(kenvp[i]);
+
+    /* 7. Update Regs */
+    regs->rcx = entry_point;
+
+    /* Update User Stack in Per-CPU */
+    cpu_info_t* cpu = get_current_cpu();
+    if (cpu) {
+         cpu->user_stack_scratch = rsp;
+    }
+    current->user_rsp = rsp;
+
+    /* Update Name */
+    strlcpy(current->name, kpath, 32);
+
+    /* 8. Destroy Old Address Space */
+    vmm_destroy_pml4(old_cr3);
+
+    return 0;
 }

@@ -436,6 +436,44 @@ int vmm_is_user_page(uint64_t virt_addr) {
     return 1;
 }
 
+static void free_pt_recursive(pt_entry_t* table, int level) {
+    for (int i = 0; i < 512; i++) {
+        if (!(table[i] & PAGE_PRESENT)) continue;
+
+        /* Skip Kernel Mappings */
+        /* Level 4 (PML4): Index != 0 -> Kernel (Higher Half) */
+        if (level == 4 && i != 0) continue;
+
+        /* Level 3 (PDPT inside PML4[0]): Index < 8 -> Kernel Identity Map (0-8GB) */
+        if (level == 3 && i < 8) continue;
+
+        if (level > 1) {
+            /* Recurse */
+            pt_entry_t* child = (pt_entry_t*)(table[i] & PAGE_ADDR_MASK);
+            free_pt_recursive(child, level - 1);
+
+            /* Free the table page itself */
+            pmm_free_page(child);
+        } else {
+            /* Level 1 (PT): Free the page */
+            if (table[i] & PAGE_USER) {
+                uint64_t phys = table[i] & PAGE_ADDR_MASK;
+                pmm_unref_page((void*)phys);
+            }
+        }
+    }
+}
+
+void vmm_destroy_pml4(uint64_t pml4_phys) {
+    if (!pml4_phys) return;
+    pt_entry_t* pml4 = (pt_entry_t*)pml4_phys;
+
+    free_pt_recursive(pml4, 4);
+
+    /* Free PML4 itself */
+    pmm_free_page(pml4);
+}
+
 int vmm_validate_user_ptr(const void* addr, size_t size) {
     uint64_t start = (uint64_t)addr;
     uint64_t end = start + size;
