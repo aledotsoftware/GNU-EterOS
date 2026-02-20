@@ -596,3 +596,37 @@ function makeDraggable(el) {
         document.ontouchmove = null;
     }
 }
+
+function setupLauncherNav() {
+    const search = document.getElementById('launcher-search');
+    const getApps = () => Array.from(document.querySelectorAll('.launcher-item')).filter(e => e.style.display !== 'none');
+
+    search.addEventListener('keydown', (e) => {
+        const apps = getApps();
+        if (e.key === 'ArrowDown' && apps.length) {
+            e.preventDefault();
+            apps[0].focus();
+        }
+        if (e.key === 'Enter' && apps.length) {
+            e.preventDefault();
+            apps[0].click();
+        }
+    });
+
+    document.querySelectorAll('.launcher-item').forEach(item => {
+        item.addEventListener('keydown', (e) => {
+            const apps = getApps();
+            const idx = apps.indexOf(item);
+            if (['ArrowDown', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+                if (idx < apps.length - 1) apps[idx + 1].focus();
+            } else if (['ArrowUp', 'ArrowLeft'].includes(e.key)) {
+                e.preventDefault();
+                if (idx > 0) apps[idx - 1].focus();
+                else search.focus();
+            }
+        });
+    });
+}
+
+setupLauncherNav();
