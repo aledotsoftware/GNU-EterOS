@@ -49,9 +49,84 @@ void benchmark_memcmp() {
     free(buf2);
 }
 
+void benchmark_strchr() {
+    const size_t size = 1024 * 1024; /* 1 MB */
+    const int iterations = 1000;
+
+    char* buf = malloc(size);
+
+    if (!buf) {
+        printf("Benchmark failed: malloc error\n");
+        return;
+    }
+
+    /* Fill buffer with 'A', put target at the end */
+    memset(buf, 'A', size - 1);
+    buf[size - 1] = 'B';
+
+    clock_t start = clock();
+
+    volatile char* res;
+    for (int i = 0; i < iterations; i++) {
+        res = strchr(buf, 'B');
+    }
+
+    clock_t end = clock();
+    double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+    printf("Benchmark strchr: %d iterations of 1MB search took %f seconds\n", iterations, time_taken);
+
+    free(buf);
+}
+
 int main() {
     benchmark_memcmp();
+    benchmark_strchr();
     printf("Running string tests...\n");
+
+    /* Test strchr */
+    {
+        const char *str = "Hello World";
+
+        /* Find char */
+        assert(strchr(str, 'H') == str);
+        assert(strchr(str, 'e') == str + 1);
+        assert(strchr(str, 'o') == str + 4);
+        assert(strchr(str, 'd') == str + 10);
+
+        /* Find null terminator */
+        assert(strchr(str, '\0') == str + 11);
+
+        /* Not found */
+        assert(strchr(str, 'X') == NULL);
+
+        /* Empty string */
+        assert(strchr("", 'A') == NULL);
+        assert(strchr("", '\0') != NULL);
+
+        /* Alignment tests */
+        /* Use a buffer that we can align manually */
+        char *buf = malloc(64);
+        if (buf) {
+             memset(buf, 'A', 63);
+             buf[63] = '\0';
+
+             /* Test searching from different offsets */
+             for (int i = 0; i < 16; i++) {
+                 /* Target at varying distances */
+                 /* Ensure we don't go out of bounds */
+                 if (i + 10 < 63) {
+                     buf[i+10] = 'B';
+                     assert(strchr(buf + i, 'B') == buf + i + 10);
+                     buf[i+10] = 'A'; /* Restore */
+                 }
+             }
+
+             free(buf);
+        }
+
+        printf("strchr tests passed\n");
+    }
 
     /* Test itoa_s */
     {

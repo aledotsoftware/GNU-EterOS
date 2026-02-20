@@ -13,3 +13,7 @@
 ## 2026-11-23 - [Glow Overdraw & VRAM Reads]
 **Learning:** Alpha blending operations like `omni_fill_rect_alpha` require reading from the framebuffer (VRAM), which is extremely slow due to uncached memory access. Drawing a full filled rectangle for a border/glow effect and then overwriting the center wastes ~90% of bandwidth.
 **Action:** Use a "hollow" drawing function (4 strips) for borders and glows to eliminate overdraw of the central area, especially for large UI elements.
+
+## 2026-10-24 - [Shadowing Host Symbols in Tests]
+**Learning:** When testing freestanding kernel implementations (like `strchr`) on a host environment, linking against the host's libc causes symbol conflicts or accidental testing of the host's optimized version instead of the kernel's.
+**Action:** Explicitly rename kernel functions (e.g., `#define strchr eteros_strchr`) in `include/string.h` within the `__ETEROS_HOST_TEST__` block to ensure the test harness executes the kernel code.

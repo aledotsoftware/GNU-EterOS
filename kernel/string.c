@@ -435,6 +435,47 @@ int strcmp(const char* s1, const char* s2) {
 }
 
 char* strchr(const char *s, int c) {
+#ifdef __x86_64__
+    /* ⚡ BOLT Optimization: Use SWAR to check 8 bytes at a time */
+
+    /* Handle unaligned bytes first */
+    while ((uintptr_t)s & 7) {
+        if (*s == (char)c) return (char *)s;
+        if (!*s) return 0;
+        s++;
+    }
+
+    /* Prepare constants for SWAR */
+    uint64_t mask_c = (unsigned char)c;
+    mask_c |= mask_c << 8;
+    mask_c |= mask_c << 16;
+    mask_c |= mask_c << 32;
+
+    const uint64_t *ls = (const uint64_t *)s;
+    uint64_t v, x;
+
+    /* Constants for zero byte detection */
+    const uint64_t magic_lo = 0x0101010101010101ULL;
+    const uint64_t magic_hi = 0x8080808080808080ULL;
+
+    while (1) {
+        v = *ls++;
+
+        /* Check for null terminator: (v - 0x01..) & ~v & 0x80.. */
+        uint64_t zero_bytes = (v - magic_lo) & ~v & magic_hi;
+
+        /* Check for target char: XOR with mask, then check for zero bytes */
+        x = v ^ mask_c;
+        uint64_t target_bytes = (x - magic_lo) & ~x & magic_hi;
+
+        if (zero_bytes || target_bytes) {
+            /* Found something. Backtrack and find exact byte. */
+            s = (const char *)(ls - 1);
+            break;
+        }
+    }
+#endif
+
     while (*s != (char)c) {
         if (!*s++) {
             return 0;
