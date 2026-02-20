@@ -532,12 +532,12 @@ static int64_t sys_open(const char* path, int flags, int mode) {
             if (!parent) return -ENOENT;
 
             if (create_fs(parent, filename, (uint16_t)mode) != 0) {
-                kfree(parent);
+                vfs_destroy_node(parent);
                 return -EACCES;
             }
 
             node = vfs_lookup(fs_root, path);
-            kfree(parent);
+            vfs_destroy_node(parent);
             if (!node) return -ENOENT;
         } else {
             return -ENOENT;
@@ -569,7 +569,7 @@ static int64_t sys_close(int fd) {
     if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
         close_fs(node);
         /* Free the node memory (vfs_lookup allocates it) */
-        kfree(node);
+        vfs_destroy_node(node);
     }
 
     current->fd_table[fd].node = NULL;
@@ -588,7 +588,7 @@ static int64_t sys_mkdir(const char* path, int mode) {
     if (!parent) return -ENOENT;
 
     int res = mkdir_fs(parent, filename, (uint16_t)mode);
-    kfree(parent);
+    vfs_destroy_node(parent);
     return res;
 }
 
@@ -603,7 +603,7 @@ static int64_t sys_unlink(const char* path) {
     if (!parent) return -ENOENT;
 
     int res = unlink_fs(parent, filename);
-    kfree(parent);
+    vfs_destroy_node(parent);
     return res;
 }
 
@@ -795,7 +795,7 @@ static int64_t sys_stat(const char* path, struct stat* buf) {
        If vfs_lookup allocates, we must free.
        sys_close calls kfree(node).
        So yes, we must free. */
-    kfree(node);
+    vfs_destroy_node(node);
 
     return 0;
 }
@@ -1087,7 +1087,7 @@ static int64_t sys_access(const char* path, int mode) {
     (void)mode;
     fs_node_t* node = vfs_lookup(fs_root, path);
     if (!node) return -ENOENT;
-    kfree(node);
+    vfs_destroy_node(node);
     return 0;
 }
 

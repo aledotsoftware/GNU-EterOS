@@ -92,6 +92,14 @@ int ioctl_fs(fs_node_t *node, int request, void *arg) {
 
 extern fs_node_t* tty_create_node(void);
 
+void vfs_destroy_node(fs_node_t *node) {
+    if (!node) return;
+    if (node->destroy) {
+        node->destroy(node);
+    }
+    kfree(node);
+}
+
 /**
  * Resolves a path to a filesystem node.
  *
@@ -162,14 +170,14 @@ fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
         } else {
             next = finddir_fs(current, segment);
             /* Free previous step */
-            kfree(current);
+            vfs_destroy_node(current);
         }
 
         if (!next) return 0;
         current = next;
 
         if ((current->flags & 0x7) != FS_DIRECTORY && *p) {
-            kfree(current);
+            vfs_destroy_node(current);
             return 0;
         }
     }

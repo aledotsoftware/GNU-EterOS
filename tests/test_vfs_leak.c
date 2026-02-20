@@ -1,13 +1,13 @@
 #define __ETEROS_HOST_TEST__ 1
-#define ETEROS_STRING_H
+/* #define ETEROS_STRING_H -- Allow include/string.h to work */
 #define ETEROS_MM_H
 #define FS_VFS_H
 #define ETEROS_TYPES_H
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stdint.h>
+#include <string.h>
 #include <assert.h>
 
 /* Types (matches include/fs/vfs.h and types.h) */
@@ -38,6 +38,10 @@ typedef void (*open_type_t)(struct fs_node*);
 typedef void (*close_type_t)(struct fs_node*);
 typedef struct dirent * (*readdir_type_t)(struct fs_node*, uint32_t);
 typedef struct fs_node * (*finddir_type_t)(struct fs_node*, char *name);
+typedef int (*create_type_t)(struct fs_node*, char*, uint16_t);
+typedef int (*mkdir_type_t)(struct fs_node*, char*, uint16_t);
+typedef int (*unlink_type_t)(struct fs_node*, char*);
+typedef int (*ioctl_type_t)(struct fs_node*, int, void*);
 
 typedef struct fs_node {
     char name[128];
@@ -57,8 +61,21 @@ typedef struct fs_node {
     close_type_t close;
     readdir_type_t readdir;
     finddir_type_t finddir;
+    create_type_t create;
+    mkdir_type_t mkdir;
+    unlink_type_t unlink;
+    ioctl_type_t ioctl;
     struct fs_node *ptr;
+    uint32_t ref_count;
+    uint32_t lock;
+    void *private_data;
+    void (*destroy)(struct fs_node *node);
 } fs_node_t;
+
+/* Mock locking */
+#define spinlock_t uint32_t
+void spin_lock(spinlock_t *lock) { (void)lock; }
+void spin_unlock(spinlock_t *lock) { (void)lock; }
 
 /* Externs from vfs.c */
 extern fs_node_t *fs_root;
@@ -82,6 +99,17 @@ void kfree(void* ptr) {
 
 /* Helper for finding root */
 fs_node_t* finddir_fs(fs_node_t* node, char* name);
+
+/* Mock tty */
+fs_node_t* tty_create_node(void) {
+    fs_node_t* node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!node) return NULL;
+    memset(node, 0, sizeof(fs_node_t));
+    return node;
+}
+
+/* Include dependencies */
+#include "../kernel/string.c"
 
 /* Include Code Under Test */
 #include "../kernel/fs/vfs.c"

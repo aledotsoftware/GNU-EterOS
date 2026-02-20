@@ -151,6 +151,8 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/drivers/net/e1000.c     \
               $(KERNEL_DIR)/fs/initrd.c            \
+              $(KERNEL_DIR)/fs/ramfs.c             \
+              $(KERNEL_DIR)/fs/overlay.c           \
               $(KERNEL_DIR)/fs/vfs.c               \
               $(KERNEL_DIR)/fs/devfs.c             \
               $(KERNEL_DIR)/fs/procfs.c            \

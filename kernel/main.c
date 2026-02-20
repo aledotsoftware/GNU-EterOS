@@ -23,6 +23,8 @@
 #include <vmm.h>
 #include <fs/initrd.h>
 #include <fs/vfs.h>
+#include <fs/ramfs.h>
+#include <fs/overlay.h>
 #include <vga.h>
 #include <task.h>
 #include <net/defs.h>
@@ -141,9 +143,24 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* ---- 3.5 Inicializar Initrd ---- */
         #if defined(ARCH_X86_64)
         if (boot_info && boot_info->initrd_addr != 0) {
-            fs_root = initialise_initrd(boot_info->initrd_addr, boot_info->initrd_size);
-            if (fs_root) {
-                hal_console_write("[VFS] Initrd mounted at /\n");
+            fs_node_t *root_ro = initialise_initrd(boot_info->initrd_addr, boot_info->initrd_size);
+            if (root_ro) {
+                hal_console_write("[VFS] Initrd mounted (Read-Only).\n");
+
+                fs_node_t *root_rw = ramfs_init();
+                if (root_rw) {
+                     hal_console_write("[VFS] RamFS initialized (Read-Write).\n");
+                     fs_root = overlay_init(root_ro, root_rw);
+                     if (fs_root) {
+                         hal_console_write("[VFS] OverlayFS mounted at /\n");
+                     } else {
+                         hal_console_write("[VFS] Error: OverlayFS init failed.\n");
+                         fs_root = root_ro;
+                     }
+                } else {
+                     hal_console_write("[VFS] Error: RamFS init failed.\n");
+                     fs_root = root_ro;
+                }
 
                 /* List files using VFS */
                 struct dirent *node = 0;

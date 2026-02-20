@@ -51,6 +51,8 @@ typedef struct fs_node {
     struct fs_node *ptr; /* Used by mountpoints and symlinks */
     uint32_t ref_count;   /* Reference counting for shared nodes */
     spinlock_t lock;      /* SMP lock for this node */
+    void *private_data;   /* Driver-specific data */
+    void (*destroy)(struct fs_node *node); /* Destructor callback */
 } fs_node_t;
 
 struct dirent {
@@ -72,6 +74,12 @@ int create_fs(fs_node_t *parent, char *name, uint16_t permission);
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission);
 int unlink_fs(fs_node_t *parent, char *name);
 int ioctl_fs(fs_node_t *node, int request, void *arg);
+
+/**
+ * Destroys a filesystem node, calling its destructor if present.
+ * Also frees the node memory.
+ */
+void vfs_destroy_node(fs_node_t *node);
 
 /**
  * Resolves a path to a filesystem node.
