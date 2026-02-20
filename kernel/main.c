@@ -39,6 +39,7 @@
 #include <futex.h>
 #include <sem.h>
 #include <serial.h>
+#include <framebuffer.h>
 
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */
@@ -146,8 +147,40 @@ void __attribute__((section(".text.boot"))) kmain(void) {
             /* Inicializar Subsistema Gráfico (FrameBuffer + Dirty Rects) */
             gfx_init(boot_info);
 
-            /* Dibujar fondo */
-            gfx_fill_rect(0, 0, 1024, 768, 0x002040);
+            /* ---- SPLASH SCREEN ---- */
+            terminal_set_silent(true);
+            uint32_t width = framebuffer_get_width();
+            uint32_t height = framebuffer_get_height();
+
+            /* Fondo blanco */
+            gfx_fill_rect(0, 0, width, height, 0xFFFFFF);
+
+            /* Logo: Cuadrado azul */
+            int logo_size = 128;
+            int logo_x = (width - logo_size) / 2;
+            int logo_y = (height - logo_size) / 2 - 32;
+            gfx_fill_rect(logo_x, logo_y, logo_size, logo_size, 0x007ACC);
+
+            /* Texto: "eterOS" */
+            const char* title = "eterOS";
+            int char_w = 8;
+            int title_x = (width - (6 * char_w)) / 2;
+            int title_y = logo_y + logo_size + 16;
+
+            for (int i = 0; i < 6; i++) {
+                framebuffer_putchar(title[i], title_x + (i * char_w), title_y, 0x000000, 0xFFFFFF);
+            }
+
+            gfx_present();
+
+            /* Espera activa (Busy Wait) para mostrar el logo ~1-2s */
+            for (volatile uint64_t i = 0; i < 300000000; i++) { __asm__ volatile ("nop"); }
+
+            terminal_set_silent(false);
+            /* ---- FIN SPLASH SCREEN ---- */
+
+            /* Dibujar fondo (Recuperar estado original) */
+            gfx_fill_rect(0, 0, width, height, 0x002040);
             gfx_present();
         }
     #endif

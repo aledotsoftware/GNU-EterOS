@@ -41,3 +41,7 @@
 ## 2026-12-05 - [Focus Management in Web-based OS]
 **Learning:** Standard web focus flow (tabbing sequentially) breaks the illusion of a desktop environment. Explicitly managing focus (e.g., auto-focusing menu items on open, handling Escape to return focus) is critical to make the interface feel like an OS, not just a webpage.
 **Action:** Always implement explicit focus entry/exit logic for overlay components (menus, windows, launchers).
+
+## 2027-01-10 - [Seamless Boot Experience]
+**Learning:** Transitioning from a kernel splash screen to the main UI requires hiding the underlying console noise. Using `terminal_set_silent(true)` allows the splash screen to persist without being overwritten by boot logs, creating a polished, "consumer-grade" feel.
+**Action:** When designing boot sequences, always consider suppressing verbose logs during the visual phase to maintain immersion.
