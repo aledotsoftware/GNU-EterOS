@@ -2,6 +2,7 @@
 #define FAT32_H
 
 #include <types.h>
+#include <lock.h>
 
 /**
  * FAT32 Boot Sector (BPB)
@@ -114,6 +115,7 @@ typedef struct {
     uint32_t sectors_per_cluster;
     uint16_t bytes_per_sector;
     uint32_t fat_size;          // in sectors
+    spinlock_t lock;
 } fat32_volume_t;
 
 /**
