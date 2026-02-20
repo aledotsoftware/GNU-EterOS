@@ -435,12 +435,66 @@ int strcmp(const char* s1, const char* s2) {
 }
 
 char* strchr(const char *s, int c) {
+#ifdef __x86_64__
+    char ch = (char)c;
+
+    /* ⚡ BOLT Optimization: Use SWAR (SIMD Within A Register) for strchr.
+       Processes 8 bytes at a time instead of byte-by-byte loop. */
+
+    /* 1. Align to 8 bytes boundary */
+    while ((uintptr_t)s & 7) {
+        if (*s == ch) return (char *)s;
+        if (!*s) return 0;
+        s++;
+    }
+
+    /* 2. Process 8 bytes at a time */
+    const uint64_t *ls = (const uint64_t *)s;
+    uint64_t v;
+
+    /* Precompute patterns */
+    uint64_t c_pattern = (unsigned char)ch;
+    c_pattern |= c_pattern << 8;
+    c_pattern |= c_pattern << 16;
+    c_pattern |= c_pattern << 32;
+
+    uint64_t lomagic = 0x0101010101010101ULL;
+    uint64_t himagic = 0x8080808080808080ULL;
+
+    while (1) {
+        v = *ls++;
+
+        /* Check for null terminator: (v - 0x01) & ~v & 0x80 */
+        uint64_t zero_mask = (v - lomagic) & ~v & himagic;
+
+        /* Check for target char: XOR with pattern, then check for zero byte */
+        uint64_t x = v ^ c_pattern;
+        uint64_t target_mask = (x - lomagic) & ~x & himagic;
+
+        /* If we found either a null or the target char */
+        if (zero_mask | target_mask) {
+            /* Found something. Revert to byte check on this word to find exact position. */
+            const char *p = (const char *)(ls - 1);
+
+            /* Check 8 bytes */
+            if (p[0] == ch) return (char *)&p[0]; if (!p[0]) return 0;
+            if (p[1] == ch) return (char *)&p[1]; if (!p[1]) return 0;
+            if (p[2] == ch) return (char *)&p[2]; if (!p[2]) return 0;
+            if (p[3] == ch) return (char *)&p[3]; if (!p[3]) return 0;
+            if (p[4] == ch) return (char *)&p[4]; if (!p[4]) return 0;
+            if (p[5] == ch) return (char *)&p[5]; if (!p[5]) return 0;
+            if (p[6] == ch) return (char *)&p[6]; if (!p[6]) return 0;
+            if (p[7] == ch) return (char *)&p[7]; if (!p[7]) return 0;
+        }
+    }
+#else
     while (*s != (char)c) {
         if (!*s++) {
             return 0;
         }
     }
     return (char *)s;
+#endif
 }
 
 int strncmp(const char* s1, const char* s2, size_t n) {

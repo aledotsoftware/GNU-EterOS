@@ -49,8 +49,45 @@ void benchmark_memcmp() {
     free(buf2);
 }
 
+void benchmark_strchr() {
+    const size_t size = 1024 * 1024; /* 1 MB */
+    const int iterations = 1000;
+
+    char* buf = malloc(size);
+
+    if (!buf) {
+        printf("Benchmark failed: malloc error\n");
+        return;
+    }
+
+    /* Fill buffer with non-target chars */
+    std_memset(buf, 'A', size);
+    /* Place target at the very end to force full scan */
+    buf[size - 1] = 'B';
+    /* Ensure null termination (though strchr searches for char, it stops at null if not found) */
+    /* But here we search for 'B', which is at size-1. */
+    /* If we search for 'C' (not found), we need null terminator. */
+    buf[size - 1] = '\0'; /* actually let's make it a string */
+    buf[size - 2] = 'B';
+
+    clock_t start = clock();
+
+    volatile char* res = 0;
+    for (int i = 0; i < iterations; i++) {
+        res = strchr(buf, 'B');
+    }
+
+    clock_t end = clock();
+    double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+    printf("Benchmark strchr: %d iterations of 1MB search took %f seconds\n", iterations, time_taken);
+
+    free(buf);
+}
+
 int main() {
     benchmark_memcmp();
+    benchmark_strchr();
     printf("Running string tests...\n");
 
     /* Test itoa_s */
@@ -844,6 +881,60 @@ int main() {
         assert(res == -1);
 
         printf("atoi_s tests passed\n");
+    }
+
+    /* Test strchr */
+    {
+        char* str = "Hello World";
+
+        /* Test 1: Find first char */
+        assert(strchr(str, 'H') == str);
+
+        /* Test 2: Find middle char */
+        assert(strchr(str, 'e') == str + 1);
+        assert(strchr(str, 'o') == str + 4); /* First 'o' */
+
+        /* Test 3: Find last char (before null) */
+        assert(strchr(str, 'd') == str + 10);
+
+        /* Test 4: Find null terminator */
+        assert(strchr(str, '\0') == str + 11);
+
+        /* Test 5: Not found */
+        assert(strchr(str, 'z') == NULL);
+        assert(strchr(str, 'Z') == NULL);
+
+        /* Test 6: Empty string */
+        assert(strchr("", 'A') == NULL);
+        assert(strchr("", '\0') != NULL); /* Should point to the null char */
+
+        /* Test 7: Alignment and SWAR edge cases */
+        /* Create a buffer where we can control alignment */
+        char* buf = malloc(64);
+        if (buf) {
+            memset(buf, 'X', 63);
+            buf[63] = '\0';
+
+            /* Test finding char at various offsets */
+            for (int i = 0; i < 63; i++) {
+                buf[i] = 'Y';
+                /* Search for 'Y' starting from different alignments */
+                /* Try searching from buf, buf+1, etc. */
+                /* But strchr always starts from given pointer. */
+
+                char* res = strchr(buf, 'Y');
+                assert(res == buf + i);
+
+                buf[i] = 'X'; /* Restore */
+            }
+
+            /* Test finding null at the end */
+            assert(strchr(buf, '\0') == buf + 63);
+
+            free(buf);
+        }
+
+        printf("strchr tests passed\n");
     }
 
     printf("All tests passed!\n");
