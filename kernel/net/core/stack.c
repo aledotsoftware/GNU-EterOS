@@ -1,6 +1,6 @@
 #include <net/defs.h>
 #include <net/socket.h>
-#include <net/e1000.h>
+#include <net/nic.h>
 #include <string.h>
 #include <timer.h>
 #include <task.h>
@@ -63,7 +63,8 @@ static void handle_arp(struct ethernet_header* eth, struct arp_packet* arp) {
             struct ethernet_header* reth = (struct ethernet_header*)buffer;
             struct arp_packet* rarp = (struct arp_packet*)(buffer + sizeof(struct ethernet_header));
 
-            uint8_t* my_mac = e1000_get_mac();
+            if (!current_nic) return;
+            uint8_t* my_mac = current_nic->get_mac();
 
             memcpy(reth->dest, eth->src, 6);
             memcpy(reth->src, my_mac, 6);
@@ -80,14 +81,15 @@ static void handle_arp(struct ethernet_header* eth, struct arp_packet* arp) {
             memcpy(rarp->dest_mac, arp->src_mac, 6);
             rarp->dest_ip = arp->src_ip;
 
-            e1000_send_packet(buffer, sizeof(struct ethernet_header) + sizeof(struct arp_packet));
+            if (current_nic) current_nic->send(buffer, sizeof(struct ethernet_header) + sizeof(struct arp_packet));
         }
     }
 }
 
 void net_poll(void) {
+    if (!current_nic) return;
     uint8_t buffer[1514];
-    int len = e1000_receive(buffer, sizeof(buffer));
+    int len = current_nic->receive(buffer, sizeof(buffer));
     if (len > 0) {
         /* Security Check: Ethernet Header */
         if ((size_t)len < sizeof(struct ethernet_header)) return;
@@ -167,7 +169,8 @@ int net_arp_lookup(uint32_t target_ip) {
     struct ethernet_header* eth = (struct ethernet_header*)buffer;
     struct arp_packet* arp = (struct arp_packet*)(buffer + sizeof(struct ethernet_header));
     
-    uint8_t* my_mac = e1000_get_mac();
+    if (!current_nic) return -1;
+    uint8_t* my_mac = current_nic->get_mac();
     
     /* Ethernet */
     memset(eth->dest, 0xFF, 6);
@@ -194,7 +197,7 @@ int net_arp_lookup(uint32_t target_ip) {
     itoa_s(tip[3], buf, sizeof(buf), 10); hal_console_write(buf);
     hal_console_write("...\n");
 
-    e1000_send_packet(buffer, sizeof(struct ethernet_header) + sizeof(struct arp_packet));
+    if (current_nic) current_nic->send(buffer, sizeof(struct ethernet_header) + sizeof(struct arp_packet));
     
     /* Wait for response via net_poll */
     uint64_t start = timer_get_ticks();

@@ -27,6 +27,7 @@ BUILD_DIR   = build
 # ---- Herramientas ----
 QEMU    ?= qemu-system-x86_64
 OBJCOPY ?= objcopy
+AR      ?= ar
 
 # ---- Flags de compilación ----
 ASFLAGS = -f elf64
@@ -165,14 +166,18 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/arch/x86_64/syscall.c \
               $(KERNEL_DIR)/drivers/disk/partition.c \
               $(KERNEL_DIR)/fs/elf.c \
-              $(KERNEL_DIR)/net/ip_utils.c \
-              $(KERNEL_DIR)/net/stack.c \
-              $(KERNEL_DIR)/net/tcp.c \
-              $(KERNEL_DIR)/net/dhcp.c \
-              $(KERNEL_DIR)/net/dhcp_parser.c \
-              $(KERNEL_DIR)/net/raw_tcp.c \
               $(KERNEL_DIR)/drivers/net/e1000.c \
               $(KERNEL_DIR)/apps/wget.c
+
+NET_CORE_SRCS = $(KERNEL_DIR)/net/core/stack.c \
+                $(KERNEL_DIR)/net/core/tcp.c \
+                $(KERNEL_DIR)/net/core/dhcp.c \
+                $(KERNEL_DIR)/net/core/dhcp_parser.c \
+                $(KERNEL_DIR)/net/core/ip_utils.c \
+                $(KERNEL_DIR)/net/core/raw_tcp.c \
+                $(KERNEL_DIR)/net/core/nic.c
+
+NET_CORE_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(NET_CORE_SRCS))
 
 KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/gdt_flush.asm \
@@ -247,6 +252,7 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/apps
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/net
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/core
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/core
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/core/ipv4
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/netif
@@ -286,10 +292,15 @@ $(BUILD_DIR)/%.o: %.asm
 	@echo "[ASM]  $<"
 	$(AS) -f elf64 $< -o $@
 
+# ---- Network Library ----
+$(BUILD_DIR)/libnet.a: $(NET_CORE_OBJS)
+	@echo "[AR]   $@"
+	$(AR) rcs $@ $^
+
 # Enlazar objetos en un ELF, luego extraer binario plano
-$(KERNEL_BIN): $(KERNEL_OBJS)
+$(KERNEL_BIN): $(KERNEL_OBJS) $(BUILD_DIR)/libnet.a
 	@echo "[LD]   Enlazando kernel..."
-	$(LD) $(LDFLAGS) -o $(KERNEL_ELF) $(KERNEL_OBJS)
+	$(LD) $(LDFLAGS) -o $(KERNEL_ELF) $(KERNEL_OBJS) $(BUILD_DIR)/libnet.a
 	@echo "[BIN]  Extrayendo binario del kernel..."
 	$(OBJCOPY) -O binary $(KERNEL_ELF) $(KERNEL_BIN)
 	@echo "[INFO] Tamaño del kernel: $$(wc -c < $(KERNEL_BIN)) bytes"

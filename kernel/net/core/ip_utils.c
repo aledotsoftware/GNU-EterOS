@@ -1,5 +1,5 @@
-#include "../../include/net/defs.h"
-#include "../../include/types.h"
+#include <net/defs.h>
+#include <types.h>
 
 /**
  * Parses an IPv4 address string safely.
