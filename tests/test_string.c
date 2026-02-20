@@ -846,6 +846,47 @@ int main() {
         printf("atoi_s tests passed\n");
     }
 
+    /* Test strchr */
+    {
+        const char *s = "Hello World";
+
+        /* Test 1: Find character at start */
+        assert(strchr(s, 'H') == s);
+
+        /* Test 2: Find character in middle */
+        assert(strchr(s, ' ') == s + 5);
+
+        /* Test 3: Find character at end */
+        assert(strchr(s, 'd') == s + 10);
+
+        /* Test 4: Find null terminator */
+        assert(strchr(s, '\0') == s + 11);
+
+        /* Test 5: Character not found */
+        assert(strchr(s, 'Z') == NULL);
+
+        /* Test 6: Empty string */
+        assert(strchr("", '\0') != NULL);
+        assert(strchr("", 'A') == NULL);
+
+        /* Test 7: Duplicate characters (find first) */
+        assert(strchr("banana", 'a') == "banana" + 1);
+
+        /* Test 8: Large string / Alignment */
+        char buffer[64];
+        memset(buffer, 'X', 63);
+        buffer[63] = '\0';
+        buffer[32] = 'Y'; /* Target in middle */
+
+        assert(strchr(buffer, 'Y') == buffer + 32);
+        assert(strchr(buffer, 'A') == NULL);
+
+        /* Test unaligned access if possible */
+        assert(strchr(buffer + 1, 'Y') == buffer + 32);
+
+        printf("strchr tests passed\n");
+    }
+
     printf("All tests passed!\n");
     return 0;
 }

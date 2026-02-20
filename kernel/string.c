@@ -435,6 +435,53 @@ int strcmp(const char* s1, const char* s2) {
 }
 
 char* strchr(const char *s, int c) {
+#ifdef __x86_64__
+    /* ⚡ BOLT Optimization: Use SWAR (SIMD Within A Register) to scan 8 bytes at a time.
+       We check for both the target char 'c' and the null terminator '\0' in parallel. */
+    typedef uint64_t __attribute__((__may_alias__)) u64_alias;
+
+    /* Handle unaligned bytes at the start */
+    while (((uintptr_t)s & 7) != 0) {
+        if (*s == (char)c) return (char *)s;
+        if (!*s) return 0;
+        s++;
+    }
+
+    /* Process 8 bytes at a time */
+    const u64_alias* ls = (const u64_alias*)s;
+    uint64_t v;
+
+    /* Replicate c into a 64-bit word pattern */
+    uint64_t char_pattern = (uint8_t)c;
+    char_pattern |= char_pattern << 8;
+    char_pattern |= char_pattern << 16;
+    char_pattern |= char_pattern << 32;
+
+    /* Magic constants for zero-byte detection */
+    const uint64_t lo_magic = 0x0101010101010101ULL;
+    const uint64_t hi_magic = 0x8080808080808080ULL;
+
+    while (1) {
+        v = *ls;
+
+        /* Check for null terminator: (v - 0x01...) & ~v & 0x80... */
+        uint64_t has_zero = (v - lo_magic) & ~v & hi_magic;
+
+        /* Check for char c: has_zero(v ^ char_pattern) */
+        uint64_t xor_v = v ^ char_pattern;
+        uint64_t has_char = (xor_v - lo_magic) & ~xor_v & hi_magic;
+
+        if (has_zero || has_char) {
+            /* Found potential match (target or null).
+               Break to byte loop to find exact location. */
+            s = (const char*)ls;
+            break;
+        }
+
+        ls++;
+    }
+#endif
+
     while (*s != (char)c) {
         if (!*s++) {
             return 0;
