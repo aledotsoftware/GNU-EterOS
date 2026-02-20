@@ -121,6 +121,16 @@ int vmm_is_user_page(uint64_t virt_addr);
 int vmm_validate_user_ptr(const void* addr, size_t size);
 
 /**
+ * Verifica si un rango de memoria de usuario es válido y tiene los permisos adecuados.
+ *
+ * @param addr Dirección de inicio.
+ * @param size Tamaño del buffer.
+ * @param write 1 si se requiere escritura, 0 si solo lectura.
+ * @return 1 si es válido, 0 si no.
+ */
+int vmm_verify_user_access(const void* addr, size_t size, int write);
+
+/**
  * Libera recursivamente un espacio de direcciones (PML4) y sus páginas de usuario.
  * @param pml4_phys Dirección física del PML4.
  */

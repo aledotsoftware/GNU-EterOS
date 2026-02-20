@@ -342,6 +342,39 @@ uint64_t vmm_clone_pml4(int cow) {
     return (uint64_t)new_pml4;
 }
 
+static int vmm_resolve_cow(uint64_t addr, pt_entry_t* pt, uint64_t pt_idx) {
+    if (!(pt[pt_idx] & PAGE_COW)) return 0;
+
+    uint64_t old_phys = pt[pt_idx] & PAGE_ADDR_MASK;
+    uint64_t flags = pt[pt_idx] & ~PAGE_ADDR_MASK;
+
+    /* Check refcount */
+    if (pmm_get_ref_count((void*)old_phys) == 1) {
+        /* Optimize: If refcount is 1, just make it writable again (we are the last owner) */
+        pt[pt_idx] &= ~PAGE_COW;
+        pt[pt_idx] |= PAGE_WRITE;
+    } else {
+        /* Alloc new page */
+        void* new_phys = pmm_alloc_page();
+        if (!new_phys) {
+            serial_write_string("[VMM] OOM during CoW\n");
+            return 0;
+        }
+
+        /* Copy content */
+        memcpy(new_phys, (void*)old_phys, PAGE_SIZE);
+
+        /* Remap */
+        pt[pt_idx] = (uint64_t)new_phys | (flags & ~PAGE_COW) | PAGE_WRITE;
+
+        /* Decrement old ref */
+        pmm_unref_page((void*)old_phys);
+    }
+
+    vmm_flush_tlb_smp(addr);
+    return 1; /* Handled */
+}
+
 int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
     /* Error Code:
        Bit 0: Present (0=Not Present, 1=Protection Violation)
@@ -368,39 +401,55 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
         pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
         if (!pt) return 0;
 
-        if (pt[pt_idx] & PAGE_COW) {
-             /* CoW Fault! */
-             uint64_t old_phys = pt[pt_idx] & PAGE_ADDR_MASK;
-             uint64_t flags = pt[pt_idx] & ~PAGE_ADDR_MASK;
-
-             /* Check refcount */
-             if (pmm_get_ref_count((void*)old_phys) == 1) {
-                 /* Optimize: If refcount is 1, just make it writable again (we are the last owner) */
-                 pt[pt_idx] &= ~PAGE_COW;
-                 pt[pt_idx] |= PAGE_WRITE;
-             } else {
-                 /* Alloc new page */
-                 void* new_phys = pmm_alloc_page();
-                 if (!new_phys) {
-                     serial_write_string("[VMM] OOM during CoW\n");
-                     return 0;
-                 }
-
-                 /* Copy content */
-                 memcpy(new_phys, (void*)old_phys, PAGE_SIZE);
-
-                 /* Remap */
-                 pt[pt_idx] = (uint64_t)new_phys | (flags & ~PAGE_COW) | PAGE_WRITE;
-
-                 /* Decrement old ref */
-                 pmm_unref_page((void*)old_phys);
-             }
-
-             vmm_flush_tlb_smp(addr);
-             return 1; /* Handled */
-        }
+        return vmm_resolve_cow(addr, pt, pt_idx);
     }
     return 0; /* Not handled */
+}
+
+int vmm_verify_user_access(const void* addr, size_t size, int write) {
+    if (!vmm_validate_user_ptr(addr, size)) return 0;
+
+    uint64_t start = (uint64_t)addr;
+    uint64_t end = start + size;
+    uint64_t start_page = start & ~(PAGE_SIZE - 1);
+    uint64_t end_page = PAGE_ALIGN_UP(end);
+
+    /* Get current PML4 (CR3) */
+    uint64_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    pt_entry_t* pml4_table = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);
+
+    for (uint64_t v = start_page; v < end_page; v += PAGE_SIZE) {
+        uint64_t pml4_idx = PML4_INDEX(v);
+        uint64_t pdpt_idx = PDPT_INDEX(v);
+        uint64_t pd_idx   = PD_INDEX(v);
+        uint64_t pt_idx   = PT_INDEX(v);
+
+        if (!(pml4_table[pml4_idx] & PAGE_PRESENT) || !(pml4_table[pml4_idx] & PAGE_USER)) return 0;
+        pt_entry_t* pdpt = (pt_entry_t*)(pml4_table[pml4_idx] & PAGE_ADDR_MASK);
+
+        if (!(pdpt[pdpt_idx] & PAGE_PRESENT) || !(pdpt[pdpt_idx] & PAGE_USER)) return 0;
+        /* Huge page check omitted */
+        pt_entry_t* pd = (pt_entry_t*)(pdpt[pdpt_idx] & PAGE_ADDR_MASK);
+
+        if (!(pd[pd_idx] & PAGE_PRESENT) || !(pd[pd_idx] & PAGE_USER)) return 0;
+        pt_entry_t* pt = (pt_entry_t*)(pd[pd_idx] & PAGE_ADDR_MASK);
+
+        if (!(pt[pt_idx] & PAGE_PRESENT) || !(pt[pt_idx] & PAGE_USER)) return 0;
+
+        /* Permissions Check */
+        if (write) {
+            if (pt[pt_idx] & PAGE_WRITE) continue;
+
+            /* If not writable, check for CoW */
+            if (pt[pt_idx] & PAGE_COW) {
+                if (!vmm_resolve_cow(v, pt, pt_idx)) return 0;
+            } else {
+                return 0; /* Read-only and not CoW */
+            }
+        }
+    }
+    return 1;
 }
 
 int vmm_is_user_page(uint64_t virt_addr) {

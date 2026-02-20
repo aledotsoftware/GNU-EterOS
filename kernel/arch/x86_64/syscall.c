@@ -200,9 +200,6 @@ static void pipe_open(fs_node_t* node) {
     (void)node;
 }
 
-static int validate_user_buffer(const void* addr, size_t size) {
-    return vmm_validate_user_ptr(addr, size);
-}
 
 static int validate_user_string(const char* str) {
     if (!str) return 0;
@@ -211,13 +208,17 @@ static int validate_user_string(const char* str) {
     if (!vmm_validate_user_ptr(str, 1)) return 0;
 
     /* Scan for null terminator within limit. */
-    /* Ensure we don't cross into non-canonical space (triggering #GP) */
     uint64_t ptr_val = (uint64_t)str;
     uint64_t remaining = USER_LIMIT - ptr_val + 1; /* Bytes until limit (inclusive) */
     uint64_t max_scan = (remaining < 4096) ? remaining : 4096;
 
-    /* We rely on Page Fault Handler to catch unmapped pages during scan. */
     for (uint64_t i = 0; i < max_scan; i++) {
+        /* Check page access for each new page */
+        uint64_t curr_addr = ptr_val + i;
+        if ((i == 0) || ((curr_addr & (PAGE_SIZE - 1)) == 0)) {
+            if (!vmm_verify_user_access((void*)curr_addr, 1, 0)) return 0;
+        }
+
         if (str[i] == '\0') return 1;
     }
     return 0; /* Too long */
@@ -345,7 +346,7 @@ static int64_t sys_socket(int domain, int type, int protocol) {
 }
 
 static int64_t sys_connect(int fd, const struct sockaddr* addr, int addrlen) {
-    if (!validate_user_buffer(addr, addrlen)) return -EFAULT;
+    if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
     if (addrlen < (int)sizeof(struct sockaddr_in)) return -EINVAL;
 
     task_t* current = task_get_current();
@@ -368,7 +369,7 @@ static int64_t sys_connect(int fd, const struct sockaddr* addr, int addrlen) {
 }
 
 static int64_t sys_pipe(int* pipefd) {
-    if (!validate_user_buffer(pipefd, 2 * sizeof(int))) return -EFAULT;
+    if (!vmm_verify_user_access(pipefd, 2 * sizeof(int), 1)) return -EFAULT;
 
     task_t* current = task_get_current();
 
@@ -473,7 +474,7 @@ struct stat {
 };
 
 static int64_t sys_write(int fd, const void* buf, size_t count) {
-    if (!validate_user_buffer(buf, count)) return -EFAULT;
+    if (!vmm_verify_user_access(buf, count, 0)) return -EFAULT;
 
     /* File Descriptor Write */
     task_t* current = task_get_current();
@@ -489,7 +490,7 @@ static int64_t sys_write(int fd, const void* buf, size_t count) {
 }
 
 static int64_t sys_read(int fd, void* buf, size_t count) {
-    if (!validate_user_buffer(buf, count)) return -EFAULT;
+    if (!vmm_verify_user_access(buf, count, 1)) return -EFAULT;
 
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -712,7 +713,7 @@ static int64_t sys_arch_prctl(int code, uint64_t addr) {
 }
 
 static int64_t sys_uname(struct utsname* buf) {
-    if (!validate_user_buffer(buf, sizeof(struct utsname))) return -EFAULT;
+    if (!vmm_verify_user_access(buf, sizeof(struct utsname), 1)) return -EFAULT;
 
     /* Simulate Linux 5.5 */
     strlcpy(buf->sysname, "Linux", 65);
@@ -755,7 +756,7 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
 }
 
 static int64_t sys_fstat(int fd, struct stat* buf) {
-    if (!validate_user_buffer(buf, sizeof(struct stat))) return -EFAULT;
+    if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) return -EFAULT;
 
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -774,7 +775,7 @@ static int64_t sys_fstat(int fd, struct stat* buf) {
 
 static int64_t sys_stat(const char* path, struct stat* buf) {
     if (!validate_user_string(path)) return -EFAULT;
-    if (!validate_user_buffer(buf, sizeof(struct stat))) return -EFAULT;
+    if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) return -EFAULT;
 
     fs_node_t* node = vfs_lookup(fs_root, path);
     if (!node) return -ENOENT;
@@ -843,7 +844,7 @@ static int64_t sys_dup2(int oldfd, int newfd) {
 }
 
 static int64_t sys_bind(int fd, const struct sockaddr* addr, int addrlen) {
-    if (!validate_user_buffer(addr, addrlen)) return -EFAULT;
+    if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
 
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -902,7 +903,7 @@ static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const 
     /* We ignore dest_addr for TCP (SOCK_STREAM) as it's connection based.
        If we supported UDP, we'd use it.
     */
-    if (!validate_user_buffer(buf, len)) return -EFAULT;
+    if (!vmm_verify_user_access(buf, len, 0)) return -EFAULT;
 
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -918,7 +919,7 @@ static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const 
 
 static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr* src_addr, int* addrlen) {
     (void)src_addr; (void)addrlen;
-    if (!validate_user_buffer(buf, len)) return -EFAULT;
+    if (!vmm_verify_user_access(buf, len, 1)) return -EFAULT;
 
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -1132,7 +1133,7 @@ static int64_t sys_execve(const char* path, char* const argv[], char* const envp
 
 static int64_t sys_wait4(int pid, int* status, int options, void* rusage) {
     (void)rusage;
-    if (status && !validate_user_buffer(status, sizeof(int))) return -EFAULT;
+    if (status && !vmm_verify_user_access(status, sizeof(int), 1)) return -EFAULT;
     return task_waitpid(pid, status, options);
 }
 
