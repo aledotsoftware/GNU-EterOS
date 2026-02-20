@@ -23,6 +23,9 @@
 #include <vmm.h>
 #include <fs/initrd.h>
 #include <fs/vfs.h>
+#include <fs/devfs.h>
+#include <fs/procfs.h>
+#include <fs/jfs.h>
 #include <vga.h>
 #include <gfx/gfx.h>
 #include <task.h>
@@ -161,6 +164,14 @@ void __attribute__((section(".text.boot"))) kmain(void) {
             fs_root = initialise_initrd(boot_info->initrd_addr, boot_info->initrd_size);
             if (fs_root) {
                 hal_console_write("[VFS] Initrd mounted at /\n");
+
+                /* Dynamic Mounts */
+                vfs_mkdir("/dev", 0);
+                vfs_mount("/dev", devfs_init());
+                vfs_mkdir("/proc", 0);
+                vfs_mount("/proc", procfs_init());
+                vfs_mkdir("/data", 0);
+                vfs_mount("/data", jfs_init());
 
                 /* List files using VFS */
                 struct dirent entry;

@@ -4,6 +4,15 @@
 
 fs_node_t *fs_root = NULL;
 
+struct mount_point {
+    uint32_t inode;
+    uint32_t impl;
+    fs_node_t *fs;
+    struct mount_point *next;
+};
+
+static struct mount_point *mounts = NULL;
+
 uint32_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     if (node->read != 0) {
         spin_lock(&node->lock);
@@ -57,6 +66,24 @@ fs_node_t *finddir_fs(fs_node_t *node, char *name) {
         spin_lock(&node->lock);
         fs_node_t* ret = node->finddir(node, name);
         spin_unlock(&node->lock);
+
+        if (ret) {
+            /* Check for mount points */
+            struct mount_point *m = mounts;
+            while (m) {
+                 if (m->inode == ret->inode && m->impl == ret->impl) {
+                     kfree(ret);
+                     fs_node_t* clone = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+                     if (!clone) return NULL;
+                     memcpy(clone, m->fs, sizeof(fs_node_t));
+                     clone->ref_count = 1;
+                     /* Inherit name from mount point? usually mount root has its own name e.g. "dev" */
+                     /* But we are looking up "dev" in parent, so returning devfs root which is named "dev" matches. */
+                     return clone;
+                 }
+                 m = m->next;
+            }
+        }
         return ret;
     }
     return 0;
@@ -88,6 +115,70 @@ int ioctl_fs(fs_node_t *node, int request, void *arg) {
         return ret;
     }
     return -1;
+}
+
+int vfs_mount(const char *path, fs_node_t *fs) {
+    if (!path || !fs) return -1;
+
+    fs_node_t *node = vfs_lookup(fs_root, path);
+    if (!node) return -1;
+
+    struct mount_point *mp = (struct mount_point*)kmalloc(sizeof(struct mount_point));
+    if (!mp) {
+        kfree(node);
+        return -2;
+    }
+
+    mp->inode = node->inode;
+    mp->impl = node->impl;
+    mp->fs = fs;
+    mp->next = mounts;
+    mounts = mp;
+
+    kfree(node);
+    return 0;
+}
+
+int vfs_mkdir(const char *path, uint16_t permission) {
+    if (!path) return -1;
+
+    char parent_path[128];
+    char name[128];
+    int len = strlen(path);
+    int last_slash = -1;
+
+    /* Find last slash */
+    for (int i = 0; i < len; i++) {
+        if (path[i] == '/') last_slash = i;
+    }
+
+    if (last_slash == -1) {
+        /* No slash? If relative paths not supported, fail.
+           But if we assume relative to root if only name given?
+           Usually syscalls handle CWD. VFS here seems absolute.
+           Lets assume invalid if no slash for now unless we default to root. */
+           return -1;
+    }
+
+    /* Split path */
+    if (last_slash == 0) {
+        /* "/name" */
+        strlcpy(parent_path, "/", sizeof(parent_path));
+        strlcpy(name, path + 1, sizeof(name));
+    } else {
+        /* "/path/to/name" */
+        if (last_slash >= 127) return -1;
+        memcpy(parent_path, path, last_slash);
+        parent_path[last_slash] = '\0';
+        strlcpy(name, path + last_slash + 1, sizeof(name));
+    }
+
+    fs_node_t *parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) return -1;
+
+    int ret = mkdir_fs(parent, name, permission);
+    kfree(parent);
+    return ret;
 }
 
 extern fs_node_t* tty_create_node(void);
