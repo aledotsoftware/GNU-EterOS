@@ -83,7 +83,7 @@ function spawnSettings() {
                             <span>Tema Global</span>
                             <p style="font-size: 11px; opacity: 0.5;">Cambia el aspecto de todo el sistema.</p>
                         </div>
-                        <select style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; cursor: pointer;">
+                        <select aria-label="Tema Global" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; cursor: pointer;">
                             <option>Oscuro Profundo (Default)</option>
                             <option>Gris Espacial</option>
                             <option>Azul Medianoche</option>
@@ -107,7 +107,7 @@ function spawnSettings() {
                             <span>Modo Tableta Dinámico</span>
                             <p style="font-size: 11px; opacity: 0.5;">Optimiza los controles para touch automáticamente.</p>
                         </div>
-                        <input type="checkbox" checked style="width: 20px; height: 20px; accent-color: var(--accent);">
+                        <input type="checkbox" checked aria-label="Modo Tableta Dinámico" style="width: 20px; height: 20px; accent-color: var(--accent);">
                     </div>
                     <div class="settings-item">
                         <span>Núcleo Linux (Eter-Core)</span>
@@ -125,7 +125,7 @@ function spawnSettings() {
                     <h3>Multidispotivo</h3>
                     <div class="settings-item">
                         <span>Eter-Drop (Airdrop clone)</span>
-                        <input type="checkbox" checked>
+                        <input type="checkbox" checked aria-label="Eter-Drop (Airdrop clone)">
                     </div>
                 </div>
             </div>
@@ -382,6 +382,10 @@ function spawnApp(name, type, customContent = null) {
     `;
 
     workspace.appendChild(win);
+
+    // Focus management for accessibility
+    win.setAttribute('tabindex', '-1');
+    win.focus();
 
     // Simple drag logic (basic concept)
     makeDraggable(win);

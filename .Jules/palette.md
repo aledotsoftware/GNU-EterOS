@@ -41,3 +41,7 @@
 ## 2026-12-05 - [Focus Management in Web-based OS]
 **Learning:** Standard web focus flow (tabbing sequentially) breaks the illusion of a desktop environment. Explicitly managing focus (e.g., auto-focusing menu items on open, handling Escape to return focus) is critical to make the interface feel like an OS, not just a webpage.
 **Action:** Always implement explicit focus entry/exit logic for overlay components (menus, windows, launchers).
+
+## 2025-02-18 - [Dynamic Content Accessibility]
+**Learning:** Dynamically injected HTML content (like settings forms) often bypasses static accessibility reviews. Inputs generated via string templates can easily miss labels, rendering them invisible to screen readers despite visual clarity.
+**Action:** Always verify `aria-label` or `id/for` associations when constructing HTML strings in JavaScript.
