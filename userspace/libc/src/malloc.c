@@ -1,117 +1,183 @@
-/**
- * éterOS Mini-LibC - Memory Allocation (malloc/free)
- * Simple brk-based allocator (musl-compatible interface)
- */
-
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
-#include <sys/syscall.h>
+#include <stdint.h>
+#include <errno.h>
 
-/* Internal brk syscall */
-static inline long syscall1_brk(long n, long a1) {
-    long ret;
-    __asm__ volatile ("syscall" : "=a"(ret) : "a"(n), "D"(a1) : "rcx", "r11", "memory");
-    return ret;
-}
+#define ALIGNMENT 16
+#define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
+#define BLOCK_SIZE ALIGN(sizeof(block_t))
 
-/* Simple block header */
 typedef struct block {
-    uint64_t size;       /* Size of the data area */
-    int      free;       /* Is this block free? */
-    struct block *next;  /* Next block in the list */
+    size_t size;
+    struct block *next;
+    struct block *prev;
+    int free;
+    int padding; // explicit padding to ensure sizeof is multiple of 16
 } block_t;
 
-#define BLOCK_SIZE sizeof(block_t)
-#define ALIGN(x) (((x) + 15) & ~15)  /* 16-byte alignment */
+// sizeof(block_t) is 8+8+8+4+4 = 32 bytes.
+// ALIGN(32) = 32.
 
-static block_t *free_list = (void*)0;
-static uint64_t current_brk = 0;
+static block_t *heap_start = NULL;
 
-static uint64_t get_brk(void) {
-    return (uint64_t)syscall1_brk(SYS_brk, 0);
-}
-
-static uint64_t set_brk(uint64_t new_brk) {
-    return (uint64_t)syscall1_brk(SYS_brk, (long)new_brk);
-}
-
-static block_t *find_free_block(uint64_t size) {
-    block_t *curr = free_list;
-    while (curr) {
-        if (curr->free && curr->size >= size) return curr;
-        curr = curr->next;
+static block_t *find_free_block(block_t **last, size_t size) {
+    block_t *current = heap_start;
+    while (current) {
+        if (current->free && current->size >= size) {
+            return current;
+        }
+        *last = current;
+        current = current->next;
     }
-    return (void*)0;
+    return NULL;
 }
 
-static block_t *request_space(uint64_t size) {
-    if (current_brk == 0) {
-        current_brk = get_brk();
-        if (current_brk == 0) current_brk = 0x400000; /* Fallback */
+static block_t *request_space(block_t *last, size_t size) {
+    block_t *block;
+    block = sbrk(0);
+    void *request = sbrk(size + BLOCK_SIZE);
+
+    if (request == (void*) -1) {
+        return NULL; // sbrk failed
     }
 
-    uint64_t total = BLOCK_SIZE + size;
-    uint64_t new_brk = current_brk + total;
-    uint64_t result = set_brk(new_brk);
+    if (last) {
+        last->next = block;
+    }
 
-    if (result < new_brk) return (void*)0; /* Failed */
-
-    block_t *block = (block_t *)current_brk;
     block->size = size;
+    block->next = NULL;
+    block->prev = last;
     block->free = 0;
-    block->next = (void*)0;
-    current_brk = new_brk;
 
     return block;
 }
 
+static void split_block(block_t *block, size_t size) {
+    // block->size is the size of data (excluding header).
+    // we want to split if remaining space is enough for another header + min data.
+    if (block->size >= size + BLOCK_SIZE + ALIGNMENT) {
+        block_t *new_block = (block_t *)((uint8_t*)block + BLOCK_SIZE + size);
+
+        new_block->size = block->size - size - BLOCK_SIZE;
+        new_block->next = block->next;
+        new_block->prev = block;
+        new_block->free = 1;
+
+        if (new_block->next) {
+            new_block->next->prev = new_block;
+        }
+
+        block->size = size;
+        block->next = new_block;
+    }
+}
+
+static void coalesce_block(block_t *block) {
+    if (block->next && block->next->free) {
+        block->size += BLOCK_SIZE + block->next->size;
+        block->next = block->next->next;
+        if (block->next) {
+            block->next->prev = block;
+        }
+    }
+
+    if (block->prev && block->prev->free) {
+        block->prev->size += BLOCK_SIZE + block->size;
+        block->prev->next = block->next;
+        if (block->next) {
+            block->next->prev = block->prev;
+        }
+        // block is now merged into prev.
+    }
+}
+
 void *malloc(size_t size) {
-    if (size == 0) return (void*)0;
+    block_t *block;
+
+    if (size <= 0) {
+        return NULL;
+    }
+
     size = ALIGN(size);
 
-    block_t *block = find_free_block(size);
-    if (block) {
-        block->free = 0;
-        return (void *)((uint8_t *)block + BLOCK_SIZE);
-    }
-
-    block = request_space(size);
-    if (!block) return (void*)0;
-
-    /* Add to list */
-    if (!free_list) {
-        free_list = block;
+    if (!heap_start) {
+        block = request_space(NULL, size);
+        if (!block) {
+            return NULL;
+        }
+        heap_start = block;
     } else {
-        block_t *curr = free_list;
-        while (curr->next) curr = curr->next;
-        curr->next = block;
+        block_t *last = heap_start;
+        block = find_free_block(&last, size);
+        if (!block) {
+            block = request_space(last, size);
+            if (!block) {
+                return NULL;
+            }
+        } else {
+            block->free = 0;
+            split_block(block, size);
+        }
     }
 
-    return (void *)((uint8_t *)block + BLOCK_SIZE);
+    return (void *)((uint8_t*)block + BLOCK_SIZE);
 }
 
 void free(void *ptr) {
-    if (!ptr) return;
-    block_t *block = (block_t *)((uint8_t *)ptr - BLOCK_SIZE);
+    if (!ptr) {
+        return;
+    }
+
+    block_t *block = (block_t*)((uint8_t*)ptr - BLOCK_SIZE);
     block->free = 1;
+
+    coalesce_block(block);
 }
 
-void *calloc(size_t nmemb, size_t size) {
-    size_t total = nmemb * size;
-    void *ptr = malloc(total);
-    if (ptr) memset(ptr, 0, total);
+void *calloc(size_t nelem, size_t elsize) {
+    size_t size = nelem * elsize;
+    void *ptr = malloc(size);
+    if (ptr) {
+        memset(ptr, 0, size);
+    }
     return ptr;
 }
 
 void *realloc(void *ptr, size_t size) {
-    if (!ptr) return malloc(size);
-    if (size == 0) { free(ptr); return (void*)0; }
+    if (!ptr) {
+        return malloc(size);
+    }
 
-    block_t *block = (block_t *)((uint8_t *)ptr - BLOCK_SIZE);
-    if (block->size >= size) return ptr;
+    if (size == 0) {
+        free(ptr);
+        return NULL;
+    }
+
+    size = ALIGN(size);
+    block_t *block = (block_t*)((uint8_t*)ptr - BLOCK_SIZE);
+
+    if (block->size >= size) {
+        split_block(block, size); // Attempt to recover unused space
+        return ptr;
+    }
+
+    // Attempt to merge with next block if free and sufficient
+    if (block->next && block->next->free && (block->size + BLOCK_SIZE + block->next->size >= size)) {
+        block->size += BLOCK_SIZE + block->next->size;
+        block->next = block->next->next;
+        if (block->next) block->next->prev = block;
+
+        split_block(block, size);
+        return ptr;
+    }
 
     void *new_ptr = malloc(size);
-    if (!new_ptr) return (void*)0;
+    if (!new_ptr) {
+        return NULL;
+    }
+
     memcpy(new_ptr, ptr, block->size);
     free(ptr);
     return new_ptr;

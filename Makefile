@@ -317,6 +317,7 @@ userspace:
 	@mkdir -p $(INITRD_DIR)
 	cp userspace/test.elf $(INITRD_DIR)/
 	cp userspace/exec_test.elf $(INITRD_DIR)/
+	cp userspace/test_libc_advanced.elf $(INITRD_DIR)/
 
 # ---- Initrd ----
 initrd: userspace $(INITRD_IMG)
