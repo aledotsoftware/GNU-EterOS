@@ -13,6 +13,12 @@ typedef struct {
     uint32_t count;
 } __attribute__((packed)) initrd_header_t;
 
+typedef struct initrd_dir {
+    char name[128];
+    uint32_t inode;
+    struct initrd_dir *next;
+} initrd_dir_t;
+
 /* Global state */
 static uint8_t* initrd_start = NULL;
 static uint32_t initrd_image_size = 0;
@@ -20,8 +26,18 @@ static uint32_t file_count = 0;
 static initrd_file_header_t* file_headers = NULL;
 static fs_node_t *initrd_root = NULL;             /* The root directory node */
 
-static fs_node_t *devfs_root_node = NULL;
-static fs_node_t *procfs_root_node = NULL;
+static initrd_dir_t *virtual_dirs = NULL;
+static uint32_t virtual_dirs_count = 0;
+
+/* Virtual Dir Helper */
+static initrd_dir_t* find_virtual_dir(const char* name) {
+    initrd_dir_t* current = virtual_dirs;
+    while (current) {
+        if (strcmp(current->name, (char*)name) == 0) return current;
+        current = current->next;
+    }
+    return NULL;
+}
 
 uint32_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     initrd_file_header_t header = file_headers[node->inode];
@@ -52,25 +68,21 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     if (node != initrd_root)
         return -1;
 
-    /* Virtual entries */
-    if (index == 0) {
-        strlcpy(entry->name, "dev", sizeof(entry->name));
-        entry->inode = 0;
-        return 0;
-    }
-    if (index == 1) {
-        strlcpy(entry->name, "proc", sizeof(entry->name));
-        entry->inode = 0;
-        return 0;
-    }
-    if (index == 2) {
-        strlcpy(entry->name, "sys", sizeof(entry->name));
-        entry->inode = 0;
-        return 0;
+    /* Virtual entries from dynamic list */
+    if (index < virtual_dirs_count) {
+        initrd_dir_t* current = virtual_dirs;
+        for (uint32_t i = 0; i < index; i++) {
+            if (current) current = current->next;
+        }
+        if (current) {
+            strlcpy(entry->name, current->name, sizeof(entry->name));
+            entry->inode = current->inode;
+            return 0;
+        }
     }
 
-    /* Initrd files (offset by 3) */
-    uint32_t file_index = index - 3;
+    /* Initrd files (offset by virtual_dirs_count) */
+    uint32_t file_index = index - virtual_dirs_count;
 
     if (file_index >= file_count)
         return 1; /* EOF */
@@ -85,41 +97,44 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     return 0;
 }
 
+int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
+    (void)parent; (void)permission;
+
+    if (find_virtual_dir(name)) return -1; /* Already exists */
+
+    /* Check conflicts with real files */
+    for (uint32_t i = 0; i < file_count; i++) {
+        if (strncmp(file_headers[i].name, name, sizeof(file_headers[i].name)) == 0) return -1;
+    }
+
+    initrd_dir_t *new_dir = (initrd_dir_t*)kmalloc(sizeof(initrd_dir_t));
+    if (!new_dir) return -2;
+
+    strlcpy(new_dir->name, name, sizeof(new_dir->name));
+    /* Assign generic inode high up to avoid collision with file indices */
+    new_dir->inode = 0xF0000000 + virtual_dirs_count;
+    new_dir->next = virtual_dirs;
+    virtual_dirs = new_dir;
+    virtual_dirs_count++;
+
+    return 0;
+}
+
 fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
     if (node != initrd_root)
         return 0;
 
     /* Check for virtual directories */
-    if (strcmp(name, "dev") == 0) {
-        if (devfs_root_node) {
-            fs_node_t* copy = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-            if (copy) {
-                memcpy(copy, devfs_root_node, sizeof(fs_node_t));
-                copy->ref_count = 1;
-            }
-            return copy;
-        }
-        return 0;
-    }
-    if (strcmp(name, "proc") == 0) {
-        if (procfs_root_node) {
-            fs_node_t* copy = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-            if (copy) {
-                memcpy(copy, procfs_root_node, sizeof(fs_node_t));
-                copy->ref_count = 1;
-            }
-            return copy;
-        }
-        return 0;
-    }
-    if (strcmp(name, "sys") == 0) {
-        /* Placeholder for sysfs */
+    initrd_dir_t* vdir = find_virtual_dir(name);
+    if (vdir) {
         fs_node_t* fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
         if (!fnode) return 0;
         memset(fnode, 0, sizeof(fs_node_t));
         fnode->ref_count = 1;
-        strlcpy(fnode->name, "sys", sizeof(fnode->name));
+        strlcpy(fnode->name, vdir->name, sizeof(fnode->name));
+        fnode->inode = vdir->inode;
         fnode->flags = FS_DIRECTORY;
+        /* No ops for virtual dir, it's just a placeholder for mounting */
         return fnode;
     }
 
@@ -198,9 +213,7 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     hal_console_write(count_buf);
     hal_console_write(" files.\n");
 
-    /* Initialize Virtual Filesystems */
-    devfs_root_node = devfs_init();
-    procfs_root_node = procfs_init();
+    /* Initialize Virtual Filesystems - REMOVED global init here, done in main */
 
     initrd_root = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!initrd_root) {
@@ -218,6 +231,7 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     initrd_root->close = 0;
     initrd_root->readdir = &initrd_readdir;
     initrd_root->finddir = &initrd_finddir;
+    initrd_root->mkdir = &initrd_mkdir;
     initrd_root->ptr = 0;
     initrd_root->impl = 0;
 

@@ -89,15 +89,15 @@ void test_initrd_readdir_leak() {
     fs_node_t* root = initialise_initrd((uint64_t)image, sizeof(image));
     assert(root != NULL);
 
-    // Call readdir for File 1 (index 3, since 0,1,2 are dev, proc, sys)
-    // index 3 -> file_headers[0] -> file1
+    // Call readdir for File 1 (index 0, since virtual dirs are now dynamic and start empty)
+    // index 0 -> file_headers[0] -> file1
     struct dirent entry;
     memset(&entry, 0, sizeof(entry));
 
     // readdir_fs calls initrd_readdir
     // We call initrd_readdir directly to avoid linking vfs.c
-    // int ret = readdir_fs(root, 3, &entry);
-    int ret = initrd_readdir(root, 3, &entry);
+    // int ret = readdir_fs(root, 0, &entry);
+    int ret = initrd_readdir(root, 0, &entry);
 
     // If successful (0), check name
     if (ret != 0) {
