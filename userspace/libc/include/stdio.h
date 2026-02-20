@@ -11,6 +11,10 @@
 typedef struct _IO_FILE FILE;
 typedef uint64_t size_t;
 
+extern FILE *stdin;
+extern FILE *stdout;
+extern FILE *stderr;
+
 /* Very basic printf support */
 int printf(const char *format, ...);
 int dprintf(int fd, const char *format, ...);

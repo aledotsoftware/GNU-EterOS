@@ -204,10 +204,15 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
     /* ---- 8. Lanzar shell interactivo ---- */
     hal_interrupts_enable();
-    shell_run();  /* Nunca retorna (tarea 0 del kernel) */
 
-    /* Si por alguna razón retorna, halt */
-    kernel_halt();
+    /* We now use userspace shell launched by UserLoader */
+    /* shell_run(); */
+
+    /* Main kernel task becomes Idle loop */
+    while(1) {
+        hal_cpu_halt();
+        task_yield();
+    }
 }
 
 /* ========================================================================= */
