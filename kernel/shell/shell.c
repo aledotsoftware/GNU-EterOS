@@ -86,7 +86,7 @@ void shell_run(void) {
                 terminal_putchar('\b');
             }
 
-        } else if ((unsigned char)c == KEY_UP) {
+        } else if ((unsigned char)c == KB_KEY_UP) {
             /* ---- Flecha Arriba: historial anterior ---- */
             unsigned int count = shell_history_count();
             if (count > 0 && history_nav_idx > 0) {
@@ -95,7 +95,7 @@ void shell_run(void) {
                 if (entry) shell_replace_line(input, &pos, entry);
             }
 
-        } else if ((unsigned char)c == KEY_DOWN) {
+        } else if ((unsigned char)c == KB_KEY_DOWN) {
             /* ---- Flecha Abajo: historial siguiente ---- */
             unsigned int count = shell_history_count();
             if (history_nav_idx + 1 < count) {

@@ -1,0 +1,1205 @@
+[CC]   kernel/apps/user_loader.c
+cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/apps/user_loader.c -o build/kernel/apps/user_loader.o
+[LD]   Enlazando kernel...
+ld -T boot/x86_64/linker.ld -nostdlib -o build/kernel.elf build/kernel/main.o build/kernel/klog.o build/kernel/string.o build/kernel/stdio.o build/kernel/futex.o build/kernel/sem.o build/kernel/shell/shell.o build/kernel/shell/commands.o build/kernel/shell/history.o build/kernel/shell/cmd_system.o build/kernel/shell/cmd_net.o build/kernel/shell/cmd_task.o build/kernel/shell/cmd_misc.o build/kernel/drivers/video/vga.o build/kernel/drivers/serial/serial.o build/kernel/drivers/input/keyboard.o build/kernel/drivers/tty.o build/kernel/arch/x86_64/hal_impl.o build/kernel/arch/x86_64/idt.o build/kernel/arch/x86_64/pic.o build/kernel/drivers/timer/pit.o build/kernel/drivers/rtc/rtc.o build/kernel/arch/x86_64/boot/nvram.o build/kernel/mm/heap.o build/kernel/apps/santitravel.o build/kernel/apps/sysmon.o build/kernel/apps/user_loader.o build/kernel/drivers/pci/pci.o build/kernel/fs/initrd.o build/kernel/fs/vfs.o build/kernel/fs/bcache.o build/kernel/fs/devfs.o build/kernel/fs/procfs.o build/kernel/task.o build/kernel/drivers/video/framebuffer.o build/kernel/drivers/video/font.o build/kernel/gfx/gfx.o build/kernel/mm/pmm.o build/kernel/mm/vmm.o build/kernel/drivers/input/mouse.o build/kernel/arch/x86_64/gdt.o build/kernel/arch/x86_64/acpi.o build/kernel/arch/x86_64/smp.o build/kernel/arch/x86_64/pat.o build/kernel/arch/x86_64/apic.o build/kernel/arch/x86_64/syscall.o build/kernel/drivers/disk/partition.o build/kernel/fs/elf.o build/kernel/drivers/net/e1000.o build/kernel/apps/wget.o build/kernel/arch/x86_64/context_switch.o build/kernel/arch/x86_64/gdt_flush.o build/kernel/arch/x86_64/interrupts.o build/kernel/arch/x86_64/syscall_entry.o build/kernel/arch/x86_64/trampoline.o build/kernel/arch/x86_64/smp_trampoline_wrapper.o build/kernel/arch/x86_64/user_mode.o build/kernel/arch/x86_64/user_payload.o build/libnet.a
+ld: warning: build/kernel/arch/x86_64/user_payload.o: missing .note.GNU-stack section implies executable stack
+ld: NOTE: This behaviour is deprecated and will be removed in a future version of the linker
+[BIN]  Extrayendo binario del kernel...
+objcopy -O binary build/kernel.elf build/kernel.bin
+[INFO] Tamaño del kernel: 83560 bytes
+[ASM]  boot/x86_64/boot.asm (Dynamic Sectors)
+Detected: Kernel=164 sectors, Initrd=117 sectors
+[USER] Compilando userspace...
+make -C userspace
+make[1]: Entering directory '/app/userspace'
+make[1]: Nothing to be done for 'all'.
+make[1]: Leaving directory '/app/userspace'
+cp userspace/test.elf initrd_root/
+cp userspace/exec_test.elf initrd_root/
+cp userspace/test_libc_advanced.elf initrd_root/
+[IMG]  Generando imagen de disco...
+dd if=/dev/zero of=build/eteros.img bs=512 count=2880 2>/dev/null
+dd if=build/boot.bin of=build/eteros.img bs=512 conv=notrunc 2>/dev/null
+Writing Initrd at sector 181 (Boot=17, Kernel=164)
+[IMG]  Imagen generada: build/eteros.img (1474560 bytes)
+
+================================================
+  eterOS construido exitosamente! (ARCH=x86_64)
+  Imagen: build/eteros.img
+  Ejecutar: make run
+================================================
+
+[QEMU] Iniciando eterOS (modo texto)...
+qemu-system-x86_64 -drive format=raw,file=build/eteros.img,index=0,if=ide,media=disk \
+        -serial mon:stdio                             \
+        -m 128M                                       \
+        -nographic                                    \
+        -no-reboot                                    \
+        -no-shutdown
+c[?7l[2J[0mSeaBIOS (version 1.16.3-debian-1.16.3-2)
+
+
+iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+06FCAF60+06F0AF60 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...
+
+
+Booting from Hard Disk...
+[eterOS] Bootloader Stage 1
+  Cargando Stage 2... OK
+[eterOS] Stage 2 activo
+  Cargando Kernel...   Long Mode: Soportado
+  Memoria detectada (E820)
+  Cargando Kernel...   Cargando Initrd...   Configurando VBE 1024x768...[01;11H[01;23H[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[PMM] OOM! No more physical pages.
+[VMM] Error: OOM, no se pudo alocar tabla de paginacion
+[FB] LFB Address: 0x mapped to 0x0xFFFFFFFFE0000000
+qemu-system-x86_64: terminating on signal 15 from pid 7570 (timeout)

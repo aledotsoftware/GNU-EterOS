@@ -138,6 +138,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/video/vga.c  \
               $(KERNEL_DIR)/drivers/serial/serial.c \
               $(KERNEL_DIR)/drivers/input/keyboard.c \
+              $(KERNEL_DIR)/drivers/input/input.c  \
               $(KERNEL_DIR)/drivers/tty.c \
               $(KERNEL_DIR)/arch/x86_64/hal_impl.c \
               $(KERNEL_DIR)/arch/x86_64/idt.c    \
@@ -155,6 +156,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/fs/bcache.c            \
               $(KERNEL_DIR)/fs/devfs.c             \
               $(KERNEL_DIR)/fs/procfs.c            \
+              $(KERNEL_DIR)/fs/jfs.c               \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
@@ -317,7 +319,7 @@ userspace:
 	@mkdir -p $(INITRD_DIR)
 	cp userspace/test.elf $(INITRD_DIR)/
 	cp userspace/exec_test.elf $(INITRD_DIR)/
-	cp userspace/test_security.elf $(INITRD_DIR)/
+	cp userspace/test_libc_advanced.elf $(INITRD_DIR)/
 
 # ---- Initrd ----
 initrd: userspace $(INITRD_IMG)

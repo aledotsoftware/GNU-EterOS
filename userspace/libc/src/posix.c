@@ -135,8 +135,9 @@ void *brk(void *addr) {
 void *sbrk(int64_t increment) {
     long current = _syscall1(SYS_brk, 0);
     if (increment == 0) return (void*)current;
-    long new_brk = _syscall1(SYS_brk, current + increment);
-    if (new_brk < current + increment) {
+    long requested = current + increment;
+    long new_brk = _syscall1(SYS_brk, requested);
+    if (new_brk != requested) {
         errno = ENOMEM;
         return (void*)-1;
     }

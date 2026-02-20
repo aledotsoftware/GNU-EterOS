@@ -73,6 +73,9 @@ int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission);
 int unlink_fs(fs_node_t *parent, char *name);
 int ioctl_fs(fs_node_t *node, int request, void *arg);
 
+int vfs_mount(const char *path, fs_node_t *fs);
+int vfs_mkdir(const char *path, uint16_t permission);
+
 /**
  * Resolves a path to a filesystem node.
  *
