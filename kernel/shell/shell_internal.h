@@ -34,5 +34,6 @@ void cmd_demo(const char* args);
 void cmd_date(const char* args);
 void cmd_usermode(const char* args);
 void cmd_wget(const char* args);
+void cmd_test_compositor(const char* args);
 
 #endif

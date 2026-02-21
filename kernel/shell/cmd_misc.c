@@ -3,6 +3,8 @@
 #include "../../include/pmm.h"
 #include "../../include/pci.h"
 #include "../../include/string.h"
+#include <gfx/window.h>
+#include <hal.h>
 
 void cmd_echo(const char* args) {
     terminal_write_string(args);
@@ -55,4 +57,60 @@ void cmd_lspci(const char* args) {
 void cmd_clear(const char* args) {
     (void)args;
     terminal_initialize(NULL);
+}
+
+void cmd_test_compositor(const char* args) {
+    (void)args;
+    terminal_write_string("Testing Basic Compositor...\n");
+
+    compositor_init();
+
+    /* Create Window 1 (Red) */
+    window_t* w1 = window_create(50, 50, 200, 150, WIN_VISIBLE);
+    if (!w1) {
+        terminal_write_string("Failed to create Window 1\n");
+        return;
+    }
+
+    /* Fill Buffer Red */
+    for (int i = 0; i < 200*150; i++) w1->buffer[i] = 0xFFFF0000;
+
+    compositor_add_window(w1);
+
+    /* Create Window 2 (Green, overlapping) */
+    window_t* w2 = window_create(150, 100, 200, 150, WIN_VISIBLE);
+    if (!w2) {
+        terminal_write_string("Failed to create Window 2\n");
+        return;
+    }
+
+    /* Fill Buffer Green */
+    for (int i = 0; i < 200*150; i++) w2->buffer[i] = 0xFF00FF00;
+
+    compositor_add_window(w2); /* w2 is now on top */
+
+    /* Create Window 3 (Blue with transparency hole) */
+    window_t* w3 = window_create(100, 200, 100, 100, WIN_VISIBLE);
+    if (!w3) {
+        terminal_write_string("Failed to create Window 3\n");
+        return;
+    }
+
+    /* Fill Buffer Blue, but center transparent */
+    for (int y = 0; y < 100; y++) {
+        for (int x = 0; x < 100; x++) {
+            if (x > 25 && x < 75 && y > 25 && y < 75) {
+                w3->buffer[y*100 + x] = 0x00000000; /* Transparent */
+            } else {
+                w3->buffer[y*100 + x] = 0xFF0000FF;
+            }
+        }
+    }
+
+    compositor_add_window(w3);
+
+    terminal_write_string("Rendering...\n");
+    compositor_render();
+
+    terminal_write_string("Check screen. Windows should be visible.\n");
 }

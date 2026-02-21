@@ -61,12 +61,45 @@ void test_networking() {
     printf("[TEST] Socket closed.\n");
 }
 
+void test_mouse() {
+    printf("[TEST] Testing Mouse Input (/dev/input/mouse0)...\n");
+    int fd = open("/dev/input/mouse0", O_RDONLY);
+    if (fd < 0) {
+        printf("[TEST] Error: open(/dev/input/mouse0) failed. Errno: %d\n", errno);
+        return;
+    }
+    printf("[TEST] open() success. FD: %d. Reading 5 events (move mouse now!)...\n", fd);
+
+    /* Local definition to match kernel structure */
+    typedef struct {
+        unsigned short type;
+        unsigned short code;
+        int  value;
+    } input_event_t;
+
+    input_event_t ev;
+    for (int i = 0; i < 5; i++) {
+        int n = read(fd, &ev, sizeof(ev));
+        if (n < 0) {
+            printf("[TEST] read error: %d\n", errno);
+            break;
+        }
+        if (n == 0) {
+            printf("[TEST] EOF?\n");
+            break;
+        }
+        printf("[MOUSE] Type: %d, Code: %d, Value: %d\n", ev.type, ev.code, ev.value);
+    }
+    close(fd);
+}
+
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
     printf("userspace test starting...\n");
 
     test_fork_exec();
     test_networking();
+    test_mouse();
 
     // Original test code preserved if needed, or simplified
     printf("Test complete.\n");

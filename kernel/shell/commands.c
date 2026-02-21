@@ -41,6 +41,7 @@ static const shell_command_t commands[] = {
     { "date",     "Muestra fecha y hora (UTC / Argentina)",      cmd_date    },
     { "reboot",   "Reinicia el sistema",                         cmd_reboot  },
     { "halt",     "Detiene la CPU",                              cmd_halt    },
+    { "test_compositor", "Test Basic Compositor",                cmd_test_compositor },
 };
 
 #define NUM_COMMANDS  (sizeof(commands) / sizeof(commands[0]))

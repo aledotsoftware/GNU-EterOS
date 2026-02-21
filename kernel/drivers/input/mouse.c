@@ -178,22 +178,22 @@ void mouse_process_byte(uint8_t byte) {
         }
 
         /* Report to Input System */
-        if (dx != 0) input_push(EV_REL, REL_X, dx);
-        if (dy != 0) input_push(EV_REL, REL_Y, -dy); /* Invert Y */
+        if (dx != 0) input_mouse_push(EV_REL, REL_X, dx);
+        if (dy != 0) input_mouse_push(EV_REL, REL_Y, -dy); /* Invert Y */
 
         uint8_t buttons = status & 0x07;
 
         if ((buttons & 1) != (prev_buttons & 1))
-            input_push(EV_KEY, BTN_LEFT, (buttons & 1));
+            input_mouse_push(EV_KEY, BTN_LEFT, (buttons & 1));
 
         if ((buttons & 2) != (prev_buttons & 2))
-            input_push(EV_KEY, BTN_RIGHT, (buttons & 2) ? 1 : 0);
+            input_mouse_push(EV_KEY, BTN_RIGHT, (buttons & 2) ? 1 : 0);
 
         if ((buttons & 4) != (prev_buttons & 4))
-            input_push(EV_KEY, BTN_MIDDLE, (buttons & 4) ? 1 : 0);
+            input_mouse_push(EV_KEY, BTN_MIDDLE, (buttons & 4) ? 1 : 0);
 
         prev_buttons = buttons;
-        input_push(EV_SYN, 0, 0);
+        input_mouse_push(EV_SYN, 0, 0);
 
         /* Notificar callback */
         if (active_callback) {

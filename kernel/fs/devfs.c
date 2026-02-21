@@ -59,9 +59,9 @@ static uint32_t dev_tty_write(fs_node_t *node, uint32_t offset, uint32_t size, u
 }
 
 /* ========================================================================= */
-/* /dev/input Implementation                                                 */
+/* /dev/input/event0 (Aggregate) Implementation                              */
 /* ========================================================================= */
-static uint32_t dev_input_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static uint32_t dev_event_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
 
     if (size < sizeof(input_event_t)) return 0;
@@ -71,6 +71,64 @@ static uint32_t dev_input_read(fs_node_t *node, uint32_t offset, uint32_t size, 
 
     return read * sizeof(input_event_t);
 }
+
+/* ========================================================================= */
+/* /dev/input/mouse0 Implementation                                          */
+/* ========================================================================= */
+static uint32_t dev_mouse_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset;
+
+    if (size < sizeof(input_event_t)) return 0;
+
+    int count = size / sizeof(input_event_t);
+    int read = input_read_mouse((input_event_t*)buffer, count);
+
+    return read * sizeof(input_event_t);
+}
+
+/* ========================================================================= */
+/* /dev/input Directory Implementation                                       */
+/* ========================================================================= */
+static int devfs_input_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
+    (void)node;
+    if (index == 0) {
+        strlcpy(entry->name, "event0", sizeof(entry->name));
+        entry->inode = 7; /* Arbitrary unique inode */
+        return 0;
+    }
+    if (index == 1) {
+        strlcpy(entry->name, "mouse0", sizeof(entry->name));
+        entry->inode = 6; /* Arbitrary unique inode */
+        return 0;
+    }
+    return 1; /* EOF */
+}
+
+static fs_node_t *devfs_input_finddir(fs_node_t *node, char *name) {
+    (void)node;
+    if (!name) return 0;
+
+    fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!fnode) return 0;
+    memset(fnode, 0, sizeof(fs_node_t));
+    fnode->ref_count = 1;
+    fnode->flags = FS_CHARDEVICE;
+
+    if (strcmp(name, "event0") == 0) {
+        strlcpy(fnode->name, "event0", sizeof(fnode->name));
+        fnode->read = dev_event_read;
+        fnode->inode = 7;
+    } else if (strcmp(name, "mouse0") == 0) {
+        strlcpy(fnode->name, "mouse0", sizeof(fnode->name));
+        fnode->read = dev_mouse_read;
+        fnode->inode = 6;
+    } else {
+        kfree(fnode);
+        return 0;
+    }
+    return fnode;
+}
+
 
 /* ========================================================================= */
 /* /dev/random & /dev/urandom Implementation                                 */
@@ -186,8 +244,11 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->inode = 4;
     } else if (strcmp(name, "input") == 0) {
         strlcpy(fnode->name, "input", sizeof(fnode->name));
-        fnode->read = dev_input_read;
-        fnode->write = NULL;
+        /* Change from FS_CHARDEVICE to FS_DIRECTORY */
+        fnode->flags = FS_DIRECTORY;
+        fnode->readdir = devfs_input_readdir;
+        fnode->finddir = devfs_input_finddir;
+        fnode->read = NULL;
         fnode->inode = 5;
     } else {
         kfree(fnode);

@@ -127,4 +127,8 @@ void input_init(void);
 void input_push(uint16_t type, uint16_t code, int32_t value);
 int  input_read(input_event_t* buffer, int count);
 
+/* Mouse specific input API */
+void input_mouse_push(uint16_t type, uint16_t code, int32_t value);
+int  input_read_mouse(input_event_t* buffer, int count);
+
 #endif

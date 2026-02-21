@@ -12,6 +12,13 @@ static uint32_t tail = 0;
 static sem_t input_sem;
 static spinlock_t input_lock = 0;
 
+/* Dedicated Mouse Queue */
+static input_event_t mouse_queue[INPUT_QUEUE_SIZE];
+static uint32_t mouse_head = 0;
+static uint32_t mouse_tail = 0;
+static sem_t mouse_sem;
+static spinlock_t mouse_lock = 0;
+
 static inline uint64_t save_irq(void) {
     uint64_t flags;
     __asm__ volatile("pushfq; pop %0" : "=r"(flags));
@@ -28,6 +35,12 @@ void input_init(void) {
     head = 0;
     tail = 0;
     input_lock = 0;
+
+    /* Initialize Mouse Queue */
+    sem_init(&mouse_sem, 0);
+    mouse_head = 0;
+    mouse_tail = 0;
+    mouse_lock = 0;
 }
 
 void input_push(uint16_t type, uint16_t code, int32_t value) {
@@ -73,6 +86,52 @@ int input_read(input_event_t* buffer, int count) {
     }
 
     spin_unlock(&input_lock);
+    restore_irq(flags);
+
+    return events_read;
+}
+
+void input_mouse_push(uint16_t type, uint16_t code, int32_t value) {
+    /* 1. Push to dedicated mouse queue */
+    uint64_t flags = save_irq();
+    spin_lock(&mouse_lock);
+
+    uint32_t next = (mouse_head + 1) % INPUT_QUEUE_SIZE;
+    if (next != mouse_tail) {
+        mouse_queue[mouse_head].type = type;
+        mouse_queue[mouse_head].code = code;
+        mouse_queue[mouse_head].value = value;
+        mouse_head = next;
+
+        spin_unlock(&mouse_lock);
+        restore_irq(flags);
+        sem_signal(&mouse_sem);
+    } else {
+        spin_unlock(&mouse_lock);
+        restore_irq(flags);
+    }
+
+    /* 2. Also push to global queue for aggregation */
+    input_push(type, code, value);
+}
+
+int input_read_mouse(input_event_t* buffer, int count) {
+    if (count <= 0) return 0;
+
+    /* Blocking wait for mouse data */
+    sem_wait(&mouse_sem);
+
+    int events_read = 0;
+    uint64_t flags = save_irq();
+    spin_lock(&mouse_lock);
+
+    if (mouse_head != mouse_tail) {
+        *buffer = mouse_queue[mouse_tail];
+        mouse_tail = (mouse_tail + 1) % INPUT_QUEUE_SIZE;
+        events_read = 1;
+    }
+
+    spin_unlock(&mouse_lock);
     restore_irq(flags);
 
     return events_read;
