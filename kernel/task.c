@@ -654,10 +654,10 @@ int task_fork(void* regs_ptr) {
     /* 4. Clone Address Space (CoW) */
     /* Use current task's CR3, not necessarily kernel's CR3 */
     /*
-     * NOTE: VMM CoW handler is incomplete/unreliable. We use Deep Copy (0)
-     * instead of CoW (1) to prevent memory corruption and crashes on write.
+     * NOTE: Enabling CoW (1) to reduce memory usage.
+     * Ensure vmm_handle_page_fault properly handles CoW faults.
      */
-    tasks[slot].cr3 = vmm_clone_pml4(0);
+    tasks[slot].cr3 = vmm_clone_pml4(1);
 
     /* 5. Copy Task Struct Fields */
     task_t* parent = task_get_current();
