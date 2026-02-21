@@ -4,6 +4,7 @@
 #include <io.h>
 #include <timer.h>
 #include <string.h>
+#include <task.h>
 
 static uint64_t lapic_base = 0;
 
@@ -63,4 +64,66 @@ void lapic_send_startup(uint32_t apic_id, uint8_t vector) {
     lapic_write(LAPIC_ICR_LOW, ICR_STARTUP | ICR_PHYSICAL | ICR_ASSERT | ICR_EDGE | ICR_NO_SHORTHAND | vector);
     
     timer_wait(1);
+}
+
+/* ========================================================================= */
+/* LAPIC Timer Support                                                       */
+/* ========================================================================= */
+
+void lapic_timer_handler(void) {
+    lapic_eoi();
+    schedule();
+}
+
+void lapic_timer_init(uint32_t frequency) {
+    if (!lapic_base) return;
+
+    /* 1. Set Divide Configuration Register to /16 */
+    lapic_write(LAPIC_TDCR, 0x03);
+
+    /* 2. Prepare for calibration */
+    /* Wait for the start of a new tick to align measurement */
+    uint64_t current_tick = timer_get_ticks();
+    while (timer_get_ticks() == current_tick) {
+        __asm__ volatile("pause");
+    }
+
+    /* Now we are at the beginning of a tick interval */
+    /* Set Initial Count to Max to start downcounting */
+    lapic_write(LAPIC_TICR, 0xFFFFFFFF);
+
+    /* Wait for ONE full tick (10ms) */
+    current_tick = timer_get_ticks();
+    while (timer_get_ticks() == current_tick) {
+        __asm__ volatile("pause");
+    }
+
+    /* 3. Stop Timer and Read Elapsed */
+    /* Read current count */
+    uint32_t current_count = lapic_read(LAPIC_TCCR);
+
+    /* Stop the timer (mask it) */
+    lapic_write(LAPIC_LVT_TIMER, 0x10000);
+
+    uint32_t ticks_in_10ms = 0xFFFFFFFF - current_count;
+
+    /* 4. Calculate ticks for desired frequency */
+    /* ticks_in_10ms corresponds to 100Hz (10ms) */
+    /* Total ticks per second = ticks_in_10ms * 100 */
+    /* Ticks per target frequency = (ticks_in_10ms * 100) / frequency */
+
+    uint64_t ticks_per_second = (uint64_t)ticks_in_10ms * 100;
+    uint32_t ticks_per_target = (uint32_t)(ticks_per_second / frequency);
+
+    if (ticks_per_target == 0) ticks_per_target = 1000;
+
+    /* 5. Setup Timer in Periodic Mode */
+    /* Vector 0x40, Periodic (0x20000) */
+    lapic_write(LAPIC_LVT_TIMER, LAPIC_TIMER_VECTOR | 0x20000);
+
+    /* 6. Set Divide Config again (just to be safe) */
+    lapic_write(LAPIC_TDCR, 0x03);
+
+    /* 7. Start Timer */
+    lapic_write(LAPIC_TICR, ticks_per_target);
 }

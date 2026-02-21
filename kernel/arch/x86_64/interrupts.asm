@@ -9,12 +9,14 @@ global isr_stub_keyboard
 global isr_stub_serial
 global isr_stub_mouse
 global isr_stub_network
+global isr_stub_lapic_timer
 
 extern irq_timer_handler    ; Renombraremos las funciones en C para evitar conflictos
 extern irq_keyboard_handler
 extern irq_serial_handler
 extern irq_mouse_handler
 extern irq_network_handler
+extern lapic_timer_handler
 
 section .text
 
@@ -151,4 +153,22 @@ isr_stub_network:
     jz .n2
     swapgs
 .n2:
+    iretq
+
+; -----------------------------------------------------------------------------
+; ISR LAPIC Timer (Vector 0x40)
+; -----------------------------------------------------------------------------
+isr_stub_lapic_timer:
+    test qword [rsp + 8], 3
+    jz .lt1
+    swapgs
+.lt1:
+    PUSH_ALL
+    cld
+    call lapic_timer_handler
+    POP_ALL
+    test qword [rsp + 8], 3
+    jz .lt2
+    swapgs
+.lt2:
     iretq

@@ -166,8 +166,68 @@ void scheduler_init(void) {
 }
 
 void task_init_ap(void) {
-    /* Placeholder for AP scheduler initialization */
-    serial_write_string("[SCHED] AP scheduler stub\n");
+    /* Inicializar la tarea "Idle" para este AP */
+    __asm__ volatile("cli");
+    spin_lock(&sched_lock);
+
+    int slot = -1;
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (tasks[i].state == TASK_DEAD || (i >= task_count && tasks[i].state == 0)) {
+            slot = i;
+            break;
+        }
+    }
+
+    if (slot == -1) {
+        spin_unlock(&sched_lock);
+        serial_write_string("[SCHED] Error: No slots for AP idle task\n");
+        return;
+    }
+
+    /* Inicializar tarea Idle para este CPU */
+    tasks[slot].id = next_id++;
+    tasks[slot].parent_id = 0;
+    tasks[slot].state = TASK_RUNNING; /* Ya está corriendo */
+    tasks[slot].stack_base = NULL;    /* Usa el stack del AP init */
+    tasks[slot].rsp = 0;
+
+    uint64_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    tasks[slot].cr3 = cr3;
+    tasks[slot].kernel_stack = 0;
+
+    cpu_info_t* cpu = get_current_cpu();
+    char name[32] = "Idle AP ";
+    if (cpu) {
+        char buf[8];
+        itoa_s(cpu->apic_id, buf, 8, 10);
+        strlcat(name, buf, 32);
+
+        cpu->current_task = &tasks[slot];
+        cpu->sched_ticks = 0;
+        /* Set RSP0 in TSS for this AP (using its current stack top) */
+        tss_set_rsp0(cpu->kernel_stack_top);
+        tasks[slot].kernel_stack = cpu->kernel_stack_top;
+    } else {
+        strlcat(name, "?", 32);
+    }
+
+    strlcpy(tasks[slot].name, name, sizeof(tasks[slot].name));
+
+    /* Basic Init */
+    memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
+    tasks[slot].fs_base = 0;
+    tasks[slot].gs_base = 0;
+
+    if (slot >= task_count) {
+        task_count = slot + 1;
+    }
+
+    spin_unlock(&sched_lock);
+
+    serial_write_string("[SCHED] AP Task Initialized: ");
+    serial_write_string(name);
+    serial_write_string("\n");
 }
 
 int task_create(const char* name, void (*entry)(void)) {
@@ -293,16 +353,15 @@ static task_t* find_next_task(task_t* current) {
     int next_idx = start_idx;
     for (int i = 0; i < task_count; i++) {
         next_idx = (next_idx + 1) % task_count;
-        if (tasks[next_idx].state == TASK_READY || tasks[next_idx].state == TASK_RUNNING) {
-            /* If we found ourselves, only return if we are RUNNING/READY */
-             /* Logic handles this naturally? */
-             /* If loop returns to start, we check below */
+        /* SMP Fix: Only pick READY tasks.
+           Do NOT pick RUNNING tasks (they are busy on this or other CPUs). */
+        if (tasks[next_idx].state == TASK_READY) {
              return &tasks[next_idx];
         }
     }
 
-    /* Si la tarea actual también está durmiendo/bloqueada, no podemos retornarla */
-    if (current->state == TASK_READY || current->state == TASK_RUNNING) {
+    /* Si no hay tareas listas y la actual esta muerta/durmiendo */
+    if (current->state == TASK_RUNNING) {
         return current;
     }
 

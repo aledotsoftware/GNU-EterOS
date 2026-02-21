@@ -289,6 +289,7 @@ extern void isr_stub_keyboard(void);
 extern void isr_stub_serial(void);
 extern void isr_stub_mouse(void);
 extern void isr_stub_network(void);
+extern void isr_stub_lapic_timer(void);
 
 /* ========================================================================= */
 /* IRQ Handlers (Funciones C llamadas por los Stubs ASM)                     */
@@ -400,6 +401,9 @@ void idt_init(void) {
 
     /* --- IPI Handlers --- */
     idt_set_gate(IPI_TLB_SHOOTDOWN, (void*)isr_tlb_shootdown, IDT_GATE_INTERRUPT);
+
+    /* --- LAPIC Timer --- */
+    idt_set_gate(LAPIC_TIMER_VECTOR, (void*)isr_stub_lapic_timer, IDT_GATE_INTERRUPT);
 
     /* --- Cargar la IDT --- */
     idtr.limit = sizeof(idt) - 1;
