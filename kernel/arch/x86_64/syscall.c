@@ -237,6 +237,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     if (addr && (flags & 0x10)) {
         virt = (uint64_t)addr;
         if (virt & 0xFFF) return -EINVAL;
+        if (!vmm_validate_user_ptr(addr, len)) return -ENOMEM;
     } else {
         virt = current->mmap_base;
         current->mmap_base += PAGE_ALIGN_UP(len);
@@ -860,6 +861,7 @@ static int64_t sys_dup(int oldfd) {
 }
 static int64_t sys_getcwd(char* buf, size_t size) {
     if (!buf || size < 2) return -EINVAL;
+    if (!vmm_verify_user_access(buf, size, 1)) return -EFAULT;
     strlcpy(buf, "/", size);
     return (int64_t)buf;
 }
