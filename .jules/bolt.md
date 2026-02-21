@@ -13,3 +13,7 @@
 ## 2026-11-23 - [Glow Overdraw & VRAM Reads]
 **Learning:** Alpha blending operations like `omni_fill_rect_alpha` require reading from the framebuffer (VRAM), which is extremely slow due to uncached memory access. Drawing a full filled rectangle for a border/glow effect and then overwriting the center wastes ~90% of bandwidth.
 **Action:** Use a "hollow" drawing function (4 strips) for borders and glows to eliminate overdraw of the central area, especially for large UI elements.
+
+## 2026-11-24 - [Direct Framebuffer Access]
+**Learning:** Per-pixel function calls (`framebuffer_putpixel`) in tight rendering loops add significant overhead due to repeated bounds checks and address calculations.
+**Action:** For high-performance rendering (e.g., compositing), access the framebuffer memory directly with pointer arithmetic, lifting invariant calculations out of the loop, especially for known BPPs (32-bit).
