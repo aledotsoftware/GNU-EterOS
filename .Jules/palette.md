@@ -49,3 +49,7 @@
 ## 2027-02-18 - [CSS-Only Tooltips]
 **Learning:** Using `attr(data-tooltip)` with `::before` pseudo-elements allows for lightweight, accessible tooltips without JavaScript overhead, keeping the interface snappy and declaratively defined.
 **Action:** Standardize `data-tooltip` usage across icon-only controls to provide consistent contextual help.
+
+## 2027-02-18 - [Search Input Reset Pattern]
+**Learning:** Users typing long queries often need a quick reset. Without a dedicated "Clear" button inside the input field, they are forced to use backspace repeatedly or select-all-delete, which feels tedious in a desktop-like environment.
+**Action:** Always include an embedded "X" button in search inputs that appears on input and clears focus back to the field.

@@ -951,6 +951,7 @@ body {
 .search-container {
     width: 100%;
     margin-bottom: 20px;
+    position: relative;
 }
 
 #launcher-search {
@@ -958,12 +959,40 @@ body {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
-    padding: 15px 25px;
+    padding: 15px 40px 15px 25px;
     color: white;
     font-size: 18px;
     outline: none;
     backdrop-filter: blur(10px);
     transition: border-color 0.2s, background 0.2s;
+}
+
+.search-clear {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 50%;
+    transition: all 0.2s;
+    outline: none;
+}
+
+.search-clear:hover,
+.search-clear:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.search-clear[hidden] {
+    display: none;
 }
 
 #launcher-search:focus {

@@ -160,6 +160,16 @@ function toggleLauncher() {
 
 function filterApps() {
     const query = document.getElementById('launcher-search').value.toLowerCase();
+
+    const clearBtn = document.getElementById('search-clear');
+    if (clearBtn) {
+        if (query.length > 0) {
+            clearBtn.removeAttribute('hidden');
+        } else {
+            clearBtn.setAttribute('hidden', '');
+        }
+    }
+
     const items = document.querySelectorAll('.launcher-item');
     let hasResults = false;
 
@@ -661,6 +671,15 @@ function makeDraggable(el) {
         document.onmousemove = null;
         document.ontouchend = null;
         document.ontouchmove = null;
+    }
+}
+
+function clearSearch() {
+    const input = document.getElementById('launcher-search');
+    if (input) {
+        input.value = '';
+        filterApps();
+        input.focus();
     }
 }
 
