@@ -92,6 +92,20 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
                 return 0;
             }
 
+            /* SECURITY FIX: Check for file offset/size truncation (since read_fs uses uint32_t) */
+            if (file_offset > UINT32_MAX || file_size > UINT32_MAX) {
+                serial_write_string("[ELF] Error: Segment exceeds 32-bit file limits.\n");
+                kfree(node);
+                return 0;
+            }
+
+            /* Check for integer overflow in file_offset + file_size */
+            if (file_offset + file_size < file_offset) {
+                 serial_write_string("[ELF] Error: File offset wraparound (overflow).\n");
+                 kfree(node);
+                 return 0;
+            }
+
             if (vaddr + mem_size > max_vaddr) {
                 max_vaddr = vaddr + mem_size;
             }
