@@ -697,3 +697,19 @@ function setupLauncherNav() {
 }
 
 setupLauncherNav();
+
+// Boot Splash Screen Logic
+document.addEventListener('DOMContentLoaded', () => {
+    const splash = document.getElementById('boot-splash');
+    if (splash) {
+        // Simulate boot time (e.g. 2.5 seconds)
+        setTimeout(() => {
+            splash.classList.add('fade-out');
+
+            // Remove from DOM after transition
+            setTimeout(() => {
+                splash.remove();
+            }, 600); // Match CSS transition duration
+        }, 2500);
+    }
+});
