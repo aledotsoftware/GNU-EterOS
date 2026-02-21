@@ -88,21 +88,21 @@
         <nav class="dock-container">
             <div class="dock" id="dock">
                 <div class="dock-item" role="button" aria-label="Lanzador de aplicaciones" tabindex="0"
-                    onclick="toggleLauncher()" onkeydown="if(event.key==='Enter') toggleLauncher()" title="Lanzador">
+                    onclick="toggleLauncher()" onkeydown="if(event.key==='Enter') toggleLauncher()" data-tooltip="Lanzador">
                     <img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/menu--v1.png" class="dock-icon">
                 </div>
                 <div class="dock-item running" role="button" aria-label="Abrir GIMP" tabindex="0"
-                    onclick="spawnApp('GIMP', 'linux')" onkeydown="if(event.key==='Enter') spawnApp('GIMP', 'linux')">
+                    onclick="spawnApp('GIMP', 'linux')" onkeydown="if(event.key==='Enter') spawnApp('GIMP', 'linux')" data-tooltip="GIMP">
                     <img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/gimp.png" class="dock-icon">
                 </div>
                 <div class="dock-item" role="button" aria-label="Abrir Play Store" tabindex="0"
                     onclick="spawnApp('Play Store', 'android')"
-                    onkeydown="if(event.key==='Enter') spawnApp('Play Store', 'android')">
+                    onkeydown="if(event.key==='Enter') spawnApp('Play Store', 'android')" data-tooltip="Play Store">
                     <img alt="" src="https://img.icons8.com/color/48/000000/google-play.png" class="dock-icon">
                 </div>
                 <div class="dock-item" role="button" aria-label="Abrir Terminal" tabindex="0"
                     onclick="spawnApp('Terminal', 'linux')"
-                    onkeydown="if(event.key==='Enter') spawnApp('Terminal', 'linux')">
+                    onkeydown="if(event.key==='Enter') spawnApp('Terminal', 'linux')" data-tooltip="Terminal">
                     <img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/console.png" class="dock-icon">
                 </div>
             </div>

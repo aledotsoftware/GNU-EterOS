@@ -173,6 +173,34 @@ body {
     box-shadow: 0 0 8px var(--accent-glow);
 }
 
+/* Tooltip implementation */
+.dock-item::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(0) scale(0.9);
+    padding: 6px 12px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+    margin-bottom: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 2000;
+}
+
+.dock-item:hover::before,
+.dock-item:focus-visible::before {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-5px) scale(1);
+}
+
 .dock-icon {
     width: 32px;
     height: 32px;

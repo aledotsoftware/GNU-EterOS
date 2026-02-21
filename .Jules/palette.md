@@ -45,3 +45,7 @@
 ## 2026-02-20 - [Empty States are Helpful States]
 **Learning:** When a search yields no results, a blank screen feels like a system failure. Providing an explicit "No results" message with a helpful tip transforms a dead end into a navigational guide.
 **Action:** Always implement empty states for search/filter interfaces to maintain user confidence.
+
+## 2027-02-18 - [CSS-Only Tooltips]
+**Learning:** Using `attr(data-tooltip)` with `::before` pseudo-elements allows for lightweight, accessible tooltips without JavaScript overhead, keeping the interface snappy and declaratively defined.
+**Action:** Standardize `data-tooltip` usage across icon-only controls to provide consistent contextual help.
