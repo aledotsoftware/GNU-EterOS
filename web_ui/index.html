@@ -28,7 +28,7 @@
                     <div class="menu-item" role="menuitem" tabindex="0" onkeydown="handleMenuKey(event, this)">Apagar</div>
                 </div>
             </div>
-            <div class="status-right" role="button" tabindex="0" aria-label="Abrir centro de control" onclick="toggleControlCenter(event)" onkeydown="if(event.key==='Enter') toggleControlCenter(event)">
+            <div class="status-right" id="cc-trigger" role="button" tabindex="0" aria-label="Abrir centro de control" aria-haspopup="true" aria-expanded="false" onclick="toggleControlCenter(event)" onkeydown="if(event.key==='Enter') toggleControlCenter(event)">
                 <span class="net">WiFi 6</span>
                 <span class="battery">88%</span>
                 <span class="time" id="clock">20:38</span>
@@ -87,7 +87,7 @@
 
         <nav class="dock-container">
             <div class="dock" id="dock">
-                <div class="dock-item" role="button" aria-label="Lanzador de aplicaciones" tabindex="0"
+                <div class="dock-item" id="launcher-trigger" role="button" aria-label="Lanzador de aplicaciones" aria-haspopup="true" aria-expanded="false" tabindex="0"
                     onclick="toggleLauncher()" onkeydown="if(event.key==='Enter') toggleLauncher()" data-tooltip="Lanzador">
                     <img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/menu--v1.png" class="dock-icon">
                 </div>
