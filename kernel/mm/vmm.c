@@ -500,6 +500,26 @@ int vmm_is_user_page(uint64_t virt_addr) {
     return 1;
 }
 
+int vmm_check_user_string(const char* str, size_t max_len) {
+    if (!str) return 0;
+    if (!vmm_validate_user_ptr(str, 1)) return 0;
+
+    uint64_t ptr_val = (uint64_t)str;
+    /* USER_LIMIT is the last valid address, so size is limit - ptr + 1 */
+    uint64_t remaining = USER_LIMIT - ptr_val + 1;
+    uint64_t scan_len = (remaining < max_len) ? remaining : max_len;
+
+    for (uint64_t i = 0; i < scan_len; i++) {
+        uint64_t curr_addr = ptr_val + i;
+        /* Check page access only when crossing page boundary or at start */
+        if ((i == 0) || ((curr_addr & (PAGE_SIZE - 1)) == 0)) {
+            if (!vmm_verify_user_access((void*)curr_addr, 1, 0)) return 0;
+        }
+        if (str[i] == '\0') return 1;
+    }
+    return 0;
+}
+
 static void free_pt_recursive(pt_entry_t* table, int level) {
     for (int i = 0; i < 512; i++) {
         if (!(table[i] & PAGE_PRESENT)) continue;

@@ -809,7 +809,7 @@ int task_waitpid(int pid, int* status, int options) {
 
 int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) {
     /* 1. Validate */
-    if (!vmm_validate_user_ptr(path, 1)) return -EFAULT;
+    if (!vmm_check_user_string(path, 256)) return -EFAULT;
 
     char kpath[256];
     strlcpy(kpath, path, 256);
@@ -821,7 +821,7 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
         for (int i=0; i<32; i++) {
             char* ptr = argv[i];
             if (!ptr) break;
-            if (!vmm_validate_user_ptr(ptr, 1)) return -EFAULT;
+            if (!vmm_check_user_string(ptr, 128)) return -EFAULT;
             kargv[argc] = (char*)kmalloc(128);
             if (!kargv[argc]) return -ENOMEM;
             strlcpy(kargv[argc], ptr, 128);
@@ -837,7 +837,7 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
         for (int i=0; i<32; i++) {
             char* ptr = envp[i];
             if (!ptr) break;
-            if (!vmm_validate_user_ptr(ptr, 1)) return -EFAULT;
+            if (!vmm_check_user_string(ptr, 128)) return -EFAULT;
             kenvp[envc] = (char*)kmalloc(128);
             if (!kenvp[envc]) return -ENOMEM;
             strlcpy(kenvp[envc], ptr, 128);

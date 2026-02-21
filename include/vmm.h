@@ -138,4 +138,15 @@ int vmm_verify_user_access(const void* addr, size_t size, int write);
  */
 void vmm_destroy_pml4(uint64_t pml4_phys);
 
+/**
+ * Verifica si una cadena en espacio de usuario es válida (segura para leer).
+ * Chequea que esté dentro del rango de usuario, que las páginas sean accesibles,
+ * y que contenga un terminador nulo dentro de max_len bytes.
+ *
+ * @param str Puntero al inicio de la cadena.
+ * @param max_len Longitud máxima a escanear.
+ * @return 1 si es válida, 0 si no.
+ */
+int vmm_check_user_string(const char* str, size_t max_len);
+
 #endif /* ETEROS_VMM_H */
