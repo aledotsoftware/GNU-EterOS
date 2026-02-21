@@ -118,17 +118,23 @@
 #include "types.h"
 
 /* Estructura que representa los registros pasados al handler de syscall */
+/* Mapped to match PUSH_ALL macro in kernel/arch/x86_64/asm_macros.inc */
 struct syscall_regs {
-    uint64_t r11;    /* Saved RFLAGS by syscall instruction */
-    uint64_t rcx;    /* Saved RIP by syscall instruction */
-    uint64_t rbp;
-    uint64_t rdi;    /* Arg 1 */
-    uint64_t rsi;    /* Arg 2 */
-    uint64_t rdx;    /* Arg 3 */
-    uint64_t r10;    /* Arg 4 (RCX is used by syscall, so R10 is used instead) */
-    uint64_t r8;     /* Arg 5 */
-    uint64_t r9;     /* Arg 6 */
-    uint64_t rax;    /* Syscall Number */
+    uint64_t r15;    /* 0 */
+    uint64_t r14;    /* 8 */
+    uint64_t r13;    /* 16 */
+    uint64_t r12;    /* 24 */
+    uint64_t r11;    /* 32 - Saved RFLAGS */
+    uint64_t r10;    /* 40 - Arg 4 */
+    uint64_t r9;     /* 48 - Arg 6 */
+    uint64_t r8;     /* 56 - Arg 5 */
+    uint64_t rbp;    /* 64 */
+    uint64_t rdi;    /* 72 - Arg 1 */
+    uint64_t rsi;    /* 80 - Arg 2 */
+    uint64_t rdx;    /* 88 - Arg 3 */
+    uint64_t rcx;    /* 96 - Saved RIP */
+    uint64_t rbx;    /* 104 */
+    uint64_t rax;    /* 112 - Syscall Number */
 };
 
 /* ========================================================================= */

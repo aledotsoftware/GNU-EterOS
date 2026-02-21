@@ -138,6 +138,7 @@ void scheduler_init(void) {
     tasks[0].signal_mask = 0;
     tasks[0].signal_pending = 0;
     memset(tasks[0].signal_handlers, 0, sizeof(tasks[0].signal_handlers));
+    memset(tasks[0].signal_restorers, 0, sizeof(tasks[0].signal_restorers));
 
     /* Linux Init */
     tasks[0].brk = 0;
@@ -287,6 +288,7 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].signal_mask = 0;
     tasks[slot].signal_pending = 0;
     memset(tasks[slot].signal_handlers, 0, sizeof(tasks[slot].signal_handlers));
+    memset(tasks[slot].signal_restorers, 0, sizeof(tasks[slot].signal_restorers));
 
     /* Linux Init */
     tasks[slot].brk = 0;
@@ -673,6 +675,7 @@ int task_fork(void* regs_ptr) {
 
     tasks[slot].signal_mask = parent->signal_mask;
     memcpy(tasks[slot].signal_handlers, parent->signal_handlers, sizeof(parent->signal_handlers));
+    memcpy(tasks[slot].signal_restorers, parent->signal_restorers, sizeof(parent->signal_restorers));
     tasks[slot].brk = parent->brk;
     tasks[slot].fs_base = parent->fs_base;
     tasks[slot].gs_base = parent->gs_base;

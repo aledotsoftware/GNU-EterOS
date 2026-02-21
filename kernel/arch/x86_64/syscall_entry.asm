@@ -2,6 +2,8 @@
 global syscall_entry
 extern syscall_handler
 
+%include "kernel/arch/x86_64/asm_macros.inc"
+
 ; Struct offsets in per_cpu_t (include/cpu.h)
 ; uint64_t kernel_stack; // offset 0
 ; uint64_t user_stack;   // offset 8
@@ -28,19 +30,9 @@ syscall_entry:
     pop rdx
     pop rax
 
-    ; 4. Save Registers to match struct syscall_regs
-    ; Struct: r11, rcx, rbp, rdi, rsi, rdx, r10, r8, r9, rax
-    ; Push in reverse order
-    push rax    ; Syscall Number
-    push r9     ; Arg 6
-    push r8     ; Arg 5
-    push r10    ; Arg 4 (RCX is used for RIP, R10 for Arg 4)
-    push rdx    ; Arg 3
-    push rsi    ; Arg 2
-    push rdi    ; Arg 1
-    push rbp    ; Base Pointer
-    push rcx    ; RIP (Saved by syscall)
-    push r11    ; RFLAGS (Saved by syscall)
+    ; 4. Save All Registers (Context)
+    ; Matches struct syscall_regs in include/syscall.h (UPDATED)
+    PUSH_ALL
 
     ; 5. Call Handler
     ; void syscall_handler(struct syscall_regs* regs);
@@ -51,16 +43,7 @@ syscall_entry:
     call syscall_handler
 
     ; 6. Restore Registers
-    pop r11
-    pop rcx
-    pop rbp
-    pop rdi
-    pop rsi
-    pop rdx
-    pop r10
-    pop r8
-    pop r9
-    pop rax     ; Restore RAX (return value)
+    POP_ALL
 
     ; 7. Restore User Stack (user_stack_scratch)
     mov rsp, [gs:56]

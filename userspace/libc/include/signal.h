@@ -34,6 +34,9 @@
 #define SIG_UNBLOCK 1
 #define SIG_SETMASK 2
 
+/* Signal flags */
+#define SA_RESTORER 0x04000000
+
 typedef uint64_t sigset_t;
 typedef void (*sighandler_t)(int);
 

@@ -22,13 +22,19 @@ static inline long syscall4_sig(long n, long a1, long a2, long a3, long a4) {
     return ret;
 }
 
+/* Trampoline for signal restoration */
+static void __restore_rt(void) {
+    __asm__ volatile ("mov $15, %rax\nsyscall");
+}
+
 sighandler_t signal(int sig, sighandler_t handler) {
     struct sigaction act, oldact;
     act.sa_handler = handler;
-    act.sa_flags = 0;
-    act.sa_restorer = 0;
+    act.sa_flags = SA_RESTORER;
+    act.sa_restorer = __restore_rt;
     act.sa_mask = 0;
 
+    /* SYS_rt_sigaction expects 8 as sigsetsize (sizeof(uint64_t)) */
     long ret = syscall4_sig(SYS_rt_sigaction, sig, (long)&act, (long)&oldact, 8);
     if (ret < 0) {
         errno = (int)(-ret);
@@ -38,7 +44,20 @@ sighandler_t signal(int sig, sighandler_t handler) {
 }
 
 int sigaction(int sig, const struct sigaction *act, struct sigaction *oldact) {
-    long ret = syscall4_sig(SYS_rt_sigaction, sig, (long)act, (long)oldact, 8);
+    struct sigaction kact;
+    const struct sigaction *pact = act;
+
+    if (act) {
+        kact = *act;
+        /* Ensure SA_RESTORER is set */
+        if (!(kact.sa_flags & SA_RESTORER)) {
+            kact.sa_flags |= SA_RESTORER;
+            kact.sa_restorer = __restore_rt;
+        }
+        pact = &kact;
+    }
+
+    long ret = syscall4_sig(SYS_rt_sigaction, sig, (long)pact, (long)oldact, 8);
     if (ret < 0) { errno = (int)(-ret); return -1; }
     return 0;
 }

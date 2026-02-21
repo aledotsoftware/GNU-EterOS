@@ -1,6 +1,8 @@
 #ifndef ETEROS_SYS_SIGNAL_H
 #define ETEROS_SYS_SIGNAL_H
 
+#include <types.h>
+
 /* Standard Signals */
 #define SIGHUP      1
 #define SIGINT      2
@@ -35,5 +37,13 @@
 #define SIGPOLL     SIGIO
 #define SIGPWR      30
 #define SIGSYS      31
+
+/* Signal Dispositions */
+#define SIG_DFL     ((void (*)(int))0)
+#define SIG_IGN     ((void (*)(int))1)
+#define SIG_ERR     ((void (*)(int))-1)
+
+/* Flags */
+#define SA_RESTORER 0x04000000
 
 #endif /* ETEROS_SYS_SIGNAL_H */

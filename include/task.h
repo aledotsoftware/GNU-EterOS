@@ -71,6 +71,7 @@ typedef struct task {
     uint32_t       signal_mask;             /* Mask of blocked signals */
     uint32_t       signal_pending;          /* Bitmap of pending signals */
     void           (*signal_handlers[32])(int); /* Signal Handlers */
+    void           (*signal_restorers[32])(void); /* Signal Restorer Trampolines */
 
     /* Linux Compatibility (TLS & Heap) */
     uint64_t       brk;                     /* Program break (end of data segment) */
