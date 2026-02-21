@@ -62,8 +62,32 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 
 size_t strlen(const char *s) {
     const char *p = s;
-    while (*p) p++;
-    return (size_t)(p - s);
+
+    /* Fast path: Align to 8-byte boundary */
+    while ((uintptr_t)p & 7) {
+        if (!*p) return (size_t)(p - s);
+        p++;
+    }
+
+    /* Process 8 bytes at a time */
+    const uint64_t *lp = (const uint64_t *)p;
+    uint64_t v, magic = 0x0101010101010101ULL;
+
+    while (1) {
+        v = *lp++;
+        /* Check for null byte: ((v - 0x01...) & ~v & 0x80...) */
+        if (((v - magic) & ~v & (magic << 7)) != 0) {
+            const char *cp = (const char *)(lp - 1);
+            if (cp[0] == 0) return (size_t)(cp - s);
+            if (cp[1] == 0) return (size_t)(cp - s + 1);
+            if (cp[2] == 0) return (size_t)(cp - s + 2);
+            if (cp[3] == 0) return (size_t)(cp - s + 3);
+            if (cp[4] == 0) return (size_t)(cp - s + 4);
+            if (cp[5] == 0) return (size_t)(cp - s + 5);
+            if (cp[6] == 0) return (size_t)(cp - s + 6);
+            return (size_t)(cp - s + 7);
+        }
+    }
 }
 
 int strcmp(const char *s1, const char *s2) {
