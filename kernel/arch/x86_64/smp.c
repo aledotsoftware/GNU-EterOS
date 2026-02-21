@@ -164,10 +164,16 @@ void cpu_init_ap(int index) {
     /* Señalizar que estamos listos */
     cpu->state = CPU_STATE_ONLINE;
 
-    /* Inicializar scheduler local y entrar en loop */
-    // task_init_ap();
+    /* Inicializar timer del LAPIC (100 Hz) para Scheduling */
+    /* Nota: Esto usa polling del PIT para calibrar, asume que BSP está corriendo timer global */
+    lapic_timer_init(100);
+
+    /* Inicializar scheduler local */
+    task_init_ap();
     
-    /* Halt loop if no tasks */
+    /* Habilitar interrupciones globales y esperar */
+    __asm__ volatile("sti");
+
     for(;;) {
         __asm__ volatile("hlt");
     }

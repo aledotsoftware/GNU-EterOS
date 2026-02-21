@@ -54,11 +54,17 @@
 #define ICR_ALL_INCL_SELF   0x80000
 #define ICR_ALL_EXCL_SELF   0xC0000
 
+/* LAPIC Timer Vector */
+#define LAPIC_TIMER_VECTOR  0x40
+
 void lapic_init(void);
 void lapic_eoi(void);
 void lapic_send_ipi(uint32_t apic_id, uint32_t vector);
 void lapic_send_init(uint32_t apic_id);
 void lapic_send_startup(uint32_t apic_id, uint8_t vector);
 uint32_t lapic_get_id(void);
+
+void lapic_timer_init(uint32_t frequency);
+void lapic_timer_handler(void);
 
 #endif /* ETEROS_APIC_H */
