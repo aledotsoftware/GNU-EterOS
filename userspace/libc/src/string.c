@@ -4,6 +4,7 @@
  */
 
 #include <string.h>
+#include <stdint.h>
 
 void *memcpy(void *dest, const void *src, size_t n) {
     uint8_t *d = (uint8_t *)dest;
@@ -62,8 +63,34 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 
 size_t strlen(const char *s) {
     const char *p = s;
-    while (*p) p++;
-    return (size_t)(p - s);
+
+    /* Align to 8-byte boundary */
+    while ((uintptr_t)p & 7) {
+        if (!*p) return p - s;
+        p++;
+    }
+
+    /* Fast path: 8 bytes at a time (SWAR) */
+    /* Use may_alias to avoid strict aliasing violation */
+    typedef uint64_t __attribute__((__may_alias__)) u64_alias;
+    const u64_alias *lp = (const u64_alias *)p;
+    uint64_t v;
+    while (1) {
+        v = *lp++;
+        /* Check if any byte is 0 using the standard bit hack:
+           (v - 0x01...) & ~v & 0x80... detects zero bytes */
+        if (((v - 0x0101010101010101UL) & ~v & 0x8080808080808080UL)) {
+            const char *cp = (const char *)(lp - 1);
+            if (!cp[0]) return cp - s;
+            if (!cp[1]) return cp - s + 1;
+            if (!cp[2]) return cp - s + 2;
+            if (!cp[3]) return cp - s + 3;
+            if (!cp[4]) return cp - s + 4;
+            if (!cp[5]) return cp - s + 5;
+            if (!cp[6]) return cp - s + 6;
+            return cp - s + 7;
+        }
+    }
 }
 
 int strcmp(const char *s1, const char *s2) {

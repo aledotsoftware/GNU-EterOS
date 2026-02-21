@@ -323,6 +323,7 @@ userspace:
 	cp userspace/exec_test.elf $(INITRD_DIR)/
 	cp userspace/test_libc_advanced.elf $(INITRD_DIR)/
 	cp userspace/test_signal.elf $(INITRD_DIR)/
+	cp userspace/bench_strlen.elf $(INITRD_DIR)/
 
 # ---- Initrd ----
 initrd: userspace $(INITRD_IMG)
