@@ -11,6 +11,7 @@
 #include "../../include/serial.h"
 #include "../../include/vga.h"
 #include "../../include/fs/bcache.h"
+#include "../../include/lock.h"
 
 /* ========================================================================= */
 /* Variables Globales                                                        */
@@ -25,6 +26,9 @@ static uint64_t pmm_bitmap_size = 0; /* En bytes */
 
 /* Array de Reference Counts (1 byte por página) */
 static uint8_t* pmm_ref_counts = NULL;
+
+/* Spinlock para proteger el estado del PMM en SMP */
+static spinlock_t pmm_lock = 0;
 
 static uint64_t total_ram = 0;
 static uint64_t used_ram = 0;
@@ -54,6 +58,7 @@ static int bitmap_test(uint64_t bit) {
 
 /* Marca un rango de direcciones físicas como OCUPADAS */
 void pmm_mark_region_used(uint64_t base, uint64_t size) {
+    spin_lock(&pmm_lock);
     uint64_t start_page = base / PAGE_SIZE;
     uint64_t num_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
 
@@ -66,10 +71,13 @@ void pmm_mark_region_used(uint64_t base, uint64_t size) {
             }
         }
     }
+    spin_unlock(&pmm_lock);
 }
 
 /* Marca un rango de direcciones físicas como LIBRES (si existen en el mapa E820) */
 static void pmm_mark_region_free(uint64_t base, uint64_t size) {
+    /* Internal helper called by pmm_init (single threaded), but for consistency we lock */
+    spin_lock(&pmm_lock);
     uint64_t start_page = base / PAGE_SIZE;
     uint64_t num_pages = size / PAGE_SIZE; /* Round down for safety */
 
@@ -82,6 +90,7 @@ static void pmm_mark_region_free(uint64_t base, uint64_t size) {
             }
         }
     }
+    spin_unlock(&pmm_lock);
 }
 
 /* ========================================================================= */
@@ -310,7 +319,11 @@ void* pmm_alloc_page(void) {
         __asm__ volatile("cli");
         for(;;) __asm__ volatile("hlt");
     }
+
+    spin_lock(&pmm_lock);
     void* ptr = pmm_alloc_page_impl();
+    spin_unlock(&pmm_lock);
+
     if (ptr) return ptr;
 
     /* First failure: Try to reclaim memory from caches */
@@ -318,7 +331,10 @@ void* pmm_alloc_page(void) {
     bcache_invalidate_all();
 
     /* Retry */
+    spin_lock(&pmm_lock);
     ptr = pmm_alloc_page_impl();
+    spin_unlock(&pmm_lock);
+
     if (ptr) return ptr;
 
     /* Soft Failure: Return NULL and let callers handle it gracefully.
@@ -330,9 +346,13 @@ void* pmm_alloc_page(void) {
 }
 
 void pmm_free_page(void* addr) {
+    spin_lock(&pmm_lock);
     uint64_t page_idx = (uint64_t)addr / PAGE_SIZE;
     
-    if (page_idx >= total_pages) return;
+    if (page_idx >= total_pages) {
+        spin_unlock(&pmm_lock);
+        return;
+    }
     
     if (pmm_ref_counts) {
         if (pmm_ref_counts[page_idx] > 0) {
@@ -340,6 +360,7 @@ void pmm_free_page(void* addr) {
         }
         if (pmm_ref_counts[page_idx] > 0) {
             /* Still referenced, do not free */
+            spin_unlock(&pmm_lock);
             return;
         }
     }
@@ -350,11 +371,16 @@ void pmm_free_page(void* addr) {
         /* Note: We do NOT reset last_free_idx here to avoid fragmentation
            and maintain Next-Fit behavior (allocations keep moving forward). */
     }
+    spin_unlock(&pmm_lock);
 }
 
 void pmm_ref_page(void* addr) {
+    spin_lock(&pmm_lock);
     uint64_t page_idx = (uint64_t)addr / PAGE_SIZE;
-    if (page_idx >= total_pages) return;
+    if (page_idx >= total_pages) {
+        spin_unlock(&pmm_lock);
+        return;
+    }
 
     if (pmm_ref_counts) {
         /* Cap at 255 to prevent overflow */
@@ -362,6 +388,7 @@ void pmm_ref_page(void* addr) {
             pmm_ref_counts[page_idx]++;
         }
     }
+    spin_unlock(&pmm_lock);
 }
 
 void pmm_unref_page(void* addr) {
@@ -369,9 +396,18 @@ void pmm_unref_page(void* addr) {
 }
 
 uint8_t pmm_get_ref_count(void* addr) {
+    /* Reading refcount without lock might be racy but for checking it's mostly ok.
+       Better to lock if exact value needed, but this is usually debug or hint.
+       Wait, let's lock to be safe. */
+    spin_lock(&pmm_lock);
     uint64_t page_idx = (uint64_t)addr / PAGE_SIZE;
-    if (page_idx >= total_pages) return 0;
-    return pmm_ref_counts ? pmm_ref_counts[page_idx] : 0;
+    if (page_idx >= total_pages) {
+        spin_unlock(&pmm_lock);
+        return 0;
+    }
+    uint8_t val = pmm_ref_counts ? pmm_ref_counts[page_idx] : 0;
+    spin_unlock(&pmm_lock);
+    return val;
 }
 
 uint64_t pmm_get_total_ram(void) { return total_ram; }
