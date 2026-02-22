@@ -808,39 +808,65 @@ int task_waitpid(int pid, int* status, int options) {
 }
 
 int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) {
-    /* 1. Validate */
-    if (!vmm_validate_user_ptr(path, 1)) return -EFAULT;
-
-    char kpath[256];
-    strlcpy(kpath, path, 256);
-
+    int res = 0;
     int argc = 0;
-    char* kargv[32];
+    int envc = 0;
+    char* kargv[33];
+    char* kenvp[33];
+
+    /* 1. Validate */
+    char kpath[256];
+    res = vmm_strncpy_from_user(kpath, path, 256);
+    if (res < 0) return res;
+
     if (argv) {
-        if (!vmm_validate_user_ptr(argv, sizeof(char*))) return -EFAULT;
+        if (!vmm_verify_user_access(argv, sizeof(char*), 0)) return -EFAULT;
         for (int i=0; i<32; i++) {
+            if (!vmm_verify_user_access(&argv[i], sizeof(char*), 0)) {
+                res = -EFAULT;
+                goto cleanup_error;
+            }
             char* ptr = argv[i];
             if (!ptr) break;
-            if (!vmm_validate_user_ptr(ptr, 1)) return -EFAULT;
+
             kargv[argc] = (char*)kmalloc(128);
-            if (!kargv[argc]) return -ENOMEM;
-            strlcpy(kargv[argc], ptr, 128);
+            if (!kargv[argc]) {
+                res = -ENOMEM;
+                goto cleanup_error;
+            }
+            res = vmm_strncpy_from_user(kargv[argc], ptr, 128);
+            if (res < 0) {
+                kfree(kargv[argc]);
+                goto cleanup_error;
+            }
             argc++;
         }
     }
     kargv[argc] = NULL;
 
-    int envc = 0;
-    char* kenvp[32];
     if (envp) {
-        if (!vmm_validate_user_ptr(envp, sizeof(char*))) return -EFAULT;
+        if (!vmm_verify_user_access(envp, sizeof(char*), 0)) {
+            res = -EFAULT;
+            goto cleanup_error;
+        }
         for (int i=0; i<32; i++) {
+            if (!vmm_verify_user_access(&envp[i], sizeof(char*), 0)) {
+                res = -EFAULT;
+                goto cleanup_error;
+            }
             char* ptr = envp[i];
             if (!ptr) break;
-            if (!vmm_validate_user_ptr(ptr, 1)) return -EFAULT;
+
             kenvp[envc] = (char*)kmalloc(128);
-            if (!kenvp[envc]) return -ENOMEM;
-            strlcpy(kenvp[envc], ptr, 128);
+            if (!kenvp[envc]) {
+                res = -ENOMEM;
+                goto cleanup_error;
+            }
+            res = vmm_strncpy_from_user(kenvp[envc], ptr, 128);
+            if (res < 0) {
+                kfree(kenvp[envc]);
+                goto cleanup_error;
+            }
             envc++;
         }
     }
@@ -851,7 +877,10 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     uint64_t old_cr3 = current->cr3;
 
     uint64_t new_cr3_phys = (uint64_t)pmm_alloc_page();
-    if (!new_cr3_phys) return -ENOMEM;
+    if (!new_cr3_phys) {
+        res = -ENOMEM;
+        goto cleanup_error;
+    }
     uint64_t* new_pml4 = (uint64_t*)new_cr3_phys;
     memset(new_pml4, 0, PAGE_SIZE);
 
@@ -863,7 +892,10 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
 
     /* Copy Identity Map (Index 0) - Need deep copy of PDPT to separate User Space */
     uint64_t new_pdpt_phys = (uint64_t)pmm_alloc_page();
-    if (!new_pdpt_phys) return -ENOMEM;
+    if (!new_pdpt_phys) {
+        res = -ENOMEM;
+        goto cleanup_error;
+    }
     uint64_t* new_pdpt = (uint64_t*)new_pdpt_phys;
     memset(new_pdpt, 0, PAGE_SIZE);
 
@@ -891,7 +923,8 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
         /* Failed: Restore old CR3 and abort */
         __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
         current->cr3 = old_cr3;
-        return -ENOEXEC;
+        res = -ENOEXEC;
+        goto cleanup_error;
     }
 
     /* 5. Setup Stack */
@@ -972,4 +1005,9 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     vmm_destroy_pml4(old_cr3);
 
     return 0;
+
+cleanup_error:
+    for (int i=0; i<argc; i++) kfree(kargv[i]);
+    for (int i=0; i<envc; i++) kfree(kenvp[i]);
+    return res;
 }
