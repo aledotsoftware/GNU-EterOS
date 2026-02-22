@@ -97,6 +97,12 @@ size_t strlen(const char *s) {
 #endif
 }
 
+size_t strnlen(const char *s, size_t maxlen) {
+    size_t i;
+    for (i = 0; i < maxlen && s[i]; i++);
+    return i;
+}
+
 int strcmp(const char *s1, const char *s2) {
     while (*s1 && *s1 == *s2) { s1++; s2++; }
     return (int)(unsigned char)*s1 - (int)(unsigned char)*s2;
@@ -108,12 +114,6 @@ int strncmp(const char *s1, const char *s2, size_t n) {
     return (int)(unsigned char)*s1 - (int)(unsigned char)*s2;
 }
 
-char *strcpy(char *dest, const char *src) {
-    char *d = dest;
-    while ((*d++ = *src++));
-    return dest;
-}
-
 char *strncpy(char *dest, const char *src, size_t n) {
     char *d = dest;
     while (n && (*d++ = *src++)) n--;
@@ -121,11 +121,32 @@ char *strncpy(char *dest, const char *src, size_t n) {
     return dest;
 }
 
-char *strcat(char *dest, const char *src) {
-    char *d = dest;
-    while (*d) d++;
-    while ((*d++ = *src++));
-    return dest;
+/**
+ * strlcpy - Copy a C-string into a sized buffer
+ * @dest: Where to copy the string to
+ * @src: Where to copy the string from
+ * @size: size of destination buffer
+ */
+size_t strlcpy(char *dest, const char *src, size_t size) {
+    size_t len = strlen(src);
+    if (size > 0) {
+        size_t to_copy = (len >= size) ? size - 1 : len;
+        memcpy(dest, src, to_copy);
+        dest[to_copy] = '\0';
+    }
+    return len;
+}
+
+/**
+ * strlcat - Append a length-limited, C-string to another
+ * @dest: The string to be appended to
+ * @src: The string to append to it
+ * @size: Total size of the destination buffer
+ */
+size_t strlcat(char *dest, const char *src, size_t size) {
+    size_t dlen = strnlen(dest, size);
+    if (dlen >= size) return size + strlen(src);
+    return dlen + strlcpy(dest + dlen, src, size - dlen);
 }
 
 char *strchr(const char *s, int c) {

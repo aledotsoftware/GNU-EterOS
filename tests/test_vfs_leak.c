@@ -114,7 +114,7 @@ int main() {
     memset(fs_root, 0, sizeof(fs_node_t));
     fs_root->flags = FS_DIRECTORY;
     fs_root->finddir = mock_finddir;
-    strcpy(fs_root->name, "root");
+    strlcpy(fs_root->name, "root", sizeof(fs_root->name));
 
     /* Test 1: Lookup single level */
     printf("\nTest 1: Lookup '/a'...\n");

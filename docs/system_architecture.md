@@ -587,7 +587,7 @@ userspace/
     │   └── etc.
     └── src/           ← Implementaciones
         ├── crt0.asm       ← C runtime startup (call main, sys_exit)
-        ├── string.c       ← strlen, strcpy, memcpy, etc.
+        ├── string.c       ← strlen, strlcpy, memcpy, etc.
         ├── stdio.c        ← printf, puts, fprintf, etc.
         ├── stdlib.c       ← malloc/free (vía brk syscall)
         ├── unistd.c       ← write, read, fork, exec, waitpid, etc.
