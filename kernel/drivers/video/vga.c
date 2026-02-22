@@ -165,8 +165,31 @@ void terminal_set_color(uint8_t color) {
 
 void terminal_scroll(void) {
     if (use_framebuffer) {
-        terminal_row = 0; // Wrap simple por ahora
-        framebuffer_clear(fb_bg);
+        /* Implementación de scroll real para framebuffer */
+        uint32_t height = framebuffer_get_height();
+        uint32_t width  = framebuffer_get_width();
+        uint32_t pitch  = framebuffer_get_pitch();
+        uint32_t* buffer = framebuffer_get_buffer();
+
+        if (buffer) {
+            /* Asumimos altura de fuente de 16 pixeles */
+            const uint32_t font_height = 16;
+
+            /* Movemos todo el contenido hacia arriba por una línea de texto */
+            /* Usamos aritmética de punteros en bytes porque pitch está en bytes */
+            uint8_t* dest = (uint8_t*)buffer;
+            uint8_t* src  = (uint8_t*)buffer + (font_height * pitch);
+            size_t size   = (height - font_height) * pitch;
+
+            memmove(dest, src, size);
+
+            /* Limpiamos la última línea que ahora quedó duplicada/sucia */
+            framebuffer_rect(0, height - font_height, width, font_height, fb_bg);
+        }
+
+        /* Mantenemos el cursor en la última línea */
+        terminal_row = (height / 16) - 1;
+
     } else {
         vga_scroll();
         terminal_row = VGA_HEIGHT - 1;
