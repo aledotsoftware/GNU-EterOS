@@ -3,6 +3,7 @@
 
 #include <types.h>
 #include <lock.h>
+#include <fs/vfs.h>
 
 /**
  * FAT32 Boot Sector (BPB)
@@ -129,55 +130,10 @@ typedef struct {
 int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_sector_t write_func, uint32_t partition_offset);
 
 /**
- * List files in the root directory (prints to console)
+ * Mount the FAT32 volume and return the root filesystem node.
+ * @param vol Initialized FAT32 volume structure
+ * @return Pointer to root fs_node_t, or NULL on failure.
  */
-void fat32_list_directory(fat32_volume_t* vol);
-
-/**
- * Read a file by name from the root directory
- * @param filename 8.3 filename (e.g. "TEST.TXT")
- * @param buffer Destination buffer
- * @param size Buffer size
- * @return Bytes read, or -1 on error
- */
-int fat32_read_file(fat32_volume_t* vol, const char* filename, void* buffer, uint32_t size);
-
-/**
- * Write a file by name to the root directory (overwrites or creates new if needed)
- * @param filename 8.3 filename
- * @param buffer Source buffer
- * @param size Data size
- * @return Bytes written, or -1 on error
- */
-int fat32_write_file(fat32_volume_t* vol, const char* filename, const void* buffer, uint32_t size);
-
-/**
- * Create a new empty file in the root directory
- * @param filename 8.3 filename
- * @return 0 on success, non-zero on error
- */
-int fat32_create_file(fat32_volume_t* vol, const char* filename);
-
-/**
- * Create a new directory in the root directory
- * @param dirname 8.3 directory name
- * @return 0 on success, non-zero on error
- */
-int fat32_create_directory(fat32_volume_t* vol, const char* dirname);
-
-/**
- * Delete a file or empty directory from the root directory
- * @param filename 8.3 filename
- * @return 0 on success, non-zero on error
- */
-int fat32_delete_file(fat32_volume_t* vol, const char* filename);
-
-/**
- * Find a file entry in the root directory
- * @param filename Name to search for
- * @param entry Output structure
- * @return 0 on success, non-zero on failure
- */
-int fat32_find_file(fat32_volume_t* vol, const char* filename, fat32_dir_entry_t* entry);
+fs_node_t* fat32_mount(fat32_volume_t* vol);
 
 #endif /* FAT32_H */
