@@ -338,8 +338,7 @@ void* pmm_alloc_page(void) {
     if (ptr) return ptr;
 
     /* Soft Failure: Return NULL and let callers handle it gracefully.
-     * All kernel components now check for allocation failures.
-     * The page reclaimer thread will free unused pages in the background. */
+     * All kernel components now check for allocation failures. */
     serial_write_string("[PMM] WARNING: OOM. Returning NULL to caller.\n");
 
     return NULL;

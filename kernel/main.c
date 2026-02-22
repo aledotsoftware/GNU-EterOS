@@ -215,12 +215,6 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("  [INIT] Scheduler Round-Robin\n");
     scheduler_init();
     
-    /* ---- 7.0 Inicializar Page Reclaimer ---- */
-    /* Disabled due to instability (no swap-in support yet) */
-    /* hal_console_write("  [INIT] Page Reclaimer\n"); */
-    /* extern void reclaimer_init(void); */
-    /* reclaimer_init(); */
-
     /* ---- 7.1 Inicializar Futex ---- */
     futex_init();
 
