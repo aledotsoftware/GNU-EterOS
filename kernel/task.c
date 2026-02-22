@@ -115,38 +115,46 @@ static void task_entry_wrapper(void) {
 /* API del Scheduler                                                         */
 /* ========================================================================= */
 
+static void task_setup_slot(int slot, const char* name, int state, void* stack_base, uint64_t kernel_stack, uint64_t cr3) {
+    tasks[slot].id = next_id++;
+    tasks[slot].parent_id = 0;
+    tasks[slot].state = state;
+    tasks[slot].stack_base = stack_base;
+    tasks[slot].kernel_stack = kernel_stack;
+    tasks[slot].cr3 = cr3;
+    tasks[slot].rsp = 0;
+
+    if (name) {
+        strlcpy(tasks[slot].name, name, sizeof(tasks[slot].name));
+    } else {
+        tasks[slot].name[0] = '\0';
+    }
+
+    memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
+    tasks[slot].signal_mask = 0;
+    tasks[slot].signal_pending = 0;
+    memset(tasks[slot].signal_handlers, 0, sizeof(tasks[slot].signal_handlers));
+    memset(tasks[slot].signal_restorers, 0, sizeof(tasks[slot].signal_restorers));
+
+    tasks[slot].brk = 0;
+    tasks[slot].fs_base = 0;
+    tasks[slot].gs_base = 0;
+    tasks[slot].mmap_base = 0x700000000000ULL;
+
+    if (slot >= task_count) {
+        task_count = slot + 1;
+    }
+}
+
 void scheduler_init(void) {
     memset(tasks, 0, sizeof(tasks));
-
-    /* Tarea 0: Representa el hilo de ejecución actual (kernel/shell) */
-    tasks[0].id = next_id++;
-    tasks[0].parent_id = 0;
-    tasks[0].state = TASK_RUNNING;
-    tasks[0].stack_base = NULL;  /* El kernel ya tiene su stack */
-    tasks[0].rsp = 0;            /* Se llenará en el primer context_switch */
 
     /* Inicializar CR3 del kernel */
     uint64_t cr3;
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
-    tasks[0].cr3 = cr3;
-    tasks[0].kernel_stack = 0;   /* No necesario para tarea kernel pura */
 
-    strlcpy(tasks[0].name, "kernel", sizeof(tasks[0].name));
-
-    /* POSIX Init for Kernel Task */
-    memset(tasks[0].fd_table, 0, sizeof(tasks[0].fd_table));
-    tasks[0].signal_mask = 0;
-    tasks[0].signal_pending = 0;
-    memset(tasks[0].signal_handlers, 0, sizeof(tasks[0].signal_handlers));
-    memset(tasks[0].signal_restorers, 0, sizeof(tasks[0].signal_restorers));
-
-    /* Linux Init */
-    tasks[0].brk = 0;
-    tasks[0].fs_base = 0;
-    tasks[0].gs_base = 0;
-    tasks[0].mmap_base = 0x700000000000ULL;
-
-    task_count = 1;
+    /* Tarea 0: Representa el hilo de ejecución actual (kernel/shell) */
+    task_setup_slot(0, "kernel", TASK_RUNNING, NULL, 0, cr3);
     /* current_task = 0; removed */
     scheduler_active = true;
 
@@ -185,17 +193,9 @@ void task_init_ap(void) {
         return;
     }
 
-    /* Inicializar tarea Idle para este CPU */
-    tasks[slot].id = next_id++;
-    tasks[slot].parent_id = 0;
-    tasks[slot].state = TASK_RUNNING; /* Ya está corriendo */
-    tasks[slot].stack_base = NULL;    /* Usa el stack del AP init */
-    tasks[slot].rsp = 0;
-
+    /* Inicializar CR3 del kernel */
     uint64_t cr3;
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
-    tasks[slot].cr3 = cr3;
-    tasks[slot].kernel_stack = 0;
 
     cpu_info_t* cpu = get_current_cpu();
     char name[32] = "Idle AP ";
@@ -203,25 +203,19 @@ void task_init_ap(void) {
         char buf[8];
         itoa_s(cpu->apic_id, buf, 8, 10);
         strlcat(name, buf, 32);
+    } else {
+        strlcat(name, "?", 32);
+    }
 
+    /* Inicializar tarea Idle para este CPU */
+    task_setup_slot(slot, name, TASK_RUNNING, NULL, 0, cr3);
+
+    if (cpu) {
         cpu->current_task = &tasks[slot];
         cpu->sched_ticks = 0;
         /* Set RSP0 in TSS for this AP (using its current stack top) */
         tss_set_rsp0(cpu->kernel_stack_top);
         tasks[slot].kernel_stack = cpu->kernel_stack_top;
-    } else {
-        strlcat(name, "?", 32);
-    }
-
-    strlcpy(tasks[slot].name, name, sizeof(tasks[slot].name));
-
-    /* Basic Init */
-    memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
-    tasks[slot].fs_base = 0;
-    tasks[slot].gs_base = 0;
-
-    if (slot >= task_count) {
-        task_count = slot + 1;
     }
 
     spin_unlock(&sched_lock);
@@ -266,35 +260,14 @@ int task_create(const char* name, void (*entry)(void)) {
     }
     /* Note: alloc_kernel_stack already memsets to 0 */
 
-    /* Configurar la tarea */
-    tasks[slot].id = next_id++;
-    tasks[slot].parent_id = 0;
-    tasks[slot].state = TASK_READY;
-    tasks[slot].stack_base = stack;
-
-    /* Configurar stack de kernel y CR3 */
-    tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
-
     /* Heredar CR3 del kernel (por ahora, luego cada proceso tendrá su PML4) */
     uint64_t cr3;
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
-    tasks[slot].cr3 = cr3;
 
-    strlcpy(tasks[slot].name, name, sizeof(tasks[slot].name));
+    /* Configurar la tarea */
+    task_setup_slot(slot, name, TASK_READY, stack, (uint64_t)(stack + TASK_STACK_SIZE), cr3);
+
     tasks[slot].entry = entry;
-
-    /* POSIX Init for New Task */
-    memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
-    tasks[slot].signal_mask = 0;
-    tasks[slot].signal_pending = 0;
-    memset(tasks[slot].signal_handlers, 0, sizeof(tasks[slot].signal_handlers));
-    memset(tasks[slot].signal_restorers, 0, sizeof(tasks[slot].signal_restorers));
-
-    /* Linux Init */
-    tasks[slot].brk = 0;
-    tasks[slot].fs_base = 0;
-    tasks[slot].gs_base = 0;
-    tasks[slot].mmap_base = 0x700000000000ULL;
 
     /*
      * Preparar el stack para que context_switch pueda "entrar" por primera vez.
@@ -324,10 +297,6 @@ int task_create(const char* name, void (*entry)(void)) {
     *(--sp) = (uint64_t)entry;       /* r15 = entry point (leído por wrapper) */
 
     tasks[slot].rsp = (uint64_t)sp;
-
-    if (slot >= task_count) {
-        task_count = slot + 1;
-    }
 
     spin_unlock(&sched_lock);
     __asm__ volatile("sti");
