@@ -412,6 +412,8 @@ void schedule(void) {
     }
 
     if (next_task == current) {
+        /* Clear any pending timeout if we are resuming a blocked task */
+        current->wake_tick = 0;
         spin_unlock(&sched_lock);
         __asm__ volatile("sti");
         return;
@@ -438,6 +440,8 @@ void schedule(void) {
     current->gs_base = rdmsr(MSR_KERNEL_GS_BASE); /* User GS is in KERNEL_GS_BASE while in kernel */
     
     next_task->state = TASK_RUNNING;
+    /* Clear any pending timeout when task is scheduled */
+    next_task->wake_tick = 0;
     cpu->current_task = next_task;
 
     /* Actualizar TSS RSP0 y Per-CPU Kernel Stack para Syscalls */
@@ -505,7 +509,8 @@ void task_wake_expired(uint64_t current_tick) {
     /* Called from timer interrupt, so interrupts are disabled. */
     spin_lock(&sched_lock);
     for (int i = 0; i < task_count; i++) {
-        if (tasks[i].state == TASK_SLEEPING) {
+        if (tasks[i].state == TASK_SLEEPING ||
+           (tasks[i].state == TASK_BLOCKED && tasks[i].wake_tick > 0)) {
             if (current_tick >= tasks[i].wake_tick) {
                 tasks[i].state = TASK_READY;
             }
