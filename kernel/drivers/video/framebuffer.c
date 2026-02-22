@@ -17,6 +17,34 @@ static uint32_t fb_size_bytes = 0;
 /* Cached pointer to current drawing buffer (front or back) */
 static uint32_t* active_buffer = 0;
 
+/* Dirty region tracking (inclusive min, exclusive max) */
+static uint32_t dirty_min_x = 0;
+static uint32_t dirty_min_y = 0;
+static uint32_t dirty_max_x = 0;
+static uint32_t dirty_max_y = 0;
+
+/* Helper to mark region as dirty */
+static void framebuffer_mark_dirty(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
+    if (w == 0 || h == 0) return;
+
+    uint32_t max_x = x + w;
+    uint32_t max_y = y + h;
+
+    if (dirty_min_x >= dirty_max_x) {
+        /* First dirty rect */
+        dirty_min_x = x;
+        dirty_min_y = y;
+        dirty_max_x = max_x;
+        dirty_max_y = max_y;
+    } else {
+        /* Union */
+        if (x < dirty_min_x) dirty_min_x = x;
+        if (y < dirty_min_y) dirty_min_y = y;
+        if (max_x > dirty_max_x) dirty_max_x = max_x;
+        if (max_y > dirty_max_y) dirty_max_y = max_y;
+    }
+}
+
 void framebuffer_init(boot_info_t* info) {
     if (!info || !info->fb_addr) return;
     if (fb_buffer) return; /* Already initialized */
@@ -38,6 +66,12 @@ void framebuffer_init(boot_info_t* info) {
     size_t total_size = fb_size_bytes + offset;
     size_t pages = (total_size + HAL_PAGE_SIZE - 1) / HAL_PAGE_SIZE;
 
+#ifdef __ETEROS_HOST_TEST__
+    /* In host tests, we use the provided address directly as it's a malloc pointer */
+    fb_buffer = (uint32_t*)phys_addr;
+    (void)virt_base;
+    (void)pages;
+#else
     for(size_t i = 0; i < pages; i++) {
          hal_mem_map(phys_base + i * HAL_PAGE_SIZE,
                      virt_base + i * HAL_PAGE_SIZE,
@@ -45,6 +79,7 @@ void framebuffer_init(boot_info_t* info) {
     }
 
     fb_buffer = (uint32_t*)(virt_base + offset);
+#endif
     
     char buf[64];
     serial_write_string("[FB] LFB Address: 0x");
@@ -56,6 +91,12 @@ void framebuffer_init(boot_info_t* info) {
 
     /* Default to front buffer */
     active_buffer = fb_buffer;
+
+    /* Initialize dirty rect to empty */
+    dirty_min_x = fb_width; /* Invalid state: min >= max */
+    dirty_max_x = 0;
+    dirty_min_y = fb_height;
+    dirty_max_y = 0;
 }
 
 uint32_t framebuffer_get_width(void) { return fb_width; }
@@ -81,8 +122,56 @@ void framebuffer_enable_double_buffer(void) {
 
 void framebuffer_flush(void) {
     if (back_buffer && fb_buffer) {
-        /* Optimized flush? memcpy is already rep movsq */
-        memcpy(fb_buffer, back_buffer, fb_size_bytes);
+        /* Check dirty region */
+        if (dirty_min_x >= dirty_max_x) return;
+
+        /* Clip to screen bounds */
+        if (dirty_min_x >= fb_width) dirty_min_x = 0;
+        if (dirty_min_y >= fb_height) dirty_min_y = 0;
+        if (dirty_max_x > fb_width) dirty_max_x = fb_width;
+        if (dirty_max_y > fb_height) dirty_max_y = fb_height;
+
+        uint32_t w = dirty_max_x - dirty_min_x;
+        uint32_t h = dirty_max_y - dirty_min_y;
+
+        if (w == 0 || h == 0) {
+             /* Reset and return */
+             dirty_min_x = fb_width; dirty_max_x = 0;
+             dirty_min_y = fb_height; dirty_max_y = 0;
+             return;
+        }
+
+        /* If full screen update */
+        if (w == fb_width && h == fb_height && fb_pitch == fb_width * (fb_bpp / 8)) {
+             memcpy(fb_buffer, back_buffer, fb_size_bytes);
+        } else {
+             /* Partial update */
+             size_t bpp_bytes = fb_bpp / 8;
+             size_t row_len = w * bpp_bytes;
+
+             uint8_t* dest = (uint8_t*)fb_buffer;
+             uint8_t* src = (uint8_t*)back_buffer;
+
+             /* Offset to starting Y */
+             size_t y_offset = dirty_min_y * fb_pitch;
+             dest += y_offset;
+             src += y_offset;
+
+             /* Offset to starting X */
+             size_t x_offset = dirty_min_x * bpp_bytes;
+             dest += x_offset;
+             src += x_offset;
+
+             for (uint32_t i = 0; i < h; i++) {
+                 memcpy(dest, src, row_len);
+                 dest += fb_pitch;
+                 src += fb_pitch;
+             }
+        }
+
+        /* Reset dirty region */
+        dirty_min_x = fb_width; dirty_max_x = 0;
+        dirty_min_y = fb_height; dirty_max_y = 0;
     }
 }
 
@@ -113,6 +202,9 @@ void framebuffer_putpixel(uint32_t x, uint32_t y, uint32_t color) {
     
     /* Use cached active_buffer */
     if (!active_buffer) return;
+
+    /* Mark pixel as dirty */
+    framebuffer_mark_dirty(x, y, 1, 1);
 
     /* 32-bit optimization (Most common case) */
     if (fb_bpp == 32) {
@@ -145,6 +237,9 @@ extern const uint8_t font8x16[];
 void framebuffer_clear(uint32_t color) {
     if (!active_buffer) return;
 
+    /* Mark full screen as dirty */
+    framebuffer_mark_dirty(0, 0, fb_width, fb_height);
+
     /* Optimización para 32-bit */
     if (fb_bpp == 32) {
         if (fb_pitch == fb_width * 4) {
@@ -173,6 +268,9 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
 
     if (!active_buffer) return;
 
+    /* Mark rect as dirty */
+    framebuffer_mark_dirty(x, y, w, h);
+
     /* Optimized 32-bit path */
     if (fb_bpp == 32) {
         for (uint32_t i = 0; i < h; i++) {
@@ -198,6 +296,9 @@ void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t b
 
     /* Clip basic check */
     if (x >= fb_width || y >= fb_height - 16) return;
+
+    /* Mark char bounds as dirty */
+    framebuffer_mark_dirty(x, y, 8, 16);
 
     unsigned char uc = (unsigned char)c;
     const uint8_t* glyph = &font8x16[uc * 16];
