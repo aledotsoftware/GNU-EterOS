@@ -72,6 +72,52 @@ static uint32_t next_id       = 0;    /* Generador de IDs */
 static bool     scheduler_active = false; /* El scheduler está inicializado? */
 static spinlock_t sched_lock  = 0;    /* SMP protection */
 
+/* Queue Globals (O(1) Scheduler) */
+static task_t*  ready_head = NULL;
+static task_t*  ready_tail = NULL;
+
+static void enqueue_ready(task_t* t) {
+    if (!t) return;
+    /* Ensure we don't enqueue something already in queue?
+       Ideally caller ensures this. But for safety we could check.
+       However, checking is O(N) or requires a flag.
+       Let's assume caller correctness for O(1). */
+
+    t->next_ready = NULL;
+    t->prev_ready = ready_tail;
+    if (ready_tail) {
+        ready_tail->next_ready = t;
+    } else {
+        ready_head = t;
+    }
+    ready_tail = t;
+}
+
+static void dequeue_ready(task_t* t) {
+    if (!t) return;
+
+    if (t->prev_ready) {
+        t->prev_ready->next_ready = t->next_ready;
+    } else {
+        /* If head is t */
+        if (ready_head == t) {
+            ready_head = t->next_ready;
+        }
+    }
+
+    if (t->next_ready) {
+        t->next_ready->prev_ready = t->prev_ready;
+    } else {
+        /* If tail is t */
+        if (ready_tail == t) {
+            ready_tail = t->prev_ready;
+        }
+    }
+
+    t->next_ready = NULL;
+    t->prev_ready = NULL;
+}
+
 /* CPU Load Metrics */
 static uint64_t cpu_total_ticks = 0;
 static uint64_t cpu_idle_ticks = 0;
@@ -117,6 +163,10 @@ static void task_entry_wrapper(void) {
 
 void scheduler_init(void) {
     memset(tasks, 0, sizeof(tasks));
+
+    /* Initialize Queue */
+    ready_head = NULL;
+    ready_tail = NULL;
 
     /* Tarea 0: Representa el hilo de ejecución actual (kernel/shell) */
     tasks[0].id = next_id++;
@@ -329,6 +379,7 @@ int task_create(const char* name, void (*entry)(void)) {
         task_count = slot + 1;
     }
 
+    enqueue_ready(&tasks[slot]);
     spin_unlock(&sched_lock);
     __asm__ volatile("sti");
 
@@ -344,22 +395,9 @@ int task_create(const char* name, void (*entry)(void)) {
  * @return Puntero a la siguiente tarea, o current_task si no hay otra.
  */
 static task_t* find_next_task(task_t* current) {
-    /* We iterate the global array. Using pointer arithmetic or index. */
-    /* Let's use index based on current ID or just scan */
-    /* To keep Round Robin fair, we need to start from current+1 */
-    /* We can find current index by pointer math if `tasks` is contiguous */
-
-    int start_idx = (int)(current - tasks);
-    if (start_idx < 0 || start_idx >= MAX_TASKS) start_idx = 0;
-
-    int next_idx = start_idx;
-    for (int i = 0; i < task_count; i++) {
-        next_idx = (next_idx + 1) % task_count;
-        /* SMP Fix: Only pick READY tasks.
-           Do NOT pick RUNNING tasks (they are busy on this or other CPUs). */
-        if (tasks[next_idx].state == TASK_READY) {
-             return &tasks[next_idx];
-        }
+    /* O(1) Scheduler: Check ready queue */
+    if (ready_head) {
+        return ready_head;
     }
 
     /* Si no hay tareas listas y la actual esta muerta/durmiendo */
@@ -431,12 +469,18 @@ void schedule(void) {
     /* Cambiar estado */
     if (current->state == TASK_RUNNING) {
         current->state = TASK_READY;
+        enqueue_ready(current);
     }
 
     /* Save current TLS state */
     current->fs_base = rdmsr(MSR_FS_BASE);
     current->gs_base = rdmsr(MSR_KERNEL_GS_BASE); /* User GS is in KERNEL_GS_BASE while in kernel */
     
+    /* Remove next task from ready queue */
+    if (next_task != current) {
+        dequeue_ready(next_task);
+    }
+
     next_task->state = TASK_RUNNING;
     cpu->current_task = next_task;
 
@@ -508,10 +552,34 @@ void task_wake_expired(uint64_t current_tick) {
         if (tasks[i].state == TASK_SLEEPING) {
             if (current_tick >= tasks[i].wake_tick) {
                 tasks[i].state = TASK_READY;
+                enqueue_ready(&tasks[i]);
             }
         }
     }
     spin_unlock(&sched_lock);
+}
+
+void task_wakeup(task_t* t) {
+    if (!scheduler_active || !t) return;
+
+    /* Save interrupt state */
+    uint64_t rflags;
+    __asm__ volatile("pushfq; pop %0" : "=r"(rflags));
+    __asm__ volatile("cli");
+
+    spin_lock(&sched_lock);
+    /* Only wake if BLOCKED or SLEEPING.
+       If it is already READY or RUNNING, do nothing. */
+    if (t->state == TASK_BLOCKED || t->state == TASK_SLEEPING) {
+        t->state = TASK_READY;
+        enqueue_ready(t);
+    }
+    spin_unlock(&sched_lock);
+
+    /* Restore interrupts if they were enabled */
+    if (rflags & 0x200) {
+        __asm__ volatile("sti");
+    }
 }
 
 void task_exit(int status) {
@@ -555,6 +623,7 @@ int task_get_count(void) {
 int task_kill(uint32_t pid) {
     if (pid == 0) return -1; /* No matar kernel */
     
+    __asm__ volatile("cli");
     spin_lock(&sched_lock);
 
     task_t* current = task_get_current();
@@ -562,6 +631,10 @@ int task_kill(uint32_t pid) {
 
     for (int i = 1; i < task_count; i++) {
         if (tasks[i].id == pid && tasks[i].state != TASK_DEAD) {
+            if (tasks[i].state == TASK_READY) {
+                dequeue_ready(&tasks[i]);
+            }
+
             tasks[i].state = TASK_DEAD;
             serial_write_string("[SCHED] Killed task PID ");
             serial_write_string("\n");
@@ -571,6 +644,7 @@ int task_kill(uint32_t pid) {
             }
 
             spin_unlock(&sched_lock);
+            __asm__ volatile("sti");
 
             if (killed_self) {
                 schedule();
@@ -580,6 +654,7 @@ int task_kill(uint32_t pid) {
     }
 
     spin_unlock(&sched_lock);
+    __asm__ volatile("sti");
     return -1;
 }
 
@@ -713,6 +788,7 @@ int task_fork(void* regs_ptr) {
 
     if (slot >= task_count) task_count = slot + 1;
 
+    enqueue_ready(&tasks[slot]);
     spin_unlock(&sched_lock);
     __asm__ volatile("sti");
 

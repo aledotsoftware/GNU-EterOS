@@ -142,7 +142,7 @@ int futex_wake(uint32_t *uaddr, int count) {
         if (curr->uaddr == uaddr) {
             /* Wake up this task */
             if (curr->task->state == TASK_BLOCKED) {
-                curr->task->state = TASK_READY;
+                task_wakeup(curr->task);
             }
 
             /* Remove from list */

@@ -66,6 +66,9 @@ typedef struct task {
     struct semaphore* waiting_sem;          /* Semaphore waiting on (if blocked) */
     char           name[32];                /* Nombre descriptivo */
 
+    struct task*   next_ready;              /* Next task in ready queue */
+    struct task*   prev_ready;              /* Previous task in ready queue */
+
     /* POSIX Compatibility */
     file_descriptor_t fd_table[MAX_FD];     /* File Descriptor Table */
     uint32_t       signal_mask;             /* Mask of blocked signals */
@@ -125,6 +128,12 @@ void task_sleep(uint64_t ms);
  * Llamado desde el timer interrupt.
  */
 void task_wake_expired(uint64_t current_tick);
+
+/**
+ * Despierta una tarea bloqueada o dormida.
+ * Cambia su estado a TASK_READY y la encola.
+ */
+void task_wakeup(task_t* t);
 
 /**
  * Termina la tarea actual.
