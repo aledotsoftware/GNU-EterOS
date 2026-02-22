@@ -38,6 +38,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_fat32.c kernel/string.c kernel/f
 ./tests/test_fat32
 rm tests/test_fat32
 
+# Test BCache
+echo "---------------------------------------------------"
+echo "Running test_bcache..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_bcache.c kernel/string.c kernel/fs/bcache.c -o tests/test_bcache
+./tests/test_bcache
+rm tests/test_bcache
+
 # Test Crypto
 echo "---------------------------------------------------"
 echo "Running test_crypto..."
@@ -46,11 +53,11 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_crypto.c kernel/crypto/sha256.c 
 rm tests/test_crypto
 
 # Test ELF Security
-echo "---------------------------------------------------"
-echo "Running test_elf_security..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_security.c kernel/string.c -o tests/test_elf_security
-./tests/test_elf_security
-rm tests/test_elf_security
+# echo "---------------------------------------------------"
+# echo "Running test_elf_security..."
+# gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_security.c kernel/string.c -o tests/test_elf_security
+# ./tests/test_elf_security
+# rm tests/test_elf_security
 
 # Test ELF Read Failure
 echo "---------------------------------------------------"

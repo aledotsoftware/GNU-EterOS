@@ -93,6 +93,12 @@ int vmm_validate_user_ptr(const void* addr, size_t size) {
     return vmm_verify_user_access(addr, size, 0);
 }
 
+int vmm_check_user_string(const char* str, size_t max_len) {
+    if (!str) return 0;
+    // For test purposes, assume all strings are valid
+    return 1;
+}
+
 uint64_t vmm_virt_to_phys(uint64_t virt) { return virt; }
 int vmm_map_page(uint64_t phys, uint64_t virt, uint64_t flags) { return 0; }
 void vmm_destroy_pml4(uint64_t pml4) {}
