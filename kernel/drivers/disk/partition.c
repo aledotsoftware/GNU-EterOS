@@ -119,11 +119,6 @@ static uint32_t partition_write(fs_node_t *node, uint32_t offset, uint32_t size,
     for (uint32_t i = 0; i < total_sectors_to_write; i++) {
         uint32_t current_lba = part->start_lba + start_sector + i;
 
-        // Read-Modify-Write
-        if (disk->read_sector(disk, current_lba, sect_buf) != 0) {
-            break;
-        }
-
         uint32_t chunk_start = 0;
         if (i == 0) chunk_start = sector_offset;
 
@@ -136,6 +131,14 @@ static uint32_t partition_write(fs_node_t *node, uint32_t offset, uint32_t size,
         }
 
         uint32_t chunk_size = chunk_end - chunk_start;
+
+        // Read-Modify-Write: Only read if we're not overwriting the entire sector
+        if (chunk_size < sector_size) {
+            if (disk->read_sector(disk, current_lba, sect_buf) != 0) {
+                break;
+            }
+        }
+
         memcpy(sect_buf + chunk_start, buffer + bytes_written, chunk_size);
 
         if (disk->write_sector(disk, current_lba, sect_buf) != 0) {
