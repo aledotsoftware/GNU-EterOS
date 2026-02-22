@@ -55,6 +55,11 @@ void test_snprintf() {
     assert(strcmp(buf, "Hello") == 0);
     assert(ret == 5);
 
+    /* String width padding */
+    ret = snprintf(buf, sizeof(buf), "%10s", "Hello");
+    assert(strcmp(buf, "     Hello") == 0);
+    assert(ret == 10);
+
     /* Char */
     ret = snprintf(buf, sizeof(buf), "%c", 'A');
     assert(strcmp(buf, "A") == 0);

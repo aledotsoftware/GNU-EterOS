@@ -122,7 +122,10 @@ int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
                 const char* s = va_arg(ap, const char*);
                 if (!s) s = "(null)";
                 size_t len = strlen(s);
-                /* TODO: Width padding for strings if needed */
+                if (width > 0 && (size_t)width > len) {
+                    size_t padding = (size_t)width - len;
+                    while (padding-- > 0) buffer_append(str, size, &pos, ' ');
+                }
                 for (size_t i = 0; i < len; i++) buffer_append(str, size, &pos, s[i]);
                 break;
             }
