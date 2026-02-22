@@ -49,3 +49,7 @@
 ## 2027-02-18 - [CSS-Only Tooltips]
 **Learning:** Using `attr(data-tooltip)` with `::before` pseudo-elements allows for lightweight, accessible tooltips without JavaScript overhead, keeping the interface snappy and declaratively defined.
 **Action:** Standardize `data-tooltip` usage across icon-only controls to provide consistent contextual help.
+
+## 2027-02-20 - [Explicit Search Clearing]
+**Learning:** Relying on backspace to clear search inputs adds friction, especially on touch interfaces or long queries. A dedicated "Clear" button that appears on input provides an immediate escape hatch and restores the default state with a single click.
+**Action:** Always implement a conditional "Clear" button (`x`) inside search inputs that becomes visible when `value.length > 0`.
