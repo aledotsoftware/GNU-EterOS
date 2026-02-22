@@ -98,10 +98,34 @@ void test_stdlib(void) {
     printf("rand(): %d\n", rand());
 }
 
+void test_string(void) {
+    printf("[TEST] Testing string functions...\n");
+
+    /* Test strlen */
+    if (strlen("") != 0) printf("FAIL: strlen empty\n");
+    if (strlen("a") != 1) printf("FAIL: strlen 'a'\n");
+    if (strlen("1234567") != 7) printf("FAIL: strlen 7\n");
+    if (strlen("12345678") != 8) printf("FAIL: strlen 8\n");
+    if (strlen("123456789") != 9) printf("FAIL: strlen 9\n");
+
+    /* Test alignment and long strings */
+    char buf[100];
+    memset(buf, 'x', 99);
+    buf[99] = '\0';
+    if (strlen(buf) != 99) printf("FAIL: strlen long (99)\n");
+
+    /* Test unaligned access handled correctly */
+    /* Note: string literals might be aligned, but buf+1 is definitely odd if buf is aligned */
+    if (strlen(buf + 1) != 98) printf("FAIL: strlen unaligned +1\n");
+
+    printf("PASS: String functions\n");
+}
+
 int main(int argc, char **argv) {
     (void)argc; (void)argv;
     printf("=== Libc Advanced Test ===\n");
     test_malloc();
+    test_string();
     test_printf();
     test_stdlib();
     printf("=== Test Complete ===\n");

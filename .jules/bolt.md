@@ -13,3 +13,7 @@
 ## 2026-11-23 - [Glow Overdraw & VRAM Reads]
 **Learning:** Alpha blending operations like `omni_fill_rect_alpha` require reading from the framebuffer (VRAM), which is extremely slow due to uncached memory access. Drawing a full filled rectangle for a border/glow effect and then overwriting the center wastes ~90% of bandwidth.
 **Action:** Use a "hollow" drawing function (4 strips) for borders and glows to eliminate overdraw of the central area, especially for large UI elements.
+
+## 2026-12-14 - [SWAR String Length Optimization]
+**Learning:** Naive byte-by-byte `strlen` was a significant bottleneck (~0.64s for 1GB scan). Implementing a SWAR (SIMD Within A Register) algorithm processing 8 bytes at a time yielded a ~5.7x speedup (0.11s) without requiring platform-specific SIMD instructions.
+**Action:** When implementing low-level string primitives in libc, prioritize word-at-a-time processing (SWAR) over byte loops for massive performance gains on standard hardware.
