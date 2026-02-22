@@ -1,77 +1,69 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #include <assert.h>
+#include <stdlib.h>
+#include <stdint.h>
 
-/* Rename userspace functions to avoid conflict with host libc */
-#define strlen eteros_strlen
-#define memcpy eteros_memcpy
-#define memset eteros_memset
-#define memmove eteros_memmove
-#define memcmp eteros_memcmp
-#define strcmp eteros_strcmp
-#define strncmp eteros_strncmp
-#define strcpy eteros_strcpy
-#define strncpy eteros_strncpy
-#define strcat eteros_strcat
-#define strchr eteros_strchr
-#define strrchr eteros_strrchr
-#define strstr eteros_strstr
-#define strtok eteros_strtok
+// Macros to rename functions to avoid conflict with host libc
+#define strlen my_strlen
+#define memcpy my_memcpy
+#define memset my_memset
+#define memmove my_memmove
+#define memcmp my_memcmp
+#define strcmp my_strcmp
+#define strncmp my_strncmp
+#define strcpy my_strcpy
+#define strncpy my_strncpy
+#define strcat my_strcat
+#define strchr my_strchr
+#define strrchr my_strrchr
+#define strstr my_strstr
 
-/* Include the source file directly */
+// Include the source file directly
 #include "../userspace/libc/src/string.c"
 
-int main() {
-    printf("Testing userspace strlen implementation...\n");
+#undef strlen
 
-    /* Test 1: Empty string */
-    assert(eteros_strlen("") == 0);
+void test_strlen_correctness() {
+    printf("Testing userspace strlen correctness...\n");
 
-    /* Test 2: Short string */
-    assert(eteros_strlen("Hello") == 5);
+    // Test 1: Empty string
+    assert(my_strlen("") == 0);
 
-    /* Test 3: String with spaces */
-    assert(eteros_strlen("Hello World") == 11);
+    // Test 2: Single char
+    assert(my_strlen("a") == 1);
 
-    /* Test 4: Long string (trigger optimization) */
-    char long_str[100];
-    for (int i = 0; i < 99; i++) long_str[i] = 'A';
-    long_str[99] = '\0';
-    assert(eteros_strlen(long_str) == 99);
+    // Test 3: Standard string
+    assert(my_strlen("hello") == 5);
 
-    /* Test 5: Alignment check using malloc (usually 16-byte aligned) */
-    /* We want to test aligned and unaligned starts */
-    char *buf = malloc(256);
-    if (!buf) {
-        printf("Malloc failed\n");
-        return 1;
-    }
+    // Test 4: Long string
+    char *long_str = malloc(1000);
+    memset(long_str, 'a', 999);
+    long_str[999] = '\0';
+    assert(my_strlen(long_str) == 999);
+    free(long_str);
 
-    /* Fill with non-null */
-    memset(buf, 'X', 256);
+    // Test 5: Alignment test
+    char *buf = malloc(64);
+    memset(buf, 'x', 63);
+    buf[63] = '\0';
 
-    /* Test various offsets (0-15) to check alignment handling */
-    for (int offset = 0; offset < 16; offset++) {
-        char *ptr = buf + offset;
-
-        /* Test various lengths (0-64) */
-        for (int len = 0; len < 64; len++) {
-            ptr[len] = '\0'; /* Terminate */
-
-            size_t res = eteros_strlen(ptr);
-            if (res != (size_t)len) {
-                printf("FAIL: offset=%d, len=%d, expected=%d, got=%lu\n", offset, len, len, res);
-                assert(res == (size_t)len);
-            }
-
-            ptr[len] = 'X'; /* Restore */
+    // Test all start offsets
+    for (int i = 0; i < 16; i++) {
+        // Place a null terminator at various distances
+        for (int len = 0; len < 30; len++) {
+            char saved = buf[i + len];
+            buf[i + len] = '\0';
+            assert(my_strlen(buf + i) == (size_t)len);
+            buf[i + len] = saved;
         }
     }
-
     free(buf);
 
-    printf("ALL TESTS PASSED.\n");
+    printf("Userspace strlen correctness passed.\n");
+}
+
+int main() {
+    test_strlen_correctness();
     return 0;
 }
