@@ -139,14 +139,14 @@ int vmm_verify_user_access(const void* addr, size_t size, int write);
 void vmm_destroy_pml4(uint64_t pml4_phys);
 
 /**
- * Verifica si una cadena en espacio de usuario es válida (segura para leer).
- * Chequea que esté dentro del rango de usuario, que las páginas sean accesibles,
- * y que contenga un terminador nulo dentro de max_len bytes.
+ * Safely copies a string from user space to kernel space.
+ * Checks for page boundaries and user permissions during the copy.
  *
- * @param str Puntero al inicio de la cadena.
- * @param max_len Longitud máxima a escanear.
- * @return 1 si es válida, 0 si no.
+ * @param dst Kernel buffer to copy to.
+ * @param src User space address to copy from.
+ * @param max Maximum bytes to copy (buffer size).
+ * @return Number of bytes copied (including null terminator), or -EFAULT on error.
  */
-int vmm_check_user_string(const char* str, size_t max_len);
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max);
 
 #endif /* ETEROS_VMM_H */

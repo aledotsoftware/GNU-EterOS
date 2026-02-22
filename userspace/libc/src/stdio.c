@@ -29,7 +29,7 @@ struct buf_arg {
 
 static void buf_putc(int c, void *arg) {
     struct buf_arg *ba = (struct buf_arg*)arg;
-    if (ba->pos < ba->size - 1) {
+    if (ba->size > 0 && ba->pos < ba->size - 1) {
         ba->buf[ba->pos++] = (char)c;
     }
 }

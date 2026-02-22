@@ -73,6 +73,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_initrd_overflow.c -o tests/test_
 ./tests/test_initrd_overflow
 rm tests/test_initrd_overflow
 
+# Test Readv Security
+echo "---------------------------------------------------"
+echo "Running test_readv_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_readv_security.c kernel/string.c -o tests/test_readv_security
+./tests/test_readv_security
+rm tests/test_readv_security
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 
