@@ -9,6 +9,7 @@
 #include "../../include/vmm.h"
 #include "../../include/pmm.h"
 #include "../../include/string.h"
+#include "../../include/errno.h"
 #include "../../include/serial.h"
 #include "../../include/hal/mm.h"
 #include "../../include/apic.h"
@@ -550,4 +551,31 @@ int vmm_validate_user_ptr(const void* addr, size_t size) {
     if (end > (USER_LIMIT + 1)) return 0;
 
     return 1;
+}
+
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max) {
+    if (!dst || !src || max == 0) return -EINVAL;
+
+    size_t copied = 0;
+    while (copied < max) {
+        uint64_t addr = (uint64_t)(src + copied);
+
+        /* Check page boundary or first byte */
+        if ((copied == 0) || ((addr & (PAGE_SIZE - 1)) == 0)) {
+             if (!vmm_verify_user_access((void*)addr, 1, 0)) {
+                 return -EFAULT;
+             }
+        }
+
+        char c = src[copied];
+        dst[copied] = c;
+        if (c == '\0') {
+            return (int)(copied + 1); /* Return bytes copied including null */
+        }
+        copied++;
+    }
+
+    /* Max reached without null terminator */
+    dst[max - 1] = '\0';
+    return (int)max;
 }

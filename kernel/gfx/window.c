@@ -90,17 +90,41 @@ static void draw_window(window_t* win) {
     int32_t draw_x_end = x_end > (int32_t)fb_w ? (int32_t)fb_w : x_end;
     int32_t draw_y_end = y_end > (int32_t)fb_h ? (int32_t)fb_h : y_end;
 
-    for (int32_t y = draw_y_start; y < draw_y_end; y++) {
-        for (int32_t x = draw_x_start; x < draw_x_end; x++) {
-            /* Map screen (x,y) to window (win_x, win_y) */
-            int32_t win_x = x - win->x;
-            int32_t win_y = y - win->y;
+    /* Optimized 32-bit path */
+    if (framebuffer_get_bpp() == 32) {
+        uint32_t* fb_buf = framebuffer_get_buffer();
+        uint32_t fb_pitch = framebuffer_get_pitch();
+        int32_t width = draw_x_end - draw_x_start;
+        int32_t height = draw_y_end - draw_y_start;
 
-            uint32_t color = win->buffer[win_y * win->width + win_x];
+        int32_t win_y_start = draw_y_start - win->y;
+        int32_t win_x_start = draw_x_start - win->x;
 
-            /* Simple Alpha: If 0, transparent */
-            if (color != 0) {
-                 framebuffer_putpixel(x, y, color);
+        for (int32_t i = 0; i < height; i++) {
+            uint32_t* dest = (uint32_t*)((uint8_t*)fb_buf + ((draw_y_start + i) * fb_pitch) + (draw_x_start * 4));
+            uint32_t* src = win->buffer + ((win_y_start + i) * win->width) + win_x_start;
+
+            for (int32_t j = 0; j < width; j++) {
+                uint32_t color = src[j];
+                if (color != 0) {
+                    dest[j] = color;
+                }
+            }
+        }
+    } else {
+        /* Fallback for other depths */
+        for (int32_t y = draw_y_start; y < draw_y_end; y++) {
+            for (int32_t x = draw_x_start; x < draw_x_end; x++) {
+                /* Map screen (x,y) to window (win_x, win_y) */
+                int32_t win_x = x - win->x;
+                int32_t win_y = y - win->y;
+
+                uint32_t color = win->buffer[win_y * win->width + win_x];
+
+                /* Simple Alpha: If 0, transparent */
+                if (color != 0) {
+                    framebuffer_putpixel(x, y, color);
+                }
             }
         }
     }

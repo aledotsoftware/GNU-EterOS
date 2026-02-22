@@ -62,6 +62,7 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 }
 
 size_t strlen(const char *s) {
+#ifdef __x86_64__
     const char *p = s;
 
     /* Align to 8 bytes */
@@ -70,14 +71,14 @@ size_t strlen(const char *s) {
         p++;
     }
 
+    /* Process 8 bytes at a time */
     const uint64_t *lp = (const uint64_t *)p;
     uint64_t v;
-    const uint64_t magic1 = 0x0101010101010101ULL;
-    const uint64_t magic2 = 0x8080808080808080ULL;
-
     while (1) {
         v = *lp++;
-        if (((v - magic1) & ~v & magic2) != 0) {
+        /* Check if any byte is 0 using SWAR magic:
+           (v - 0x01...) & ~v & 0x80... detects zero byte */
+        if (((v - 0x0101010101010101ULL) & ~v & 0x8080808080808080ULL)) {
             const char *cp = (const char *)(lp - 1);
             if (cp[0] == 0) return cp - s;
             if (cp[1] == 0) return cp - s + 1;
@@ -89,6 +90,11 @@ size_t strlen(const char *s) {
             return cp - s + 7;
         }
     }
+#else
+    const char *p = s;
+    while (*p) p++;
+    return (size_t)(p - s);
+#endif
 }
 
 int strcmp(const char *s1, const char *s2) {

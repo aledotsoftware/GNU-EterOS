@@ -138,4 +138,15 @@ int vmm_verify_user_access(const void* addr, size_t size, int write);
  */
 void vmm_destroy_pml4(uint64_t pml4_phys);
 
+/**
+ * Safely copies a string from user space to kernel space.
+ * Checks for page boundaries and user permissions during the copy.
+ *
+ * @param dst Kernel buffer to copy to.
+ * @param src User space address to copy from.
+ * @param max Maximum bytes to copy (buffer size).
+ * @return Number of bytes copied (including null terminator), or -EFAULT on error.
+ */
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max);
+
 #endif /* ETEROS_VMM_H */
