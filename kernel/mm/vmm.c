@@ -15,6 +15,7 @@
 #include "../../include/cpu.h"
 #include "../../include/lock.h"
 #include "../../include/idt.h" /* For IPI_TLB_SHOOTDOWN */
+#include "../../include/errno.h"
 
 /* Estructura de una entrada de tabla de páginas (64-bit) */
 typedef uint64_t pt_entry_t;
@@ -550,4 +551,26 @@ int vmm_validate_user_ptr(const void* addr, size_t size) {
     if (end > (USER_LIMIT + 1)) return 0;
 
     return 1;
+}
+
+int vmm_strncpy_from_user(char* dest, const char* src, size_t max_len) {
+    if (!vmm_validate_user_ptr(src, 1)) return -EFAULT;
+
+    size_t i = 0;
+    while (i < max_len) {
+        /* Check page boundary for src + i */
+        if (i == 0 || ((uint64_t)(src + i) & 0xFFF) == 0) {
+            /* Start of a page (or first byte), check validity */
+            if (!vmm_verify_user_access(src + i, 1, 0)) return -EFAULT;
+        }
+
+        char c = src[i];
+        dest[i] = c;
+        if (c == '\0') return (int)i;
+        i++;
+    }
+
+    /* Ensure null termination if max_len reached */
+    if (max_len > 0) dest[max_len - 1] = '\0';
+    return (int)i;
 }

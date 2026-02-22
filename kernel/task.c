@@ -819,12 +819,28 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     if (argv) {
         if (!vmm_validate_user_ptr(argv, sizeof(char*))) return -EFAULT;
         for (int i=0; i<32; i++) {
+            /* Verify we can read the pointer from the argv array */
+            char** ptr_addr = (char**)argv + i;
+            if (!vmm_verify_user_access(ptr_addr, sizeof(char*), 0)) {
+                for(int j=0; j<argc; j++) kfree(kargv[j]);
+                return -EFAULT;
+            }
+
             char* ptr = argv[i];
             if (!ptr) break;
-            if (!vmm_validate_user_ptr(ptr, 1)) return -EFAULT;
+
             kargv[argc] = (char*)kmalloc(128);
-            if (!kargv[argc]) return -ENOMEM;
-            strlcpy(kargv[argc], ptr, 128);
+            if (!kargv[argc]) {
+                for(int j=0; j<argc; j++) kfree(kargv[j]);
+                return -ENOMEM;
+            }
+
+            /* Securely copy string from user */
+            if (vmm_strncpy_from_user(kargv[argc], ptr, 128) < 0) {
+                kfree(kargv[argc]);
+                for(int j=0; j<argc; j++) kfree(kargv[j]);
+                return -EFAULT;
+            }
             argc++;
         }
     }
@@ -835,12 +851,31 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     if (envp) {
         if (!vmm_validate_user_ptr(envp, sizeof(char*))) return -EFAULT;
         for (int i=0; i<32; i++) {
+            /* Verify we can read the pointer from the envp array */
+            char** ptr_addr = (char**)envp + i;
+            if (!vmm_verify_user_access(ptr_addr, sizeof(char*), 0)) {
+                for(int j=0; j<argc; j++) kfree(kargv[j]);
+                for(int j=0; j<envc; j++) kfree(kenvp[j]);
+                return -EFAULT;
+            }
+
             char* ptr = envp[i];
             if (!ptr) break;
-            if (!vmm_validate_user_ptr(ptr, 1)) return -EFAULT;
+
             kenvp[envc] = (char*)kmalloc(128);
-            if (!kenvp[envc]) return -ENOMEM;
-            strlcpy(kenvp[envc], ptr, 128);
+            if (!kenvp[envc]) {
+                for(int j=0; j<argc; j++) kfree(kargv[j]);
+                for(int j=0; j<envc; j++) kfree(kenvp[j]);
+                return -ENOMEM;
+            }
+
+            /* Securely copy string from user */
+            if (vmm_strncpy_from_user(kenvp[envc], ptr, 128) < 0) {
+                kfree(kenvp[envc]);
+                for(int j=0; j<argc; j++) kfree(kargv[j]);
+                for(int j=0; j<envc; j++) kfree(kenvp[j]);
+                return -EFAULT;
+            }
             envc++;
         }
     }

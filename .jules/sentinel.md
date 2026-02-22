@@ -17,3 +17,8 @@
 **Vulnerability:** Integer overflow in `ip_aton` allowed bypassing IP filters or connecting to unintended hosts (e.g., 300.2.3.4 becoming valid).
 **Learning:** Custom parsing logic often misses standard boundary checks present in libc functions like `inet_aton`.
 **Prevention:** Always validate numeric inputs against their logical bounds (0-255 for octets) during parsing.
+
+## 2026-05-26 - [Unsafe User String Access in Kernel]
+**Vulnerability:** `task_exec` directly dereferenced user-space pointers (both array elements and strings) using `strlcpy` without validating page boundaries or ensuring the string was null-terminated within mapped memory. This allowed a malicious user to crash the kernel by passing pointers to unmapped pages.
+**Learning:** Functions like `strlcpy` assume the source string is valid and null-terminated. They are unsafe for reading from untrusted user memory, which may be partially unmapped or malicious.
+**Prevention:** Always use specialized copy-from-user functions (like `strncpy_from_user`) that validate memory access page-by-page and handle faults gracefully, rather than relying on standard string functions.
