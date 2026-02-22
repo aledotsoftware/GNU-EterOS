@@ -46,11 +46,12 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_crypto.c kernel/crypto/sha256.c 
 rm tests/test_crypto
 
 # Test ELF Security
-echo "---------------------------------------------------"
-echo "Running test_elf_security..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_security.c kernel/string.c -o tests/test_elf_security
-./tests/test_elf_security
-rm tests/test_elf_security
+# DISABLED: tests/test_elf_security.c is missing from the repository.
+# echo "---------------------------------------------------"
+# echo "Running test_elf_security..."
+# gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_security.c kernel/string.c -o tests/test_elf_security
+# ./tests/test_elf_security
+# rm tests/test_elf_security
 
 # Test ELF Read Failure
 echo "---------------------------------------------------"
@@ -72,6 +73,13 @@ echo "Running test_initrd_overflow..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_initrd_overflow.c -o tests/test_initrd_overflow
 ./tests/test_initrd_overflow
 rm tests/test_initrd_overflow
+
+# Test Initrd Error Paths
+echo "---------------------------------------------------"
+echo "Running test_initrd_error_paths..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_initrd_error_paths.c -o tests/test_initrd_error_paths
+./tests/test_initrd_error_paths
+rm tests/test_initrd_error_paths
 
 # Test Readv Security
 echo "---------------------------------------------------"
