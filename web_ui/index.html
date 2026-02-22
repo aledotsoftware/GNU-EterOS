@@ -12,6 +12,23 @@
 </head>
 
 <body>
+    <div id="boot-splash" class="boot-splash">
+        <div class="splash-content">
+            <svg class="splash-logo" width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                <rect x="10" y="10" width="100" height="100" rx="28" fill="url(#logoGradient)" />
+                <text x="60" y="80" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="white" text-anchor="middle">E</text>
+            </svg>
+            <h1 class="splash-title">Eter OS</h1>
+            <div class="splash-loader" aria-label="Loading system" role="status"></div>
+        </div>
+    </div>
+
     <div class="os-shell">
         <header class="status-bar">
             <div class="status-left">
@@ -28,7 +45,7 @@
                     <div class="menu-item" role="menuitem" tabindex="0" onkeydown="handleMenuKey(event, this)">Apagar</div>
                 </div>
             </div>
-            <div class="status-right" role="button" tabindex="0" aria-label="Abrir centro de control" onclick="toggleControlCenter(event)" onkeydown="if(event.key==='Enter') toggleControlCenter(event)">
+            <div class="status-right" id="cc-trigger" role="button" tabindex="0" aria-label="Abrir centro de control" aria-haspopup="true" aria-expanded="false" onclick="toggleControlCenter(event)" onkeydown="if(event.key==='Enter') toggleControlCenter(event)">
                 <span class="net">WiFi 6</span>
                 <span class="battery">88%</span>
                 <span class="time" id="clock">20:38</span>
@@ -87,7 +104,7 @@
 
         <nav class="dock-container">
             <div class="dock" id="dock">
-                <div class="dock-item" role="button" aria-label="Lanzador de aplicaciones" tabindex="0"
+                <div class="dock-item" id="launcher-trigger" role="button" aria-label="Lanzador de aplicaciones" aria-haspopup="true" aria-expanded="false" tabindex="0"
                     onclick="toggleLauncher()" onkeydown="if(event.key==='Enter') toggleLauncher()" data-tooltip="Lanzador">
                     <img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/menu--v1.png" class="dock-icon">
                 </div>
@@ -113,11 +130,9 @@
     <div class="launcher" id="launcher" onclick="toggleLauncher()">
         <div class="launcher-content" onclick="event.stopPropagation()">
             <div class="search-container">
-                <div class="search-wrapper">
-                    <input type="text" id="launcher-search" placeholder="Buscar aplicaciones (Linux, Android...)"
-                        aria-label="Buscar aplicaciones" oninput="filterApps()">
-                    <button id="search-clear" aria-label="Limpiar búsqueda" onclick="clearSearch()" hidden>✕</button>
-                </div>
+                <input type="text" id="launcher-search" placeholder="Buscar aplicaciones (Linux, Android...)"
+                    aria-label="Buscar aplicaciones" oninput="filterApps()">
+                <button id="search-clear" aria-label="Limpiar búsqueda" hidden onclick="clearSearch()">×</button>
             </div>
             <div class="launcher-grid" id="launcher-grid">
                 <!-- Linux Apps -->

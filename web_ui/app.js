@@ -12,7 +12,12 @@ function toggleEterMenu(e) {
 
     // Hide other panels
     document.getElementById('control-center').classList.remove('active');
+    const ccTrigger = document.getElementById('cc-trigger');
+    if (ccTrigger) ccTrigger.setAttribute('aria-expanded', 'false');
+
     document.getElementById('launcher').classList.remove('active');
+    const launcherTrigger = document.getElementById('launcher-trigger');
+    if (launcherTrigger) launcherTrigger.setAttribute('aria-expanded', 'false');
 
     if (isActive) {
         const firstItem = menu.querySelector('.menu-item');
@@ -144,9 +149,12 @@ updateClock();
 
 function toggleLauncher() {
     const launcher = document.getElementById('launcher');
-    launcher.classList.toggle('active');
+    const isActive = launcher.classList.toggle('active');
 
-    if (launcher.classList.contains('active')) {
+    const trigger = document.getElementById('launcher-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', isActive);
+
+    if (isActive) {
         document.getElementById('launcher-search').focus();
     } else {
         // Clear search on close
@@ -155,7 +163,19 @@ function toggleLauncher() {
     }
 
     // Hide CC if opening launcher
-    document.getElementById('control-center').classList.remove('active');
+    const cc = document.getElementById('control-center');
+    if (cc.classList.contains('active')) {
+        cc.classList.remove('active');
+        const ccTrigger = document.getElementById('cc-trigger');
+        if (ccTrigger) ccTrigger.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function clearSearch() {
+    const input = document.getElementById('launcher-search');
+    input.value = '';
+    input.focus();
+    filterApps();
 }
 
 function clearSearch() {
@@ -166,16 +186,12 @@ function clearSearch() {
 }
 
 function filterApps() {
-    const searchInput = document.getElementById('launcher-search');
-    const query = searchInput.value.toLowerCase();
+    const query = document.getElementById('launcher-search').value.toLowerCase();
 
+    // Toggle clear button
     const clearBtn = document.getElementById('search-clear');
     if (clearBtn) {
-        if (query.length > 0) {
-            clearBtn.removeAttribute('hidden');
-        } else {
-            clearBtn.setAttribute('hidden', '');
-        }
+        clearBtn.hidden = query.length === 0;
     }
 
     const items = document.querySelectorAll('.launcher-item');
@@ -209,9 +225,18 @@ function filterApps() {
 function toggleControlCenter(e) {
     if (e) e.stopPropagation();
     const cc = document.getElementById('control-center');
-    cc.classList.toggle('active');
+    const isActive = cc.classList.toggle('active');
+
+    const trigger = document.getElementById('cc-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', isActive);
+
     // Hide launcher if opening CC
-    document.getElementById('launcher').classList.remove('active');
+    const launcher = document.getElementById('launcher');
+    if (launcher.classList.contains('active')) {
+        launcher.classList.remove('active');
+        const launcherTrigger = document.getElementById('launcher-trigger');
+        if (launcherTrigger) launcherTrigger.setAttribute('aria-expanded', 'false');
+    }
 }
 
 // App Switcher Logic
@@ -306,7 +331,12 @@ function confirmSwitcherSelection() {
 // Close overlays when clicking on workspace
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.control-center') && !e.target.closest('.status-right')) {
-        document.getElementById('control-center').classList.remove('active');
+        const cc = document.getElementById('control-center');
+        if (cc.classList.contains('active')) {
+            cc.classList.remove('active');
+            const trigger = document.getElementById('cc-trigger');
+            if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        }
     }
 
     const menu = document.getElementById('eter-menu');
@@ -715,3 +745,19 @@ function setupLauncherNav() {
 }
 
 setupLauncherNav();
+
+// Boot Splash Screen Logic
+document.addEventListener('DOMContentLoaded', () => {
+    const splash = document.getElementById('boot-splash');
+    if (splash) {
+        // Simulate boot time (e.g. 2.5 seconds)
+        setTimeout(() => {
+            splash.classList.add('fade-out');
+
+            // Remove from DOM after transition
+            setTimeout(() => {
+                splash.remove();
+            }, 600); // Match CSS transition duration
+        }, 2500);
+    }
+});

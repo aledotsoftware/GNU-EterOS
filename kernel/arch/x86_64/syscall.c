@@ -94,6 +94,8 @@ static void socket_close_fs(fs_node_t* node) {
 #define O_RDWR      00000002
 #define O_CREAT     0x00000040
 
+#define UIO_MAXIOV  1024
+
 typedef struct {
     uint8_t* buffer;
     uint32_t size;
@@ -184,23 +186,6 @@ static void pipe_close(fs_node_t* node) {
 
 static void pipe_open(fs_node_t* node) {
     (void)node;
-}
-
-static int validate_user_string(const char* str) {
-    if (!str) return 0;
-    if (!vmm_validate_user_ptr(str, 1)) return 0;
-    uint64_t ptr_val = (uint64_t)str;
-    uint64_t remaining = USER_LIMIT - ptr_val + 1;
-    uint64_t max_scan = (remaining < 4096) ? remaining : 4096;
-
-    for (uint64_t i = 0; i < max_scan; i++) {
-        uint64_t curr_addr = ptr_val + i;
-        if ((i == 0) || ((curr_addr & (PAGE_SIZE - 1)) == 0)) {
-            if (!vmm_verify_user_access((void*)curr_addr, 1, 0)) return 0;
-        }
-        if (str[i] == '\0') return 1;
-    }
-    return 0;
 }
 
 static int split_path(const char* path, char* parent, char* name) {
@@ -390,7 +375,7 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
 }
 
 static int64_t sys_open(const char* path, int flags, int mode) {
-    if (!validate_user_string(path)) return -EFAULT;
+    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
     task_t* current = task_get_current();
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) { if (current->fd_table[i].node == NULL) { fd = i; break; } }
@@ -429,7 +414,7 @@ static int64_t sys_close(int fd) {
 }
 
 static int64_t sys_mkdir(const char* path, int mode) {
-    if (!validate_user_string(path)) return -EFAULT;
+    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
     char parent_path[128]; char filename[128];
     if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
@@ -440,7 +425,7 @@ static int64_t sys_mkdir(const char* path, int mode) {
 }
 
 static int64_t sys_unlink(const char* path) {
-    if (!validate_user_string(path)) return -EFAULT;
+    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
     char parent_path[128]; char filename[128];
     if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
@@ -523,6 +508,9 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
 
 static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
     if (fd < 0 || !iov) return -EINVAL;
+    if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
+    if (!vmm_verify_user_access(iov, sizeof(struct iovec) * iovcnt, 0)) return -EFAULT;
+
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
         int64_t res = sys_write(fd, iov[i].iov_base, iov[i].iov_len);
@@ -534,6 +522,9 @@ static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
 
 static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
     if (fd < 0 || !iov) return -EINVAL;
+    if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
+    if (!vmm_verify_user_access(iov, sizeof(struct iovec) * iovcnt, 0)) return -EFAULT;
+
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
         int64_t res = sys_read(fd, iov[i].iov_base, iov[i].iov_len);
@@ -556,7 +547,7 @@ static int64_t sys_fstat(int fd, struct stat* buf) {
 }
 
 static int64_t sys_stat(const char* path, struct stat* buf) {
-    if (!validate_user_string(path)) return -EFAULT;
+    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
     if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) return -EFAULT;
     fs_node_t* node = vfs_lookup(fs_root, path);
     if (!node) return -ENOENT;
@@ -833,7 +824,7 @@ static int64_t sys_getgid(void)  { return 0; }
 static int64_t sys_geteuid(void) { return 0; }
 static int64_t sys_getegid(void) { return 0; }
 static int64_t sys_access(const char* path, int mode) {
-    if (!validate_user_string(path)) return -EFAULT;
+    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
     (void)mode;
     fs_node_t* node = vfs_lookup(fs_root, path);
     if (!node) return -ENOENT;

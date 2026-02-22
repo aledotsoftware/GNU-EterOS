@@ -17,3 +17,8 @@
 **Vulnerability:** Integer overflow in `ip_aton` allowed bypassing IP filters or connecting to unintended hosts (e.g., 300.2.3.4 becoming valid).
 **Learning:** Custom parsing logic often misses standard boundary checks present in libc functions like `inet_aton`.
 **Prevention:** Always validate numeric inputs against their logical bounds (0-255 for octets) during parsing.
+
+## 2026-05-26 - Recursive Pointer Validation in Scatter/Gather Syscalls
+**Vulnerability:** `sys_readv` and `sys_writev` validated the individual buffers pointed to by `iov[i].iov_base`, but failed to validate the `iov` array itself (user pointer). A malicious user could pass a kernel address for `iov`, causing the kernel to read/write `struct iovec` from kernel memory or crash.
+**Learning:** Complex syscalls with nested pointers (like scatter/gather I/O) require multiple layers of validation. Validating the "inner" pointers (buffers) is not enough; the "outer" container (array) must also be validated.
+**Prevention:** Walk the data structure hierarchy and validate *every* pointer crossing the user/kernel boundary.
