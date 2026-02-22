@@ -19,6 +19,8 @@ typedef struct {
     uint32_t inode_blocks;
     uint32_t data_start;
     uint32_t total_blocks;
+    uint32_t inode_bitmap_start;
+    uint32_t block_bitmap_start;
 } jfs_superblock_t;
 
 #define JFS_TX_BEGIN  1

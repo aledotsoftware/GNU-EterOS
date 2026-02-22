@@ -38,6 +38,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_fat32.c kernel/string.c kernel/f
 ./tests/test_fat32
 rm tests/test_fat32
 
+# Test JFS
+echo "---------------------------------------------------"
+echo "Running test_jfs..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_jfs.c kernel/string.c -o tests/test_jfs
+./tests/test_jfs
+rm tests/test_jfs
+
 # Test Crypto
 echo "---------------------------------------------------"
 echo "Running test_crypto..."

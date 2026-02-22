@@ -23,6 +23,71 @@ static void disk_write(uint32_t block, const void *buffer) {
     memcpy(jfs_disk_buffer + (block * 512), buffer, 512);
 }
 
+/* Bitmap Helpers */
+static void jfs_set_bit(uint32_t start_block, uint32_t bit) {
+    uint32_t block_idx = bit / (512 * 8);
+    uint32_t bit_offset = bit % (512 * 8);
+    uint32_t sector_idx = start_block + block_idx;
+
+    uint8_t sector[512];
+    disk_read(sector_idx, sector);
+    sector[bit_offset / 8] |= (1 << (bit_offset % 8));
+    disk_write(sector_idx, sector);
+}
+
+static void jfs_clear_bit(uint32_t start_block, uint32_t bit) {
+    uint32_t block_idx = bit / (512 * 8);
+    uint32_t bit_offset = bit % (512 * 8);
+    uint32_t sector_idx = start_block + block_idx;
+
+    uint8_t sector[512];
+    disk_read(sector_idx, sector);
+    sector[bit_offset / 8] &= ~(1 << (bit_offset % 8));
+    disk_write(sector_idx, sector);
+}
+
+static int jfs_test_bit(uint32_t start_block, uint32_t bit) {
+    uint32_t block_idx = bit / (512 * 8);
+    uint32_t bit_offset = bit % (512 * 8);
+    uint32_t sector_idx = start_block + block_idx;
+
+    uint8_t sector[512];
+    disk_read(sector_idx, sector);
+    return (sector[bit_offset / 8] & (1 << (bit_offset % 8))) ? 1 : 0;
+}
+
+/* Allocator */
+static uint32_t jfs_alloc_block(void) {
+    for (uint32_t i = 0; i < sb->total_blocks; i++) {
+        if (!jfs_test_bit(sb->block_bitmap_start, i)) {
+            jfs_set_bit(sb->block_bitmap_start, i);
+            return i;
+        }
+    }
+    return 0; /* No free blocks */
+}
+
+static void jfs_free_block(uint32_t block) {
+    jfs_clear_bit(sb->block_bitmap_start, block);
+}
+
+static uint32_t jfs_alloc_inode(void) {
+    uint32_t inodes_per_block = 512 / sizeof(jfs_inode_t);
+    uint32_t total_inodes = sb->inode_blocks * inodes_per_block;
+
+    for (uint32_t i = 0; i < total_inodes; i++) {
+        if (!jfs_test_bit(sb->inode_bitmap_start, i)) {
+            jfs_set_bit(sb->inode_bitmap_start, i);
+            return i;
+        }
+    }
+    return 0; /* No free inodes */
+}
+
+static void jfs_free_inode(uint32_t inode) {
+    jfs_clear_bit(sb->inode_bitmap_start, inode);
+}
+
 /* Journaling Core */
 static void jfs_journal_write(uint32_t target_block, const void *data) {
     /*
@@ -130,18 +195,9 @@ static uint32_t jfs_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8
         if (block_idx >= 12) break;
 
         if (inode->blocks[block_idx] == 0) {
-            /* Alloc new block - primitive allocator: scan for free from data start */
-            /* In this toy FS, we just increment a global counter or scan. */
-            /* Let's scan linearly from data_start */
-            for (uint32_t b = sb->data_start; b < sb->total_blocks; b++) {
-                 /* Check if used by any inode (slow!) - generic bitmap would be better.
-                    For now, hack: static allocator next_free.
-                 */
-                 static uint32_t next_free = 0;
-                 if (next_free == 0) next_free = sb->data_start;
-                 inode->blocks[block_idx] = next_free++;
-                 break;
-            }
+            uint32_t new_block = jfs_alloc_block();
+            if (new_block == 0) return written_bytes; /* No space */
+            inode->blocks[block_idx] = new_block;
         }
 
         uint32_t disk_block = inode->blocks[block_idx];
@@ -224,11 +280,8 @@ static int jfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     if (parent->inode != 0) return -1;
 
     /* Find free inode */
-    uint32_t free_inode = 0;
-    /* Scan inode table... assuming 1 is free for now (0 is root) */
-    /* Real impl would use bitmap */
-    static uint32_t next_inode = 1;
-    free_inode = next_inode++;
+    uint32_t free_inode = jfs_alloc_inode();
+    if (free_inode == 0) return -1;
 
     /* Add entry to root */
     jfs_inode_t *root = get_inode(0);
@@ -236,10 +289,12 @@ static int jfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     for (int i = 0; i < 12; i++) {
         if (root->blocks[i] == 0) {
              /* Alloc block for directory entries */
-             /* Reuse hack allocator */
-             static uint32_t next_free_block = 0;
-             if (next_free_block == 0) next_free_block = sb->data_start;
-             root->blocks[i] = next_free_block++;
+             uint32_t new_block = jfs_alloc_block();
+             if (new_block == 0) {
+                 jfs_free_inode(free_inode);
+                 return -1;
+             }
+             root->blocks[i] = new_block;
              /* Clear it */
              uint8_t z[512]; memset(z, 0, 512);
              disk_write(root->blocks[i], z);
@@ -270,6 +325,7 @@ static int jfs_create(fs_node_t *parent, char *name, uint16_t permission) {
             }
         }
     }
+    jfs_free_inode(free_inode);
     return -1;
 }
 
@@ -285,18 +341,27 @@ fs_node_t* jfs_init(void) {
     sb->block_size = 512;
     sb->journal_start = 1;
     sb->journal_blocks = 64;
-    sb->inode_start = 65;
+    sb->inode_bitmap_start = 65;
+    sb->block_bitmap_start = 66;
+    sb->inode_start = 68;
     sb->inode_blocks = 32;
     sb->data_start = 100;
     sb->total_blocks = jfs_disk_size / 512;
 
+    /* Mark system blocks as used */
+    for (uint32_t i = 0; i < sb->data_start; i++) {
+        jfs_set_bit(sb->block_bitmap_start, i);
+    }
+
     /* Create Root Inode (0) */
+    jfs_set_bit(sb->inode_bitmap_start, 0); /* Mark root inode used */
+
     jfs_inode_t *root = get_inode(0);
     root->inode = 0;
     root->size = 0;
     root->flags = FS_DIRECTORY;
     /* Alloc block 0 for root dir entries */
-    root->blocks[0] = sb->data_start; /* Block 100 */
+    root->blocks[0] = jfs_alloc_block();
 
     fs_node_t *fs = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!fs) return NULL;
