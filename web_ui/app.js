@@ -750,6 +750,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Remove from DOM after transition
             setTimeout(() => {
                 splash.remove();
+                const startBtn = document.querySelector('.os-logo');
+                if (startBtn) startBtn.focus();
             }, 600); // Match CSS transition duration
         }, 2500);
     }

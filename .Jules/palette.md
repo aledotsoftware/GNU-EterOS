@@ -53,3 +53,7 @@
 ## 2027-02-17 - [Dynamic ARIA States for Custom Panels]
 **Learning:** Static ARIA attributes on custom trigger elements (like a control center button) fail to communicate state changes to assistive technology. Explicitly toggling `aria-expanded` in JS when the panel opens/closes is crucial for a complete accessibility experience.
 **Action:** Always pair custom UI toggles with dynamic `aria-expanded` state management in the event handler.
+
+## 2027-02-18 - [Refining the Boot Experience]
+**Learning:** A static boot splash feels unresponsive and leaves keyboard users disoriented. Adding a subtle "pulse" animation makes the wait feel intentional, and a "zoom-out" transition creates a sense of depth. Crucially, automatically focusing the primary interaction point (Start button) after boot is essential for immediate accessibility.
+**Action:** Always animate wait states and programmatically manage focus handoff when transitioning between major UI contexts (like Splash -> Desktop).
