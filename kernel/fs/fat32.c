@@ -119,6 +119,9 @@ int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_s
     // Note: Root Directory in FAT32 is a cluster chain, usually starting at cluster 2 (start of data area).
     vol->data_start_lba = vol->fat_start_lba + (bpb->num_fats * fat_size);
 
+    // Initialize next_free_cluster hint
+    vol->next_free_cluster = 2; // Start of data clusters
+
     kfree(buffer);
     return 0;
 }
@@ -181,35 +184,59 @@ static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
     if (!buffer) return -1;
 
-    uint32_t current_fat_sector = vol->fat_start_lba;
     uint32_t entries_per_sector = vol->bytes_per_sector / 4;
-    uint32_t cluster_idx = 0;
+    uint32_t fat_start_sector = vol->fat_start_lba;
 
-    // Scan full FAT
-    for (uint32_t i = 0; i < vol->fat_size; i++) {
-        if (fat32_read_sector_cached(vol, current_fat_sector + i, buffer) != 0) {
+    uint32_t start_cluster = vol->next_free_cluster;
+    // Sanity check
+    if (start_cluster < 2) start_cluster = 2;
+
+    // Bounds check: if next_free_cluster is beyond the FAT, wrap to start
+    uint32_t max_cluster = (vol->fat_size * vol->bytes_per_sector) / 4;
+    if (start_cluster >= max_cluster) {
+        start_cluster = 2;
+    }
+
+    uint32_t start_sector_idx = (start_cluster * 4) / vol->bytes_per_sector;
+    uint32_t start_entry_idx = ((start_cluster * 4) % vol->bytes_per_sector) / 4;
+
+    uint32_t current_sector_idx = start_sector_idx;
+    int wrapped = 0;
+
+    while (1) {
+        if (fat32_read_sector_cached(vol, fat_start_sector + current_sector_idx, buffer) != 0) {
             kfree(buffer);
             return -2;
         }
 
         uint32_t* entries = (uint32_t*)buffer;
-        for (uint32_t j = 0; j < entries_per_sector; j++) {
-            // Cluster 0 and 1 are reserved.
-            if (cluster_idx < 2) {
-                cluster_idx++;
-                continue;
+        uint32_t j = (current_sector_idx == start_sector_idx && !wrapped) ? start_entry_idx : 0;
+
+        for (; j < entries_per_sector; j++) {
+            uint32_t cluster_val = current_sector_idx * entries_per_sector + j;
+
+            // Skip reserved clusters
+            if (cluster_val < 2) continue;
+
+            // If we wrapped and reached the start again, we are full
+            if (wrapped && cluster_val >= start_cluster) {
+                kfree(buffer);
+                return -4; // Disk full
             }
 
             if ((entries[j] & 0x0FFFFFFF) == 0) {
                 // Found free
-                *out_cluster = cluster_idx;
+                *out_cluster = cluster_val;
 
                 // Mark as EOC
                 entries[j] = FAT32_EOC;
-                if (fat32_write_sector_cached(vol, current_fat_sector + i, buffer) != 0) {
+                if (fat32_write_sector_cached(vol, fat_start_sector + current_sector_idx, buffer) != 0) {
                     kfree(buffer);
                     return -3;
                 }
+
+                // Update hint
+                vol->next_free_cluster = cluster_val + 1;
 
                 // Zero out the cluster data
                 uint8_t* zero_buf = kmalloc(vol->bytes_per_sector);
@@ -225,7 +252,20 @@ static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
                 kfree(buffer);
                 return 0;
             }
-            cluster_idx++;
+        }
+
+        current_sector_idx++;
+        if (current_sector_idx >= vol->fat_size) {
+            if (wrapped) {
+                 break;
+            }
+            current_sector_idx = 0;
+            wrapped = 1;
+        }
+
+        // Safety break if we wrapped and went past start_sector_idx (should be caught by inner loop)
+        if (wrapped && current_sector_idx > start_sector_idx) {
+            break;
         }
     }
 
