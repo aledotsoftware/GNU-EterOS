@@ -45,13 +45,6 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_crypto.c kernel/crypto/sha256.c 
 ./tests/test_crypto
 rm tests/test_crypto
 
-# Test ELF Security
-echo "---------------------------------------------------"
-echo "Running test_elf_security..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_security.c kernel/string.c -o tests/test_elf_security
-./tests/test_elf_security
-rm tests/test_elf_security
-
 # Test ELF Read Failure
 echo "---------------------------------------------------"
 echo "Running test_elf_read_failure..."
@@ -79,6 +72,13 @@ echo "Running test_readv_security..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_readv_security.c kernel/string.c -o tests/test_readv_security
 ./tests/test_readv_security
 rm tests/test_readv_security
+
+# Test ELF Header Failures
+echo "---------------------------------------------------"
+echo "Running test_elf_header_failures..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_elf_header_failures.c -o tests/test_elf_header_failures
+./tests/test_elf_header_failures
+rm tests/test_elf_header_failures
 
 echo "---------------------------------------------------"
 echo "All tests passed!"
