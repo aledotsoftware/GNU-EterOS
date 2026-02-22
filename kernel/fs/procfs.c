@@ -11,7 +11,7 @@ static fs_node_t* procfs_root = NULL;
 /* ========================================================================= */
 /* /proc/version Implementation                                              */
 /* ========================================================================= */
-static uint32_t proc_version_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t proc_version_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node;
     const char* version = "eterOS version 0.1.0 (Genesis) (gcc version 12.2.0)\n";
     size_t len = strlen(version);
@@ -26,7 +26,7 @@ static uint32_t proc_version_read(fs_node_t *node, uint32_t offset, uint32_t siz
 /* ========================================================================= */
 /* /proc/uptime Implementation                                               */
 /* ========================================================================= */
-static uint32_t proc_uptime_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t proc_uptime_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node;
 
     char uptime_str[64];
@@ -49,7 +49,7 @@ static uint32_t proc_uptime_read(fs_node_t *node, uint32_t offset, uint32_t size
 /* ========================================================================= */
 /* /proc/meminfo Implementation                                              */
 /* ========================================================================= */
-static uint32_t proc_meminfo_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t proc_meminfo_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node;
     char meminfo_str[256];
     char num_buf[32];

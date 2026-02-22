@@ -85,7 +85,7 @@ static jfs_inode_t* get_inode(uint32_t inode_idx) {
 }
 
 /* VFS Interface */
-static uint32_t jfs_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t jfs_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     jfs_inode_t *inode = get_inode(node->inode);
     if (offset >= inode->size) return 0;
     if (offset + size > inode->size) size = inode->size - offset;

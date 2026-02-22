@@ -93,13 +93,18 @@ int vmm_validate_user_ptr(const void* addr, size_t size) {
     return vmm_verify_user_access(addr, size, 0);
 }
 
+int vmm_check_user_string(const char* str, size_t max_len) {
+    // Simplified check for test purposes
+    return vmm_verify_user_access(str, 1, 0);
+}
+
 uint64_t vmm_virt_to_phys(uint64_t virt) { return virt; }
 int vmm_map_page(uint64_t phys, uint64_t virt, uint64_t flags) { return 0; }
 void vmm_destroy_pml4(uint64_t pml4) {}
 uint64_t vmm_clone_pml4(int cow) { return 0; }
 
 /* Mock VFS functions */
-uint32_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+ssize_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     return size; // Simulate success
 }
 
