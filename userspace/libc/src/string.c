@@ -62,8 +62,33 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 
 size_t strlen(const char *s) {
     const char *p = s;
-    while (*p) p++;
-    return (size_t)(p - s);
+
+    /* 1. Align to 8 bytes boundary */
+    while ((uintptr_t)p & 7) {
+        if (!*p) return (size_t)(p - s);
+        p++;
+    }
+
+    /* 2. Process 8 bytes at a time */
+    const uint64_t *ls = (const uint64_t *)p;
+    uint64_t v;
+
+    while (1) {
+        v = *ls++;
+        /* Check for null byte using bit magic:
+           (v - 0x01...) & ~v & 0x80... detects if any byte is 0 */
+        if (((v - 0x0101010101010101ULL) & ~v & 0x8080808080808080ULL)) {
+            const char *cp = (const char *)(ls - 1);
+            if (!cp[0]) return (size_t)(cp - s);
+            if (!cp[1]) return (size_t)(cp - s + 1);
+            if (!cp[2]) return (size_t)(cp - s + 2);
+            if (!cp[3]) return (size_t)(cp - s + 3);
+            if (!cp[4]) return (size_t)(cp - s + 4);
+            if (!cp[5]) return (size_t)(cp - s + 5);
+            if (!cp[6]) return (size_t)(cp - s + 6);
+            return (size_t)(cp - s + 7);
+        }
+    }
 }
 
 int strcmp(const char *s1, const char *s2) {

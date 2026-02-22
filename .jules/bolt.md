@@ -13,3 +13,7 @@
 ## 2026-11-23 - [Glow Overdraw & VRAM Reads]
 **Learning:** Alpha blending operations like `omni_fill_rect_alpha` require reading from the framebuffer (VRAM), which is extremely slow due to uncached memory access. Drawing a full filled rectangle for a border/glow effect and then overwriting the center wastes ~90% of bandwidth.
 **Action:** Use a "hollow" drawing function (4 strips) for borders and glows to eliminate overdraw of the central area, especially for large UI elements.
+
+## 2026-12-05 - [Naive Userspace String Functions]
+**Learning:** Userspace string functions (libc) often lag behind kernel implementations in performance optimizations. A naive `while(*p) p++` `strlen` was ~5.3x slower than the kernel's SWAR implementation for large strings.
+**Action:** Audit userspace libraries for naive implementations of critical functions and port existing kernel optimizations (like SWAR or SIMD) where appropriate.
