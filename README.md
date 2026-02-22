@@ -279,7 +279,7 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 
 ### Fase 4.5: Compatibilidad POSIX ✅
 - [x] **Tabla de Syscalls Linux:** Implementación ampliada (`open`, `close`, `read`, `write`, `lseek`, `kill`, `exit`, `getpid`, `sched_yield`, `pipe`, `mmap`, `stat`, `fstat`, `futex`, `dup2`, `fork`, `nanosleep`, `clock_gettime`, `munmap`, `mprotect`, `madvise`, `access`, `dup`, `fcntl`, `getcwd`, `getppid`, `gettid`, `set_tid_address`, `exit_group`, `getuid`, `getgid`, `geteuid`, `getegid`).
-- [x] **Mini-LibC POSIX (musl-compatible):** Librería C minimalista para aplicaciones de usuario (`userspace/libc/`) con: `malloc`/`free`/`calloc`/`realloc` (brk-based), `memcpy`/`memset`/`memmove`/`memcmp`, `strlen`/`strcmp`/`strcpy`/`strcat`/`strchr`/`strstr`, `printf`/`dprintf`, `signal`/`sigaction`/`sigprocmask`/`raise`, `fork`/`pipe`/`dup2`/`brk`/`sbrk`/`mmap`/`munmap`/`sleep`/`usleep`/`nanosleep`.
+- [x] **Mini-LibC POSIX (musl-compatible):** Librería C minimalista para aplicaciones de usuario (`userspace/libc/`) con: `malloc`/`free`/`calloc`/`realloc` (brk-based), `memcpy`/`memset`/`memmove`/`memcmp`, `strlen`/`strcmp`/`strlcpy`/`strlcat`/`strchr`/`strstr`, `printf`/`dprintf`, `signal`/`sigaction`/`sigprocmask`/`raise`, `fork`/`pipe`/`dup2`/`brk`/`sbrk`/`mmap`/`munmap`/`sleep`/`usleep`/`nanosleep`.
 - [x] **Soporte de señales:** `rt_sigaction`/`rt_sigprocmask`/`rt_sigreturn` implementados. SIGKILL (9) y SIGTERM (15) terminan el proceso inmediatamente. Señales restantes se encolan como `signal_pending` en la estructura `task_t`.
 - [x] **Estructura `/dev`, `/proc`, `/sys`:** Implementados `/dev/null`, `/dev/zero`, `/dev/tty`, `/dev/random`, `/dev/urandom`, `/proc/uptime`, `/proc/version`, `/proc/meminfo`.
 

@@ -13,9 +13,9 @@
 #define strlen my_strlen
 #define strcmp my_strcmp
 #define strncmp my_strncmp
-#define strcpy my_strcpy
 #define strncpy my_strncpy
-#define strcat my_strcat
+#define strlcpy my_strlcpy
+#define strlcat my_strlcat
 #define strchr my_strchr
 #define strrchr my_strrchr
 #define strstr my_strstr
