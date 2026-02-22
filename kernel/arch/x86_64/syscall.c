@@ -94,6 +94,8 @@ static void socket_close_fs(fs_node_t* node) {
 #define O_RDWR      00000002
 #define O_CREAT     0x00000040
 
+#define UIO_MAXIOV  1024
+
 typedef struct {
     uint8_t* buffer;
     uint32_t size;
@@ -523,6 +525,9 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
 
 static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
     if (fd < 0 || !iov) return -EINVAL;
+    if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
+    if (!vmm_verify_user_access(iov, sizeof(struct iovec) * iovcnt, 0)) return -EFAULT;
+
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
         int64_t res = sys_write(fd, iov[i].iov_base, iov[i].iov_len);
@@ -534,6 +539,9 @@ static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
 
 static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
     if (fd < 0 || !iov) return -EINVAL;
+    if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
+    if (!vmm_verify_user_access(iov, sizeof(struct iovec) * iovcnt, 0)) return -EFAULT;
+
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
         int64_t res = sys_read(fd, iov[i].iov_base, iov[i].iov_len);
