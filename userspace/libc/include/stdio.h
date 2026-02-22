@@ -18,6 +18,7 @@ extern FILE *stderr;
 /* Very basic printf support */
 int printf(const char *format, ...);
 int dprintf(int fd, const char *format, ...);
+int snprintf(char *str, size_t size, const char *format, ...);
 
 /* File I/O */
 FILE *fopen(const char *pathname, const char *mode);

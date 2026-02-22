@@ -810,13 +810,13 @@ int main() {
         assert(val == -12345);
 
         /* INT32_MAX */
-        sprintf(str_buf, "%d", INT32_MAX);
+        snprintf(str_buf, sizeof(str_buf), "%d", INT32_MAX);
         res = atoi_s(str_buf, &val);
         assert(res == 0);
         assert(val == INT32_MAX);
 
         /* INT32_MIN */
-        sprintf(str_buf, "%d", INT32_MIN);
+        snprintf(str_buf, sizeof(str_buf), "%d", INT32_MIN);
         res = atoi_s(str_buf, &val);
         assert(res == 0);
         assert(val == INT32_MIN);
