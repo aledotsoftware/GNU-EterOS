@@ -156,6 +156,17 @@ int task_kill(uint32_t pid) { return 0; }
 /* Stub syscall entry */
 void syscall_entry(void) {}
 
+/* Mock vmm_check_user_string */
+int vmm_check_user_string(const char* str, size_t max_len) {
+    if (!str) return 0;
+    size_t len = 0;
+    while (len < max_len) {
+        if (str[len] == '\0') return 1;
+        len++;
+    }
+    return 0;
+}
+
 /* Stub eteros_snprintf (called by syscall.c via macro) */
 #include <stdarg.h>
 #undef snprintf
