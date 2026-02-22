@@ -80,6 +80,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_readv_security.c kernel/string.c
 ./tests/test_readv_security
 rm tests/test_readv_security
 
+# Test Stdio
+echo "---------------------------------------------------"
+echo "Running test_stdio..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_stdio.c kernel/stdio.c kernel/string.c -o tests/test_stdio
+./tests/test_stdio
+rm tests/test_stdio
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 

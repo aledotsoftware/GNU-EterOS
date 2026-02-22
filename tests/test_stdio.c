@@ -89,6 +89,34 @@ void test_snprintf() {
     ret = snprintf(buf, sizeof(buf), "%5d", 123);
     assert(strcmp(buf, "  123") == 0);
 
+    /* Left justification */
+    ret = snprintf(buf, sizeof(buf), "%-5d", 123);
+    assert(strcmp(buf, "123  ") == 0);
+
+    /* Left justification with zero flag (should ignore zero) */
+    ret = snprintf(buf, sizeof(buf), "%-05d", 123);
+    assert(strcmp(buf, "123  ") == 0);
+
+    /* String width padding */
+    ret = snprintf(buf, sizeof(buf), "%10s", "Hello");
+    assert(strcmp(buf, "     Hello") == 0);
+
+    /* String left justification */
+    ret = snprintf(buf, sizeof(buf), "%-10s", "Hello");
+    assert(strcmp(buf, "Hello     ") == 0);
+
+    /* String precision */
+    ret = snprintf(buf, sizeof(buf), "%.3s", "Hello");
+    assert(strcmp(buf, "Hel") == 0);
+
+    /* String width + precision */
+    ret = snprintf(buf, sizeof(buf), "%10.3s", "Hello");
+    assert(strcmp(buf, "       Hel") == 0);
+
+    /* String width + precision + left justification */
+    ret = snprintf(buf, sizeof(buf), "%-10.3s", "Hello");
+    assert(strcmp(buf, "Hel       ") == 0);
+
     /* INT64_MIN */
     ret = snprintf(buf, sizeof(buf), "%ld", INT64_MIN);
     /* -9223372036854775808 */
