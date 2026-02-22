@@ -5,6 +5,7 @@
 #include <mm.h>
 #include <string.h>
 #include <types.h>
+#include <drivers/tty.h>
 
 /* TTY Node Functions */
 
@@ -71,7 +72,7 @@ fs_node_t* tty_create_node(void) {
     memset(tty, 0, sizeof(fs_node_t));
     strlcpy(tty->name, "tty", 128);
     tty->flags = FS_CHARDEVICE;
-    tty->inode = 0; /* Device ID? */
+    tty->inode = 2; /* Matches DevFS inode */
     tty->length = 0;
     tty->read = tty_read;
     tty->write = tty_write;

@@ -181,8 +181,6 @@ int vfs_mkdir(const char *path, uint16_t permission) {
     return ret;
 }
 
-extern fs_node_t* tty_create_node(void);
-
 /**
  * Resolves a path to a filesystem node.
  *
@@ -195,11 +193,6 @@ extern fs_node_t* tty_create_node(void);
  */
 fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
     if (!root || !path) return 0;
-
-    /* Hack for /dev/tty */
-    if (strcmp(path, "/dev/tty") == 0) {
-        return tty_create_node();
-    }
 
     /* Handle root path specially */
     if (path[0] == '/' && path[1] == '\0') {

@@ -6,6 +6,7 @@
 #include <keyboard.h>
 #include <vga.h>
 #include <input/event.h>
+#include <drivers/tty.h>
 
 /* Global root node for DevFS */
 static fs_node_t* devfs_root = NULL;
@@ -35,27 +36,6 @@ static uint32_t dev_zero_read(fs_node_t *node, uint32_t offset, uint32_t size, u
 static uint32_t dev_zero_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset; (void)size; (void)buffer;
     return size; /* Discard */
-}
-
-/* ========================================================================= */
-/* /dev/tty Implementation                                                   */
-/* ========================================================================= */
-static uint32_t dev_tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset;
-    for (uint32_t i = 0; i < size; i++) {
-        buffer[i] = (uint8_t)keyboard_getchar();
-        /* Line buffered simulation (optional) */
-        if (buffer[i] == '\n') return i+1;
-    }
-    return size;
-}
-
-static uint32_t dev_tty_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset;
-    for (uint32_t i = 0; i < size; i++) {
-        terminal_putchar((char)buffer[i]);
-    }
-    return size;
 }
 
 /* ========================================================================= */
@@ -211,6 +191,11 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
     (void)node;
     if (!name) return 0;
 
+    /* Handle tty special case */
+    if (strcmp(name, "tty") == 0) {
+        return tty_create_node();
+    }
+
     fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!fnode) return 0;
     memset(fnode, 0, sizeof(fs_node_t));
@@ -227,11 +212,6 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->read = dev_zero_read;
         fnode->write = dev_zero_write;
         fnode->inode = 1;
-    } else if (strcmp(name, "tty") == 0) {
-        strlcpy(fnode->name, "tty", sizeof(fnode->name));
-        fnode->read = dev_tty_read;
-        fnode->write = dev_tty_write;
-        fnode->inode = 2;
     } else if (strcmp(name, "random") == 0) {
         strlcpy(fnode->name, "random", sizeof(fnode->name));
         fnode->read = dev_random_read;
