@@ -61,3 +61,7 @@
 ## 2027-04-12 - [Search Accessibility & Escape]
 **Learning:** For overlay search interfaces (like a launcher), users expect the "Escape" key to perform context-sensitive actions: clearing text first, then closing the overlay. This two-stage dismissal pattern prevents accidental closure and aligns with desktop OS conventions.
 **Action:** Implement a `keydown` handler on search inputs that checks value length: `Escape` -> `value.length > 0 ? clear() : close()`.
+
+## 2027-05-20 - [Actionable Empty States]
+**Learning:** A static "No results" message is a dead end. Providing a clear action button (e.g., "Clear Search" or "Browse All") within the empty state helps users recover from a failed search without needing to hunt for small controls.
+**Action:** Always include a primary recovery action button inside search empty states.
