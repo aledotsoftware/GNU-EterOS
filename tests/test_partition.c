@@ -140,9 +140,9 @@ void test_io() {
 
     char read_buf[512];
     memset(read_buf, 0, 512);
-    uint32_t read = passive->read(passive, 0, 512, (uint8_t*)read_buf);
+    ssize_t read = passive->read(passive, 0, 512, (uint8_t*)read_buf);
 
-    if (read != 512) { printf("FAILED: Read returned %d\n", read); exit(1); }
+    if (read != 512) { printf("FAILED: Read returned %ld\n", (long)read); exit(1); }
 
     if (memcmp(read_buf, write_buf, 512) != 0) {
         printf("FAILED: Read data mismatch\n");

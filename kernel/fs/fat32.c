@@ -362,7 +362,7 @@ static int fat32_find_dirent_in_chain(fat32_volume_t* vol, uint32_t start_cluste
 /* ========================================================================= */
 
 // Forward declarations
-uint32_t fat32_read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer);
+ssize_t fat32_read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer);
 uint32_t fat32_write_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer);
 void fat32_open_fs(fs_node_t *node);
 void fat32_close_fs(fs_node_t *node);
@@ -397,7 +397,7 @@ void fat32_close_fs(fs_node_t *node) {
     spin_unlock(&vol->lock);
 }
 
-static uint32_t fat32_read_fs_impl(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t fat32_read_fs_impl(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
     uint32_t start_cluster = node->inode;
 
@@ -448,10 +448,10 @@ static uint32_t fat32_read_fs_impl(fs_node_t *node, uint32_t offset, uint32_t si
     return bytes_read;
 }
 
-uint32_t fat32_read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+ssize_t fat32_read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
     spin_lock(&vol->lock);
-    uint32_t res = fat32_read_fs_impl(node, offset, size, buffer);
+    ssize_t res = fat32_read_fs_impl(node, offset, size, buffer);
     spin_unlock(&vol->lock);
     return res;
 }
