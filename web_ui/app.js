@@ -178,6 +178,9 @@ function clearSearch() {
     filterApps();
 }
 
+// Cache for launcher items to avoid DOM thrashing
+let launcherCache = null;
+
 function filterApps() {
     const query = document.getElementById('launcher-search').value.toLowerCase();
 
@@ -187,17 +190,24 @@ function filterApps() {
         clearBtn.hidden = query.length === 0;
     }
 
-    const items = document.querySelectorAll('.launcher-item');
+    // ⚡ Bolt: Build cache on first run to avoid querying DOM on every keystroke
+    if (!launcherCache) {
+        const items = document.querySelectorAll('.launcher-item');
+        launcherCache = Array.from(items).map(item => ({
+            element: item,
+            name: item.querySelector('span').innerText.toLowerCase(),
+            tag: item.querySelector('.tag').innerText.toLowerCase()
+        }));
+    }
+
     let hasResults = false;
 
-    items.forEach(item => {
-        const name = item.querySelector('span').innerText.toLowerCase();
-        const tag = item.querySelector('.tag').innerText.toLowerCase();
+    launcherCache.forEach(({ element, name, tag }) => {
         if (name.includes(query) || tag.includes(query)) {
-            item.style.display = 'flex';
+            if (element.style.display !== 'flex') element.style.display = 'flex';
             hasResults = true;
         } else {
-            item.style.display = 'none';
+            if (element.style.display !== 'none') element.style.display = 'none';
         }
     });
 
