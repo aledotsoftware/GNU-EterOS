@@ -94,6 +94,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_stdio.c kernel/stdio.c kernel/st
 ./tests/test_stdio
 rm tests/test_stdio
 
+# Test ProcFS
+echo "---------------------------------------------------"
+echo "Running test_procfs..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_procfs.c -o tests/test_procfs
+./tests/test_procfs
+rm tests/test_procfs
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 
