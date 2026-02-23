@@ -142,6 +142,29 @@ void framebuffer_putpixel(uint32_t x, uint32_t y, uint32_t color) {
 
 extern const uint8_t font8x16[];
 
+void framebuffer_scroll(uint32_t pixels, uint32_t bg_color) {
+    if (!active_buffer) return;
+    if (pixels >= fb_height) {
+        framebuffer_clear(bg_color);
+        return;
+    }
+
+    /* Move content up */
+    size_t copy_height = fb_height - pixels;
+    size_t bytes_to_move = copy_height * fb_pitch;
+
+    /* Destination: Start of buffer */
+    void* dst = (void*)active_buffer;
+    /* Source: Start of buffer + pixels * pitch */
+    const void* src = (const void*)((uint8_t*)active_buffer + (pixels * fb_pitch));
+
+    memmove(dst, src, bytes_to_move);
+
+    /* Clear the bottom area */
+    /* Rect from (0, fb_height - pixels) with size (fb_width, pixels) */
+    framebuffer_rect(0, fb_height - pixels, fb_width, pixels, bg_color);
+}
+
 void framebuffer_clear(uint32_t color) {
     if (!active_buffer) return;
 

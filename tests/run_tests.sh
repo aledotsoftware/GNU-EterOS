@@ -101,6 +101,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_procfs.c -o tests/test_procfs
 ./tests/test_procfs
 rm tests/test_procfs
 
+# Test Framebuffer Scroll
+echo "---------------------------------------------------"
+echo "Running test_framebuffer_scroll..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_framebuffer_scroll.c kernel/drivers/video/font.c -o tests/test_framebuffer_scroll
+./tests/test_framebuffer_scroll
+rm tests/test_framebuffer_scroll
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 
