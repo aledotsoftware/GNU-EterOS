@@ -17,3 +17,7 @@
 ## 2026-11-24 - [Direct Framebuffer Access]
 **Learning:** Per-pixel function calls (`framebuffer_putpixel`) in tight rendering loops add significant overhead due to repeated bounds checks and address calculations.
 **Action:** For high-performance rendering (e.g., compositing), access the framebuffer memory directly with pointer arithmetic, lifting invariant calculations out of the loop, especially for known BPPs (32-bit).
+
+## 2024-05-22 - [DOM Thrashing in Search Loops]
+**Learning:** Repeatedly querying the DOM (`querySelectorAll`) and reading layout properties (`innerText`) inside a filter loop forces the browser to recalculate styles and layout for every item on every keystroke, leading to massive performance degradation (e.g., ~850ms per filter op for 1000 items).
+**Action:** Cache the DOM elements and their text content into a plain JavaScript array/object structure on first access. Iterate over this cache to filter, only touching the DOM to update `style.display`. This can yield a >1000x performance improvement.
