@@ -1,5 +1,6 @@
 #include <fs/fat32.h>
 #include <fs/vfs.h>
+#include <fs/bcache.h>
 #include <string.h>
 #include <hal.h>
 #include <mm.h>
@@ -91,7 +92,7 @@ int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_s
     fat32_boot_sector_t* bpb = (fat32_boot_sector_t*)buffer;
 
     // Check Signature
-    if (bpb->boot_sector_signature != 0xAA55) {
+    if (bpb->boot_sector_signature != FAT32_BOOT_SIGNATURE) {
         hal_console_write("[FAT32] Invalid Boot Sector Signature\n");
         kfree(buffer);
         return -4;

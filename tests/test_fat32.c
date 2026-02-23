@@ -72,7 +72,7 @@ void setup_disk() {
     // BPB
     fat32_boot_sector_t* bpb = (fat32_boot_sector_t*)&disk_image[0];
     bpb->jmp_boot[0] = 0xEB; bpb->jmp_boot[1] = 0x3C; bpb->jmp_boot[2] = 0x90;
-    bpb->boot_sector_signature = 0xAA55;
+    bpb->boot_sector_signature = FAT32_BOOT_SIGNATURE;
     bpb->bytes_per_sector = SECTOR_SIZE;
     bpb->sectors_per_cluster = 1;
     bpb->reserved_sectors = 32;
