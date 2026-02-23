@@ -133,6 +133,15 @@ int vmm_validate_user_ptr(const void* addr, size_t size);
 int vmm_verify_user_access(const void* addr, size_t size, int write);
 
 /**
+ * Checks if a string in user space is valid and null-terminated within max_len.
+ *
+ * @param str User space string pointer.
+ * @param max_len Maximum length to scan.
+ * @return 1 if valid and terminated, 0 otherwise.
+ */
+int vmm_check_user_string(const char* str, size_t max_len);
+
+/**
  * Libera recursivamente un espacio de direcciones (PML4) y sus páginas de usuario.
  * @param pml4_phys Dirección física del PML4.
  */

@@ -220,7 +220,13 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         if (!vmm_validate_user_ptr(addr, len)) return -ENOMEM;
     } else {
         virt = current->mmap_base;
-        current->mmap_base += PAGE_ALIGN_UP(len);
+        uint64_t aligned_len = PAGE_ALIGN_UP(len);
+        if (aligned_len < len) return -ENOMEM; /* Overflow in alignment */
+
+        uint64_t new_base = virt + aligned_len;
+        if (new_base < virt || new_base > (USER_LIMIT + 1)) return -ENOMEM;
+
+        current->mmap_base = new_base;
     }
 
     uint64_t start = PAGE_ALIGN_DOWN(virt);
@@ -467,6 +473,9 @@ static int64_t sys_kill(int pid, int sig) {
 static int64_t sys_brk(uint64_t brk) {
     task_t* current = task_get_current();
     if (brk == 0) return current->brk;
+    /* Check boundary */
+    if (brk > USER_LIMIT) return current->brk;
+
     if (brk < current->brk) { current->brk = brk; return current->brk; }
     uint64_t old_page = PAGE_ALIGN_UP(current->brk);
     uint64_t new_page = PAGE_ALIGN_UP(brk);
