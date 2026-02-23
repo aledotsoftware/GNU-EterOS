@@ -24,3 +24,4 @@ Thumbs.db
 # Logs temporales
 build/serial_output.log
 /build
+web_ui/node_modules/

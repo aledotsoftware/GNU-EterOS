@@ -142,10 +142,15 @@ function spawnSettings() {
 function updateClock() {
     const now = new Date();
     const clock = document.getElementById('clock');
-    clock.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (clock) {
+        clock.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
 }
-setInterval(updateClock, 1000);
-updateClock();
+
+if (typeof module === 'undefined') {
+    setInterval(updateClock, 1000);
+    updateClock();
+}
 
 function toggleLauncher() {
     const launcher = document.getElementById('launcher');
@@ -737,7 +742,9 @@ function setupLauncherNav() {
     });
 }
 
-setupLauncherNav();
+if (typeof module === 'undefined') {
+    setupLauncherNav();
+}
 
 // Boot Splash Screen Logic
 document.addEventListener('DOMContentLoaded', () => {
@@ -760,3 +767,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 2500);
     }
 });
+
+if (typeof module !== 'undefined') {
+    module.exports = {
+        toggleEterMenu,
+        toggleLauncher,
+        toggleControlCenter,
+        filterApps,
+        spawnApp,
+        closeWindow,
+        maximizeWindow,
+        minimizeWindow,
+        toggleFocusMode,
+        snapWindow
+    };
+}
