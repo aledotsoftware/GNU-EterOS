@@ -719,6 +719,14 @@ function setupLauncherNav() {
             e.preventDefault();
             apps[0].click();
         }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            if (search.value.length > 0) {
+                clearSearch();
+            } else {
+                toggleLauncher();
+            }
+        }
     });
 
     document.querySelectorAll('.launcher-item').forEach(item => {
@@ -732,6 +740,9 @@ function setupLauncherNav() {
                 e.preventDefault();
                 if (idx > 0) apps[idx - 1].focus();
                 else search.focus();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                toggleLauncher();
             }
         });
     });
