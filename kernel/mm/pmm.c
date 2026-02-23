@@ -257,18 +257,22 @@ static void* pmm_alloc_page_impl(void) {
             int start_bit = (i == word_idx) ? bit_idx : 0;
 
             if (i == word_idx && start_bit > 0) {
-                 /* Manual scan for partial first word */
-                 for (int bit = start_bit; bit < 64; bit++) {
-                     if (!(word & (1ULL << bit))) {
-                         uint64_t page = i * 64 + bit;
-                         if (page >= total_pages) goto check_wrap;
+                 /* Optimized scan for partial first word using ctzll */
+                 /* We want to find the first 0 bit at or after start_bit. */
+                 /* Invert word so 0s become 1s. Mask out bits below start_bit. */
+                 uint64_t mask = ~((1ULL << start_bit) - 1);
+                 uint64_t inv_word = ~word & mask;
 
-                         bitmap_set(page);
-                         if (pmm_ref_counts) pmm_ref_counts[page] = 1;
-                         used_ram += PAGE_SIZE;
-                         last_free_idx = page + 1;
-                         return (void*)(page * PAGE_SIZE);
-                     }
+                 if (inv_word != 0) {
+                     int bit = __builtin_ctzll(inv_word);
+                     uint64_t page = i * 64 + bit;
+                     if (page >= total_pages) goto check_wrap;
+
+                     bitmap_set(page);
+                     if (pmm_ref_counts) pmm_ref_counts[page] = 1;
+                     used_ram += PAGE_SIZE;
+                     last_free_idx = page + 1;
+                     return (void*)(page * PAGE_SIZE);
                  }
                  continue;
             }
