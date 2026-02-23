@@ -20,11 +20,12 @@ typedef enum {
 typedef struct task {
     uint32_t id;
     task_state_t state;
+    uint64_t wake_tick;
 } task_t;
 
 /* Global state for test */
-task_t task1 = {1, TASK_RUNNING};
-task_t task2 = {2, TASK_RUNNING};
+task_t task1 = {1, TASK_RUNNING, 0};
+task_t task2 = {2, TASK_RUNNING, 0};
 task_t *current_task = &task1;
 
 /* Mock Implementations */
@@ -49,6 +50,12 @@ task_t *task_get_current(void) {
     return current_task;
 }
 
+uint64_t timer_get_ticks(void) {
+    return 0;
+}
+
+#define TIMER_HZ 1000
+
 void task_yield(void) {
     /* No-op in single-threaded test */
 }
@@ -59,6 +66,7 @@ void task_yield(void) {
 #define EFAULT 14
 #define EINTR 4
 #define ENOSYS 38
+#define ETIMEDOUT 110
 
 /* Include the source file under test */
 /* We rely on -Itests/mocks to provide empty headers for the includes in futex.c */
