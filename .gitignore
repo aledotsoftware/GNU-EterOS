@@ -24,3 +24,7 @@ Thumbs.db
 # Logs temporales
 build/serial_output.log
 /build
+
+# Verification artifacts
+verification/*.png
+__pycache__/
