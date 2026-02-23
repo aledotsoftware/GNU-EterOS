@@ -10,6 +10,8 @@
 #include <errno.h>
 #include <string.h>
 #include <hal.h>
+#include <time.h>
+#include <timer.h>
 
 #define FUTEX_BUCKETS 16
 
@@ -53,7 +55,19 @@ static int validate_uaddr(uint32_t *uaddr) {
 }
 
 int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout) {
-    (void)timeout; /* TODO: Implement timeout support */
+    const struct timespec *ts = (const struct timespec *)timeout;
+    uint64_t target_tick = 0;
+    int has_timeout = 0;
+
+    if (ts) {
+        uint64_t ticks = (uint64_t)ts->tv_sec * TIMER_HZ;
+        /* TIMER_HZ is 1000, so each tick is 1ms = 1,000,000 ns */
+        ticks += (uint64_t)ts->tv_nsec / 1000000;
+
+        target_tick = timer_get_ticks() + ticks;
+        if (target_tick == 0) target_tick = 1; /* Ensure non-zero */
+        has_timeout = 1;
+    }
 
     if (!validate_uaddr(uaddr)) return -EFAULT;
 
@@ -85,6 +99,13 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout) {
 
     /* 4. Block task */
     task_t *current = task_get_current();
+
+    if (has_timeout) {
+        current->wake_tick = target_tick;
+    } else {
+        current->wake_tick = 0;
+    }
+
     current->state = TASK_BLOCKED;
 
     spin_unlock(&b->lock);
@@ -93,6 +114,10 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout) {
     task_yield();
 
     /* 6. We are back. Check why. */
+    int timed_out = 0;
+    if (has_timeout && timer_get_ticks() >= target_tick) {
+        timed_out = 1;
+    }
 
     spin_lock(&b->lock);
 
@@ -103,7 +128,7 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout) {
 
     while (curr) {
         if (curr == node) {
-            /* Still in queue! This means spurious wakeup or signal. */
+            /* Still in queue! This means spurious wakeup, signal, or timeout. */
             found = 1;
             /* Remove from list */
             *pp = curr->next;
@@ -120,6 +145,7 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout) {
 
     if (found) {
         /* If we were found in the queue, we weren't woken by futex_wake. */
+        if (timed_out) return -ETIMEDOUT;
         return -EINTR;
     }
 
@@ -142,7 +168,7 @@ int futex_wake(uint32_t *uaddr, int count) {
         if (curr->uaddr == uaddr) {
             /* Wake up this task */
             if (curr->task->state == TASK_BLOCKED) {
-                curr->task->state = TASK_READY;
+                task_wakeup(curr->task);
             }
 
             /* Remove from list */

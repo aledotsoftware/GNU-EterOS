@@ -361,13 +361,13 @@ int main() {
         size_t len;
 
         /* Test 1: Normal concatenation */
-        strcpy(buffer, "Hello");
+        strlcpy(buffer, "Hello", sizeof(buffer));
         len = strlcat(buffer, " World", sizeof(buffer));
         assert(len == 11);
         assert(strcmp(buffer, "Hello World") == 0);
 
         /* Test 2: Truncation */
-        strcpy(buffer, "Hello");
+        strlcpy(buffer, "Hello", sizeof(buffer));
         /* "Hello" (5) + " World" (6) = 11. Size limit 8. */
         /* Should append " Wo" (3 chars) -> "Hello Wo" (8 chars). Wait. */
         /* Size 8 means buffer can hold 7 chars + null. */
@@ -378,27 +378,27 @@ int main() {
         assert(strcmp(buffer, "Hello W") == 0);
 
         /* Test 3: Size smaller than dest string (no modification) */
-        strcpy(buffer, "Hello");
+        strlcpy(buffer, "Hello", sizeof(buffer));
         /* Size 3. Dest "Hello" is 5. */
         len = strlcat(buffer, " World", 3);
         assert(len == 3 + 6); /* size + strlen(src) = 3 + 6 = 9 */
         assert(strcmp(buffer, "Hello") == 0);
 
         /* Test 4: Size equals dest string (no modification) */
-        strcpy(buffer, "Hello");
+        strlcpy(buffer, "Hello", sizeof(buffer));
         len = strlcat(buffer, " World", 5);
         assert(len == 5 + 6); /* 11 */
         assert(strcmp(buffer, "Hello") == 0);
 
         /* Test 5: Exact fit */
-        strcpy(buffer, "Hello");
+        strlcpy(buffer, "Hello", sizeof(buffer));
         /* "Hello" + "!" = 6 chars. Size 7. */
         len = strlcat(buffer, "!", 7);
         assert(len == 6);
         assert(strcmp(buffer, "Hello!") == 0);
 
         /* Test 6: Empty src */
-        strcpy(buffer, "Hello");
+        strlcpy(buffer, "Hello", sizeof(buffer));
         len = strlcat(buffer, "", sizeof(buffer));
         assert(len == 5);
         assert(strcmp(buffer, "Hello") == 0);
@@ -457,7 +457,7 @@ int main() {
         char buffer[20];
 
         /* Initialize buffer: "0123456789" */
-        strcpy(buffer, "0123456789");
+        strlcpy(buffer, "0123456789", sizeof(buffer));
 
         /* Overlap: dest > src (shift right, requires backward copy) */
         /* src = buffer ("01234..."), dest = buffer + 1 ("12345...") */
@@ -474,7 +474,7 @@ int main() {
         printf("memmove backward copy (dest > src) passed\n");
 
         /* Reset */
-        strcpy(buffer, "0123456789");
+        strlcpy(buffer, "0123456789", sizeof(buffer));
 
         /* Overlap: dest < src (shift left, forward copy is safe) */
         /* src = buffer + 1 ("12345..."), dest = buffer ("01234...") */
@@ -488,7 +488,7 @@ int main() {
         printf("memmove forward copy (dest < src) passed\n");
 
         /* No overlap */
-        strcpy(buffer, "0123456789");
+        strlcpy(buffer, "0123456789", sizeof(buffer));
         memmove(buffer + 5, buffer, 5);
         /* Expected: "0123401234" */
         assert(memcmp(buffer, "0123401234", 10) == 0);
@@ -496,7 +496,7 @@ int main() {
         printf("memmove no overlap passed\n");
 
         /* Self assignment */
-        strcpy(buffer, "0123456789");
+        strlcpy(buffer, "0123456789", sizeof(buffer));
         memmove(buffer, buffer, 10);
         assert(memcmp(buffer, "0123456789", 10) == 0);
 
@@ -810,13 +810,13 @@ int main() {
         assert(val == -12345);
 
         /* INT32_MAX */
-        sprintf(str_buf, "%d", INT32_MAX);
+        snprintf(str_buf, sizeof(str_buf), "%d", INT32_MAX);
         res = atoi_s(str_buf, &val);
         assert(res == 0);
         assert(val == INT32_MAX);
 
         /* INT32_MIN */
-        sprintf(str_buf, "%d", INT32_MIN);
+        snprintf(str_buf, sizeof(str_buf), "%d", INT32_MIN);
         res = atoi_s(str_buf, &val);
         assert(res == 0);
         assert(val == INT32_MIN);
@@ -844,6 +844,42 @@ int main() {
         assert(res == -1);
 
         printf("atoi_s tests passed\n");
+    }
+
+    /* Test atoi */
+    {
+        /* Basic positive */
+        assert(atoi("12345") == 12345);
+
+        /* Basic negative */
+        assert(atoi("-12345") == -12345);
+
+        /* Zero */
+        assert(atoi("0") == 0);
+
+        /* Whitespace handling */
+        assert(atoi("  123") == 123);
+        assert(atoi("\t\n123") == 123);
+
+        /* Plus sign */
+        assert(atoi("+123") == 123);
+
+        /* Mixed whitespace and sign */
+        assert(atoi("  -123") == -123);
+
+        /* Trailing characters */
+        assert(atoi("123abc") == 123);
+
+        /* Empty string */
+        assert(atoi("") == 0);
+
+        /* Only sign */
+        assert(atoi("-") == 0);
+
+        /* Only whitespace */
+        assert(atoi("   ") == 0);
+
+        printf("atoi tests passed\n");
     }
 
     /* Test strchr */

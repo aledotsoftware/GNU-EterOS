@@ -12,9 +12,9 @@
 #define memcmp my_memcmp
 #define strcmp my_strcmp
 #define strncmp my_strncmp
-#define strcpy my_strcpy
 #define strncpy my_strncpy
-#define strcat my_strcat
+#define strlcpy my_strlcpy
+#define strlcat my_strlcat
 #define strchr my_strchr
 #define strrchr my_strrchr
 #define strstr my_strstr
@@ -63,7 +63,53 @@ void test_strlen_correctness() {
     printf("Userspace strlen correctness passed.\n");
 }
 
+void test_strlcpy_correctness() {
+    printf("Testing userspace strlcpy correctness...\n");
+    char buffer[16];
+    size_t len;
+
+    // Test 1: Normal copy
+    len = my_strlcpy(buffer, "Hello", sizeof(buffer));
+    assert(len == 5);
+    assert(my_strcmp(buffer, "Hello") == 0);
+
+    // Test 2: Truncation
+    len = my_strlcpy(buffer, "Hello World", 5);
+    assert(len == 11);
+    assert(my_strcmp(buffer, "Hell") == 0);
+    assert(buffer[4] == '\0');
+
+    // Test 3: Zero size
+    len = my_strlcpy(buffer, "Hello", 0);
+    assert(len == 5);
+
+    printf("Userspace strlcpy correctness passed.\n");
+}
+
+void test_strlcat_correctness() {
+    printf("Testing userspace strlcat correctness...\n");
+    char buffer[16];
+    size_t len;
+
+    my_strlcpy(buffer, "Hello", sizeof(buffer));
+
+    // Test 1: Normal cat
+    len = my_strlcat(buffer, " World", sizeof(buffer));
+    assert(len == 11);
+    assert(my_strcmp(buffer, "Hello World") == 0);
+
+    // Test 2: Truncation
+    my_strlcpy(buffer, "Hello", sizeof(buffer));
+    len = my_strlcat(buffer, " World", 8);
+    assert(len == 11);
+    assert(my_strcmp(buffer, "Hello W") == 0);
+
+    printf("Userspace strlcat correctness passed.\n");
+}
+
 int main() {
     test_strlen_correctness();
+    test_strlcpy_correctness();
+    test_strlcat_correctness();
     return 0;
 }

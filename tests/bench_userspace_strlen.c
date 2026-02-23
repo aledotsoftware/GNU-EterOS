@@ -53,7 +53,7 @@ void verify_strlen() {
     /* Unaligned test */
     char buffer[32];
     /* Using eteros_strcpy since standard strcpy is renamed */
-    eteros_strcpy(buffer, "1234567890");
+    eteros_strlcpy(buffer, "1234567890", sizeof(buffer));
 
     for (int i = 0; i < 8; i++) {
         size_t std_len = std_strlen(buffer + i);

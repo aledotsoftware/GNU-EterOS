@@ -4,12 +4,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h> // For O_RDONLY etc.
-#include <stdio.h> // For printf in test runner
 
 // Mock or override conflicting symbols
 // We rename functions implemented in stdio.c to test them
 #define snprintf my_snprintf
-#define sprintf my_sprintf
 #define printf my_printf
 #define vcbprintf my_vcbprintf
 #define fprintf my_fprintf
@@ -57,7 +55,6 @@
 // Manually define needed types/macros if missing.
 
 #undef snprintf
-#undef sprintf
 #undef printf
 #undef vcbprintf
 #undef fprintf
@@ -79,7 +76,6 @@
 
 // Clean slate
 #define snprintf my_snprintf
-#define sprintf my_sprintf
 #define printf my_printf
 #define vcbprintf my_vcbprintf
 #define fprintf my_fprintf

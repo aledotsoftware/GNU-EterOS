@@ -24,6 +24,7 @@
 #include <futex.h>
 #include <net/socket.h>
 #include <net/defs.h>
+#include <fcntl.h>
 
 extern void syscall_entry(void);
 
@@ -66,11 +67,11 @@ void syscall_init(void) {
 
 /* --- Socket VFS Wrappers --- */
 
-static uint32_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
+static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
     int res = net_recv((int)node->inode, buffer, size, 0);
-    return (res < 0) ? 0 : (uint32_t)res;
+    return (res < 0) ? 0 : (ssize_t)res;
 }
 
 static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
@@ -88,12 +89,6 @@ static void socket_close_fs(fs_node_t* node) {
 
 /* --- End Socket VFS Wrappers --- */
 
-#define O_ACCMODE   00000003
-#define O_RDONLY    00000000
-#define O_WRONLY    00000001
-#define O_RDWR      00000002
-#define O_CREAT     0x00000040
-
 #define UIO_MAXIOV  1024
 
 typedef struct {
@@ -109,12 +104,12 @@ typedef struct {
 
 #define PIPE_SIZE 4096
 
-static uint32_t pipe_read(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
+static ssize_t pipe_read(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     pipe_t* pipe = (pipe_t*)node->ptr;
     if (!pipe) return 0;
 
-    uint32_t read = 0;
+    ssize_t read = 0;
     while (read < size) {
         spin_lock(&pipe->lock);
 
@@ -225,13 +220,26 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         if (!vmm_validate_user_ptr(addr, len)) return -ENOMEM;
     } else {
         virt = current->mmap_base;
-        current->mmap_base += PAGE_ALIGN_UP(len);
+        uint64_t aligned_len = PAGE_ALIGN_UP(len);
+        if (aligned_len < len) return -ENOMEM; /* Overflow in alignment */
+
+        uint64_t new_base = virt + aligned_len;
+        if (new_base < virt || new_base > (USER_LIMIT + 1)) return -ENOMEM;
+
+        current->mmap_base = new_base;
     }
 
     uint64_t start = PAGE_ALIGN_DOWN(virt);
     uint64_t end = PAGE_ALIGN_UP(virt + len);
 
     for (uint64_t v = start; v < end; v += PAGE_SIZE) {
+        /* SECURITY FIX: Check if page is already mapped. If so, unmap it to prevent data leaks or reuse. */
+        uint64_t existing_phys = hal_mem_get_phys(v);
+        if (existing_phys != 0) {
+            pmm_unref_page((void*)existing_phys);
+            vmm_unmap_page(v);
+        }
+
         if (hal_mem_get_phys(v) == 0) {
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
@@ -369,8 +377,10 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
-    uint32_t read = read_fs(current->fd_table[fd].node, current->fd_table[fd].offset, count, (uint8_t*)buf);
-    current->fd_table[fd].offset += read;
+    ssize_t read = read_fs(current->fd_table[fd].node, current->fd_table[fd].offset, count, (uint8_t*)buf);
+    if (read > 0) {
+        current->fd_table[fd].offset += read;
+    }
     return read;
 }
 
@@ -398,6 +408,9 @@ static int64_t sys_open(const char* path, int flags, int mode) {
     if ((flags & O_ACCMODE) == O_RDONLY) { read_mode = 1; }
     else if ((flags & O_ACCMODE) == O_WRONLY) { write_mode = 1; }
     else if ((flags & O_ACCMODE) == O_RDWR) { read_mode = 1; write_mode = 1; }
+
+    if (flags & O_NONBLOCK) node->flags |= O_NONBLOCK;
+
     open_fs(node, read_mode, write_mode);
     current->fd_table[fd].node = node; current->fd_table[fd].offset = 0; current->fd_table[fd].flags = flags;
     return fd;
@@ -460,13 +473,16 @@ static int64_t sys_kill(int pid, int sig) {
     if (!target) return -ESRCH;
     if (target->state == TASK_DEAD) return -ESRCH;
     target->signal_pending |= (1u << sig);
-    if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) target->state = TASK_READY;
+    if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) task_wakeup(target);
     return 0;
 }
 
 static int64_t sys_brk(uint64_t brk) {
     task_t* current = task_get_current();
     if (brk == 0) return current->brk;
+    /* Check boundary */
+    if (brk > USER_LIMIT) return current->brk;
+
     if (brk < current->brk) { current->brk = brk; return current->brk; }
     uint64_t old_page = PAGE_ALIGN_UP(current->brk);
     uint64_t new_page = PAGE_ALIGN_UP(brk);
@@ -838,7 +854,16 @@ static int64_t sys_fcntl(int fd, int cmd, int64_t arg) {
     if (cmd == 1) return 0;
     if (cmd == 2) return 0;
     if (cmd == 3) return current->fd_table[fd].flags;
-    if (cmd == 4) { current->fd_table[fd].flags = (int)arg; return 0; }
+    if (cmd == 4) {
+        current->fd_table[fd].flags = (int)arg;
+        if (current->fd_table[fd].node) {
+            if (arg & O_NONBLOCK)
+                current->fd_table[fd].node->flags |= O_NONBLOCK;
+            else
+                current->fd_table[fd].node->flags &= ~O_NONBLOCK;
+        }
+        return 0;
+    }
     return -EINVAL;
 }
 static int64_t sys_dup(int oldfd) {

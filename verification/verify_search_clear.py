@@ -10,6 +10,17 @@ def verify_search_clear():
         file_path = os.path.abspath("web_ui/index.html")
         page.goto(f"file://{file_path}")
 
+        # Wait for boot splash to disappear
+        print("Waiting for boot splash to disappear...")
+        try:
+            page.wait_for_selector("#boot-splash", state="detached", timeout=10000)
+            print("Boot splash disappeared.")
+        except:
+             print("Boot splash did not disappear in time.")
+             page.screenshot(path="verification/error_splash_timeout.png")
+             browser.close()
+             return
+
         # Open Launcher
         print("Opening launcher...")
         launcher_btn = page.get_by_label("Lanzador de aplicaciones")
@@ -26,9 +37,10 @@ def verify_search_clear():
 
         # Verify clear button is visible
         clear_btn = page.get_by_label("Limpiar búsqueda")
-        if clear_btn.is_visible():
+        try:
+            clear_btn.wait_for(state="visible", timeout=2000)
             print("Clear button is visible.")
-        else:
+        except:
             print("ERROR: Clear button is NOT visible.")
             page.screenshot(path="verification/error_not_visible.png")
             browser.close()
@@ -49,9 +61,10 @@ def verify_search_clear():
             print(f"ERROR: Input is not empty. Value: '{input_value}'")
 
         # Verify clear button is hidden
-        if not clear_btn.is_visible():
+        try:
+             clear_btn.wait_for(state="hidden", timeout=2000)
              print("Clear button is hidden.")
-        else:
+        except:
              print("ERROR: Clear button is still visible.")
 
         # Take final screenshot

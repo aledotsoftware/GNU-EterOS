@@ -72,7 +72,7 @@ void setup_disk() {
     // BPB
     fat32_boot_sector_t* bpb = (fat32_boot_sector_t*)&disk_image[0];
     bpb->jmp_boot[0] = 0xEB; bpb->jmp_boot[1] = 0x3C; bpb->jmp_boot[2] = 0x90;
-    bpb->boot_sector_signature = 0xAA55;
+    bpb->boot_sector_signature = FAT32_BOOT_SIGNATURE;
     bpb->bytes_per_sector = SECTOR_SIZE;
     bpb->sectors_per_cluster = 1;
     bpb->reserved_sectors = 32;
@@ -114,10 +114,24 @@ void test_fat32_read() {
         exit(1);
     }
 
+    fs_node_t* root = fat32_mount(&vol);
+    if (!root) {
+        printf("FAILED: fat32_mount returned NULL\n");
+        exit(1);
+    }
+
+    fs_node_t* file = fat32_finddir_fs(root, "TEST.TXT");
+    if (!file) {
+        printf("FAILED: TEST.TXT not found\n");
+        exit(1);
+    }
+
     char buffer[100];
     memset(buffer, 0, sizeof(buffer));
 
-    int bytes = fat32_read_file(&vol, "TEST.TXT", buffer, sizeof(buffer));
+    uint32_t bytes = fat32_read_fs(file, 0, sizeof(buffer), (uint8_t*)buffer);
+    kfree(file);
+    kfree(root);
 
     if (bytes != 13) {
         printf("FAILED: Expected 13 bytes, got %d\n", bytes);
@@ -139,13 +153,20 @@ void test_fat32_not_found() {
     fat32_volume_t vol;
     fat32_init(&vol, mock_read_sector, mock_write_sector, 0);
 
-    char buffer[100];
-    int res = fat32_read_file(&vol, "NONEXIST.ENT", buffer, sizeof(buffer));
-
-    if (res >= 0) {
-        printf("FAILED: Expected error for non-existent file, got %d\n", res);
+    fs_node_t* root = fat32_mount(&vol);
+    if (!root) {
+        printf("FAILED: fat32_mount returned NULL\n");
         exit(1);
     }
+
+    fs_node_t* file = fat32_finddir_fs(root, "NONEXIST.ENT");
+    if (file) {
+        printf("FAILED: Found non-existent file\n");
+        kfree(file);
+        kfree(root);
+        exit(1);
+    }
+    kfree(root);
     printf("PASSED\n");
 }
 
@@ -154,7 +175,21 @@ void test_fat32_list() {
     setup_disk();
     fat32_volume_t vol;
     fat32_init(&vol, mock_read_sector, mock_write_sector, 0);
-    fat32_list_directory(&vol);
+
+    fs_node_t* root = fat32_mount(&vol);
+    if (!root) {
+        printf("FAILED: fat32_mount returned NULL\n");
+        exit(1);
+    }
+
+    printf("  [FAT32] Listing Root Directory:\n");
+    struct dirent entry;
+    uint32_t idx = 0;
+    while (fat32_readdir_fs(root, idx, &entry) == 0) {
+        printf("    - %s\n", entry.name);
+        idx++;
+    }
+    kfree(root);
     printf("PASSED (Check output manually if needed)\n");
 }
 
@@ -164,29 +199,51 @@ void test_fat32_create_write_read() {
     fat32_volume_t vol;
     fat32_init(&vol, mock_read_sector, mock_write_sector, 0);
 
+    fs_node_t* root = fat32_mount(&vol);
+    if (!root) {
+        printf("FAILED: fat32_mount returned NULL\n");
+        exit(1);
+    }
+
     // Create file
-    int res = fat32_create_file(&vol, "NEW.TXT");
+    int res = fat32_create_fs(root, "NEW.TXT", 0);
     if (res != 0) {
-        printf("FAILED: fat32_create_file returned %d\n", res);
+        printf("FAILED: fat32_create_fs returned %d\n", res);
         exit(1);
     }
 
     // Write file
     const char* data = "This is a new file content.";
-    res = fat32_write_file(&vol, "NEW.TXT", data, strlen(data));
-    if (res != strlen(data)) {
-        printf("FAILED: fat32_write_file returned %d (expected %ld)\n", res, strlen(data));
+    fs_node_t* file = fat32_finddir_fs(root, "NEW.TXT");
+    if (!file) {
+        printf("FAILED: Could not find NEW.TXT\n");
         exit(1);
     }
+
+    uint32_t bytes = fat32_write_fs(file, 0, strlen(data), (uint8_t*)data);
+    if (bytes != strlen(data)) {
+        printf("FAILED: fat32_write_fs returned %d (expected %ld)\n", bytes, strlen(data));
+        exit(1);
+    }
+    kfree(file);
 
     // Read back
     char buffer[100];
     memset(buffer, 0, sizeof(buffer));
-    res = fat32_read_file(&vol, "NEW.TXT", buffer, sizeof(buffer));
-    if (res != strlen(data)) {
-        printf("FAILED: fat32_read_file returned %d\n", res);
+
+    file = fat32_finddir_fs(root, "NEW.TXT");
+    if (!file) {
+        printf("FAILED: Could not find NEW.TXT for reading\n");
         exit(1);
     }
+
+    bytes = fat32_read_fs(file, 0, sizeof(buffer), (uint8_t*)buffer);
+    if (bytes != strlen(data)) {
+        printf("FAILED: fat32_read_fs returned %d\n", bytes);
+        exit(1);
+    }
+    kfree(file);
+    kfree(root);
 
     if (strcmp(buffer, data) != 0) {
         printf("FAILED: Read content mismatch: '%s'\n", buffer);
@@ -202,20 +259,27 @@ void test_fat32_delete() {
     fat32_volume_t vol;
     fat32_init(&vol, mock_read_sector, mock_write_sector, 0);
 
-    // Delete existing file TEST.TXT
-    int res = fat32_delete_file(&vol, "TEST.TXT");
-    if (res != 0) {
-        printf("FAILED: fat32_delete_file returned %d\n", res);
+    fs_node_t* root = fat32_mount(&vol);
+    if (!root) {
+        printf("FAILED: fat32_mount returned NULL\n");
         exit(1);
     }
 
-    // Try to read it
-    char buffer[100];
-    res = fat32_read_file(&vol, "TEST.TXT", buffer, sizeof(buffer));
-    if (res >= 0) {
-        printf("FAILED: Should not be able to read deleted file\n");
+    // Delete existing file TEST.TXT
+    int res = fat32_unlink_fs(root, "TEST.TXT");
+    if (res != 0) {
+        printf("FAILED: fat32_unlink_fs returned %d\n", res);
         exit(1);
     }
+
+    // Try to find it
+    fs_node_t* file = fat32_finddir_fs(root, "TEST.TXT");
+    if (file) {
+        printf("FAILED: Should not be able to find deleted file\n");
+        kfree(file);
+        exit(1);
+    }
+    kfree(root);
 
     printf("PASSED\n");
 }
@@ -226,25 +290,32 @@ void test_fat32_mkdir() {
     fat32_volume_t vol;
     fat32_init(&vol, mock_read_sector, mock_write_sector, 0);
 
+    fs_node_t* root = fat32_mount(&vol);
+    if (!root) {
+        printf("FAILED: fat32_mount returned NULL\n");
+        exit(1);
+    }
+
     // Create directory
-    int res = fat32_create_directory(&vol, "SUBDIR");
+    int res = fat32_mkdir_fs(root, "SUBDIR", 0);
     if (res != 0) {
-        printf("FAILED: fat32_create_directory returned %d\n", res);
+        printf("FAILED: fat32_mkdir_fs returned %d\n", res);
         exit(1);
     }
 
     // Verify it exists in directory listing (by finding it)
-    fat32_dir_entry_t entry;
-    res = fat32_find_file(&vol, "SUBDIR", &entry);
-    if (res != 0) {
+    fs_node_t* dir = fat32_finddir_fs(root, "SUBDIR");
+    if (!dir) {
         printf("FAILED: Could not find created directory\n");
         exit(1);
     }
 
-    if (!(entry.attr & ATTR_DIRECTORY)) {
+    if (!(dir->flags & FS_DIRECTORY)) {
         printf("FAILED: Created entry is not a directory\n");
         exit(1);
     }
+    kfree(dir);
+    kfree(root);
 
     printf("PASSED\n");
 }

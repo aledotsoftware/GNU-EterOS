@@ -79,7 +79,7 @@ void pmm_unref_page(void* addr);
 /**
  * Obtiene el contador de referencias actual de una página.
  */
-uint8_t pmm_get_ref_count(void* addr);
+uint16_t pmm_get_ref_count(void* addr);
 
 /**
  * Marca un rango de memoria física como OCUPADO.

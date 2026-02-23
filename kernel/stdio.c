@@ -13,7 +13,7 @@ static void buffer_append(char* str, size_t size, size_t* pos, char c) {
 }
 
 /* Helper for numbers */
-static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int base, int width, int zeropad, int uppercase, int is_signed) {
+static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int base, int width, int zeropad, int left_justify, int uppercase, int is_signed) {
     char temp[65];
     int i = 0;
     int is_neg = 0;
@@ -37,7 +37,7 @@ static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int ba
     int len = i + (is_neg ? 1 : 0);
     int padding = width - len;
 
-    if (!zeropad && padding > 0) {
+    if (!left_justify && !zeropad && padding > 0) {
         while (padding-- > 0) buffer_append(str, size, pos, ' ');
     }
 
@@ -48,6 +48,10 @@ static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int ba
     }
 
     while (i > 0) buffer_append(str, size, pos, temp[--i]);
+
+    if (left_justify && padding > 0) {
+        while (padding-- > 0) buffer_append(str, size, pos, ' ');
+    }
 }
 
 int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
@@ -66,8 +70,10 @@ int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
 
         /* Flags */
         int zeropad = 0;
-        if (*p == '0') {
-            zeropad = 1;
+        int left_justify = 0;
+        while (*p == '0' || *p == '-') {
+            if (*p == '0') zeropad = 1;
+            else if (*p == '-') left_justify = 1;
             p++;
         }
 
@@ -76,6 +82,19 @@ int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
         while (*p >= '0' && *p <= '9') {
             width = width * 10 + (*p - '0');
             p++;
+        }
+
+        if (left_justify) zeropad = 0;
+
+        /* Precision */
+        int precision = -1;
+        if (*p == '.') {
+            p++;
+            precision = 0;
+            while (*p >= '0' && *p <= '9') {
+                precision = precision * 10 + (*p - '0');
+                p++;
+            }
         }
 
         /* Length modifier */
@@ -98,7 +117,7 @@ int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
                 if (is_longlong) val = va_arg(ap, long long);
                 else if (is_long) val = va_arg(ap, long);
                 else val = va_arg(ap, int);
-                format_int(str, size, &pos, (uint64_t)val, 10, width, zeropad, 0, 1);
+                format_int(str, size, &pos, (uint64_t)val, 10, width, zeropad, left_justify, 0, 1);
                 break;
             }
             case 'u': {
@@ -106,7 +125,7 @@ int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
                 if (is_longlong) val = va_arg(ap, unsigned long long);
                 else if (is_long) val = va_arg(ap, unsigned long);
                 else val = va_arg(ap, unsigned int);
-                format_int(str, size, &pos, val, 10, width, zeropad, 0, 0);
+                format_int(str, size, &pos, val, 10, width, zeropad, left_justify, 0, 0);
                 break;
             }
             case 'x':
@@ -115,15 +134,23 @@ int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
                 if (is_longlong) val = va_arg(ap, unsigned long long);
                 else if (is_long) val = va_arg(ap, unsigned long);
                 else val = va_arg(ap, unsigned int);
-                format_int(str, size, &pos, val, 16, width, zeropad, (*p == 'X'), 0);
+                format_int(str, size, &pos, val, 16, width, zeropad, left_justify, (*p == 'X'), 0);
                 break;
             }
             case 's': {
                 const char* s = va_arg(ap, const char*);
                 if (!s) s = "(null)";
                 size_t len = strlen(s);
-                /* TODO: Width padding for strings if needed */
+                if (precision >= 0 && (size_t)precision < len) len = (size_t)precision;
+                int padding = width - (int)len;
+
+                if (!left_justify) {
+                    while (padding-- > 0) buffer_append(str, size, &pos, ' ');
+                }
                 for (size_t i = 0; i < len; i++) buffer_append(str, size, &pos, s[i]);
+                if (left_justify) {
+                    while (padding-- > 0) buffer_append(str, size, &pos, ' ');
+                }
                 break;
             }
             case 'c': {
@@ -135,7 +162,7 @@ int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
                 void* ptr = va_arg(ap, void*);
                 buffer_append(str, size, &pos, '0');
                 buffer_append(str, size, &pos, 'x');
-                format_int(str, size, &pos, (uintptr_t)ptr, 16, 0, 0, 0, 0);
+                format_int(str, size, &pos, (uintptr_t)ptr, 16, 0, 0, 0, 0, 0);
                 break;
             }
             case '%': {

@@ -217,13 +217,11 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
     hal_interrupts_enable();
 
     /* Wait loop (max ~10 seconds) */
-    int timeout_ticks = 10000;
+    int timeout_ms = 10000;
 
-    while (!state->completed && timeout_ticks > 0) {
-        task_yield();
-        /* Simple delay */
-        for(volatile int i=0; i<10000; i++);
-        timeout_ticks--;
+    while (!state->completed && timeout_ms > 0) {
+        task_sleep(1);
+        timeout_ms--;
     }
 
     int result_status = state->status;

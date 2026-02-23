@@ -165,8 +165,13 @@ void terminal_set_color(uint8_t color) {
 
 void terminal_scroll(void) {
     if (use_framebuffer) {
-        terminal_row = 0; // Wrap simple por ahora
-        framebuffer_clear(fb_bg);
+        // Implementación de scroll real en framebuffer
+        framebuffer_scroll(16, fb_bg);
+
+        // Mantenernos en la última fila (calculada como height / 16 - 1)
+        // Usamos la misma lógica de altura que en _terminal_putchar
+        size_t height = framebuffer_get_height() / 16;
+        terminal_row = height - 1;
     } else {
         vga_scroll();
         terminal_row = VGA_HEIGHT - 1;
@@ -183,8 +188,8 @@ static void _terminal_putchar(char c) {
 
     if (terminal_silent) return;
 
-    size_t width = use_framebuffer ? (1024/8) : VGA_WIDTH;
-    size_t height = use_framebuffer ? (768/16) : VGA_HEIGHT;
+    size_t width = use_framebuffer ? (framebuffer_get_width() / 8) : VGA_WIDTH;
+    size_t height = use_framebuffer ? (framebuffer_get_height() / 16) : VGA_HEIGHT;
 
     switch (c) {
         case '\n':
@@ -267,8 +272,8 @@ void terminal_clear(void) {
 }
 
 void terminal_set_cursor(size_t x, size_t y) {
-    size_t width = use_framebuffer ? (1024/8) : VGA_WIDTH;
-    size_t height = use_framebuffer ? (768/16) : VGA_HEIGHT;
+    size_t width = use_framebuffer ? (framebuffer_get_width() / 8) : VGA_WIDTH;
+    size_t height = use_framebuffer ? (framebuffer_get_height() / 16) : VGA_HEIGHT;
 
     if (x < width && y < height) {
         terminal_col = x;

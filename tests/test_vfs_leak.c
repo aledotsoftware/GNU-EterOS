@@ -28,7 +28,7 @@ struct dirent {
     uint32_t inode;
 };
 
-typedef uint32_t (*read_type_t)(struct fs_node*, uint32_t, uint32_t, uint8_t*);
+typedef ssize_t (*read_type_t)(struct fs_node*, uint32_t, uint32_t, uint8_t*);
 typedef uint32_t (*write_type_t)(struct fs_node*, uint32_t, uint32_t, uint8_t*);
 typedef void (*open_type_t)(struct fs_node*);
 typedef void (*close_type_t)(struct fs_node*);
@@ -114,7 +114,7 @@ int main() {
     memset(fs_root, 0, sizeof(fs_node_t));
     fs_root->flags = FS_DIRECTORY;
     fs_root->finddir = mock_finddir;
-    strcpy(fs_root->name, "root");
+    strlcpy(fs_root->name, "root", sizeof(fs_root->name));
 
     /* Test 1: Lookup single level */
     printf("\nTest 1: Lookup '/a'...\n");

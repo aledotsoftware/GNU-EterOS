@@ -42,6 +42,17 @@ uint16_t* mock_vga_buffer;
 #include "../include/types.h"
 #include "../include/io.h"
 #include "../include/vga.h"
+#include "../include/boot.h"
+
+/* Mock Framebuffer functions */
+void framebuffer_init(boot_info_t* info) { (void)info; }
+void framebuffer_clear(uint32_t color) { (void)color; }
+void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t bg) {
+    (void)c; (void)x; (void)y; (void)fg; (void)bg;
+}
+void framebuffer_scroll(uint32_t pixels, uint32_t bg_color) {
+    (void)pixels; (void)bg_color;
+}
 
 /* Mock I/O functions */
 void outb(uint16_t port, uint8_t value) {
@@ -102,7 +113,7 @@ int main() {
     }
 
     /* Initialize terminal */
-    terminal_initialize();
+    terminal_initialize(NULL);
 
     /* Check if buffer is cleared */
     uint16_t empty = vga_entry(' ', terminal_color);

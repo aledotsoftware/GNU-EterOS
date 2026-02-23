@@ -5,10 +5,12 @@
 #include <mm.h>
 #include <string.h>
 #include <types.h>
+#include <fcntl.h>
+#include <errno.h>
 
 /* TTY Node Functions */
 
-static uint32_t tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
 
     if (size == 0) return 0;
@@ -17,7 +19,10 @@ static uint32_t tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_
     /* This blocks until input is available */
     uint32_t i = 0;
     while (i < size) {
-        /* TODO: Handle non-blocking if O_NONBLOCK is set */
+        if ((node->flags & O_NONBLOCK) && !keyboard_has_input()) {
+            if (i == 0) return -EAGAIN;
+            return i;
+        }
         char c = keyboard_getchar();
 
         /* Echo to screen and serial */

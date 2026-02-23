@@ -20,6 +20,9 @@ void framebuffer_enable_double_buffer(void);
 /* Dibuja un rectángulo */
 void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color);
 
+/* Realiza un scroll vertical del framebuffer */
+void framebuffer_scroll(uint32_t pixels, uint32_t bg_color);
+
 uint32_t framebuffer_get_width(void);
 uint32_t framebuffer_get_height(void);
 

@@ -13,7 +13,7 @@ static fs_node_t* devfs_root = NULL;
 /* ========================================================================= */
 /* /dev/null Implementation                                                  */
 /* ========================================================================= */
-static uint32_t dev_null_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t dev_null_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset; (void)size; (void)buffer;
     return 0; /* EOF */
 }
@@ -26,7 +26,7 @@ static uint32_t dev_null_write(fs_node_t *node, uint32_t offset, uint32_t size, 
 /* ========================================================================= */
 /* /dev/zero Implementation                                                  */
 /* ========================================================================= */
-static uint32_t dev_zero_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t dev_zero_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
     memset(buffer, 0, size);
     return size;
@@ -40,7 +40,7 @@ static uint32_t dev_zero_write(fs_node_t *node, uint32_t offset, uint32_t size, 
 /* ========================================================================= */
 /* /dev/tty Implementation                                                   */
 /* ========================================================================= */
-static uint32_t dev_tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t dev_tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
     for (uint32_t i = 0; i < size; i++) {
         buffer[i] = (uint8_t)keyboard_getchar();
@@ -61,7 +61,7 @@ static uint32_t dev_tty_write(fs_node_t *node, uint32_t offset, uint32_t size, u
 /* ========================================================================= */
 /* /dev/input/event0 (Aggregate) Implementation                              */
 /* ========================================================================= */
-static uint32_t dev_event_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t dev_event_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
 
     if (size < sizeof(input_event_t)) return 0;
@@ -75,7 +75,7 @@ static uint32_t dev_event_read(fs_node_t *node, uint32_t offset, uint32_t size, 
 /* ========================================================================= */
 /* /dev/input/mouse0 Implementation                                          */
 /* ========================================================================= */
-static uint32_t dev_mouse_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t dev_mouse_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
 
     if (size < sizeof(input_event_t)) return 0;
@@ -144,7 +144,7 @@ static uint32_t xorshift32(void) {
     return x;
 }
 
-static uint32_t dev_random_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t dev_random_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
     /* Mix in TSC for entropy */
     uint32_t lo, hi;

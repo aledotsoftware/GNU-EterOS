@@ -26,6 +26,7 @@
 #define strchr eteros_strchr
 #define strncmp eteros_strncmp
 #define explicit_bzero eteros_explicit_bzero
+#define atoi eteros_atoi
 #endif
 
 /* ========================================================================= */

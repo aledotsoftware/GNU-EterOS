@@ -11,6 +11,7 @@ static uint8_t *jfs_disk_buffer = NULL;
 static uint32_t jfs_disk_size = 4 * 1024 * 1024; /* 4MB */
 static jfs_superblock_t *sb = NULL;
 static uint32_t current_tx_id = 1;
+static uint32_t jfs_next_free_block = 0;
 
 /* Helpers for disk I/O */
 static void disk_read(uint32_t block, void *buffer) {
@@ -85,7 +86,7 @@ static jfs_inode_t* get_inode(uint32_t inode_idx) {
 }
 
 /* VFS Interface */
-static uint32_t jfs_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+static ssize_t jfs_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     jfs_inode_t *inode = get_inode(node->inode);
     if (offset >= inode->size) return 0;
     if (offset + size > inode->size) size = inode->size - offset;
@@ -132,16 +133,7 @@ static uint32_t jfs_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8
         if (inode->blocks[block_idx] == 0) {
             /* Alloc new block - primitive allocator: scan for free from data start */
             /* In this toy FS, we just increment a global counter or scan. */
-            /* Let's scan linearly from data_start */
-            for (uint32_t b = sb->data_start; b < sb->total_blocks; b++) {
-                 /* Check if used by any inode (slow!) - generic bitmap would be better.
-                    For now, hack: static allocator next_free.
-                 */
-                 static uint32_t next_free = 0;
-                 if (next_free == 0) next_free = sb->data_start;
-                 inode->blocks[block_idx] = next_free++;
-                 break;
-            }
+            inode->blocks[block_idx] = jfs_next_free_block++;
         }
 
         uint32_t disk_block = inode->blocks[block_idx];
@@ -236,10 +228,7 @@ static int jfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     for (int i = 0; i < 12; i++) {
         if (root->blocks[i] == 0) {
              /* Alloc block for directory entries */
-             /* Reuse hack allocator */
-             static uint32_t next_free_block = 0;
-             if (next_free_block == 0) next_free_block = sb->data_start;
-             root->blocks[i] = next_free_block++;
+             root->blocks[i] = jfs_next_free_block++;
              /* Clear it */
              uint8_t z[512]; memset(z, 0, 512);
              disk_write(root->blocks[i], z);
@@ -297,6 +286,7 @@ fs_node_t* jfs_init(void) {
     root->flags = FS_DIRECTORY;
     /* Alloc block 0 for root dir entries */
     root->blocks[0] = sb->data_start; /* Block 100 */
+    jfs_next_free_block = sb->data_start + 1;
 
     fs_node_t *fs = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!fs) return NULL;

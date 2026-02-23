@@ -57,3 +57,11 @@
 ## 2027-03-01 - [Boot Splash Focus Handoff]
 **Learning:** Transitions between a loading state (like a boot splash) and the main interface can disorient keyboard/screen reader users if focus isn't explicitly moved to a logical starting point.
 **Action:** Always programmatically set focus to the primary interactive element (e.g., Start button) after a major state transition or splash screen removal.
+
+## 2027-04-12 - [Search Accessibility & Escape]
+**Learning:** For overlay search interfaces (like a launcher), users expect the "Escape" key to perform context-sensitive actions: clearing text first, then closing the overlay. This two-stage dismissal pattern prevents accidental closure and aligns with desktop OS conventions.
+**Action:** Implement a `keydown` handler on search inputs that checks value length: `Escape` -> `value.length > 0 ? clear() : close()`.
+
+## 2027-04-14 - [Actionable Empty States]
+**Learning:** An empty state that only says "No results" is a dead end. Adding a clear, primary action button (like "Clear Search" or "Create New") turns a failure state into a recovery opportunity, keeping the user in the flow.
+**Action:** Always include a recovery action button in empty state components.
