@@ -846,6 +846,42 @@ int main() {
         printf("atoi_s tests passed\n");
     }
 
+    /* Test atoi */
+    {
+        /* Basic positive */
+        assert(atoi("12345") == 12345);
+
+        /* Basic negative */
+        assert(atoi("-12345") == -12345);
+
+        /* Zero */
+        assert(atoi("0") == 0);
+
+        /* Whitespace handling */
+        assert(atoi("  123") == 123);
+        assert(atoi("\t\n123") == 123);
+
+        /* Plus sign */
+        assert(atoi("+123") == 123);
+
+        /* Mixed whitespace and sign */
+        assert(atoi("  -123") == -123);
+
+        /* Trailing characters */
+        assert(atoi("123abc") == 123);
+
+        /* Empty string */
+        assert(atoi("") == 0);
+
+        /* Only sign */
+        assert(atoi("-") == 0);
+
+        /* Only whitespace */
+        assert(atoi("   ") == 0);
+
+        printf("atoi tests passed\n");
+    }
+
     /* Test strchr */
     {
         const char* str = "Hello World";
