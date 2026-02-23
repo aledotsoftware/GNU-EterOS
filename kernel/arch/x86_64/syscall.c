@@ -460,7 +460,7 @@ static int64_t sys_kill(int pid, int sig) {
     if (!target) return -ESRCH;
     if (target->state == TASK_DEAD) return -ESRCH;
     target->signal_pending |= (1u << sig);
-    if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) target->state = TASK_READY;
+    if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) task_wakeup(target);
     return 0;
 }
 

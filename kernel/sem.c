@@ -60,8 +60,8 @@ void sem_signal(sem_t* sem) {
         task_t* t = task_get_at(i);
         /* Check if task exists, is blocked, and waiting on THIS sem */
         if (t && t->state == TASK_BLOCKED && t->waiting_sem == (struct semaphore*)sem) {
-            t->state = TASK_READY;
             t->waiting_sem = 0;
+            task_wakeup(t);
             break; /* Wake up only one task per signal */
         }
     }
