@@ -719,6 +719,16 @@ function setupLauncherNav() {
             e.preventDefault();
             apps[0].click();
         }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            if (search.value.length > 0) {
+                clearSearch();
+            } else {
+                toggleLauncher();
+                const trigger = document.getElementById('launcher-trigger');
+                if (trigger) trigger.focus();
+            }
+        }
     });
 
     document.querySelectorAll('.launcher-item').forEach(item => {
