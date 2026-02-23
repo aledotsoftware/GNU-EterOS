@@ -233,15 +233,20 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     uint64_t end = PAGE_ALIGN_UP(virt + len);
 
     for (uint64_t v = start; v < end; v += PAGE_SIZE) {
-        if (hal_mem_get_phys(v) == 0) {
-            void* phys = pmm_alloc_page();
-            if (!phys) return -ENOMEM;
-            uint32_t map_flags = HAL_MEM_USER | HAL_MEM_READ;
-            if (prot & 2) map_flags |= HAL_MEM_WRITE;
-            if (prot & 4) map_flags |= HAL_MEM_EXEC;
-            hal_mem_map((uint64_t)phys, v, map_flags);
-            memset((void*)v, 0, PAGE_SIZE);
+        /* Fix for MAP_FIXED: If address is already mapped, unmap it first */
+        uint64_t old_phys = hal_mem_get_phys(v);
+        if (old_phys != 0) {
+            hal_mem_unmap(v);
+            pmm_unref_page((void*)old_phys);
         }
+
+        void* phys = pmm_alloc_page();
+        if (!phys) return -ENOMEM;
+        uint32_t map_flags = HAL_MEM_USER | HAL_MEM_READ;
+        if (prot & 2) map_flags |= HAL_MEM_WRITE;
+        if (prot & 4) map_flags |= HAL_MEM_EXEC;
+        hal_mem_map((uint64_t)phys, v, map_flags);
+        memset((void*)v, 0, PAGE_SIZE);
     }
     return virt;
 }
