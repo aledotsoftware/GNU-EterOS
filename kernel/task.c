@@ -72,6 +72,9 @@ static void* alloc_kernel_stack(int slot) {
 /* ========================================================================= */
 
 static task_t   tasks[MAX_TASKS] __attribute__((aligned(16)));
+static uint64_t task_bitmap   = 0;
+_Static_assert(MAX_TASKS <= 64, "Bitmap optimization supports max 64 tasks");
+
 /* static int current_task removed in favor of per-CPU */
 static int      task_count    = 0;    /* Número total de tareas */
 static uint32_t next_id       = 0;    /* Generador de IDs */
@@ -133,6 +136,16 @@ static int      cpu_last_load = 0;
 /* Variable global para el stack del kernel (usada por syscall_entry) */
 uint64_t kernel_stack_top = 0;
 
+static int find_free_slot(void) {
+    if (~task_bitmap == 0) return -1;
+
+    int slot = __builtin_ctzll(~task_bitmap);
+    if (slot >= MAX_TASKS) return -1;
+
+    task_bitmap |= (1ULL << slot);
+    return slot;
+}
+
 /* ========================================================================= */
 /* Task Entry Wrapper                                                        */
 /* ========================================================================= */
@@ -170,6 +183,7 @@ static void task_entry_wrapper(void) {
 
 void scheduler_init(void) {
     memset(tasks, 0, sizeof(tasks));
+    task_bitmap = 1; /* Task 0 used */
 
     /* Initialize Queue */
     ready_head = NULL;
@@ -228,13 +242,7 @@ void task_init_ap(void) {
     __asm__ volatile("cli");
     spin_lock(&sched_lock);
 
-    int slot = -1;
-    for (int i = 0; i < MAX_TASKS; i++) {
-        if (tasks[i].state == TASK_DEAD || (i >= task_count && tasks[i].state == 0)) {
-            slot = i;
-            break;
-        }
-    }
+    int slot = find_free_slot();
 
     if (slot == -1) {
         spin_unlock(&sched_lock);
@@ -300,13 +308,7 @@ int task_create(const char* name, void (*entry)(void)) {
     }
 
     /* Encontrar un slot libre */
-    int slot = -1;
-    for (int i = 0; i < MAX_TASKS; i++) {
-        if (tasks[i].state == TASK_DEAD || (i >= task_count && tasks[i].state == 0)) {
-            slot = i;
-            break;
-        }
-    }
+    int slot = find_free_slot();
     if (slot == -1) {
         spin_unlock(&sched_lock);
         __asm__ volatile("sti");
@@ -317,6 +319,7 @@ int task_create(const char* name, void (*entry)(void)) {
     uint8_t* stack = (uint8_t*)alloc_kernel_stack(slot);
     if (!stack) {
         serial_write_string("[SCHED] Error: No hay memoria para el stack\n");
+        task_bitmap &= ~(1ULL << slot);
         spin_unlock(&sched_lock);
         __asm__ volatile("sti");
         return -1;
@@ -605,6 +608,11 @@ void task_exit(int status) {
 
     current->state = TASK_DEAD;
     current->exit_code = status;
+
+    int slot = (int)(current - tasks);
+    if (slot >= 0 && slot < MAX_TASKS) {
+        task_bitmap &= ~(1ULL << slot);
+    }
     spin_unlock(&sched_lock);
 
     /* Yield forever until switched out */
@@ -648,6 +656,7 @@ int task_kill(uint32_t pid) {
             }
 
             tasks[i].state = TASK_DEAD;
+            task_bitmap &= ~(1ULL << i);
             serial_write_string("[SCHED] Killed task PID ");
             serial_write_string("\n");
             
@@ -709,13 +718,7 @@ int task_fork(void* regs_ptr) {
         __asm__ volatile("sti");
         return -1;
     }
-    int slot = -1;
-    for (int i = 0; i < MAX_TASKS; i++) {
-        if (tasks[i].state == TASK_DEAD || (i >= task_count && tasks[i].state == 0)) {
-            slot = i;
-            break;
-        }
-    }
+    int slot = find_free_slot();
     if (slot == -1) {
         spin_unlock(&sched_lock);
         __asm__ volatile("sti");
@@ -725,6 +728,7 @@ int task_fork(void* regs_ptr) {
     /* 2. Alloc Stack (con Guard Page) */
     uint8_t* stack = (uint8_t*)alloc_kernel_stack(slot);
     if (!stack) {
+        task_bitmap &= ~(1ULL << slot);
         spin_unlock(&sched_lock);
         __asm__ volatile("sti");
         return -1;
