@@ -87,6 +87,13 @@ rm tests/test_initrd_overflow
 # ./tests/test_readv_security
 # rm tests/test_readv_security
 
+# Test Mmap Fixed Security
+echo "---------------------------------------------------"
+echo "Running test_mmap_fixed..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_mmap_fixed.c kernel/string.c -o tests/test_mmap_fixed
+./tests/test_mmap_fixed
+rm tests/test_mmap_fixed
+
 # Test Reclaimer
 echo "---------------------------------------------------"
 echo "Running test_reclaimer..."

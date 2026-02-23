@@ -22,3 +22,8 @@
 **Vulnerability:** `sys_readv` and `sys_writev` validated the individual buffers pointed to by `iov[i].iov_base`, but failed to validate the `iov` array itself (user pointer). A malicious user could pass a kernel address for `iov`, causing the kernel to read/write `struct iovec` from kernel memory or crash.
 **Learning:** Complex syscalls with nested pointers (like scatter/gather I/O) require multiple layers of validation. Validating the "inner" pointers (buffers) is not enough; the "outer" container (array) must also be validated.
 **Prevention:** Walk the data structure hierarchy and validate *every* pointer crossing the user/kernel boundary.
+
+## 2026-05-27 - [Stale Data Reuse in mmap MAP_FIXED]
+**Vulnerability:** `sys_mmap` with `MAP_FIXED` did not unmap existing pages at the target address. If the physical page was already present, `hal_mem_map` was skipped, leaving the old page (potentially with old data or wrong permissions) mapped instead of allocating a fresh zeroed page.
+**Learning:** Memory management APIs must strictly enforce their contracts. `MAP_FIXED` implies replacement. Assuming "if mapped, it's fine" violates the guarantee of a fresh/zeroed page and can lead to data leaks or integrity violations.
+**Prevention:** When implementing memory mapping overrides, always explicitly release the old resource (unmap & unref) before assigning the new one. Check for existence before allocation logic.
