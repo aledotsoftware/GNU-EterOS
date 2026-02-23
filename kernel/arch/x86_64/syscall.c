@@ -233,6 +233,13 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     uint64_t end = PAGE_ALIGN_UP(virt + len);
 
     for (uint64_t v = start; v < end; v += PAGE_SIZE) {
+        /* MAP_FIXED: If a page exists, unmap it to enforce replacement */
+        if ((flags & 0x10) && hal_mem_get_phys(v) != 0) {
+            uint64_t old_phys = hal_mem_get_phys(v);
+            hal_mem_unmap(v);
+            pmm_unref_page((void*)old_phys);
+        }
+
         if (hal_mem_get_phys(v) == 0) {
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;

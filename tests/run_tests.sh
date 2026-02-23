@@ -87,6 +87,13 @@ rm tests/test_initrd_overflow
 # ./tests/test_readv_security
 # rm tests/test_readv_security
 
+# Test Mmap Security Mock
+echo "---------------------------------------------------"
+echo "Running test_mmap_security_mock..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_mmap_security_mock.c -o tests/test_mmap_security_mock
+./tests/test_mmap_security_mock
+rm tests/test_mmap_security_mock
+
 # Test Reclaimer
 echo "---------------------------------------------------"
 echo "Running test_reclaimer..."
