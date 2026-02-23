@@ -178,6 +178,8 @@ function clearSearch() {
     filterApps();
 }
 
+let launcherCache = null;
+
 function filterApps() {
     const query = document.getElementById('launcher-search').value.toLowerCase();
 
@@ -187,17 +189,24 @@ function filterApps() {
         clearBtn.hidden = query.length === 0;
     }
 
-    const items = document.querySelectorAll('.launcher-item');
+    // ⚡ Bolt: Cache launcher items to avoid expensive DOM queries and layout thrashing
+    // on every keystroke. Using textContent is faster than innerText.
+    if (!launcherCache) {
+        launcherCache = Array.from(document.querySelectorAll('.launcher-item')).map(item => ({
+            element: item,
+            name: item.querySelector('span').textContent.toLowerCase(),
+            tag: item.querySelector('.tag').textContent.toLowerCase()
+        }));
+    }
+
     let hasResults = false;
 
-    items.forEach(item => {
-        const name = item.querySelector('span').innerText.toLowerCase();
-        const tag = item.querySelector('.tag').innerText.toLowerCase();
+    launcherCache.forEach(({ element, name, tag }) => {
         if (name.includes(query) || tag.includes(query)) {
-            item.style.display = 'flex';
+            element.style.display = 'flex';
             hasResults = true;
         } else {
-            item.style.display = 'none';
+            element.style.display = 'none';
         }
     });
 
