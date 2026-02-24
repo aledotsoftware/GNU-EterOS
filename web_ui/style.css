@@ -1198,3 +1198,14 @@ body {
         transform: translateY(0);
     }
 }
+
+/* --- Slider Value --- */
+.slider-value {
+    width: 35px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    margin-left: 8px;
+}

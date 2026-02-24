@@ -786,8 +786,22 @@ if (typeof module === 'undefined') {
     setupLauncherNav();
 }
 
+function setupSliders() {
+    const sliders = document.querySelectorAll('.cc-slider');
+    sliders.forEach(slider => {
+        slider.addEventListener('input', (e) => {
+            const span = e.target.nextElementSibling;
+            if (span && span.classList.contains('slider-value')) {
+                span.textContent = e.target.value + '%';
+            }
+        });
+    });
+}
+
 // Boot Splash Screen Logic
 document.addEventListener('DOMContentLoaded', () => {
+    setupSliders();
+
     const splash = document.getElementById('boot-splash');
     if (splash) {
         // Simulate boot time (e.g. 2.5 seconds)
@@ -819,6 +833,7 @@ if (typeof module !== 'undefined') {
         maximizeWindow,
         minimizeWindow,
         toggleFocusMode,
-        snapWindow
+        snapWindow,
+        setupSliders
     };
 }
