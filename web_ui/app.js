@@ -145,11 +145,31 @@ function updateClock() {
     if (clock) {
         clock.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
+    const dateEl = document.getElementById('cc-date');
+    if (dateEl) {
+        const options = { weekday: 'short', day: 'numeric', month: 'short' };
+        dateEl.innerText = now.toLocaleDateString(undefined, options);
+    }
+}
+
+function setupSliders() {
+    const sliders = document.querySelectorAll('.cc-slider');
+    sliders.forEach(slider => {
+        const valueDisplay = slider.nextElementSibling;
+        if (valueDisplay && valueDisplay.classList.contains('slider-value')) {
+            const update = () => {
+                valueDisplay.textContent = `${slider.value}%`;
+            };
+            slider.addEventListener('input', update);
+            update();
+        }
+    });
 }
 
 if (typeof module === 'undefined') {
     setInterval(updateClock, 1000);
     updateClock();
+    setupSliders();
 }
 
 function toggleLauncher() {
@@ -834,6 +854,7 @@ if (typeof module !== 'undefined') {
         minimizeWindow,
         toggleFocusMode,
         snapWindow,
+        updateClock,
         setupSliders
     };
 }

@@ -65,3 +65,7 @@
 ## 2027-04-14 - [Actionable Empty States]
 **Learning:** An empty state that only says "No results" is a dead end. Adding a clear, primary action button (like "Clear Search" or "Create New") turns a failure state into a recovery opportunity, keeping the user in the flow.
 **Action:** Always include a recovery action button in empty state components.
+
+## 2026-02-24 - [Dynamic Control Center Values]
+**Learning:** Adding real-time data (like current date and slider percentage values) to previously static or abstract UI elements (like sliders) significantly improves user confidence and system liveliness without cluttering the interface.
+**Action:** When working on "Control Center" or "Settings" panels, always look for opportunities to expose the actual value of a control or the current system state (time, date, battery %) rather than relying on abstract visual indicators alone.
