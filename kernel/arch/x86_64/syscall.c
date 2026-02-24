@@ -206,6 +206,20 @@ static int split_path(const char* path, char* parent, char* name) {
     return 0;
 }
 
+static int copy_user_string(const char* user_path, char** out_kpath, int max_len) {
+    if (!user_path) return -EFAULT;
+    char* kpath = (char*)kmalloc(max_len);
+    if (!kpath) return -ENOMEM;
+    int res = vmm_strncpy_from_user(kpath, user_path, max_len);
+    if (res < 0) {
+        kfree(kpath);
+        return res;
+    }
+    kpath[max_len - 1] = '\0'; /* Ensure null termination */
+    *out_kpath = kpath;
+    return 0;
+}
+
 static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
     (void)fd; (void)offset;
     if (len == 0) return -EINVAL;
@@ -385,25 +399,30 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
 }
 
 static int64_t sys_open(const char* path, int flags, int mode) {
-    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
+    char* kpath = NULL;
+    int res = copy_user_string(path, &kpath, 4096);
+    if (res < 0) return res;
+
     task_t* current = task_get_current();
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) { if (current->fd_table[i].node == NULL) { fd = i; break; } }
-    if (fd == -1) return -EMFILE;
+    if (fd == -1) { kfree(kpath); return -EMFILE; }
 
-    fs_node_t* node = vfs_lookup(fs_root, path);
+    fs_node_t* node = vfs_lookup(fs_root, kpath);
     if (!node) {
         if (flags & O_CREAT) {
             char parent_path[128]; char filename[128];
-            if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+            if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
             fs_node_t* parent = vfs_lookup(fs_root, parent_path);
-            if (!parent) return -ENOENT;
-            if (create_fs(parent, filename, (uint16_t)mode) != 0) { kfree(parent); return -EACCES; }
-            node = vfs_lookup(fs_root, path);
+            if (!parent) { kfree(kpath); return -ENOENT; }
+            if (create_fs(parent, filename, (uint16_t)mode) != 0) { kfree(parent); kfree(kpath); return -EACCES; }
+            node = vfs_lookup(fs_root, kpath);
             kfree(parent);
-            if (!node) return -ENOENT;
-        } else { return -ENOENT; }
+            if (!node) { kfree(kpath); return -ENOENT; }
+        } else { kfree(kpath); return -ENOENT; }
     }
+    kfree(kpath);
+
     uint8_t read_mode = 0; uint8_t write_mode = 0;
     if ((flags & O_ACCMODE) == O_RDONLY) { read_mode = 1; }
     else if ((flags & O_ACCMODE) == O_WRONLY) { write_mode = 1; }
@@ -427,25 +446,33 @@ static int64_t sys_close(int fd) {
 }
 
 static int64_t sys_mkdir(const char* path, int mode) {
-    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
+    char* kpath = NULL;
+    int res = copy_user_string(path, &kpath, 4096);
+    if (res < 0) return res;
+
     char parent_path[128]; char filename[128];
-    if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+    if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
-    if (!parent) return -ENOENT;
-    int res = mkdir_fs(parent, filename, (uint16_t)mode);
+    if (!parent) { kfree(kpath); return -ENOENT; }
+    int res2 = mkdir_fs(parent, filename, (uint16_t)mode);
     kfree(parent);
-    return res;
+    kfree(kpath);
+    return res2;
 }
 
 static int64_t sys_unlink(const char* path) {
-    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
+    char* kpath = NULL;
+    int res = copy_user_string(path, &kpath, 4096);
+    if (res < 0) return res;
+
     char parent_path[128]; char filename[128];
-    if (split_path(path, parent_path, filename) != 0) return -ENAMETOOLONG;
+    if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
-    if (!parent) return -ENOENT;
-    int res = unlink_fs(parent, filename);
+    if (!parent) { kfree(kpath); return -ENOENT; }
+    int res2 = unlink_fs(parent, filename);
     kfree(parent);
-    return res;
+    kfree(kpath);
+    return res2;
 }
 
 static int64_t sys_lseek(int fd, int64_t offset, int whence) {
@@ -563,14 +590,18 @@ static int64_t sys_fstat(int fd, struct stat* buf) {
 }
 
 static int64_t sys_stat(const char* path, struct stat* buf) {
-    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
-    if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) return -EFAULT;
-    fs_node_t* node = vfs_lookup(fs_root, path);
-    if (!node) return -ENOENT;
+    char* kpath = NULL;
+    int res = copy_user_string(path, &kpath, 4096);
+    if (res < 0) return res;
+
+    if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) { kfree(kpath); return -EFAULT; }
+    fs_node_t* node = vfs_lookup(fs_root, kpath);
+    if (!node) { kfree(kpath); return -ENOENT; }
     memset(buf, 0, sizeof(struct stat));
     buf->st_ino = node->inode; buf->st_size = node->length; buf->st_mode = 0100644;
     if ((node->flags & 0x7) == FS_DIRECTORY) buf->st_mode = 0040755;
     kfree(node);
+    kfree(kpath);
     return 0;
 }
 
@@ -842,11 +873,15 @@ static int64_t sys_getgid(void)  { return 0; }
 static int64_t sys_geteuid(void) { return 0; }
 static int64_t sys_getegid(void) { return 0; }
 static int64_t sys_access(const char* path, int mode) {
-    if (!vmm_check_user_string(path, 4096)) return -EFAULT;
+    char* kpath = NULL;
+    int res = copy_user_string(path, &kpath, 4096);
+    if (res < 0) return res;
+
     (void)mode;
-    fs_node_t* node = vfs_lookup(fs_root, path);
-    if (!node) return -ENOENT;
+    fs_node_t* node = vfs_lookup(fs_root, kpath);
+    if (!node) { kfree(kpath); return -ENOENT; }
     kfree(node);
+    kfree(kpath);
     return 0;
 }
 static int64_t sys_fcntl(int fd, int cmd, int64_t arg) {

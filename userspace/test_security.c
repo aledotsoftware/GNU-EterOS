@@ -66,5 +66,27 @@ int main() {
     res = write(pipes[1], ro_ptr, 5);
     check("Write from Read-Only Pointer", res, 0);
 
+    /* 6. Test open() with invalid pointer (Unmapped) */
+    res = open((const char*)unmapped_ptr, O_RDONLY);
+    check("Open with Unmapped Pointer", res, EFAULT);
+
+    /* 7. Test open() with invalid pointer (Kernel) */
+    res = open((const char*)kernel_ptr, O_RDONLY);
+    check("Open with Kernel Pointer", res, EFAULT);
+
+    /* 8. Test open() with valid pointer (non-existent file -> ENOENT) */
+    /* "/nonexistent" should be safe. */
+    res = open("/nonexistent_file_test", O_RDONLY);
+    /* ENOENT is 2 */
+    if (res < 0 && errno == ENOENT) {
+        printf("[PASS] Open with Valid Pointer (ENOENT): Failed as expected with errno %d\n", errno);
+    } else if (res >= 0) {
+         /* If file exists for some reason, we close it */
+         close(res);
+         printf("[PASS] Open with Valid Pointer (Success): Unexpected but safe\n");
+    } else {
+         printf("[FAIL] Open with Valid Pointer (ENOENT): Failed with errno %d, expected %d\n", errno, ENOENT);
+    }
+
     return 0;
 }
