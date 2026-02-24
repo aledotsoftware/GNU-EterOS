@@ -56,7 +56,7 @@
         <div class="control-center" id="control-center">
             <div class="cc-header">
                 <h3>Ajustes Rápidos</h3>
-                <span class="cc-date" id="cc-date">Martes, 17 Feb</span>
+                <span class="cc-date" id="cc-date"></span>
             </div>
             <div class="cc-grid">
                 <div class="cc-tile active" role="button" tabindex="0" aria-label="Activar WiFi" aria-pressed="true" onclick="this.classList.toggle('active'); this.setAttribute('aria-pressed', this.classList.contains('active'))" onkeydown="if(event.key==='Enter') this.click()"><img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/wifi.png"
@@ -72,10 +72,12 @@
                 <div class="cc-slider-group">
                     <img src="https://img.icons8.com/ios-filled/50/ffffff/sun.png" width="16" alt="Brillo">
                     <input type="range" class="cc-slider" value="80" aria-label="Brillo">
+                    <span class="slider-value">80%</span>
                 </div>
                 <div class="cc-slider-group">
                     <img src="https://img.icons8.com/ios-filled/50/ffffff/high-volume.png" width="16" alt="Volumen">
                     <input type="range" class="cc-slider" value="60" aria-label="Volumen">
+                    <span class="slider-value">60%</span>
                 </div>
             </div>
             <div class="cc-notifications">
@@ -131,7 +133,7 @@
         <div class="launcher-content" onclick="event.stopPropagation()">
             <div class="search-container">
                 <input type="text" id="launcher-search" placeholder="Buscar aplicaciones (Linux, Android...)"
-                    aria-label="Buscar aplicaciones" oninput="filterApps()">
+                    aria-label="Buscar aplicaciones">
                 <button id="search-clear" aria-label="Limpiar búsqueda" hidden onclick="clearSearch()">×</button>
             </div>
             <div class="launcher-grid" id="launcher-grid">

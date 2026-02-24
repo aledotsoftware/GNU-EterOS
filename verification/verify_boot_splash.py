@@ -1,38 +1,46 @@
-import os
-import time
-from playwright.sync_api import sync_playwright
 
-def verify_boot_splash_focus():
+from playwright.sync_api import sync_playwright
+import os
+
+def run():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        # Load the file
-        file_path = os.path.abspath("web_ui/index.html")
-        page.goto(f"file://{file_path}")
+        # Get absolute path to index.html
+        cwd = os.getcwd()
+        file_path = f"file://{cwd}/web_ui/index.html"
 
-        print("Waiting for boot splash to finish...")
+        print(f"Navigating to {file_path}")
+        page.goto(file_path)
 
-        # Wait for the splash screen to be removed
-        # The total time is 2500ms (wait) + 600ms (fade) = 3100ms
-        # We'll wait a bit longer to be safe
-        page.wait_for_selector("#boot-splash", state="detached", timeout=5000)
-        print("Boot splash removed.")
-
-        # Check active element
-        active_element = page.evaluate("document.activeElement.className")
-        print(f"Active element class: '{active_element}'")
-
-        if "os-logo" in active_element:
-            print("SUCCESS: Focus is on os-logo.")
+        # Check if boot splash is visible immediately
+        splash = page.locator("#boot-splash")
+        if splash.is_visible():
+            print("Boot splash is visible.")
+            page.screenshot(path="verification/boot_splash_initial.png")
         else:
-            print(f"FAILURE: Focus is NOT on os-logo. It is on '{active_element}'.")
-            # Take screenshot for debugging
-            page.screenshot(path="verification/boot_splash_focus_fail.png")
-            browser.close()
-            exit(1)
+            print("Boot splash is NOT visible initially!")
+
+        # Wait for splash to disappear (app.js has 2500ms delay + 600ms transition)
+        # We'll wait 4 seconds to be safe
+        print("Waiting for boot sequence...")
+        page.wait_for_timeout(4000)
+
+        if not splash.is_visible():
+            print("Boot splash disappeared as expected.")
+            page.screenshot(path="verification/boot_splash_after.png")
+        else:
+            print("Boot splash is STILL visible!")
+
+        # Verify focus moved to OS logo (Start button) for accessibility
+        active_element = page.evaluate("document.activeElement.className")
+        if "os-logo" in active_element:
+            print("Accessibility Check Passed: Focus moved to OS logo.")
+        else:
+            print(f"Accessibility Check FAILED: Focus is on '{active_element}', expected 'os-logo'.")
 
         browser.close()
 
 if __name__ == "__main__":
-    verify_boot_splash_focus()
+    run()

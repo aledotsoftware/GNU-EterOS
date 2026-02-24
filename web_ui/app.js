@@ -1,3 +1,16 @@
+// Utility: Debounce function to limit rate of execution
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func.apply(this, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 function toggleEterMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('eter-menu');
@@ -145,11 +158,31 @@ function updateClock() {
     if (clock) {
         clock.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
+    const dateEl = document.getElementById('cc-date');
+    if (dateEl) {
+        const options = { weekday: 'short', day: 'numeric', month: 'short' };
+        dateEl.innerText = now.toLocaleDateString(undefined, options);
+    }
+}
+
+function setupSliders() {
+    const sliders = document.querySelectorAll('.cc-slider');
+    sliders.forEach(slider => {
+        const valueDisplay = slider.nextElementSibling;
+        if (valueDisplay && valueDisplay.classList.contains('slider-value')) {
+            const update = () => {
+                valueDisplay.textContent = `${slider.value}%`;
+            };
+            slider.addEventListener('input', update);
+            update();
+        }
+    });
 }
 
 if (typeof module === 'undefined') {
     setInterval(updateClock, 1000);
     updateClock();
+    setupSliders();
 }
 
 function toggleLauncher() {
@@ -205,11 +238,16 @@ function filterApps() {
     let hasResults = false;
 
     launcherCache.forEach(app => {
-        if (app.name.includes(query) || app.tag.includes(query)) {
-            app.element.style.display = 'flex';
+        const shouldShow = app.name.includes(query) || app.tag.includes(query);
+        const targetDisplay = shouldShow ? 'flex' : 'none';
+
+        if (shouldShow) {
             hasResults = true;
-        } else {
-            app.element.style.display = 'none';
+        }
+
+        // ⚡ Bolt: Prevent redundant DOM writes to improve performance
+        if (app.element.style.display !== targetDisplay) {
+            app.element.style.display = targetDisplay;
         }
     });
 
@@ -743,6 +781,11 @@ function setupLauncherNav() {
     const search = document.getElementById('launcher-search');
     const getApps = () => Array.from(document.querySelectorAll('.launcher-item')).filter(e => e.style.display !== 'none');
 
+    // ⚡ Bolt: Debounce search input to improve performance
+    search.addEventListener('input', debounce(() => {
+        filterApps();
+    }, 150));
+
     search.addEventListener('keydown', (e) => {
         const apps = getApps();
         if (e.key === 'ArrowDown' && apps.length) {
@@ -786,8 +829,22 @@ if (typeof module === 'undefined') {
     setupLauncherNav();
 }
 
+function setupSliders() {
+    const sliders = document.querySelectorAll('.cc-slider');
+    sliders.forEach(slider => {
+        slider.addEventListener('input', (e) => {
+            const span = e.target.nextElementSibling;
+            if (span && span.classList.contains('slider-value')) {
+                span.textContent = e.target.value + '%';
+            }
+        });
+    });
+}
+
 // Boot Splash Screen Logic
 document.addEventListener('DOMContentLoaded', () => {
+    setupSliders();
+
     const splash = document.getElementById('boot-splash');
     if (splash) {
         // Simulate boot time (e.g. 2.5 seconds)
@@ -819,6 +876,8 @@ if (typeof module !== 'undefined') {
         maximizeWindow,
         minimizeWindow,
         toggleFocusMode,
-        snapWindow
+        snapWindow,
+        updateClock,
+        setupSliders
     };
 }
