@@ -927,6 +927,79 @@ static int64_t sys_wait4(int pid, int* status, int options, void* rusage) {
     return task_waitpid(pid, status, options);
 }
 
+
+static int64_t sys_sched_yield_wrapper(void) {
+    task_yield();
+    return 0;
+}
+
+static int64_t sys_exit_wrapper(int status) {
+    task_exit(status);
+    __builtin_unreachable();
+}
+
+#define MAX_SYSCALL_NUM 512
+
+typedef int64_t (*syscall_ptr_t)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+
+static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
+    (void)a1; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6;
+    return -ENOSYS;
+}
+
+static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
+    [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
+    [0] = (syscall_ptr_t)sys_read,
+    [1] = (syscall_ptr_t)sys_write,
+    [2] = (syscall_ptr_t)sys_open,
+    [3] = (syscall_ptr_t)sys_close,
+    [4] = (syscall_ptr_t)sys_stat,
+    [5] = (syscall_ptr_t)sys_fstat,
+    [8] = (syscall_ptr_t)sys_lseek,
+    [9] = (syscall_ptr_t)sys_mmap,
+    [10] = (syscall_ptr_t)sys_mprotect,
+    [11] = (syscall_ptr_t)sys_munmap,
+    [12] = (syscall_ptr_t)sys_brk,
+    [13] = (syscall_ptr_t)sys_rt_sigaction,
+    [14] = (syscall_ptr_t)sys_rt_sigprocmask,
+    [16] = (syscall_ptr_t)sys_ioctl,
+    [19] = (syscall_ptr_t)sys_readv,
+    [20] = (syscall_ptr_t)sys_writev,
+    [21] = (syscall_ptr_t)sys_access,
+    [22] = (syscall_ptr_t)sys_pipe,
+    [28] = (syscall_ptr_t)sys_madvise,
+    [32] = (syscall_ptr_t)sys_dup,
+    [33] = (syscall_ptr_t)sys_dup2,
+    [35] = (syscall_ptr_t)sys_nanosleep,
+    [39] = (syscall_ptr_t)sys_getpid,
+    [41] = (syscall_ptr_t)sys_socket,
+    [42] = (syscall_ptr_t)sys_connect,
+    [43] = (syscall_ptr_t)sys_accept,
+    [44] = (syscall_ptr_t)sys_sendto,
+    [45] = (syscall_ptr_t)sys_recvfrom,
+    [49] = (syscall_ptr_t)sys_bind,
+    [50] = (syscall_ptr_t)sys_listen,
+    [61] = (syscall_ptr_t)sys_wait4,
+    [62] = (syscall_ptr_t)sys_kill,
+    [63] = (syscall_ptr_t)sys_uname,
+    [72] = (syscall_ptr_t)sys_fcntl,
+    [79] = (syscall_ptr_t)sys_getcwd,
+    [83] = (syscall_ptr_t)sys_mkdir,
+    [87] = (syscall_ptr_t)sys_unlink,
+    [102] = (syscall_ptr_t)sys_getuid,
+    [104] = (syscall_ptr_t)sys_getgid,
+    [107] = (syscall_ptr_t)sys_geteuid,
+    [108] = (syscall_ptr_t)sys_getegid,
+    [110] = (syscall_ptr_t)sys_getppid,
+    [158] = (syscall_ptr_t)sys_arch_prctl,
+    [186] = (syscall_ptr_t)sys_gettid,
+    [202] = (syscall_ptr_t)sys_futex,
+    [218] = (syscall_ptr_t)sys_set_tid_address,
+    [228] = (syscall_ptr_t)sys_clock_gettime,
+    [231] = (syscall_ptr_t)sys_exit_group,
+    [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
+    [60] = (syscall_ptr_t)sys_exit_wrapper,
+};
 static void syscall_native_handler(struct syscall_regs* regs) {
     uint64_t ret = (uint64_t)-ENOSYS;
     task_t* current = task_get_current();
@@ -935,68 +1008,32 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         current->user_rsp = cpu->user_stack_scratch;
     }
 
-    if (regs->rax == SYS_read) ret = (uint64_t)sys_read((int)regs->rdi, (void*)regs->rsi, (size_t)regs->rdx);
-    else if (regs->rax == SYS_write) ret = (uint64_t)sys_write((int)regs->rdi, (const void*)regs->rsi, (size_t)regs->rdx);
-    else if (regs->rax == SYS_open) ret = (uint64_t)sys_open((const char*)regs->rdi, (int)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == SYS_close) ret = (uint64_t)sys_close((int)regs->rdi);
-    else if (regs->rax == SYS_lseek) ret = (uint64_t)sys_lseek((int)regs->rdi, (int64_t)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == SYS_socket) ret = (uint64_t)sys_socket((int)regs->rdi, (int)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == SYS_connect) ret = (uint64_t)sys_connect((int)regs->rdi, (const struct sockaddr*)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == SYS_bind) ret = (uint64_t)sys_bind((int)regs->rdi, (const struct sockaddr*)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == SYS_listen) ret = (uint64_t)sys_listen((int)regs->rdi, (int)regs->rsi);
-    else if (regs->rax == SYS_accept) ret = (uint64_t)sys_accept((int)regs->rdi, (struct sockaddr*)regs->rsi, (int*)regs->rdx);
-    else if (regs->rax == SYS_sendto) ret = (uint64_t)sys_sendto((int)regs->rdi, (const void*)regs->rsi, (size_t)regs->rdx, (int)regs->r10, (const struct sockaddr*)regs->r8, (int)regs->r9);
-    else if (regs->rax == SYS_recvfrom) ret = (uint64_t)sys_recvfrom((int)regs->rdi, (void*)regs->rsi, (size_t)regs->rdx, (int)regs->r10, (struct sockaddr*)regs->r8, (int*)regs->r9);
-    else if (regs->rax == SYS_exit) { task_exit((int)regs->rdi); __builtin_unreachable(); }
-    else if (regs->rax == SYS_getpid) ret = (uint64_t)sys_getpid();
-    else if (regs->rax == SYS_kill) ret = (uint64_t)sys_kill((int)regs->rdi, (int)regs->rsi);
-    else if (regs->rax == SYS_sched_yield) { task_yield(); ret = 0; }
-    else if (regs->rax == SYS_mmap) ret = (uint64_t)sys_mmap((void*)regs->rdi, (size_t)regs->rsi, (int)regs->rdx, (int)regs->r10, (int)regs->r8, (int64_t)regs->r9);
-    else if (regs->rax == SYS_brk) ret = (uint64_t)sys_brk((uint64_t)regs->rdi);
-    else if (regs->rax == SYS_fork) ret = (uint64_t)task_fork((void*)regs);
-    else if (regs->rax == SYS_execve) ret = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
-    else if (regs->rax == SYS_wait4) ret = (uint64_t)sys_wait4((int)regs->rdi, (int*)regs->rsi, (int)regs->rdx, (void*)regs->r10);
-    else if (regs->rax == 158) ret = (uint64_t)sys_arch_prctl((int)regs->rdi, (uint64_t)regs->rsi);
-    else if (regs->rax == SYS_uname) ret = (uint64_t)sys_uname((struct utsname*)regs->rdi);
-    else if (regs->rax == SYS_ioctl) ret = (uint64_t)sys_ioctl((int)regs->rdi, (unsigned long)regs->rsi, (void*)regs->rdx);
-    else if (regs->rax == SYS_writev) ret = (uint64_t)sys_writev((int)regs->rdi, (const struct iovec*)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == SYS_readv) ret = (uint64_t)sys_readv((int)regs->rdi, (const struct iovec*)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == SYS_stat) ret = (uint64_t)sys_stat((const char*)regs->rdi, (struct stat*)regs->rsi);
-    else if (regs->rax == SYS_fstat) ret = (uint64_t)sys_fstat((int)regs->rdi, (struct stat*)regs->rsi);
-    else if (regs->rax == 202) ret = (uint64_t)sys_futex((uint32_t*)regs->rdi, (int)regs->rsi, (uint32_t)regs->rdx, (void*)regs->r10, (uint32_t*)regs->r8, (uint32_t)regs->r9);
-    else if (regs->rax == SYS_dup2) ret = (uint64_t)sys_dup2((int)regs->rdi, (int)regs->rsi);
-    else if (regs->rax == SYS_pipe) ret = (uint64_t)sys_pipe((int*)regs->rdi);
-    else if (regs->rax == SYS_rt_sigaction) ret = (uint64_t)sys_rt_sigaction((int)regs->rdi, (const struct kernel_sigaction*)regs->rsi, (struct kernel_sigaction*)regs->rdx, (size_t)regs->r10);
-    else if (regs->rax == SYS_rt_sigprocmask) ret = (uint64_t)sys_rt_sigprocmask((int)regs->rdi, (const uint64_t*)regs->rsi, (uint64_t*)regs->rdx, (size_t)regs->r10);
-    else if (regs->rax == SYS_rt_sigreturn) { sys_rt_sigreturn(regs); return; }
-    else if (regs->rax == SYS_nanosleep) ret = (uint64_t)sys_nanosleep((const struct timespec*)regs->rdi, (struct timespec*)regs->rsi);
-    else if (regs->rax == SYS_access) ret = (uint64_t)sys_access((const char*)regs->rdi, (int)regs->rsi);
-    else if (regs->rax == SYS_dup) ret = (uint64_t)sys_dup((int)regs->rdi);
-    else if (regs->rax == SYS_fcntl) ret = (uint64_t)sys_fcntl((int)regs->rdi, (int)regs->rsi, (int64_t)regs->rdx);
-    else if (regs->rax == SYS_getcwd) ret = (uint64_t)sys_getcwd((char*)regs->rdi, (size_t)regs->rsi);
-    else if (regs->rax == SYS_getuid) ret = (uint64_t)sys_getuid();
-    else if (regs->rax == SYS_getgid) ret = (uint64_t)sys_getgid();
-    else if (regs->rax == SYS_geteuid) ret = (uint64_t)sys_geteuid();
-    else if (regs->rax == SYS_getegid) ret = (uint64_t)sys_getegid();
-    else if (regs->rax == SYS_mprotect) ret = (uint64_t)sys_mprotect((void*)regs->rdi, (size_t)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == SYS_munmap) ret = (uint64_t)sys_munmap((void*)regs->rdi, (size_t)regs->rsi);
-    else if (regs->rax == SYS_madvise) ret = (uint64_t)sys_madvise((void*)regs->rdi, (size_t)regs->rsi, (int)regs->rdx);
-    else if (regs->rax == 110) ret = (uint64_t)sys_getppid();
-    else if (regs->rax == 186) ret = (uint64_t)sys_gettid();
-    else if (regs->rax == 218) ret = (uint64_t)sys_set_tid_address((int*)regs->rdi);
-    else if (regs->rax == 228) ret = (uint64_t)sys_clock_gettime((int)regs->rdi, (struct timespec*)regs->rsi);
-    else if (regs->rax == 231) ret = (uint64_t)sys_exit_group((int)regs->rdi);
-    else if (regs->rax == SYS_mkdir) ret = (uint64_t)sys_mkdir((const char*)regs->rdi, (int)regs->rsi);
-    else if (regs->rax == SYS_unlink) ret = (uint64_t)sys_unlink((const char*)regs->rdi);
-    else if (regs->rax == 0xCAFEBABE) ret = 0;
-    else {
-        if (regs->rax != 302 && regs->rax != 334) {
-            char buf_nr[32];
-            serial_write_string("[SYSCALL-NATIVE] Unknown syscall: 0x");
-            utoa_hex_s(regs->rax, buf_nr, sizeof(buf_nr));
-            serial_write_string(buf_nr); serial_write_string("\n");
-        }
-        ret = (uint64_t)-ENOSYS;
+    if (regs->rax == 0xCAFEBABE) {
+        regs->rax = 0;
+        return;
+    }
+
+    if (regs->rax >= MAX_SYSCALL_NUM) {
+        regs->rax = (uint64_t)-ENOSYS;
+        return;
+    }
+
+    if (regs->rax == SYS_rt_sigreturn) {
+        sys_rt_sigreturn(regs);
+        return;
+    }
+    if (regs->rax == SYS_fork || regs->rax == SYS_vfork || regs->rax == SYS_clone) {
+        regs->rax = (uint64_t)task_fork((void*)regs);
+        return;
+    }
+    if (regs->rax == SYS_execve) {
+        regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
+        return;
+    }
+
+    syscall_ptr_t handler = syscall_table[regs->rax];
+    if (handler) {
+        ret = handler(regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8, regs->r9);
     }
 
     regs->rax = ret;
