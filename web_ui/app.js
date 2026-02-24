@@ -1,3 +1,16 @@
+// Utility: Debounce function to limit rate of execution
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func.apply(this, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 function toggleEterMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('eter-menu');
@@ -762,6 +775,11 @@ function makeDraggable(el) {
 function setupLauncherNav() {
     const search = document.getElementById('launcher-search');
     const getApps = () => Array.from(document.querySelectorAll('.launcher-item')).filter(e => e.style.display !== 'none');
+
+    // ⚡ Bolt: Debounce search input to improve performance
+    search.addEventListener('input', debounce(() => {
+        filterApps();
+    }, 150));
 
     search.addEventListener('keydown', (e) => {
         const apps = getApps();
