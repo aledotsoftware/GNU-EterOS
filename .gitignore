@@ -28,3 +28,6 @@ build/serial_output.log
 # Verification artifacts
 verification/*.png
 __pycache__/
+
+# Node
+web_ui/node_modules/

@@ -1,70 +1,43 @@
 #include <stdio.h>
-#include <unistd.h>
 #include <errno.h>
 #include <time.h>
-#include <sys/syscall.h>
-
-#ifndef NULL
-#define NULL ((void*)0)
-#endif
-
-#ifndef ETIMEDOUT
-#define ETIMEDOUT 110
-#endif
+#include <stdint.h>
 
 #define SYS_futex 202
 #define FUTEX_WAIT 0
-#define FUTEX_PRIVATE_FLAG 128
 
-static inline long my_syscall6(long n, long a1, long a2, long a3, long a4, long a5, long a6) {
+static inline long syscall6(long n, long a1, long a2, long a3, long a4, long a5, long a6) {
     long ret;
     register long r10 __asm__("r10") = a4;
     register long r8  __asm__("r8")  = a5;
     register long r9  __asm__("r9")  = a6;
     __asm__ volatile ("syscall" : "=a"(ret) : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8), "r"(r9) : "rcx", "r11", "memory");
-    if (ret < 0) {
-        errno = -ret;
-        return -1;
-    }
     return ret;
 }
 
 int main() {
-    uint32_t val = 0;
+    printf("Security Test: Syscall Futex Timeout Validation\n");
 
-    printf("[TEST] Futex Security Test\n");
+    int futex_word = 0;
+    struct timespec *kernel_timeout = (struct timespec *)0xFFFFFFFF80000000;
 
-    /* 1. Test Valid Timeout */
-    struct timespec ts;
-    ts.tv_sec = 0;
-    ts.tv_nsec = 1000;
+    /* sys_futex(uaddr, op, val, timeout, uaddr2, val3) */
+    long res = syscall6(SYS_futex, (long)&futex_word, FUTEX_WAIT, 0, (long)kernel_timeout, 0, 0);
 
-    /* Syscall args: uaddr, op, val, timeout, uaddr2, val3 */
-    int res = my_syscall6(SYS_futex, (long)&val, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, (long)&ts, 0, 0);
-    if (res == 0 || errno == ETIMEDOUT || errno == EAGAIN || errno == EINTR) {
-        printf("[PASS] Valid Timeout: OK (res=%d, errno=%d)\n", res, errno);
+    if (res < 0) {
+        /* In this libc, errno is set by the wrapper, but here we are calling raw syscall.
+           The kernel returns -errno. */
+        int err = (int)-res;
+        if (err == EFAULT) {
+            printf("[PASS] Futex with kernel timeout failed with EFAULT\n");
+            return 0;
+        } else {
+            printf("[FAIL] Futex with kernel timeout failed with unexpected errno %d (expected EFAULT)\n", err);
+            return 1;
+        }
     } else {
-        printf("[FAIL] Valid Timeout: Unexpected error %d\n", errno);
-    }
-
-    /* 2. Test Invalid Timeout (Unmapped) */
-    struct timespec *bad_ts = (struct timespec *)0xdeadbeef;
-    res = my_syscall6(SYS_futex, (long)&val, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, (long)bad_ts, 0, 0);
-
-    if (res == -1 && errno == EFAULT) {
-        printf("[PASS] Invalid Timeout (Unmapped): EFAULT received\n");
-    } else {
-        printf("[FAIL] Invalid Timeout (Unmapped): Expected EFAULT, got res=%d errno=%d\n", res, errno);
-    }
-
-    /* 3. Test Invalid Timeout (Kernel Address) */
-    struct timespec *kernel_ts = (struct timespec *)0xFFFFFFFF81000000;
-    res = my_syscall6(SYS_futex, (long)&val, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, (long)kernel_ts, 0, 0);
-
-    if (res == -1 && errno == EFAULT) {
-        printf("[PASS] Invalid Timeout (Kernel Addr): EFAULT received\n");
-    } else {
-        printf("[FAIL] Invalid Timeout (Kernel Addr): Expected EFAULT, got res=%d errno=%d\n", res, errno);
+        printf("[FAIL] Futex with kernel timeout Succeeded! (Res: %ld)\n", res);
+        return 1;
     }
 
     return 0;

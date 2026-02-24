@@ -577,11 +577,12 @@ static int64_t sys_stat(const char* path, struct stat* buf) {
 static int64_t sys_futex(uint32_t *uaddr, int op, uint32_t val, void *timeout, uint32_t *uaddr2, uint32_t val3) {
     (void)uaddr2; (void)val3;
     if (!vmm_verify_user_access(uaddr, 4, 1)) return -EFAULT;
-    /* Timeout also needs checking if used, but futex implementation handles null timeout */
-    if (timeout && !vmm_verify_user_access(timeout, sizeof(struct timespec), 0)) return -EFAULT;
 
     int cmd = op & FUTEX_CMD_MASK;
-    if (cmd == FUTEX_WAIT) return futex_wait(uaddr, val, timeout);
+    if (cmd == FUTEX_WAIT) {
+        if (timeout && !vmm_verify_user_access(timeout, sizeof(struct timespec), 0)) return -EFAULT;
+        return futex_wait(uaddr, val, timeout);
+    }
     else if (cmd == FUTEX_WAKE) return futex_wake(uaddr, (int)val);
     return -ENOSYS;
 }

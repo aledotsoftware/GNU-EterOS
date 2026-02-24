@@ -100,6 +100,11 @@ void *malloc(size_t size) {
         return NULL;
     }
 
+    /* Check for integer overflow before alignment and allocation */
+    if (size > SIZE_MAX - BLOCK_SIZE - ALIGNMENT) {
+        return NULL;
+    }
+
     size = ALIGN(size);
 
     if (!heap_start) {
@@ -137,6 +142,11 @@ void free(void *ptr) {
 }
 
 void *calloc(size_t nelem, size_t elsize) {
+    /* Check for multiplication overflow */
+    if (nelem && elsize > SIZE_MAX / nelem) {
+        return NULL;
+    }
+
     size_t size = nelem * elsize;
     void *ptr = malloc(size);
     if (ptr) {
@@ -152,6 +162,11 @@ void *realloc(void *ptr, size_t size) {
 
     if (size == 0) {
         free(ptr);
+        return NULL;
+    }
+
+    /* Check for integer overflow before alignment */
+    if (size > SIZE_MAX - BLOCK_SIZE - ALIGNMENT) {
         return NULL;
     }
 
