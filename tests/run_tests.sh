@@ -24,6 +24,13 @@ gcc -D__ETEROS_HOST_TEST__ tests/test_kcalloc.c -o tests/test_kcalloc
 ./tests/test_kcalloc
 rm tests/test_kcalloc
 
+# Test Malloc Overflow
+echo "---------------------------------------------------"
+echo "Running test_malloc_overflow..."
+gcc -D__ETEROS_HOST_TEST__ tests/test_malloc_overflow.c -o tests/test_malloc_overflow
+./tests/test_malloc_overflow
+rm tests/test_malloc_overflow
+
 # Test RTC
 echo "---------------------------------------------------"
 echo "Running test_rtc..."
