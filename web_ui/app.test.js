@@ -1,4 +1,4 @@
-const { toggleEterMenu } = require('./app');
+const { toggleEterMenu, setupSliders } = require('./app');
 
 describe('toggleEterMenu', () => {
     let menu;
@@ -77,5 +77,36 @@ describe('toggleEterMenu', () => {
         const spy = jest.spyOn(trigger, 'focus');
         toggleEterMenu();
         expect(spy).toHaveBeenCalled();
+    });
+});
+
+describe('setupSliders', () => {
+    let slider;
+    let span;
+
+    beforeEach(() => {
+        document.body.innerHTML = `
+            <div class="cc-slider-group">
+                <input type="range" class="cc-slider" value="50">
+                <span class="slider-value">50%</span>
+            </div>
+        `;
+        slider = document.querySelector('.cc-slider');
+        span = document.querySelector('.slider-value');
+        setupSliders();
+    });
+
+    test('should update span text when slider value changes', () => {
+        slider.value = '75';
+        slider.dispatchEvent(new Event('input'));
+        expect(span.textContent).toBe('75%');
+    });
+
+    test('should not throw error if span is missing', () => {
+        document.body.innerHTML = `<input type="range" class="cc-slider" value="50">`;
+        setupSliders();
+        const input = document.querySelector('input');
+        input.value = '75';
+        expect(() => input.dispatchEvent(new Event('input'))).not.toThrow();
     });
 });
