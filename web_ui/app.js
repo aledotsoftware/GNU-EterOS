@@ -205,11 +205,16 @@ function filterApps() {
     let hasResults = false;
 
     launcherCache.forEach(app => {
-        if (app.name.includes(query) || app.tag.includes(query)) {
-            app.element.style.display = 'flex';
+        const shouldShow = app.name.includes(query) || app.tag.includes(query);
+        const targetDisplay = shouldShow ? 'flex' : 'none';
+
+        if (shouldShow) {
             hasResults = true;
-        } else {
-            app.element.style.display = 'none';
+        }
+
+        // ⚡ Bolt: Prevent redundant DOM writes to improve performance
+        if (app.element.style.display !== targetDisplay) {
+            app.element.style.display = targetDisplay;
         }
     });
 
