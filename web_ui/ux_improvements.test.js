@@ -4,7 +4,11 @@ describe('UX Improvements', () => {
     beforeEach(() => {
         // Mock DOM
         document.body.innerHTML = `
-            <span id="clock"></span>
+            <div id="cc-trigger" role="button" aria-label="Abrir centro de control">
+                <span class="net">WiFi 6</span>
+                <span class="battery">100%</span>
+                <span id="clock"></span>
+            </div>
             <span id="cc-date"></span>
             <div class="cc-slider-group">
                 <input type="range" class="cc-slider" value="50">
@@ -18,19 +22,39 @@ describe('UX Improvements', () => {
     });
 
     test('updateClock should update the date element', () => {
-        // Mock Date
-        const mockDate = new Date(2023, 1, 17); // Feb 17, 2023
+        const mockDate = new Date(2023, 1, 17, 12, 0); // Feb 17, 2023 12:00
         jest.useFakeTimers().setSystemTime(mockDate);
 
         updateClock();
 
         const dateEl = document.getElementById('cc-date');
-        // The format depends on locale, but checking it's not empty is a good start.
-        // With default locale (en-US in JSDOM usually), it might be "Fri, Feb 17".
-        expect(dateEl.innerText).not.toBe('');
-        // We can check if it contains "Feb" or "17"
-        expect(dateEl.innerText).toMatch(/Feb/);
-        expect(dateEl.innerText).toMatch(/17/);
+        // Check for Spanish output "17 feb" or English if not supported.
+        expect(dateEl.innerText).toMatch(/17|feb/i);
+    });
+
+    test('updateClock should add title to clock and update aria-label of trigger', () => {
+        const mockDate = new Date(2023, 9, 12, 10, 30); // Oct 12, 2023 10:30
+        jest.useFakeTimers().setSystemTime(mockDate);
+
+        updateClock();
+
+        const clock = document.getElementById('clock');
+        const trigger = document.getElementById('cc-trigger');
+
+        // Verify clock time
+        const timeString = mockDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        expect(clock.innerText).toBe(timeString);
+
+        // Verify clock title (date tooltip)
+        const dateString = mockDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        expect(clock.title).toBe(dateString);
+
+        // Verify trigger aria-label
+        const label = trigger.getAttribute('aria-label');
+        expect(label).toContain(timeString);
+        expect(label).toContain(dateString);
+        expect(label).toContain('WiFi 6');
+        expect(label).toContain('100%');
     });
 
     test('setupSliders should update slider values on input', () => {
