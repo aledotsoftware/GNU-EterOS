@@ -372,6 +372,28 @@ struct utsname {
 
 struct iovec { void  *iov_base; size_t iov_len; };
 
+/* Helper to safely copy iovec array from user space */
+static int copy_from_user_iovec(const struct iovec* user_iov, int iovcnt, struct iovec** out_kiov) {
+    if (iovcnt < 0) return -EINVAL;
+    if (iovcnt == 0) {
+        *out_kiov = NULL;
+        return 0;
+    }
+    if (!user_iov) return -EINVAL;
+    size_t size = sizeof(struct iovec) * iovcnt;
+
+    /* Verify user access rights for the array */
+    if (!vmm_verify_user_access(user_iov, size, 0)) return -EFAULT;
+
+    struct iovec* kiov = (struct iovec*)kmalloc(size);
+    if (!kiov) return -ENOMEM;
+
+    /* Copy from user space to kernel space */
+    memcpy(kiov, user_iov, size);
+    *out_kiov = kiov;
+    return 0;
+}
+
 struct stat {
     uint64_t st_dev; uint64_t st_ino; uint64_t st_nlink; uint32_t st_mode; uint32_t st_uid; uint32_t st_gid; uint32_t __pad0; uint64_t st_rdev; int64_t  st_size; int64_t  st_blksize; int64_t  st_blocks; uint64_t st_atime; uint64_t st_atime_nsec; uint64_t st_mtime; uint64_t st_mtime_nsec; uint64_t st_ctime; uint64_t st_ctime_nsec; int64_t  __unused[3];
 };
@@ -552,28 +574,42 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
 static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
     if (fd < 0 || !iov) return -EINVAL;
     if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
-    if (!vmm_verify_user_access(iov, sizeof(struct iovec) * iovcnt, 0)) return -EFAULT;
+
+    struct iovec* kiov = NULL;
+    int res = copy_from_user_iovec(iov, iovcnt, &kiov);
+    if (res < 0) return res;
 
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
-        int64_t res = sys_write(fd, iov[i].iov_base, iov[i].iov_len);
-        if (res < 0) return res;
-        total += res;
+        int64_t r = sys_write(fd, kiov[i].iov_base, kiov[i].iov_len);
+        if (r < 0) {
+            kfree(kiov);
+            return r;
+        }
+        total += r;
     }
+    kfree(kiov);
     return total;
 }
 
 static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
     if (fd < 0 || !iov) return -EINVAL;
     if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
-    if (!vmm_verify_user_access(iov, sizeof(struct iovec) * iovcnt, 0)) return -EFAULT;
+
+    struct iovec* kiov = NULL;
+    int res = copy_from_user_iovec(iov, iovcnt, &kiov);
+    if (res < 0) return res;
 
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
-        int64_t res = sys_read(fd, iov[i].iov_base, iov[i].iov_len);
-        if (res < 0) return res;
-        total += res;
+        int64_t r = sys_read(fd, kiov[i].iov_base, kiov[i].iov_len);
+        if (r < 0) {
+            kfree(kiov);
+            return r;
+        }
+        total += r;
     }
+    kfree(kiov);
     return total;
 }
 

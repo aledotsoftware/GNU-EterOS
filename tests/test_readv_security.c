@@ -40,6 +40,8 @@ bool vmm_verify_user_access_called = false;
 const void* vmm_last_checked_addr = NULL;
 size_t vmm_last_checked_size = 0;
 bool vmm_should_fail = false;
+int kmalloc_count = 0;
+int kfree_count = 0;
 
 /* Globals for linking */
 socket_entry_t socket_table[MAX_SOCKETS];
@@ -70,8 +72,14 @@ void serial_write_string(const char* s) {
     // printf("[SERIAL] %s", s);
 }
 
-void* kmalloc(size_t size) { return malloc(size); }
-void kfree(void* ptr) { free(ptr); }
+void* kmalloc(size_t size) {
+    kmalloc_count++;
+    return malloc(size);
+}
+void kfree(void* ptr) {
+    if (ptr) kfree_count++;
+    free(ptr);
+}
 
 /* Mock vmm_verify_user_access */
 int vmm_verify_user_access(const void* addr, size_t size, int write) {
@@ -151,6 +159,24 @@ int hal_mem_map(uint64_t phys, uint64_t virt, uint32_t flags) { return 0; }
 /* Stub APIC */
 void lapic_send_ipi(int id, int vector) {}
 
+/* Stub vmm_strncpy_from_user */
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max) {
+    if (!dst || !src || max == 0) return -22; // -EINVAL
+    if (vmm_should_fail) return -14; // -EFAULT
+    strncpy(dst, src, max);
+    dst[max - 1] = '\0';
+    return strlen(dst);
+}
+
+/* Stub pmm_unref_page */
+void pmm_unref_page(void* p) {}
+
+/* Stub vmm_unmap_page */
+void vmm_unmap_page(uint64_t virt) {}
+
+/* Stub task_wakeup */
+void task_wakeup(task_t* task) {}
+
 /* Stub task functions */
 int task_fork(void* regs) { return 0; }
 int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) { return 0; }
@@ -202,11 +228,18 @@ int main() {
     printf("Test 1: Normal sys_readv\n");
     vmm_verify_user_access_called = false;
     vmm_should_fail = false;
+    kmalloc_count = 0;
+    kfree_count = 0;
     int64_t res = sys_readv(0, iovs, 2);
     if (res != 20) {
         printf("FAILED: sys_readv returned %ld, expected 20\n", res);
         return 1;
     }
+    if (kmalloc_count != 1 || kfree_count != 1) {
+        printf("FAILED: Memory not allocated/freed correctly (kmalloc: %d, kfree: %d)\n", kmalloc_count, kfree_count);
+        return 1;
+    }
+    printf("PASSED: Memory handling correct\n");
 
     /* TEST 2: sys_readv with invalid iov pointer (kernel space) */
     printf("Test 2: sys_readv with kernel pointer iov\n");
@@ -270,6 +303,24 @@ int main() {
          // This confirms the vulnerability we want to fix.
          // We will return 0 to allow build to succeed, but note it.
     }
+
+    /* TEST 5: sys_writev basic check */
+    printf("Test 5: Normal sys_writev\n");
+    current_task_mock.fd_table[0].node->write = write_fs;
+
+    kmalloc_count = 0;
+    kfree_count = 0;
+
+    res = sys_writev(0, iovs, 2);
+    if (res != 20) {
+        printf("FAILED: sys_writev returned %ld, expected 20\n", res);
+        return 1;
+    }
+    if (kmalloc_count != 1 || kfree_count != 1) {
+        printf("FAILED: Memory not allocated/freed correctly in writev (kmalloc: %d, kfree: %d)\n", kmalloc_count, kfree_count);
+        return 1;
+    }
+    printf("PASSED: writev Memory handling correct\n");
 
     free(current_task_mock.fd_table[0].node);
 
