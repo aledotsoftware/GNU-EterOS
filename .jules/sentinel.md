@@ -32,3 +32,8 @@
 **Vulnerability:** The `spawnApp` function in `web_ui/app.js` inserted the `name` argument directly into `innerHTML` without sanitization. Although current usages were safe (hardcoded strings), the function was exposed and could be exploited if ever called with user-controlled input (e.g., filenames).
 **Learning:** Functions that generate HTML from arguments are dangerous even if "internal", as they become attack vectors when the codebase evolves or when they process indirect user input.
 **Prevention:** Always escape HTML entities in string arguments before interpolating them into HTML templates, or use `textContent` where possible.
+
+## 2026-05-29 - Implicit Pointer Types in IOCTL
+**Vulnerability:** `sys_ioctl` blindly passed the `arg` parameter to drivers without validation, assuming drivers would handle it. However, because legacy IOCTLs like `TCGETS` do not encode the argument type in the request number, generic validation is impossible, and drivers running in kernel mode could inadvertently dereference a malicious user-supplied pointer.
+**Learning:** When a system call multiplexes disparate operations (like `ioctl`), central validation is difficult. Absence of strict type encoding leads to "blind trust" chains where no layer validates the pointer.
+**Prevention:** For legacy IOCTLs, explicitly check known request codes in the syscall handler and validate their specific argument types (size and direction) before dispatching to drivers. For new IOCTLs, strictly enforce encoded request numbers (e.g., `_IOR`, `_IOW`) that allow generic validation.

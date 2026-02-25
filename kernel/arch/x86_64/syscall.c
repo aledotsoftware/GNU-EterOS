@@ -25,6 +25,8 @@
 #include <net/socket.h>
 #include <net/defs.h>
 #include <fcntl.h>
+#include <ioctl.h>
+#include <termios.h>
 
 extern void syscall_entry(void);
 
@@ -565,6 +567,20 @@ static int64_t sys_uname(struct utsname* buf) {
 }
 
 static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
+    /* SECURITY FIX: Validate pointers for known IOCTLs */
+    /* Legacy IOCTLs (TCGETS/TCSETS) use void* arg as pointer without encoding */
+    if (request == TCGETS) {
+        if (!vmm_verify_user_access(arg, sizeof(struct termios), 1)) return -EFAULT;
+    } else if (request == TCSETS) {
+        if (!vmm_verify_user_access(arg, sizeof(struct termios), 0)) return -EFAULT;
+    } else if (request == TIOCGWINSZ) {
+        if (!vmm_verify_user_access(arg, sizeof(struct winsize), 1)) return -EFAULT;
+    } else if (request == TIOCSWINSZ) {
+        if (!vmm_verify_user_access(arg, sizeof(struct winsize), 0)) return -EFAULT;
+    } else if (request == FIONBIO) {
+        if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
+    }
+
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
