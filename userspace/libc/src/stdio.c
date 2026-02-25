@@ -105,7 +105,6 @@ static int vcbprintf(putc_func out, void *arg, const char *fmt, va_list ap) {
         // Length
         int len_l = 0;
         int len_ll = 0;
-        int len_h = 0;
         if (*p == 'l') {
             len_l = 1;
             p++;
@@ -114,7 +113,6 @@ static int vcbprintf(putc_func out, void *arg, const char *fmt, va_list ap) {
                 p++;
             }
         } else if (*p == 'h') {
-            len_h = 1;
             p++;
             if (*p == 'h') { // hh
                 p++;

@@ -983,6 +983,10 @@ static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4
     return -ENOSYS;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+#pragma GCC diagnostic ignored "-Woverride-init"
+
 static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
     [0] = (syscall_ptr_t)sys_read,
@@ -1036,6 +1040,8 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
 };
+
+#pragma GCC diagnostic pop
 static void syscall_native_handler(struct syscall_regs* regs) {
     uint64_t ret = (uint64_t)-ENOSYS;
     task_t* current = task_get_current();
