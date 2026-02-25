@@ -102,6 +102,12 @@ uint64_t vmm_virt_to_phys(uint64_t virt) { return virt; }
 int vmm_map_page(uint64_t phys, uint64_t virt, uint64_t flags) { return 0; }
 void vmm_destroy_pml4(uint64_t pml4) {}
 uint64_t vmm_clone_pml4(int cow) { return 0; }
+void vmm_unmap_page(uint64_t virt_addr) {}
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max) {
+    // Just copy for test
+    strncpy(dst, src, max);
+    return strlen(src) < max ? strlen(src) + 1 : max;
+}
 
 /* Mock VFS functions */
 ssize_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
@@ -143,6 +149,7 @@ int futex_wake(uint32_t *uaddr, int val) { return 0; }
 /* Stub PMM */
 void* pmm_alloc_page(void) { return malloc(4096); }
 void pmm_free_page(void* p) { free(p); }
+void pmm_unref_page(void* p) { /* free(p) if we tracked refs, but for test we leak or ignore */ }
 
 /* Stub Hal */
 uint64_t hal_mem_get_phys(uint64_t virt) { return virt; }
@@ -157,6 +164,7 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
 int task_waitpid(int pid, int* status, int options) { return 0; }
 task_t* task_get_by_id(uint32_t id) { return NULL; }
 int task_kill(uint32_t pid) { return 0; }
+void task_wakeup(task_t* t) {}
 
 /* Stub syscall entry */
 void syscall_entry(void) {}

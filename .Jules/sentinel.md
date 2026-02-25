@@ -1,0 +1,4 @@
+## 2026-10-24 - [Syscall Double-Fetch Prevention]
+**Vulnerability:** `sys_readv` and `sys_writev` iterated over a user-space `iovec` array directly after initial validation. A malicious thread could modify the `iovec` contents or unmap the memory during the loop (Time-of-Check Time-of-Use race condition), potentially causing kernel crashes or incorrect data access.
+**Learning:** Validating a user pointer once is insufficient if the kernel subsequently accesses it multiple times in a loop, as the underlying memory state can change (in a preemptive kernel).
+**Prevention:** Always copy complex user-space structures (like arrays of structs) to a kernel buffer (`kmalloc`) *immediately* after validation. Operate on the stable kernel copy. This eliminates the race window and ensures data consistency.

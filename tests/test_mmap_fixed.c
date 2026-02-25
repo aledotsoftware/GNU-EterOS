@@ -101,6 +101,10 @@ void vmm_unmap_page(uint64_t virt) {
 
 void vmm_destroy_pml4(uint64_t pml4) {}
 uint64_t vmm_clone_pml4(int cow) { return 0; }
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max) {
+    strncpy(dst, src, max);
+    return strlen(src) < max ? strlen(src) + 1 : max;
+}
 
 /* Mock PMM */
 void* pmm_alloc_page(void) { return malloc(4096); }

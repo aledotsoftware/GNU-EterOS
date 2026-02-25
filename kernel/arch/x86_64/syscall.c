@@ -372,6 +372,30 @@ struct utsname {
 
 struct iovec { void  *iov_base; size_t iov_len; };
 
+/* Helper to safely copy iovec array from user space to kernel space.
+ * This prevents TOCTOU attacks where user modifies iovec during iteration,
+ * and avoids kernel accessing user memory in a loop.
+ */
+static int copy_from_user_iovec(const struct iovec* user_iov, int iovcnt, struct iovec** out_iov) {
+    size_t size = sizeof(struct iovec) * iovcnt;
+    /* Verify the whole array is accessible */
+    if (!vmm_verify_user_access(user_iov, size, 0)) return -EFAULT;
+
+    /* Allocate kernel buffer */
+    struct iovec* k_iov = (struct iovec*)kmalloc(size);
+    if (!k_iov) return -ENOMEM;
+
+    /* Copy from user space.
+     * Note: We rely on vmm_verify_user_access + memcpy.
+     * A race condition exists if another thread unmaps pages here, but
+     * without exception tables, this is the standard pattern.
+     * Once copied, the kernel buffer is safe from modification/unmapping.
+     */
+    memcpy(k_iov, user_iov, size);
+    *out_iov = k_iov;
+    return 0;
+}
+
 struct stat {
     uint64_t st_dev; uint64_t st_ino; uint64_t st_nlink; uint32_t st_mode; uint32_t st_uid; uint32_t st_gid; uint32_t __pad0; uint64_t st_rdev; int64_t  st_size; int64_t  st_blksize; int64_t  st_blocks; uint64_t st_atime; uint64_t st_atime_nsec; uint64_t st_mtime; uint64_t st_mtime_nsec; uint64_t st_ctime; uint64_t st_ctime_nsec; int64_t  __unused[3];
 };
@@ -552,28 +576,42 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
 static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
     if (fd < 0 || !iov) return -EINVAL;
     if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
-    if (!vmm_verify_user_access(iov, sizeof(struct iovec) * iovcnt, 0)) return -EFAULT;
+
+    struct iovec* k_iov = NULL;
+    int err = copy_from_user_iovec(iov, iovcnt, &k_iov);
+    if (err < 0) return err;
 
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
-        int64_t res = sys_write(fd, iov[i].iov_base, iov[i].iov_len);
-        if (res < 0) return res;
+        int64_t res = sys_write(fd, k_iov[i].iov_base, k_iov[i].iov_len);
+        if (res < 0) {
+            kfree(k_iov);
+            return res;
+        }
         total += res;
     }
+    kfree(k_iov);
     return total;
 }
 
 static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
     if (fd < 0 || !iov) return -EINVAL;
     if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
-    if (!vmm_verify_user_access(iov, sizeof(struct iovec) * iovcnt, 0)) return -EFAULT;
+
+    struct iovec* k_iov = NULL;
+    int err = copy_from_user_iovec(iov, iovcnt, &k_iov);
+    if (err < 0) return err;
 
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
-        int64_t res = sys_read(fd, iov[i].iov_base, iov[i].iov_len);
-        if (res < 0) return res;
+        int64_t res = sys_read(fd, k_iov[i].iov_base, k_iov[i].iov_len);
+        if (res < 0) {
+            kfree(k_iov);
+            return res;
+        }
         total += res;
     }
+    kfree(k_iov);
     return total;
 }
 
