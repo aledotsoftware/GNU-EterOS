@@ -726,6 +726,15 @@ body {
     accent-color: var(--accent);
 }
 
+.slider-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    width: 36px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
 .cc-notifications {
     border-top: 1px solid var(--glass-border);
     padding-top: 15px;

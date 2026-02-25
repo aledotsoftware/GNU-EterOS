@@ -65,3 +65,7 @@
 ## 2027-04-14 - [Actionable Empty States]
 **Learning:** An empty state that only says "No results" is a dead end. Adding a clear, primary action button (like "Clear Search" or "Create New") turns a failure state into a recovery opportunity, keeping the user in the flow.
 **Action:** Always include a recovery action button in empty state components.
+
+## 2027-02-18 - [Real-Time Value Feedback]
+**Learning:** Range inputs (sliders) abstract values into a visual position, which is imprecise. Adding a real-time numerical readout (e.g., "80%") transforms the control from "roughly high" to "exactly 80%", empowering precision.
+**Action:** Pair every slider with a sibling text element that updates via the 'input' event, using 'tabular-nums' to prevent layout jitter.

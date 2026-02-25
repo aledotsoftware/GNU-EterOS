@@ -782,8 +782,23 @@ function setupLauncherNav() {
     });
 }
 
+function setupSliders() {
+    const sliders = document.querySelectorAll('.cc-slider');
+    sliders.forEach(slider => {
+        const valueDisplay = slider.nextElementSibling;
+        if (valueDisplay && valueDisplay.classList.contains('slider-value')) {
+            slider.addEventListener('input', () => {
+                valueDisplay.textContent = `${slider.value}%`;
+            });
+            // Ensure sync
+            valueDisplay.textContent = `${slider.value}%`;
+        }
+    });
+}
+
 if (typeof module === 'undefined') {
     setupLauncherNav();
+    setupSliders();
 }
 
 // Boot Splash Screen Logic
@@ -819,6 +834,7 @@ if (typeof module !== 'undefined') {
         maximizeWindow,
         minimizeWindow,
         toggleFocusMode,
-        snapWindow
+        snapWindow,
+        setupSliders
     };
 }
