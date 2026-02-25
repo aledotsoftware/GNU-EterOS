@@ -93,11 +93,16 @@ static void init_network(void) {
  * Inicializa el HAL y los subsistemas del kernel.
  */
 void __attribute__((section(".text.boot"))) kmain(void) {
+    /* ---- 0. Inicializar SMP (BSP Topology) ---- */
+    #if defined(ARCH_X86_64)
+    cpu_init_bsp();
+    #endif
+
     /* ---- 1. Inicializar Hardware Abstraction Layer (HAL) ---- */
     /* Esto configura relojes, interrupciones, consola, timer, etc. */
     hal_init();
     
-    klog(KLOG_INFO, "HAL Initialized.\n");
+    serial_write_string("[DEBUG] HAL Initialized returned to main.\n");
 
     /* ---- 2. Obtener Info del Bootloader (si aplica) ---- */
     /* En x86, esto está en 0xA000. En ARM, puede ser NULL o DTB. */
@@ -110,8 +115,6 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 2.5 Inicializar ACPI (Hardware Discovery) ---- */
     #if defined(ARCH_X86_64)
     acpi_init();
-    /* ---- 2.6 Inicializar SMP (BSP Topology) ---- */
-    cpu_init_bsp();
     /* Inicializar PAT para soportar Write-Combining en video */
     pat_init();
     #endif

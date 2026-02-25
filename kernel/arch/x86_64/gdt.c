@@ -12,6 +12,7 @@
 #include "../../../include/serial.h"
 #include "../../../include/cpu.h"
 #include "../../../include/mm.h"
+#include "../../../include/msr.h"
 
 /* ========================================================================= */
 /* Estructuras de Datos (Internas)                                           */
@@ -170,6 +171,15 @@ void gdt_init(void) {
     /* Asignar al BSP */
     cpus[0].gdt = (void*)&gdt;
     cpus[0].tss = (void*)&tss;
+    cpus[0].self = (uint64_t)&cpus[0];
+
+    /* 
+     * IMPORTANT: gdt_flush() overwrites GS segment register, which might 
+     * reset GS_BASE MSR to 0 on some CPUs/Environments. 
+     * We must ensure GS_BASE points to our per-CPU structure for get_current_cpu().
+     */
+    wrmsr(MSR_GS_BASE, (uint64_t)&cpus[0]);
+    wrmsr(MSR_KERNEL_GS_BASE, (uint64_t)&cpus[0]);
 
     serial_write_string("[GDT] GDT cargada. TSS activa.\n");
 }

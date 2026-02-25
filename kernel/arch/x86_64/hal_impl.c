@@ -52,6 +52,7 @@ void hal_init(void) {
 
     /* 7. Enable Interrupts */
     hal_interrupts_enable();
+    serial_write_string("[HAL] Interrupts enabled.\n");
 }
 
 void hal_interrupts_enable(void) {

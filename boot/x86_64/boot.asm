@@ -617,11 +617,9 @@ find_best_vbe_mode:
 
     ; Verificar BPP (Offset 25)
     cmp byte [VBE_MODE_INFO_ADDR + 25], 32
-    jne .try_24bpp
-    jmp .check_res
-.try_24bpp:
-    ; Aceptamos 32 BPP (preferido) o 24 BPP si no hay 32.
-    ; Por simplicidad, solo buscamos 32 BPP para evitar complicaciones en kernel.
+    je .check_res
+    cmp byte [VBE_MODE_INFO_ADDR + 25], 24
+    je .check_res
     jmp .scan_loop
 
 .check_res:
