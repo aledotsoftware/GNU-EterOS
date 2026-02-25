@@ -152,9 +152,19 @@ function spawnSettings() {
     document.getElementById('eter-menu').classList.remove('active');
 }
 
+let lastTimeKey = '';
+
 function updateClock() {
     const now = new Date();
     const clock = document.getElementById('clock');
+
+    // ⚡ Bolt: Prevent redundant DOM updates if time (minute) hasn't changed.
+    // We check clock.textContent to ensure we still update on initial load or if DOM was reset.
+    const currentTimeKey = `${now.getHours()}:${now.getMinutes()}`;
+    if (clock && clock.textContent && currentTimeKey === lastTimeKey) {
+        return;
+    }
+    lastTimeKey = currentTimeKey;
 
     const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const dateString = now.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
