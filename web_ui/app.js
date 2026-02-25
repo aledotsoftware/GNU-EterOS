@@ -155,13 +155,30 @@ function spawnSettings() {
 function updateClock() {
     const now = new Date();
     const clock = document.getElementById('clock');
+
+    const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const dateString = now.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
     if (clock) {
-        clock.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        clock.innerText = timeString;
+        clock.title = dateString;
     }
     const dateEl = document.getElementById('cc-date');
     if (dateEl) {
         const options = { weekday: 'short', day: 'numeric', month: 'short' };
-        dateEl.innerText = now.toLocaleDateString(undefined, options);
+        dateEl.innerText = now.toLocaleDateString('es-ES', options);
+    }
+
+    const trigger = document.getElementById('cc-trigger');
+    if (trigger) {
+        const batEl = trigger.querySelector('.battery');
+        const battery = batEl ? batEl.textContent : '';
+
+        const netEl = trigger.querySelector('.net');
+        const net = netEl ? netEl.textContent : '';
+
+        const label = `Centro de Control. Hora: ${timeString}. Fecha: ${dateString}. ${net}. Batería: ${battery}.`;
+        trigger.setAttribute('aria-label', label);
     }
 }
 
@@ -829,17 +846,6 @@ if (typeof module === 'undefined') {
     setupLauncherNav();
 }
 
-function setupSliders() {
-    const sliders = document.querySelectorAll('.cc-slider');
-    sliders.forEach(slider => {
-        slider.addEventListener('input', (e) => {
-            const span = e.target.nextElementSibling;
-            if (span && span.classList.contains('slider-value')) {
-                span.textContent = e.target.value + '%';
-            }
-        });
-    });
-}
 
 // Boot Splash Screen Logic
 document.addEventListener('DOMContentLoaded', () => {
