@@ -207,9 +207,24 @@ function setupSliders() {
     const sliders = document.querySelectorAll('.cc-slider');
     sliders.forEach(slider => {
         const valueDisplay = slider.nextElementSibling;
+        // Icon is usually the previous sibling in our layout
+        const icon = slider.previousElementSibling;
+
         if (valueDisplay && valueDisplay.classList.contains('slider-value')) {
             const update = () => {
-                valueDisplay.textContent = `${slider.value}%`;
+                const val = slider.value;
+                valueDisplay.textContent = `${val}%`;
+
+                // ♿ A11y: Update ARIA attributes for better screen reader support
+                slider.setAttribute('aria-valuenow', val);
+                slider.setAttribute('aria-valuetext', `${val}%`);
+
+                // 🎨 Palette: Visual delight - dim icon when value is low
+                if (icon && icon.tagName === 'IMG') {
+                    // Opacity range: 0.3 (at 0%) to 1.0 (at 100%)
+                    const opacity = 0.3 + (val / 100) * 0.7;
+                    icon.style.opacity = opacity;
+                }
             };
             slider.addEventListener('input', update);
             update();

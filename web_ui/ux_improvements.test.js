@@ -90,4 +90,37 @@ describe('UX Improvements', () => {
         expect(val1.textContent).toBe('10%');
         expect(val2.textContent).toBe('75%'); // Should not change
     });
+
+    test('setupSliders should update aria-valuetext and icon opacity', () => {
+        // Mock structure with icon
+        document.body.innerHTML = `
+            <div class="cc-slider-group">
+                <img class="slider-icon" src="icon.png" style="opacity: 1">
+                <input type="range" class="cc-slider" value="50" aria-label="Volume">
+                <span class="slider-value"></span>
+            </div>
+        `;
+
+        setupSliders();
+
+        const slider = document.querySelector('.cc-slider');
+        const icon = document.querySelector('.slider-icon');
+
+        // Check initial state
+        expect(slider.getAttribute('aria-valuetext')).toBe('50%');
+        expect(slider.getAttribute('aria-valuenow')).toBe('50');
+        // Opacity check: 0.3 + (50/100 * 0.7) = 0.65
+        expect(parseFloat(icon.style.opacity)).toBeCloseTo(0.65);
+
+        // Update value
+        slider.value = '100';
+        slider.dispatchEvent(new Event('input'));
+
+        expect(slider.getAttribute('aria-valuetext')).toBe('100%');
+        expect(parseFloat(icon.style.opacity)).toBe(1);
+
+        slider.value = '0';
+        slider.dispatchEvent(new Event('input'));
+        expect(parseFloat(icon.style.opacity)).toBeCloseTo(0.3);
+    });
 });

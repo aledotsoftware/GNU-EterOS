@@ -754,6 +754,10 @@ body {
     gap: 10px;
 }
 
+.cc-slider-group img {
+    transition: opacity 0.2s ease;
+}
+
 .cc-slider {
     flex: 1;
     accent-color: var(--accent);
