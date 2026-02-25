@@ -152,8 +152,16 @@ function spawnSettings() {
     document.getElementById('eter-menu').classList.remove('active');
 }
 
+let lastMinute = -1;
+
 function updateClock() {
     const now = new Date();
+    const currentMinute = now.getMinutes();
+
+    // ⚡ Bolt: Optimize clock updates to run only when minute changes (60x reduction)
+    if (currentMinute === lastMinute) return;
+    lastMinute = currentMinute;
+
     const clock = document.getElementById('clock');
 
     const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
