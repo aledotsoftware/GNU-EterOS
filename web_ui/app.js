@@ -11,6 +11,17 @@ function debounce(func, wait) {
     };
 }
 
+// 🛡️ Sentinel: Utility to escape HTML and prevent XSS
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function toggleEterMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('eter-menu');
@@ -410,6 +421,12 @@ document.addEventListener('click', (e) => {
 let zIndexCounter = 100;
 
 function spawnApp(name, type, customContent = null) {
+    // 🛡️ Sentinel: Sanitize inputs to prevent XSS.
+    // NOTE: customContent is expected to be trusted HTML (e.g. from internal calls).
+    // Do NOT pass user-generated content to customContent without sanitization.
+    const safeName = escapeHtml(name);
+    const safeType = escapeHtml(type);
+
     // Check if app is already open (to restore if minimized)
     const existingWins = document.querySelectorAll('.window');
     for (let win of existingWins) {
@@ -432,7 +449,7 @@ function spawnApp(name, type, customContent = null) {
 
     // Basic app window structure
     const win = document.createElement('div');
-    win.className = `window ${type}-app`;
+    win.className = `window ${safeType}-app`;
     win.style.top = '60px'; // Spawn below status bar
     win.style.left = '100px';
     win.style.width = type === 'native' ? '800px' : '600px';
@@ -448,7 +465,7 @@ function spawnApp(name, type, customContent = null) {
 
     win.innerHTML = `
         <div class="window-header">
-            <span class="window-title">${name} ${customContent ? '' : '(' + type.toUpperCase() + ')'}</span>
+            <span class="window-title">${safeName} ${customContent ? '' : '(' + safeType.toUpperCase() + ')'}</span>
             <div class="window-controls">
                 <div class="control focus" title="Modo Focus" role="button" aria-label="Cambiar a modo enfoque" tabindex="0" onclick="toggleFocusMode(this)" onkeydown="if(event.key==='Enter') toggleFocusMode(this)"></div>
                 <div class="control minimize" role="button" aria-label="Minimizar ventana" tabindex="0" onclick="minimizeWindow(this)" onkeydown="if(event.key==='Enter') minimizeWindow(this)"></div>
@@ -482,13 +499,13 @@ function spawnApp(name, type, customContent = null) {
         <div class="window-content" style="height: calc(100% - 40px); overflow: hidden;">
             ${customContent || `
             <div style="padding: 20px; color: #94a3b8; font-family: monospace;">
-                Initializing ${name} subsystem...<br>
-                > Loading shared libraries for ${type} kernel...<br>
+                Initializing ${safeName} subsystem...<br>
+                > Loading shared libraries for ${safeType} kernel...<br>
                 > Mounting filesystem...<br>
                 > GUI handoff complete.<br><br>
                 <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
-                    <strong>${name} Interface</strong><br>
-                    Concepto de convergencia: ${type === 'linux' ? 'Desktop Linux Application' : 'Android APK Runtime'}
+                    <strong>${safeName} Interface</strong><br>
+                    Concepto de convergencia: ${safeType === 'linux' ? 'Desktop Linux Application' : 'Android APK Runtime'}
                 </div>
             </div>
             `}

@@ -27,3 +27,8 @@
 **Vulnerability:** `sys_mmap` with `MAP_FIXED` did not unmap existing pages at the target address. If the physical page was already present, `hal_mem_map` was skipped, leaving the old page (potentially with old data or wrong permissions) mapped instead of allocating a fresh zeroed page.
 **Learning:** Memory management APIs must strictly enforce their contracts. `MAP_FIXED` implies replacement. Assuming "if mapped, it's fine" violates the guarantee of a fresh/zeroed page and can lead to data leaks or integrity violations.
 **Prevention:** When implementing memory mapping overrides, always explicitly release the old resource (unmap & unref) before assigning the new one. Check for existence before allocation logic.
+
+## 2026-05-28 - XSS in Internal UI Functions
+**Vulnerability:** The `spawnApp` function in `web_ui/app.js` inserted the `name` argument directly into `innerHTML` without sanitization. Although current usages were safe (hardcoded strings), the function was exposed and could be exploited if ever called with user-controlled input (e.g., filenames).
+**Learning:** Functions that generate HTML from arguments are dangerous even if "internal", as they become attack vectors when the codebase evolves or when they process indirect user input.
+**Prevention:** Always escape HTML entities in string arguments before interpolating them into HTML templates, or use `textContent` where possible.
