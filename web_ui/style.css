@@ -323,10 +323,37 @@ body {
     cursor: pointer;
     transition: transform 0.2s;
     outline: none;
+    position: relative;
 }
 
 .control:focus-visible {
     box-shadow: 0 0 0 2px white, 0 0 0 4px var(--accent);
+}
+
+.control::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 140%;
+    left: 50%;
+    transform: translateX(-50%) translateY(0) scale(0.9);
+    padding: 4px 8px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(10px);
+    border-radius: 6px;
+    font-size: 10px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+    z-index: 2000;
+    color: var(--text-primary);
+}
+
+.control:hover::after,
+.control:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(5px) scale(1);
 }
 
 .snap-option:focus-visible {
