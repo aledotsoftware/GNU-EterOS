@@ -90,7 +90,9 @@ size_t strlen(const char *s) {
     }
 
     /* Process 8 bytes at a time */
-    const uint64_t *lp = (const uint64_t *)p;
+    typedef uint64_t __attribute__((__may_alias__)) u64_alias;
+    const u64_alias *lp = (const u64_alias *)p;
+
     uint64_t v;
     while (1) {
         v = *lp++;
@@ -212,11 +214,56 @@ size_t strlcat(char *dest, const char *src, size_t size) {
 }
 
 char *strchr(const char *s, int c) {
+#ifdef __x86_64__
+    const char *p = s;
+    const uint64_t one_bits = 0x0101010101010101ULL;
+    const uint64_t high_bits = 0x8080808080808080ULL;
+
+    /* Align to 8 bytes */
+    while ((uintptr_t)p & 7) {
+        if (*p == (char)c) return (char *)p;
+        if (!*p) return (void*)0;
+        p++;
+    }
+
+    /* Process 8 bytes at a time */
+    typedef uint64_t __attribute__((__may_alias__)) u64_alias;
+    const u64_alias *lp = (const u64_alias *)p;
+
+    uint64_t v;
+    uint64_t char_mask = (unsigned char)c * one_bits;
+
+    while (1) {
+        v = *lp;
+        /* Check if any byte is 0 using SWAR magic:
+           (v - 0x01...) & ~v & 0x80... detects zero byte */
+        uint64_t zero_bytes = (v - one_bits) & ~v & high_bits;
+
+        /* Check if any byte matches c:
+           We XOR with char_mask, then detect zero bytes in result */
+        uint64_t match_bytes = ((v ^ char_mask) - one_bits) & ~(v ^ char_mask) & high_bits;
+
+        if (zero_bytes | match_bytes) {
+            /* Found something, break to byte loop */
+            p = (const char *)lp;
+            break;
+        }
+        lp++;
+    }
+
+    /* Byte-wise loop to find exact location */
+    while (1) {
+        if (*p == (char)c) return (char *)p;
+        if (!*p) return (void*)0;
+        p++;
+    }
+#else
     while (*s) {
         if (*s == (char)c) return (char *)s;
         s++;
     }
     return (c == 0) ? (char *)s : (void*)0;
+#endif
 }
 
 char *strrchr(const char *s, int c) {

@@ -107,9 +107,62 @@ void test_strlcat_correctness() {
     printf("Userspace strlcat correctness passed.\n");
 }
 
+void test_strchr_correctness() {
+    printf("Testing userspace strchr correctness...\n");
+
+    const char *str = "Hello World";
+
+    // Found
+    assert(my_strchr(str, 'H') == str);
+    assert(my_strchr(str, 'e') == str + 1);
+    assert(my_strchr(str, 'o') == str + 4);
+    assert(my_strchr(str, 'd') == str + 10);
+
+    // Not found
+    assert(my_strchr(str, 'z') == NULL);
+    assert(my_strchr(str, 'X') == NULL);
+
+    // Terminator
+    assert(my_strchr(str, '\0') == str + 11);
+
+    // Empty string
+    assert(my_strchr("", 'a') == NULL);
+    assert(my_strchr("", '\0') != NULL);
+    assert(*my_strchr("", '\0') == '\0');
+
+    // Alignment and SWAR test
+    char *buf = malloc(64);
+    memset(buf, 'x', 63);
+    buf[63] = '\0';
+
+    // Test finding character at various offsets and alignments
+    for (int i = 0; i < 16; i++) {
+        for (int pos = 0; pos < 30; pos++) {
+            buf[i + pos] = 'Y';
+            char *res = my_strchr(buf + i, 'Y');
+            assert(res == buf + i + pos);
+            buf[i + pos] = 'x'; // Restore
+        }
+    }
+
+    // Test finding terminator at various offsets
+     for (int i = 0; i < 16; i++) {
+        for (int len = 0; len < 30; len++) {
+            char saved = buf[i + len];
+            buf[i + len] = '\0';
+            assert(my_strchr(buf + i, '\0') == buf + i + len);
+            buf[i + len] = saved;
+        }
+    }
+
+    free(buf);
+    printf("Userspace strchr correctness passed.\n");
+}
+
 int main() {
     test_strlen_correctness();
     test_strlcpy_correctness();
     test_strlcat_correctness();
+    test_strchr_correctness();
     return 0;
 }

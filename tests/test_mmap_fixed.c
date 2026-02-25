@@ -84,6 +84,14 @@ int vmm_verify_user_access(const void* addr, size_t size, int write) { return 1;
 int vmm_validate_user_ptr(const void* addr, size_t size) { return 1; }
 int vmm_check_user_string(const char* str, size_t max_len) { return 1; }
 
+int vmm_strncpy_from_user(char *dst, const char *src, size_t count) {
+    // Mock implementation: just copy
+    if (count == 0) return 0;
+    strncpy(dst, src, count);
+    dst[count - 1] = '\0';
+    return strlen(dst);
+}
+
 uint64_t vmm_virt_to_phys(uint64_t virt) {
     // Mock mapping for 0x10000000 -> 0x999000
     if (virt >= 0x10000000 && virt < 0x10001000) {
