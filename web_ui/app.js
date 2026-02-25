@@ -152,15 +152,25 @@ function spawnSettings() {
     document.getElementById('eter-menu').classList.remove('active');
 }
 
+let lastTimeKey = null;
+
 function updateClock() {
     const now = new Date();
     const clock = document.getElementById('clock');
 
     const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+    // ⚡ Bolt: Optimize clock updates to reduce DOM thrashing
+    // Only update if time string has changed OR if DOM was reset (clock.textContent empty)
+    if (clock && lastTimeKey === timeString && clock.textContent === timeString) {
+        return;
+    }
+    lastTimeKey = timeString;
+
     const dateString = now.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     if (clock) {
-        clock.innerText = timeString;
+        clock.textContent = timeString;
         clock.title = dateString;
     }
     const dateEl = document.getElementById('cc-date');

@@ -43,7 +43,7 @@ describe('UX Improvements', () => {
 
         // Verify clock time
         const timeString = mockDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-        expect(clock.innerText).toBe(timeString);
+        expect(clock.textContent).toBe(timeString);
 
         // Verify clock title (date tooltip)
         const dateString = mockDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
