@@ -235,7 +235,6 @@ function setupSliders() {
 if (typeof module === 'undefined') {
     setInterval(updateClock, 1000);
     updateClock();
-    setupSliders();
 }
 
 function toggleLauncher() {
