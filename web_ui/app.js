@@ -391,10 +391,17 @@ function showSwitcher() {
 
         const card = document.createElement('div');
         card.className = `switcher-card ${index === 0 ? 'selected' : ''}`;
-        card.innerHTML = `
-            <img src="${iconSrc}" width="64">
-            <span>${title}</span>
-        `;
+
+        const img = document.createElement('img');
+        img.src = iconSrc;
+        img.width = 64;
+
+        const span = document.createElement('span');
+        span.textContent = title;
+
+        card.appendChild(img);
+        card.appendChild(span);
+
         card.onclick = () => {
             switcherIndex = index;
             confirmSwitcherSelection();
