@@ -164,10 +164,21 @@ function spawnSettings() {
 }
 
 let lastTimeKey = null;
+let clockElements = null;
 
 function updateClock() {
+    // ⚡ Bolt: Cache DOM elements to prevent querySelector/getElementById on every tick
+    // Invalidate cache if elements are detached (e.g. during tests or re-renders)
+    if (!clockElements || !clockElements.clock || !clockElements.clock.isConnected) {
+        clockElements = {
+            clock: document.getElementById('clock'),
+            date: document.getElementById('cc-date'),
+            trigger: document.getElementById('cc-trigger')
+        };
+    }
+
     const now = new Date();
-    const clock = document.getElementById('clock');
+    const clock = clockElements.clock;
 
     const timeString = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
@@ -184,13 +195,13 @@ function updateClock() {
         clock.textContent = timeString;
         clock.title = dateString;
     }
-    const dateEl = document.getElementById('cc-date');
+    const dateEl = clockElements.date;
     if (dateEl) {
         const options = { weekday: 'short', day: 'numeric', month: 'short' };
         dateEl.innerText = now.toLocaleDateString('es-ES', options);
     }
 
-    const trigger = document.getElementById('cc-trigger');
+    const trigger = clockElements.trigger;
     if (trigger) {
         const batEl = trigger.querySelector('.battery');
         const battery = batEl ? batEl.textContent : '';
