@@ -14,21 +14,19 @@ def run():
         print(f"Navigating to {file_path}")
         page.goto(file_path)
 
-        # 1. Verify SVG accessibility
-        svg_locator = page.locator("svg.splash-logo")
-        if svg_locator.count() > 0:
-            role = svg_locator.get_attribute("role")
-            label = svg_locator.get_attribute("aria-label")
-            print(f"SVG Role: {role}")
-            print(f"SVG Label: {label}")
+        # 1. Verify Image accessibility
+        img_locator = page.locator("img.splash-logo")
+        if img_locator.count() > 0:
+            alt = img_locator.get_attribute("alt")
+            print(f"Image Alt: {alt}")
 
-            if role == "img" and label == "Eter OS":
-                print("PASS: SVG has correct a11y attributes.")
+            if alt == "Eter OS":
+                print("PASS: Image has correct a11y attributes.")
             else:
-                print("FAIL: SVG missing correct role or aria-label.")
+                print(f"FAIL: Image missing correct alt text. Found: {alt}")
                 exit(1)
         else:
-            print("FAIL: SVG logo not found!")
+            print("FAIL: Image logo not found!")
             exit(1)
 
         # 2. Verify Title Removal
