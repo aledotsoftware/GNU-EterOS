@@ -374,7 +374,7 @@ function showSwitcher() {
     list.innerHTML = '';
 
     openWindows.forEach((win, index) => {
-        const title = win.querySelector('.window-title').innerText;
+        const title = win.querySelector('.window-title').textContent;
         let type = 'unknown';
         let iconSrc = '';
 
@@ -391,10 +391,18 @@ function showSwitcher() {
 
         const card = document.createElement('div');
         card.className = `switcher-card ${index === 0 ? 'selected' : ''}`;
-        card.innerHTML = `
-            <img src="${iconSrc}" width="64">
-            <span>${title}</span>
-        `;
+
+        // 🛡️ Sentinel: Build DOM safely to prevent XSS from window titles
+        const img = document.createElement('img');
+        img.src = iconSrc;
+        img.width = 64;
+
+        const span = document.createElement('span');
+        span.textContent = title;
+
+        card.appendChild(img);
+        card.appendChild(span);
+
         card.onclick = () => {
             switcherIndex = index;
             confirmSwitcherSelection();
@@ -455,7 +463,7 @@ function spawnApp(name, type, customContent = null) {
     // Check if app is already open (to restore if minimized)
     const existingWins = document.querySelectorAll('.window');
     for (let win of existingWins) {
-        if (win.querySelector('.window-title').innerText.includes(name)) {
+        if (win.querySelector('.window-title').textContent.includes(name)) {
             if (win.classList.contains('minimized')) {
                 win.classList.remove('minimized');
                 win.style.zIndex = ++zIndexCounter;
@@ -667,14 +675,15 @@ function maximizeWindow(btn) {
     const win = btn.closest('.window');
     const shell = document.querySelector('.os-shell');
     const appNameDisplay = document.querySelector('.active-app-name');
-    const appTitle = win.querySelector('.window-title').innerText.split('(')[0].trim();
+    const appTitle = win.querySelector('.window-title').textContent.split('(')[0].trim();
 
     win.classList.remove('snapped');
     win.classList.toggle('maximized');
 
     if (win.classList.contains('maximized')) {
         shell.classList.add('window-full');
-        appNameDisplay.innerHTML = `<span style="opacity:0.25; margin: 0 12px; font-weight: 300;">|</span> ${appTitle}`;
+        // 🛡️ Sentinel: Escape app title to prevent XSS
+        appNameDisplay.innerHTML = `<span style="opacity:0.25; margin: 0 12px; font-weight: 300;">|</span> ${escapeHtml(appTitle)}`;
         appNameDisplay.style.color = 'var(--accent)';
         win.style.zIndex = 9005; // Below status text (10000)
     } else {
