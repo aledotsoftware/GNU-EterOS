@@ -258,7 +258,7 @@ function setupSliders() {
 if (typeof module === 'undefined') {
     setInterval(updateClock, 1000);
     updateClock();
-    setupSliders();
+    // ⚡ Bolt: setupSliders() moved to DOMContentLoaded to prevent duplicate listeners
 }
 
 function toggleLauncher() {
@@ -916,14 +916,10 @@ function setupLauncherNav() {
     });
 }
 
-if (typeof module === 'undefined') {
-    setupLauncherNav();
-}
-
-
 // Boot Splash Screen Logic
 document.addEventListener('DOMContentLoaded', () => {
     setupSliders();
+    setupLauncherNav(); // ⚡ Bolt: Consolidated initialization
 
     const splash = document.getElementById('boot-splash');
     if (splash) {
