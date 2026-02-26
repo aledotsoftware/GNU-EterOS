@@ -285,6 +285,22 @@ function toggleLauncher() {
     }
 }
 
+function clearNotifications() {
+    const list = document.getElementById('notif-list');
+    const emptyState = document.getElementById('notif-empty');
+    const clearBtn = document.getElementById('clear-notifs');
+
+    if (list) {
+        list.style.opacity = '0';
+        setTimeout(() => {
+            list.innerHTML = '';
+            list.style.display = 'none';
+            if (emptyState) emptyState.hidden = false;
+            if (clearBtn) clearBtn.style.display = 'none';
+        }, 300);
+    }
+}
+
 function clearSearch() {
     const input = document.getElementById('launcher-search');
     input.value = '';
@@ -962,6 +978,7 @@ if (typeof module !== 'undefined') {
         toggleFocusMode,
         snapWindow,
         updateClock,
-        setupSliders
+        setupSliders,
+        clearNotifications
     };
 }
