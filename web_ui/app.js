@@ -358,6 +358,22 @@ function toggleControlCenter(e) {
     }
 }
 
+function clearNotifications() {
+    const list = document.getElementById('notif-list');
+    const empty = document.getElementById('notif-empty');
+    const btn = document.getElementById('clear-notifs');
+
+    if (list) {
+        list.style.display = 'none';
+        list.innerHTML = ''; // Clear content so count check works
+    }
+    if (btn) btn.style.display = 'none';
+    if (empty) empty.hidden = false;
+
+    // ♿ A11y: Focus the empty message or the header to manage focus loss
+    if (empty) empty.focus();
+}
+
 // App Switcher Logic
 let isSwitcherActive = false;
 let switcherIndex = 0;
@@ -962,6 +978,7 @@ if (typeof module !== 'undefined') {
         toggleFocusMode,
         snapWindow,
         updateClock,
-        setupSliders
+        setupSliders,
+        clearNotifications
     };
 }

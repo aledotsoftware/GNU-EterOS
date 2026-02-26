@@ -72,15 +72,21 @@
                 </div>
             </div>
             <div class="cc-notifications">
-                <h4>Notificaciones</h4>
-                <div class="notif">
-                    <strong>Sistema</strong>
-                    <p>GIMP - Actualización disponible (Linux)</p>
+                <div class="cc-notifications-header">
+                    <h4>Notificaciones</h4>
+                    <button id="clear-notifs" aria-label="Borrar notificaciones" onclick="clearNotifications()">Borrar</button>
                 </div>
-                <div class="notif">
-                    <strong>WhatsApp</strong>
-                    <p>Nuevo mensaje (Android)</p>
+                <div id="notif-list" class="notif-list">
+                    <div class="notif">
+                        <strong>Sistema</strong>
+                        <p>GIMP - Actualización disponible (Linux)</p>
+                    </div>
+                    <div class="notif">
+                        <strong>WhatsApp</strong>
+                        <p>Nuevo mensaje (Android)</p>
+                    </div>
                 </div>
+                <div id="notif-empty" class="notif-empty" role="status" tabindex="-1" hidden>Sin notificaciones nuevas</div>
             </div>
         </div>
 

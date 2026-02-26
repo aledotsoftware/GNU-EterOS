@@ -777,9 +777,40 @@ body {
     padding-top: 15px;
 }
 
-.cc-notifications h4 {
-    font-size: 14px;
+.cc-notifications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 10px;
+}
+
+.cc-notifications-header h4 {
+    font-size: 14px;
+}
+
+#clear-notifs {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+#clear-notifs:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.notif-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 20px 0;
+    font-size: 12px;
+    font-style: italic;
+    opacity: 0.8;
+    outline: none;
 }
 
 .notif {
