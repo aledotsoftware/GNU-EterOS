@@ -455,12 +455,17 @@ function spawnApp(name, type, customContent = null) {
     // Check if app is already open (to restore if minimized)
     const existingWins = document.querySelectorAll('.window');
     for (let win of existingWins) {
-        if (win.querySelector('.window-title').innerText.includes(name)) {
+        if (win.querySelector('.window-title').textContent.includes(name)) {
             if (win.classList.contains('minimized')) {
                 win.classList.remove('minimized');
                 win.style.zIndex = ++zIndexCounter;
             } else {
                 win.style.zIndex = ++zIndexCounter;
+                // 🎨 Palette: Visual feedback for already open apps
+                win.classList.remove('shake');
+                void win.offsetWidth; // Trigger reflow to restart animation
+                win.classList.add('shake');
+                setTimeout(() => win.classList.remove('shake'), 500);
             }
             document.getElementById('launcher').classList.remove('active');
             return;

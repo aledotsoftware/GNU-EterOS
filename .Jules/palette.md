@@ -69,3 +69,7 @@
 ## 2026-02-24 - [Dynamic Control Center Values]
 **Learning:** Adding real-time data (like current date and slider percentage values) to previously static or abstract UI elements (like sliders) significantly improves user confidence and system liveliness without cluttering the interface.
 **Action:** When working on "Control Center" or "Settings" panels, always look for opportunities to expose the actual value of a control or the current system state (time, date, battery %) rather than relying on abstract visual indicators alone.
+
+## 2027-05-20 - [Feedback for Existing State]
+**Learning:** When a user attempts to open an app that is already running but obscured, doing nothing (or just focusing it) feels like a broken interaction. A subtle "shake" animation provides immediate, non-intrusive feedback that the system acknowledged the request but the state remains unchanged.
+**Action:** Implement "negative" or "attention" animations for idempotent actions that don't result in a new visual state.
