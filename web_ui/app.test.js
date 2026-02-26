@@ -85,6 +85,9 @@ describe('setupSliders', () => {
     let span;
 
     beforeEach(() => {
+        // Mock requestAnimationFrame to execute immediately for testing throttled updates
+        jest.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => cb());
+
         document.body.innerHTML = `
             <div class="cc-slider-group">
                 <input type="range" class="cc-slider" value="50">
@@ -94,6 +97,10 @@ describe('setupSliders', () => {
         slider = document.querySelector('.cc-slider');
         span = document.querySelector('.slider-value');
         setupSliders();
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
     });
 
     test('should update span text when slider value changes', () => {

@@ -2,6 +2,9 @@ const { updateClock, setupSliders } = require('./app');
 
 describe('UX Improvements', () => {
     beforeEach(() => {
+        // Mock requestAnimationFrame
+        jest.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => cb());
+
         // Mock DOM
         document.body.innerHTML = `
             <div id="cc-trigger" role="button" aria-label="Abrir centro de control">
@@ -19,6 +22,10 @@ describe('UX Improvements', () => {
                 <span class="slider-value"></span>
             </div>
         `;
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
     });
 
     test('updateClock should update the date element', () => {
