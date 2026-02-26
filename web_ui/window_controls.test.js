@@ -16,7 +16,6 @@ describe('Window Controls', () => {
         const minimize = win.querySelector('.minimize');
         const maximize = win.querySelector('.maximize');
         const close = win.querySelector('.close');
-        const focus = win.querySelector('.focus');
 
         // Check custom tooltips
         expect(focus.getAttribute('data-tooltip')).toBe('Modo Focus');

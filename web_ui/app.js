@@ -374,7 +374,8 @@ function showSwitcher() {
     list.innerHTML = '';
 
     openWindows.forEach((win, index) => {
-        const title = win.querySelector('.window-title').innerText;
+        // 🛡️ Sentinel: Use textContent to safely get title and avoid JSDOM issues
+        const title = win.querySelector('.window-title').textContent;
         let type = 'unknown';
         let iconSrc = '';
 
@@ -391,10 +392,18 @@ function showSwitcher() {
 
         const card = document.createElement('div');
         card.className = `switcher-card ${index === 0 ? 'selected' : ''}`;
-        card.innerHTML = `
-            <img src="${iconSrc}" width="64">
-            <span>${title}</span>
-        `;
+
+        // 🛡️ Sentinel: Prevent XSS by building DOM instead of using innerHTML
+        const img = document.createElement('img');
+        img.src = iconSrc;
+        img.width = 64;
+
+        const span = document.createElement('span');
+        span.textContent = title;
+
+        card.appendChild(img);
+        card.appendChild(span);
+
         card.onclick = () => {
             switcherIndex = index;
             confirmSwitcherSelection();
