@@ -1,6 +1,20 @@
 const { updateClock, setupSliders } = require('./app');
 
 describe('UX Improvements', () => {
+    let originalRaf;
+    beforeAll(() => {
+        originalRaf = window.requestAnimationFrame;
+        window.requestAnimationFrame = (cb) => cb();
+    });
+
+    afterAll(() => {
+        window.requestAnimationFrame = originalRaf;
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
     beforeEach(() => {
         // Mock DOM
         document.body.innerHTML = `

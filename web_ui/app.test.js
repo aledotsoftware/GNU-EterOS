@@ -83,6 +83,16 @@ describe('toggleEterMenu', () => {
 describe('setupSliders', () => {
     let slider;
     let span;
+    let originalRaf;
+
+    beforeAll(() => {
+        originalRaf = window.requestAnimationFrame;
+        window.requestAnimationFrame = (cb) => cb();
+    });
+
+    afterAll(() => {
+        window.requestAnimationFrame = originalRaf;
+    });
 
     beforeEach(() => {
         document.body.innerHTML = `

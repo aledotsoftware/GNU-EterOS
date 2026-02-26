@@ -211,7 +211,9 @@ function setupSliders() {
         const icon = slider.previousElementSibling;
 
         if (valueDisplay && valueDisplay.classList.contains('slider-value')) {
-            const update = () => {
+            let rafId = null;
+
+            const updateDOM = () => {
                 const val = slider.value;
                 valueDisplay.textContent = `${val}%`;
 
@@ -225,9 +227,18 @@ function setupSliders() {
                     const opacity = 0.3 + (val / 100) * 0.7;
                     icon.style.opacity = opacity;
                 }
+                rafId = null;
             };
-            slider.addEventListener('input', update);
-            update();
+
+            const onInput = () => {
+                if (!rafId) {
+                    rafId = requestAnimationFrame(updateDOM);
+                }
+            };
+
+            slider.addEventListener('input', onInput);
+            // Initial update
+            updateDOM();
         }
     });
 }
