@@ -128,3 +128,39 @@ void gfx_fill_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
     /* Mark dirty */
     gfx_add_dirty_rect(x, y, w, h);
 }
+
+void gfx_draw_pixels(const gfx_point_t* pixels, size_t count) {
+    if (!pixels || count == 0) return;
+
+    int32_t min_x = 0x7FFFFFFF;
+    int32_t min_y = 0x7FFFFFFF;
+    int32_t max_x = -0x80000000;
+    int32_t max_y = -0x80000000;
+
+    uint32_t screen_w = framebuffer_get_width();
+    uint32_t screen_h = framebuffer_get_height();
+
+    for (size_t i = 0; i < count; i++) {
+        int32_t px = pixels[i].x;
+        int32_t py = pixels[i].y;
+
+        /* Safety check: Clip to screen bounds */
+        if (px < 0 || px >= (int32_t)screen_w || py < 0 || py >= (int32_t)screen_h) {
+            continue;
+        }
+
+        /* Draw directly to framebuffer (avoids repeated dirty tracking per pixel) */
+        framebuffer_putpixel((uint32_t)px, (uint32_t)py, pixels[i].color);
+
+        /* Update bounding box */
+        if (px < min_x) min_x = px;
+        if (px > max_x) max_x = px;
+        if (py < min_y) min_y = py;
+        if (py > max_y) max_y = py;
+    }
+
+    /* Add single dirty rect for all pixels */
+    if (max_x >= min_x && max_y >= min_y) {
+        gfx_add_dirty_rect(min_x, min_y, (max_x - min_x) + 1, (max_y - min_y) + 1);
+    }
+}

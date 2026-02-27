@@ -20,6 +20,8 @@ typedef struct {
     void        (*run)(void);
 } app_entry_t;
 
+void gui_demo_run(void);
+
 // Command table
 static const shell_command_t commands[] = {
     { "help",     "Muestra esta lista de comandos",              cmd_help    },
@@ -42,6 +44,7 @@ static const shell_command_t commands[] = {
     { "reboot",   "Reinicia el sistema",                         cmd_reboot  },
     { "halt",     "Detiene la CPU",                              cmd_halt    },
     { "test_compositor", "Test Basic Compositor",                cmd_test_compositor },
+    { "gui_demo", "Test Batch Drawing",                          (cmd_handler_t)gui_demo_run },
 };
 
 #define NUM_COMMANDS  (sizeof(commands) / sizeof(commands[0]))
