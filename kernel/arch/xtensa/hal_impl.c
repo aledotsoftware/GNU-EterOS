@@ -26,7 +26,9 @@
 /* ========================================================================= */
 
 /* ---- UART0 (Consola por defecto) ---- */
+#ifndef ESP32_UART0_BASE
 #define ESP32_UART0_BASE        0x3FF40000
+#endif
 #define UART_FIFO(base)         ((volatile uint32_t*)(base + 0x00))
 #define UART_INT_ENA(base)      ((volatile uint32_t*)(base + 0x0C))
 #define UART_INT_CLR(base)      ((volatile uint32_t*)(base + 0x10))
@@ -69,7 +71,9 @@ void hal_init(void) {
 
 void hal_cpu_halt(void) {
     /* Instrucción WAITI de Xtensa: espera interrupciones (bajo consumo) */
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile ("waiti 0");
+#endif
 }
 
 void hal_cpu_reset(void) {
@@ -162,12 +166,16 @@ bool hal_input_available(void) {
 
 void hal_interrupts_enable(void) {
     /* RSIL (Read and Set Interrupt Level) con nivel 0 habilita todo */
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile ("rsil %0, 0" : : "r"(0));
+#endif
 }
 
 void hal_interrupts_disable(void) {
     /* RSIL con nivel 15 (o max) deshabilita todo */
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile ("rsil %0, 15" : : "r"(0));
+#endif
 }
 
 void hal_irq_install(uint8_t vector, irq_handler_t handler) {
@@ -194,10 +202,15 @@ void hal_timer_init(uint32_t hz) {
     uint32_t cycles_per_tick = 80000000 / hz; /* Asumiendo 80MHz CPU clock */
     uint32_t current_ccount;
 
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile ("rsr %0, ccount" : "=r"(current_ccount));
 
     /* Programar primera interrupción */
     __asm__ volatile ("wsr %0, ccompare0" : : "r"(current_ccount + cycles_per_tick));
+#else
+    (void)cycles_per_tick;
+    (void)current_ccount;
+#endif
 
     /* Habilitar interrupción de Timer (bit 6 en INTENABLE, ejemplo) */
     /* __asm__ volatile ("wsr %0, intenable" ...); */
@@ -209,8 +222,10 @@ uint64_t hal_timer_ticks(void) {
      * Nota: CCOUNT es de 32 bits y da la vuelta cada ~53 segundos a 80MHz.
      * Para 64 bits reales, necesitamos un contador software en la ISR.
      */
-    uint32_t ccount;
+    uint32_t ccount = 0;
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile ("rsr %0, ccount" : "=r"(ccount));
+#endif
     return (uint64_t)ccount; /* Retorna ciclos crudos por ahora */
 }
 

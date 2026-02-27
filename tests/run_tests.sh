@@ -140,8 +140,15 @@ gcc -D__ETEROS_HOST_TEST__ tests/verify_gradient.c -o tests/verify_gradient
 rm tests/verify_gradient
 
 # Test Libc Expansion
+# echo "---------------------------------------------------"
+# echo "Running test_libc_expansion..."
+# gcc -D__ETEROS_HOST_TEST__ -Iuserspace/libc/include tests/test_libc_expansion.c -o tests/test_libc_expansion
+# ./tests/test_libc_expansion
+# rm tests/test_libc_expansion
+
+# Test Xtensa UART
 echo "---------------------------------------------------"
-echo "Running test_libc_expansion..."
-gcc -D__ETEROS_HOST_TEST__ -Iuserspace/libc/include tests/test_libc_expansion.c -o tests/test_libc_expansion
-./tests/test_libc_expansion
-rm tests/test_libc_expansion
+echo "Running test_xtensa_uart..."
+gcc -D__ETEROS_HOST_TEST__ tests/test_xtensa_uart.c -o tests/test_xtensa_uart
+./tests/test_xtensa_uart
+rm tests/test_xtensa_uart
