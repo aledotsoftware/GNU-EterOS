@@ -42,6 +42,11 @@
 #define UART_TXFIFO_CNT_SHIFT   16
 #define UART_TXFIFO_FULL_THR    126  /* FIFO size is 128 usually */
 
+/* Interrupt Enable Bits */
+#define UART_RXFIFO_FULL_INT_ENA      (1 << 0)
+#define UART_RXFIFO_FULL_THRHD_SHIFT  0
+#define UART_RXFIFO_FULL_THRHD_MASK   0x7F
+
 /* ---- Timer & Interrupts (Xtensa Special Registers) ---- */
 /* Se acceden via asm("rsr"/"wsr") */
 
@@ -131,10 +136,23 @@ void hal_console_clear(void) {
 
 void hal_input_init(void) {
     /*
-     * En modo polling no necesitamos configurar interrupciones RX.
-     * Si usáramos interrupciones, aquí se configuraría UART_INT_ENA
-     * y el handler correspondiente.
+     * Configure RX interrupt
+     * 1. Set RX FIFO Full Threshold to 1 (generate interrupt on every char)
+     * 2. Clear pending interrupts
+     * 3. Enable RX interrupt
      */
+
+    /* Set RX Full Threshold to 1 */
+    uint32_t conf1 = *UART_CONF1(ESP32_UART0_BASE);
+    conf1 &= ~UART_RXFIFO_FULL_THRHD_MASK;
+    conf1 |= (1 << UART_RXFIFO_FULL_THRHD_SHIFT);
+    *UART_CONF1(ESP32_UART0_BASE) = conf1;
+
+    /* Clear any pending RX interrupt */
+    *UART_INT_CLR(ESP32_UART0_BASE) = UART_RXFIFO_FULL_INT_ENA;
+
+    /* Enable RX interrupt */
+    *UART_INT_ENA(ESP32_UART0_BASE) |= UART_RXFIFO_FULL_INT_ENA;
 }
 
 char hal_input_getchar(void) {
