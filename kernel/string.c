@@ -74,12 +74,30 @@ void* memset(void* dest, int c, size_t n) {
 void* memset16(void* dest, uint16_t c, size_t n) {
 #ifdef __x86_64__
     void* original_dest = dest;
+    uint64_t pattern = c | ((uint64_t)c << 16);
+    pattern |= (pattern << 32);
+
+    size_t qwords = n / 4;
+    size_t remainder = n % 4;
+
+    /* ⚡ BOLT Optimization: Use rep stosq (64-bit) for bulk of memset16. */
+    /* This processes 8 bytes (4 words) per instruction instead of 2 bytes. */
     __asm__ volatile (
-        "cld; rep stosw"
-        : "+D"(dest), "+c"(n)
-        : "a"(c)
+        "cld; rep stosq"
+        : "+D"(dest), "+c"(qwords)
+        : "a"(pattern)
         : "memory"
     );
+
+    /* Handle remainder words */
+    if (remainder) {
+        __asm__ volatile (
+            "rep stosw"
+            : "+D"(dest), "+c"(remainder)
+            : "a"(c)
+            : "memory"
+        );
+    }
     return original_dest;
 #else
     uint16_t* d = (uint16_t*)dest;
