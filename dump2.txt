@@ -31719,3 +31719,14 @@ Disassembly of section .text:
 000000000002b49a <devfs_readdir.cold>:
    2b49a:	b8 01 00 00 00       	mov    $0x1,%eax
    2b49f:	e9 be 66 ff ff       	jmp    21b62 <devfs_readdir+0x62>
+
+
+
+
+
+
+
+
+
+
+

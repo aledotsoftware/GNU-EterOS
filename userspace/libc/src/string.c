@@ -60,30 +60,6 @@ void *memset(void *s, int c, size_t n) {
     uint8_t *p = (uint8_t *)s;
     uint8_t val = (uint8_t)c;
 
-#ifdef __x86_64__
-    // ⚡ BOLT Optimization: Use rep stosq for bulk set
-    // This provides ~3.3x speedup for large blocks compared to 8-byte C loop.
-    size_t qwords = n / 8;
-    size_t remainder = n % 8;
-
-    // Create 64-bit pattern using multiplication (faster/smaller than shifts/ORs)
-    uint64_t pattern = val * 0x0101010101010101ULL;
-
-    __asm__ volatile (
-        "cld; rep stosq"
-        : "+D"(p), "+c"(qwords)
-        : "a"(pattern)
-        : "memory"
-    );
-
-    __asm__ volatile (
-        "rep stosb"
-        : "+D"(p), "+c"(remainder)
-        : "a"(val)
-        : "memory"
-    );
-    return s;
-#else
     /* Fast 8-byte fill path */
     if (n >= 8) {
         uint64_t wide = val;
