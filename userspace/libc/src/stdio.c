@@ -527,7 +527,7 @@ void perror(const char *s) {
 int remove(const char *pathname) {
     int ret = unlink(pathname);
     if (ret == -1 && errno == EISDIR) {
-        return (int)_syscall1(SYS_rmdir, (long)pathname);
+        return rmdir(pathname);
     }
     return ret;
 }

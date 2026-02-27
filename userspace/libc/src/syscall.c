@@ -102,6 +102,18 @@ int64_t lseek(int fd, int64_t offset, int whence) {
     return (int64_t)ret;
 }
 
+int unlink(const char *pathname) {
+    long ret = syscall1(SYS_unlink, (long)pathname);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int rmdir(const char *pathname) {
+    long ret = syscall1(SYS_rmdir, (long)pathname);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
 int getpid(void) {
     return (int)syscall0(SYS_getpid);
 }
