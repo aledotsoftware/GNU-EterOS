@@ -2,7 +2,7 @@ import math
 import os
 from PIL import Image
 
-def generate_logo(output_path):
+def generate_logo(output_path, raw_path):
     width = 200
     height = 200
     # Initialize with transparent (all zeros)
@@ -70,6 +70,33 @@ def generate_logo(output_path):
                 pixels[idx+2] = 255
                 pixels[idx+3] = 255
 
+    # Create raw BGRA buffer blended on white background
+    raw_bgra = bytearray(width * height * 4)
+    white_r, white_g, white_b = 255, 255, 255
+
+    for i in range(0, len(pixels), 4):
+        r = pixels[i]
+        g = pixels[i+1]
+        b = pixels[i+2]
+        a = pixels[i+3]
+
+        # Alpha blend over white
+        # formula: out = alpha * src + (1 - alpha) * dest
+        alpha_f = a / 255.0
+        out_r = int(r * alpha_f + white_r * (1.0 - alpha_f))
+        out_g = int(g * alpha_f + white_g * (1.0 - alpha_f))
+        out_b = int(b * alpha_f + white_b * (1.0 - alpha_f))
+
+        # Store as BGRA (Little Endian uint32_t: B, G, R, A)
+        # Note: Alpha is usually ignored in 32-bit XRGB modes, but we can set to 255 (opaque)
+        raw_bgra[i]   = out_b
+        raw_bgra[i+1] = out_g
+        raw_bgra[i+2] = out_r
+        raw_bgra[i+3] = 255
+
+    with open(raw_path, 'wb') as f:
+        f.write(raw_bgra)
+
     # Use Pillow to create and save the image from raw bytes
     img = Image.frombuffer("RGBA", (width, height), pixels, "raw", "RGBA", 0, 1)
     img.save(output_path)
@@ -79,11 +106,8 @@ if __name__ == "__main__":
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
     
-    # Ensure raw file is cleaned up if it exists, to avoid confusion
-    raw_path = os.path.join(dest_dir, "logo.raw")
-    if os.path.exists(raw_path):
-        os.remove(raw_path)
-        
     output_path = os.path.join(dest_dir, "logo.png")
-    generate_logo(output_path)
-    print(f"Logo generated: {output_path}")
+    raw_path = os.path.join(dest_dir, "logo.raw")
+
+    generate_logo(output_path, raw_path)
+    print(f"Logo generated: {output_path} and {raw_path}")

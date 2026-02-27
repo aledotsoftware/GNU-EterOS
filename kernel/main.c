@@ -39,6 +39,8 @@
 #include <futex.h>
 #include <sem.h>
 #include <serial.h>
+#include <framebuffer.h>
+#include <timer.h>
 
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */
@@ -53,6 +55,7 @@
 /* ========================================================================= */
 static void kernel_print_banner(void);
 static void kernel_print_sysinfo(void);
+static void show_splash(void);
 
 extern void net_poll(void);
 extern uint32_t my_ip;
@@ -237,6 +240,9 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 8. Lanzar shell interactivo ---- */
     hal_interrupts_enable();
 
+    /* Show system splash screen */
+    show_splash();
+
     /* Kernel shell (fallback until userspace shell is ready) */
     shell_run();
 
@@ -286,3 +292,43 @@ static void kernel_print_sysinfo(void) {
     kprintf("  [INFO] Board/Target: Generic\n");
 }
 
+static void show_splash(void) {
+    uint32_t size = 0;
+    void* logo_data = initrd_read_file("logo.raw", &size);
+    if (!logo_data) {
+        hal_console_write("[SPLASH] Logo not found in initrd.\n");
+        return;
+    }
+
+    /* Use framebuffer functions to draw */
+    uint32_t screen_w = framebuffer_get_width();
+    uint32_t screen_h = framebuffer_get_height();
+
+    /* Clear to White */
+    framebuffer_clear(0xFFFFFFFF);
+
+    /* Center image (200x200) */
+    int32_t start_x = (screen_w - 200) / 2;
+    int32_t start_y = (screen_h - 200) / 2;
+
+    if (start_x < 0) start_x = 0;
+    if (start_y < 0) start_y = 0;
+
+    uint32_t* pixel_data = (uint32_t*)logo_data;
+
+    for (int y = 0; y < 200; y++) {
+        for (int x = 0; x < 200; x++) {
+             uint32_t color = pixel_data[y * 200 + x];
+             framebuffer_putpixel(start_x + x, start_y + y, color);
+        }
+    }
+
+    /* Wait ~2 seconds (busy wait on timer ticks to keep scheduler running) */
+    uint64_t end_ticks = timer_get_ticks() + (2 * TIMER_HZ);
+    while (timer_get_ticks() < end_ticks) {
+        __asm__ volatile("hlt");
+    }
+
+    /* Clear screen to black and reset cursor for shell */
+    terminal_clear();
+}
