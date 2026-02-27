@@ -454,6 +454,12 @@ static int64_t sys_open(const char* path, int flags, int mode) {
 
     if (flags & O_NONBLOCK) node->flags |= O_NONBLOCK;
 
+    /* Prevent opening directories for writing */
+    if ((node->flags & 0x7) == FS_DIRECTORY && (write_mode != 0)) {
+        kfree(node);
+        return -EISDIR;
+    }
+
     open_fs(node, read_mode, write_mode);
     current->fd_table[fd].node = node; current->fd_table[fd].offset = 0; current->fd_table[fd].flags = flags;
     return fd;

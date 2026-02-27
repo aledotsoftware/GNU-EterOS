@@ -129,6 +129,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_framebuffer_scroll.c kernel/driv
 ./tests/test_framebuffer_scroll
 rm tests/test_framebuffer_scroll
 
+# Test Sys Open (Security Fix)
+echo "---------------------------------------------------"
+echo "Running test_sys_open..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o tests/test_sys_open
+./tests/test_sys_open
+rm tests/test_sys_open
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 
