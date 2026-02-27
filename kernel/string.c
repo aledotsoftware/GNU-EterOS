@@ -327,10 +327,58 @@ size_t strlen(const char* str) {
 }
 
 size_t strnlen(const char* s, size_t maxlen) {
+#ifdef __x86_64__
+    const char *char_ptr = s;
+    const uint64_t *longword_ptr;
+    uint64_t longword, himagic, lomagic;
+
+    /* Handle unaligned bytes */
+    while (maxlen > 0 && ((uintptr_t)char_ptr & 7) != 0) {
+        if (*char_ptr == '\0')
+            return char_ptr - s;
+        char_ptr++;
+        maxlen--;
+    }
+
+    /* Process 8 bytes at a time */
+    longword_ptr = (const uint64_t*)char_ptr;
+    himagic = 0x8080808080808080ULL;
+    lomagic = 0x0101010101010101ULL;
+
+    /* While we have at least 8 bytes remaining in maxlen */
+    while (maxlen >= 8) {
+        longword = *longword_ptr++;
+
+        if (((longword - lomagic) & ~longword & himagic) != 0) {
+            const char* cp = (const char*)(longword_ptr - 1);
+            if (cp[0] == 0) return cp - s;
+            if (cp[1] == 0) return cp - s + 1;
+            if (cp[2] == 0) return cp - s + 2;
+            if (cp[3] == 0) return cp - s + 3;
+            if (cp[4] == 0) return cp - s + 4;
+            if (cp[5] == 0) return cp - s + 5;
+            if (cp[6] == 0) return cp - s + 6;
+            if (cp[7] == 0) return cp - s + 7;
+        }
+        maxlen -= 8;
+    }
+
+    /* Handle remaining bytes */
+    char_ptr = (const char*)longword_ptr;
+    while (maxlen > 0) {
+        if (*char_ptr == '\0')
+            return char_ptr - s;
+        char_ptr++;
+        maxlen--;
+    }
+
+    return char_ptr - s;
+#else
     const char* p;
     for (p = s; maxlen-- && *p; p++)
         ;
     return p - s;
+#endif
 }
 
 char* strncpy(char* dest, const char* src, size_t n) {

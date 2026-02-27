@@ -17,6 +17,9 @@ static int (*std_strncmp)(const char*, const char*, size_t) = strncmp;
 #endif
 #include "../include/string.h"
 
+/* Mock snprintf for eteros_snprintf or map it to standard snprintf */
+#define snprintf snprintf
+
 void benchmark_memcmp() {
     const size_t size = 1024 * 1024; /* 1 MB */
     const int iterations = 1000;
@@ -41,6 +44,12 @@ void benchmark_memcmp() {
     }
 
     clock_t end = clock();
+
+    /* CLOCKS_PER_SEC compatibility fallback */
+    #ifndef CLOCKS_PER_SEC
+    #define CLOCKS_PER_SEC 1000000
+    #endif
+
     double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
 
     printf("Benchmark memcmp: %d iterations of 1MB comparison took %f seconds\n", iterations, time_taken);
@@ -810,6 +819,7 @@ int main() {
         assert(val == -12345);
 
         /* INT32_MAX */
+        /* Use standard snprintf */
         snprintf(str_buf, sizeof(str_buf), "%d", INT32_MAX);
         res = atoi_s(str_buf, &val);
         assert(res == 0);
