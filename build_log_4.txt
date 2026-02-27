@@ -1,6 +1,0 @@
-[CC]   kernel/task.c
-cc -ffreestanding -fno-exceptions -fno-stack-protector -nostdlib -nostdinc -mno-red-zone -mno-sse -mno-sse2 -mno-mmx -Wall -Wextra -Os -Ikernel/apps/doomgeneric/include -Ikernel/apps/doomgeneric/doomgeneric -Iinclude -Ikernel/net/lwip/src/include -Ikernel/net/lwip_port -c kernel/task.c -o build/kernel/task.o
-[ASM]  kernel/arch/x86_64/context_switch.asm
-nasm -f elf64 kernel/arch/x86_64/context_switch.asm -o build/kernel/arch/x86_64/context_switch.o
-make: nasm: No such file or directory
-make: *** [Makefile:293: build/kernel/arch/x86_64/context_switch.o] Error 127
