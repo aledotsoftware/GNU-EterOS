@@ -6,6 +6,7 @@
 #include <keyboard.h>
 #include <vga.h>
 #include <input/event.h>
+#include <lock.h>
 
 /* Global root node for DevFS */
 static fs_node_t* devfs_root = NULL;
@@ -134,6 +135,7 @@ static fs_node_t *devfs_input_finddir(fs_node_t *node, char *name) {
 /* /dev/random & /dev/urandom Implementation                                 */
 /* ========================================================================= */
 static uint32_t rand_seed = 123456789;
+static spinlock_t rng_lock = 0;
 
 static uint32_t xorshift32(void) {
     uint32_t x = rand_seed;
@@ -146,6 +148,8 @@ static uint32_t xorshift32(void) {
 
 static ssize_t dev_random_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
+
+    spin_lock(&rng_lock);
     /* Mix in TSC for entropy */
     uint32_t lo, hi;
     __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
@@ -154,16 +158,19 @@ static ssize_t dev_random_read(fs_node_t *node, uint32_t offset, uint32_t size, 
     for (uint32_t i = 0; i < size; i++) {
         buffer[i] = (uint8_t)(xorshift32() & 0xFF);
     }
+    spin_unlock(&rng_lock);
     return size;
 }
 
 static uint32_t dev_random_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
     /* Allow writing to mix into pool */
+    spin_lock(&rng_lock);
     for (uint32_t i = 0; i < size; i++) {
         rand_seed ^= buffer[i];
         xorshift32();
     }
+    spin_unlock(&rng_lock);
     return size;
 }
 
