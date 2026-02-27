@@ -37,6 +37,8 @@ int close(int fd);
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 int64_t lseek(int fd, int64_t offset, int whence);
+int unlink(const char *pathname);
+int rmdir(const char *pathname);
 
 /* Process */
 int getpid(void);
