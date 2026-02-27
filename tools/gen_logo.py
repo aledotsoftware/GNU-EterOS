@@ -1,41 +1,6 @@
-import struct
 import math
 import os
-import zlib
-
-def make_png(width, height, pixels):
-    # pixels is a flat bytearray with RGBA data
-    
-    # Header
-    png_sig = b'\x89PNG\r\n\x1a\n'
-    
-    # IHDR: width, height, bit_depth=8, color_type=6 (RGBA), compression=0, filter=0, interlace=0
-    ihdr_data = struct.pack('!IIBBBBB', width, height, 8, 6, 0, 0, 0)
-    ihdr_crc = zlib.crc32(ihdr_data, zlib.crc32(b'IHDR')) & 0xFFFFFFFF
-    ihdr = struct.pack('!I', len(ihdr_data)) + b'IHDR' + ihdr_data + struct.pack('!I', ihdr_crc)
-    
-    # IDAT
-    scanlines = []
-    stride = width * 4
-    for y in range(height):
-        # Filter type 0 (None) at start of each scanline
-        row_start = y * stride
-        row_end = row_start + stride
-        # Prepend filter byte to the row data
-        line = b'\x00' + pixels[row_start:row_end]
-        scanlines.append(line)
-    
-    raw_data = b''.join(scanlines)
-    compressed = zlib.compress(raw_data)
-    
-    idat_crc = zlib.crc32(compressed, zlib.crc32(b'IDAT')) & 0xFFFFFFFF
-    idat = struct.pack('!I', len(compressed)) + b'IDAT' + compressed + struct.pack('!I', idat_crc)
-    
-    # IEND
-    iend_crc = zlib.crc32(b'', zlib.crc32(b'IEND')) & 0xFFFFFFFF
-    iend = struct.pack('!I', 0) + b'IEND' + struct.pack('!I', iend_crc)
-    
-    return png_sig + ihdr + idat + iend
+from PIL import Image
 
 def generate_logo(output_path):
     width = 200
@@ -105,10 +70,9 @@ def generate_logo(output_path):
                 pixels[idx+2] = 255
                 pixels[idx+3] = 255
 
-    png_data = make_png(width, height, pixels)
-    
-    with open(output_path, 'wb') as f:
-        f.write(png_data)
+    # Use Pillow to create and save the image from raw bytes
+    img = Image.frombuffer("RGBA", (width, height), pixels, "raw", "RGBA", 0, 1)
+    img.save(output_path)
 
 if __name__ == "__main__":
     dest_dir = "initrd_root"
