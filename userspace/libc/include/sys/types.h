@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #ifdef __ETEROS_HOST_TEST__
-#include <sys/types.h>
+#include_next <sys/types.h>
 #else
 typedef int32_t ssize_t;
 typedef uint64_t size_t;
