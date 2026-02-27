@@ -7,6 +7,22 @@
 #include <stdint.h>
 
 void *memcpy(void *dest, const void *src, size_t n) {
+#ifdef __x86_64__
+    void *original_dest = dest;
+    size_t qwords = n / 8;
+    size_t remainder = n % 8;
+
+    __asm__ volatile (
+        "cld\n\t"
+        "rep movsq\n\t"
+        "movq %3, %%rcx\n\t"
+        "rep movsb"
+        : "+D"(dest), "+S"(src), "+c"(qwords)
+        : "r"(remainder)
+        : "memory"
+    );
+    return original_dest;
+#else
     uint8_t *d = (uint8_t *)dest;
     const uint8_t *s = (const uint8_t *)src;
 
@@ -17,9 +33,30 @@ void *memcpy(void *dest, const void *src, size_t n) {
     }
     while (n--) *d++ = *s++;
     return dest;
+#endif
 }
 
 void *memset(void *s, int c, size_t n) {
+#ifdef __x86_64__
+    void *original_dest = s;
+    uint64_t val = (uint8_t)c;
+    /* Create 64-bit pattern using multiplication */
+    uint64_t pattern = val * 0x0101010101010101ULL;
+
+    size_t qwords = n / 8;
+    size_t remainder = n % 8;
+
+    __asm__ volatile (
+        "cld\n\t"
+        "rep stosq\n\t"
+        "movq %3, %%rcx\n\t"
+        "rep stosb"
+        : "+D"(s), "+c"(qwords)
+        : "a"(pattern), "r"(remainder)
+        : "memory"
+    );
+    return original_dest;
+#else
     uint8_t *p = (uint8_t *)s;
     uint8_t val = (uint8_t)c;
 
@@ -36,6 +73,7 @@ void *memset(void *s, int c, size_t n) {
     }
     while (n--) *p++ = val;
     return s;
+#endif
 }
 
 void *memmove(void *dest, const void *src, size_t n) {
