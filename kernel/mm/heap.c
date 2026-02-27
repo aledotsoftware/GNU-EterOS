@@ -1,8 +1,8 @@
 /**
- * éterOS - Simple Memory Allocator (Next-Fit + Coalescing)
+ * éterOS - Simple Memory Allocator (Explicit Free List + Coalescing)
  * 
  * Implementación de un gestor de memoria dinámica simple.
- * Usa una lista doblemente enlazada de bloques libres y ocupados.
+ * Usa una lista doblemente enlazada de bloques libres (Explicit Free List).
  * El heap vive en la región identity-mapped del bootloader (0-4GB).
  */
 
@@ -39,8 +39,14 @@ typedef struct block_header {
     struct block_header* prev;
 } block_header_t;
 
+/* Node for the explicit free list, stored inside the free block payload */
+typedef struct free_node {
+    struct block_header* next_free;
+    struct block_header* prev_free;
+} free_node_t;
+
 static block_header_t* heap_start = NULL;
-static block_header_t* last_alloc = NULL; /* Puntero para Next-Fit strategy */
+static block_header_t* free_list_head = NULL; /* Head of the explicit free list */
 static size_t memory_used = 0;
 static size_t memory_total = 0;
 
@@ -52,7 +58,55 @@ static spinlock_t heap_lock = 0;
 /* ========================================================================= */
 
 static size_t align(size_t n) {
-    return (n + HEAP_ALIGNMENT - 1) & ~(HEAP_ALIGNMENT - 1);
+    size_t aligned = (n + HEAP_ALIGNMENT - 1) & ~(HEAP_ALIGNMENT - 1);
+    /* Minimum allocation size must fit free_node_t to support the free list */
+    if (aligned < sizeof(free_node_t)) {
+        aligned = sizeof(free_node_t);
+        /* Re-align if sizeof(free_node_t) is weird, though it should be 16 bytes on 64-bit */
+        aligned = (aligned + HEAP_ALIGNMENT - 1) & ~(HEAP_ALIGNMENT - 1);
+    }
+    return aligned;
+}
+
+static free_node_t* get_free_node(block_header_t* block) {
+    return (free_node_t*)((uintptr_t)block + sizeof(block_header_t));
+}
+
+static void add_to_free_list(block_header_t* block) {
+    if (!block || !block->is_free) return;
+
+    free_node_t* node = get_free_node(block);
+
+    node->next_free = free_list_head;
+    node->prev_free = NULL;
+
+    if (free_list_head) {
+        free_node_t* head_node = get_free_node(free_list_head);
+        head_node->prev_free = block;
+    }
+
+    free_list_head = block;
+}
+
+static void remove_from_free_list(block_header_t* block) {
+    if (!block || !block->is_free) return;
+
+    free_node_t* node = get_free_node(block);
+
+    if (node->prev_free) {
+        free_node_t* prev_node = get_free_node(node->prev_free);
+        prev_node->next_free = node->next_free;
+    } else {
+        free_list_head = node->next_free;
+    }
+
+    if (node->next_free) {
+        free_node_t* next_node = get_free_node(node->next_free);
+        next_node->prev_free = node->prev_free;
+    }
+
+    node->next_free = NULL;
+    node->prev_free = NULL;
 }
 
 /* ========================================================================= */
@@ -133,7 +187,7 @@ void mm_init(boot_info_t* boot_info) {
 
     /* Inicializar variables globales */
     heap_start = (block_header_t*)best_start;
-    last_alloc = heap_start; /* Inicializar cursor Next-Fit */
+    free_list_head = NULL;
     memory_total = best_size;
 
     /* Configurar bloque inicial */
@@ -142,6 +196,10 @@ void mm_init(boot_info_t* boot_info) {
     heap_start->magic = HEAP_MAGIC;
     heap_start->next = NULL;
     heap_start->prev = NULL;
+
+    /* Add initial block to free list */
+    add_to_free_list(heap_start);
+
     memory_used = 0;
 
     /* Important: We must tell PMM that this memory is now USED by the HEAP */
@@ -175,15 +233,33 @@ static void* _kmalloc_impl(size_t size) {
 
     size_t aligned_size = align(size);
     
-    /* Next Fit Strategy: Start search from last_alloc */
-    block_header_t* start_block = (last_alloc) ? last_alloc : heap_start;
-    block_header_t* curr = start_block;
+    /* Free List Strategy: O(K) where K is number of free blocks */
+    block_header_t* curr = free_list_head;
 
-    do {
-        if (curr->is_free && curr->size >= aligned_size) {
-            if (curr->size >= aligned_size + sizeof(block_header_t) + HEAP_ALIGNMENT) {
+    while (curr) {
+        /* Sanity check */
+        if (!curr->is_free) {
+             /* Should not happen if list maintenance is correct */
+             /* Skip or remove? Safest to just move on for now. */
+             curr = get_free_node(curr)->next_free;
+             continue;
+        }
+
+        if (curr->size >= aligned_size) {
+            /* Found a fit! */
+
+            /* Remove from free list first - we will re-add the remainder if split */
+            remove_from_free_list(curr);
+
+            /* Check if we can split */
+            /* We need enough space for header + data (aligned) + min free block size (sizeof(free_node_t)) */
+            /* align() already ensures minimum size for data is sizeof(free_node_t) */
+            /* So we need: size >= aligned_size + sizeof(block_header_t) + sizeof(free_node_t) */
+
+            if (curr->size >= aligned_size + sizeof(block_header_t) + sizeof(free_node_t)) {
                 block_header_t* new_block = (block_header_t*)((uintptr_t)curr + 
                                             sizeof(block_header_t) + aligned_size);
+
                 new_block->size = curr->size - aligned_size - sizeof(block_header_t);
                 new_block->is_free = 1;
                 new_block->magic = HEAP_MAGIC;
@@ -197,12 +273,8 @@ static void* _kmalloc_impl(size_t size) {
                 curr->size = aligned_size;
                 curr->next = new_block;
 
-                /* Update last_alloc to the new free block (remainder) for better locality next time */
-                last_alloc = new_block;
-            } else {
-                /* Exact fit or close enough */
-                /* Update last_alloc to the next block (or wrap around if NULL) */
-                last_alloc = curr->next ? curr->next : heap_start;
+                /* Add the new remainder block to the free list */
+                add_to_free_list(new_block);
             }
             
             curr->is_free = 0;
@@ -210,11 +282,8 @@ static void* _kmalloc_impl(size_t size) {
             return (void*)((uintptr_t)curr + sizeof(block_header_t));
         }
 
-        curr = curr->next;
-        if (!curr) {
-            curr = heap_start; /* Wrap around */
-        }
-    } while (curr != start_block); /* Stop if we've looped back to start */
+        curr = get_free_node(curr)->next_free;
+    }
     
     serial_write_string("[MM] CRITICAL: Out of Memory!\n");
     return NULL;
@@ -256,14 +325,17 @@ static void _kfree_impl(void* ptr) {
     block->is_free = 1;
     memory_used -= (block->size + sizeof(block_header_t));
 
-    /* Coalesce O(1) */
+    /* Add to free list initially. If we merge, we might remove it/adjust it. */
+    /* Coalescing strategy:
+       Check next. If free, REMOVE next from free list, merge into current.
+       Check prev. If free, REMOVE current from free list (if we added it? or just don't add),
+       merge current into prev. Prev is already in free list.
+    */
 
     /* Merge with next block if free */
     if (block->next && block->next->is_free) {
-        /* If last_alloc points to the block being merged (removed), update it */
-        if (last_alloc == block->next) {
-            last_alloc = block;
-        }
+        /* Remove the next block from free list as it's being absorbed */
+        remove_from_free_list(block->next);
 
         block->size += sizeof(block_header_t) + block->next->size;
         block->next = block->next->next;
@@ -274,16 +346,20 @@ static void _kfree_impl(void* ptr) {
 
     /* Merge with prev block if free */
     if (block->prev && block->prev->is_free) {
-        /* If last_alloc points to the block being merged (removed), update it */
-        if (last_alloc == block) {
-            last_alloc = block->prev;
-        }
-
+        /* Prev is already free, so it should be in the free list.
+           We merge 'block' into 'prev'.
+           We do NOT need to add 'block' to free list, and we don't need to change prev's
+           position in the free list.
+           We just update prev's size.
+        */
         block->prev->size += sizeof(block_header_t) + block->size;
         block->prev->next = block->next;
         if (block->next) {
             block->next->prev = block->prev;
         }
+    } else {
+        /* Only add to free list if we didn't merge into a previous block */
+        add_to_free_list(block);
     }
 }
 
