@@ -1,6 +1,9 @@
-#ifndef _ERRNO_H
-#define _ERRNO_H
+#ifndef _ETEROS_ERRNO_H
+#define _ETEROS_ERRNO_H
 
+#ifdef __ETEROS_HOST_TEST__
+#include_next <errno.h>
+#else
 extern int errno;
 
 #define EPERM       1  /* Operation not permitted */
@@ -39,7 +42,6 @@ extern int errno;
 #define ERANGE      34 /* Math result not representable */
 
 #define ENOSYS      38 /* Function not implemented */
+#endif
 
-extern int errno;
-
-#endif /* _ERRNO_H */
+#endif /* _ETEROS_ERRNO_H */

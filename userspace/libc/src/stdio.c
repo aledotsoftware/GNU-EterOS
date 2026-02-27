@@ -3,8 +3,11 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <sys/syscall.h>
 
-struct _IO_FILE {
+#ifndef __ETEROS_HOST_TEST__
+struct _eteros_IO_FILE {
     int fd;
     int error;
     int eof;
@@ -17,6 +20,20 @@ static FILE __stderr = {2, 0, 0};
 FILE *stdin = &__stdin;
 FILE *stdout = &__stdout;
 FILE *stderr = &__stderr;
+#endif
+
+/* Syscall primitives */
+static inline long _syscall1(long n, long a1) {
+    long ret;
+    __asm__ volatile ("syscall" : "=a"(ret) : "a"(n), "D"(a1) : "rcx", "r11", "memory");
+    return ret;
+}
+
+static inline long _syscall2(long n, long a1, long a2) {
+    long ret;
+    __asm__ volatile ("syscall" : "=a"(ret) : "a"(n), "D"(a1), "S"(a2) : "rcx", "r11", "memory");
+    return ret;
+}
 
 /* Internal formatting function pointer type */
 typedef void (*putc_func)(int c, void *arg);
@@ -199,7 +216,6 @@ static int vcbprintf(putc_func out, void *arg, const char *fmt, va_list ap) {
 
             if (val == 0) {
                 if (prec != 0) buf[i++] = '0';
-                /* For p, maybe print (nil)? Standard says implementation defined. */
             } else {
                 while (val) {
                     int d = val % base;
@@ -313,6 +329,40 @@ int snprintf(char *str, size_t size, const char *format, ...) {
     return ret;
 }
 
+int sprintf(char *str, const char *format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    int ret = vsprintf(str, format, ap);
+    va_end(ap);
+    return ret;
+}
+
+#ifndef __ETEROS_HOST_TEST__
+int vprintf(const char *format, va_list ap) {
+    return vfprintf(stdout, format, ap);
+}
+
+int vfprintf(FILE *stream, const char *format, va_list ap) {
+    if (!stream) return -1;
+    return vcbprintf(fd_putc, (void*)(long)stream->fd, format, ap);
+}
+#endif
+
+int vsprintf(char *str, const char *format, va_list ap) {
+    return vsnprintf(str, (size_t)-1, format, ap);
+}
+
+int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
+    struct buf_arg ba = {str, size, 0};
+    int ret = vcbprintf(buf_putc, &ba, format, ap);
+    if (size > 0) {
+        if (ba.pos < size) str[ba.pos] = 0;
+        else str[size-1] = 0;
+    }
+    return ret;
+}
+
+#ifndef __ETEROS_HOST_TEST__
 int fprintf(FILE *stream, const char *format, ...) {
     if (!stream) return -1;
     va_list ap;
@@ -463,4 +513,27 @@ int fputs(const char *s, FILE *stream) {
     size_t len = strlen(s);
     if (fwrite(s, 1, len, stream) != len) return EOF;
     return 1;
+}
+#endif
+
+void perror(const char *s) {
+    if (s && *s) {
+        dprintf(2, "%s: %s\n", s, strerror(errno));
+    } else {
+        dprintf(2, "%s\n", strerror(errno));
+    }
+}
+
+int remove(const char *pathname) {
+    int ret = unlink(pathname);
+    if (ret == -1 && errno == EISDIR) {
+        return (int)_syscall1(SYS_rmdir, (long)pathname);
+    }
+    return ret;
+}
+
+int rename(const char *oldpath, const char *newpath) {
+    long ret = _syscall2(SYS_rename, (long)oldpath, (long)newpath);
+    if (ret < 0) { errno = (int)-ret; return -1; }
+    return 0;
 }
