@@ -110,5 +110,6 @@
 #define SYS_getgid              104
 #define SYS_geteuid             107
 #define SYS_getegid             108
+#define SYS_clock_gettime       228
 
 #endif /* _SYS_SYSCALL_H */
