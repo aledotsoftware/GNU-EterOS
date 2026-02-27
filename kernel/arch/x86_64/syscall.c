@@ -105,6 +105,8 @@ typedef struct {
 } pipe_t;
 
 #define PIPE_SIZE 4096
+#define PIPE_READ_END  1
+#define PIPE_WRITE_END 2
 
 static ssize_t pipe_read(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
@@ -165,12 +167,15 @@ static void pipe_close(fs_node_t* node) {
     if (!pipe) return;
 
     spin_lock(&pipe->lock);
-    if (node->flags == FS_PIPE) {
+
+    if (node->impl == PIPE_READ_END) {
+        pipe->readers--;
+    } else if (node->impl == PIPE_WRITE_END) {
+        pipe->writers--;
+    } else {
+        /* Fallback for legacy or unknown nodes (shouldn't happen with new pipes) */
         if (node->write == 0) pipe->readers--;
         else pipe->writers--;
-    } else {
-        pipe->readers--;
-        pipe->writers--;
     }
 
     if (pipe->readers <= 0 && pipe->writers <= 0) {
@@ -357,7 +362,10 @@ static int64_t sys_pipe(int* pipefd) {
     memset(reader, 0, sizeof(fs_node_t)); memset(writer, 0, sizeof(fs_node_t));
     reader->ref_count = 1; writer->ref_count = 1;
     strlcpy(reader->name, "pipe_r", 32); reader->flags = FS_PIPE; reader->read = pipe_read; reader->close = pipe_close; reader->open = pipe_open; reader->ptr = (struct fs_node*)pipe;
+    reader->impl = PIPE_READ_END;
+
     strlcpy(writer->name, "pipe_w", 32); writer->flags = FS_PIPE; writer->write = pipe_write; writer->close = pipe_close; writer->open = pipe_open; writer->ptr = (struct fs_node*)pipe;
+    writer->impl = PIPE_WRITE_END;
 
     current->fd_table[fd[0]].node = reader; current->fd_table[fd[0]].offset = 0; current->fd_table[fd[0]].flags = O_RDONLY;
     current->fd_table[fd[1]].node = writer; current->fd_table[fd[1]].offset = 0; current->fd_table[fd[1]].flags = O_WRONLY;
