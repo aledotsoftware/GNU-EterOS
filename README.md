@@ -285,54 +285,6 @@ Para que el sistema sea considerado "listo para producción", el flujo de actual
 
 
 
-
-### Fase 5: Entorno Gráfico (Flux UI & AetherGraphics) [LEGACY/REMOVED]
-*Nota: Este subsistema ha sido deprecado y eliminado del kernel en favor de una nueva interfaz web (ver `web_ui`).*
-- [x] **Motor de Dibujo "Omni":** Primitivas 2D (líneas, rectángulos, fuentes) y **Decodificador PNG Nativo**.
-- [x] **Double Buffering Activo:** Renderizado libre de parpadeo con composicion en RAM antes de flush.
-- [x] **Event Loop Reactivo:** Sistema de despacho de mensajes (Mouse + Teclado) dirigido a la ventana focalizada.
-- [x] **Compositor de Ventanas:** Gestión de apilamiento (Z-order) y transparencia alfa básica.
-- [x] **Flux UI Experience:** Entorno táctil/estilizado con 16+ aplicaciones integradas (Legacy):
-    - 📟 **Terminal Flux:** Integrada con soporte completo para comandos (`ls`, `ps`, `sysinfo`).
-    - 📁 **Monitor de Sistema:** Gestión visual de procesos y recursos.
-    - 🛠️ **Admin. de Dispositivos:** Inventario de hardware (CPU, RAM, PCI).
-    - 📡 **Monitor de Red:** Estado de IP y conectividad en tiempo real.
-    - 🎮 **SantiTravel:** El legendario juego de aventuras portado a la GUI.
-    - 🌌 **The Matrix:** Simulación de lluvia de código optimizada para Omni.
-    - 🎨 **Lienzo (Paint):** Herramienta de dibujo con soporte de transparencia.
-    - 🧪 **Calculadora & Notas:** Aplicaciones de productividad para el día a día.
-    - 🌐 **Navegador Eter:** Acceso a red con soporte lwIP y sockets.
-    - 🕒 **Reloj & Calendario:** Gestión de tiempo basada en RTC.
-    - 🔊 **Reproductor de Música & Galería:** Stubs de medios con interfaz unificada.
-
-
-### Fase 5.1: Optimización del Motor Gráfico (Omni v2.0) [LEGACY/REMOVED]
-- [x] **Motor Omni v2.0:** Refactorización completa del motor de dibujo 2D:
-    - ⚡ **Frame Batching:** `omni_begin_frame()` cachea el puntero al framebuffer una vez por frame, eliminando overhead de `get_buffer()` por operación.
-    - ⚡ **Dirty Region Tracking:** Sistema de regiones sucias para partial flush, reduciendo hasta un 80% el ancho de banda al bus PCI.
-    - ⚡ **Alpha Blending 256-nivel:** Composición con transparencia real (`omni_fill_rect_alpha`) para sombras, notificaciones glassmorphism y efectos de glow.
-    - ⚡ **Líneas Optimizadas:** Fast-path para líneas horizontales/verticales + Bresenham con acceso directo a buffer (sin llamada a función por pixel).
-    - ⚡ **Bitmap Blitting por Filas:** `memcpy` por scanline en blits opacos vs. bucle per-pixel anterior.
-    - ⚡ **Texto Transparente:** `omni_draw_char_transparent()` salta escritura de background para overlays sobre contenido existente.
-- [x] **Nuevas Primitivas 2D:**
-    - 🎨 **Gradientes Verticales** (`omni_fill_gradient_v`): Barra de estado, tarjetas y fondos con transición de color.
-    - 🎨 **Rectángulos Redondeados** (`omni_draw_rounded_rect`): Bresenham circular para esquinas suaves.
-    - 🎨 **Círculos Rellenos** (`omni_fill_circle`): Midpoint algorithm con scanline fill.
-- [x] **Optimización de Aplicaciones:**
-    - 🔄 **Notificaciones Fade-In/Out:** Transición alpha animada en toasts del sistema.
-    - 🔄 **Tarjetas con Gradiente:** Flux Cards ahora usan `gradient_v` para efecto de profundidad.
-    - 🔄 **Sombras Alpha-Blend** en ventanas del Window Manager (efecto glass vs. sombra sólida negra).
-    - 🔄 **Status Bar con Gradiente** premium en la barra superior.
-    - 🔄 **`image.c` delegada a Omni:** Todas las imágenes PNG ahora usan el path optimizado del motor Omni.
-- [ ] **Aceleración por GPU (VirtIO-GPU / Framebuffer DMA):** Pendiente para habilitar rendering >30 FPS en juegos y animaciones complejas.
-
-
-
-
-Para que éterOS pase de ser un proyecto técnico avanzado a un sistema operativo funcional y profesional, necesita una capa de Configuraciones de Sistema (System Settings).
-
-Dado que ya tienes el motor Omni v2.0 con soporte de gradientes y transparencias, estas configuraciones deben exponerse a través de una aplicación de "Ajustes" que interactúe con tus módulos de kernel (lwIP, VFS, ACPI).
-
 Aquí tienes la lista organizada de las configuraciones esenciales que debes implementar:
 
 🛠️ Panel de Control de éterOS: Áreas Críticas
