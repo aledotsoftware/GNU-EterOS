@@ -94,13 +94,6 @@ int sched_yield(void) {
     return 0;
 }
 
-/* nanosleep() */
-int nanosleep(const void *req, void *rem) {
-    long ret = _syscall2(SYS_nanosleep, (long)req, (long)rem);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
-    return 0;
-}
-
 /* mmap() */
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, int64_t offset) {
     long ret = _syscall6(SYS_mmap, (long)addr, (long)length, prot, flags, fd, offset);

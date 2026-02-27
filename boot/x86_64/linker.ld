@@ -48,6 +48,7 @@ SECTIONS
     /* Sección BSS (datos no inicializados) */
     .bss BLOCK(4K) : ALIGN(4K)
     {
+        _bss_start = .;
         *(COMMON)
         *(.bss)
         *(.bss.*)

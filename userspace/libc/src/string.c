@@ -334,3 +334,65 @@ char *strstr(const char *haystack, const char *needle) {
     }
     return (void*)0;
 }
+
+char *strcpy(char *dest, const char *src) {
+    char *d = dest;
+    while ((*d++ = *src++));
+    return dest;
+}
+
+char *strcat(char *dest, const char *src) {
+    char *d = dest;
+    while (*d) d++;
+    while ((*d++ = *src++));
+    return dest;
+}
+
+void *memchr(const void *s, int c, size_t n) {
+    const unsigned char *p = (const unsigned char *)s;
+    while (n--) {
+        if (*p == (unsigned char)c) return (void *)p;
+        p++;
+    }
+    return (void *)0;
+}
+
+char *strerror(int errnum) {
+    switch (errnum) {
+        case 0:     return "Success";
+        case 1:     return "Operation not permitted";
+        case 2:     return "No such file or directory";
+        case 3:     return "No such process";
+        case 4:     return "Interrupted system call";
+        case 5:     return "Input/output error";
+        case 6:     return "No such device or address";
+        case 7:     return "Argument list too long";
+        case 8:     return "Exec format error";
+        case 9:     return "Bad file descriptor";
+        case 10:    return "No child processes";
+        case 11:    return "Resource temporarily unavailable";
+        case 12:    return "Cannot allocate memory";
+        case 13:    return "Permission denied";
+        case 14:    return "Bad address";
+        case 16:    return "Device or resource busy";
+        case 17:    return "File exists";
+        case 18:    return "Invalid cross-device link";
+        case 19:    return "No such device";
+        case 20:    return "Not a directory";
+        case 21:    return "Is a directory";
+        case 22:    return "Invalid argument";
+        case 23:    return "Too many open files in system";
+        case 24:    return "Too many open files";
+        case 25:    return "Inappropriate ioctl for device";
+        case 27:    return "File too large";
+        case 28:    return "No space left on device";
+        case 29:    return "Illegal seek";
+        case 30:    return "Read-only file system";
+        case 36:    return "File name too long";
+        case 38:    return "Function not implemented";
+        case 39:    return "Directory not empty";
+        case 61:    return "No data available";
+        case 75:    return "Value too large for defined data type";
+        default:    return "Unknown error";
+    }
+}

@@ -13,6 +13,7 @@
 #include <vmm.h>
 #include <task.h>
 #include <gdt.h>
+#include <idt.h>
 
 /* Symbols from trampoline.asm */
 extern char trampoline_start[];
@@ -153,6 +154,9 @@ void cpu_init_ap(int index) {
     /* Load Per-CPU GDT/TSS */
     /* This will reset GS Base to 0, so we must do it BEFORE setting MSR_GS_BASE */
     gdt_load_for_cpu(cpu);
+
+    /* Load IDT (shared table, already initialized by BSP) */
+    idt_load_ap();
     
     /* Configurar GS Base */
     wrmsr(MSR_GS_BASE, (uint64_t)cpu);

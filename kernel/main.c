@@ -93,7 +93,15 @@ static void init_network(void) {
  * Inicializa el HAL y los subsistemas del kernel.
  */
 void __attribute__((section(".text.boot"))) kmain(void) {
-    /* ---- 0. Inicializar SMP (BSP Topology) ---- */
+    /* ---- 0. Limpiar BSS (el bootloader no lo hace) ---- */
+    /* Sin esto, variables globales como total_cpus contienen basura */
+    {
+        extern char _bss_start[], _kernel_end[];
+        char *p = _bss_start;
+        while (p < _kernel_end) *p++ = 0;
+    }
+
+    /* ---- 0.5. Inicializar SMP (BSP Topology) ---- */
     #if defined(ARCH_X86_64)
     cpu_init_bsp();
     #endif

@@ -413,3 +413,7 @@ void idt_init(void) {
 
     serial_write_string("[eterOS] IDT cargada (256 vectores).\n");
 }
+
+void idt_load_ap(void) {
+    __asm__ volatile ("lidt %0" : : "m"(idtr));
+}

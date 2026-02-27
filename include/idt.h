@@ -120,4 +120,10 @@ struct interrupt_frame {
  */
 void idt_init(void);
 
+/**
+ * Carga la IDT en un Application Processor (AP).
+ * La tabla ya fue inicializada por el BSP; solo ejecuta LIDT.
+ */
+void idt_load_ap(void);
+
 #endif /* ETEROS_IDT_H */

@@ -174,6 +174,8 @@ char *ctime(const time_t *timep) {
 }
 
 size_t strftime(char *s, size_t max, const char *format, const struct tm *tm) {
+    (void)format;
+    (void)tm;
     if (max > 0) *s = '\0';
     return 0;
 }
