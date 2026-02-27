@@ -341,6 +341,25 @@ function filterApps() {
     }
 }
 
+function clearNotifications() {
+    const list = document.getElementById('notif-list');
+    const clearBtn = document.getElementById('clear-notifs');
+    const emptyState = document.getElementById('notif-empty');
+
+    if (list) {
+        list.innerHTML = '';
+    }
+
+    if (clearBtn) {
+        clearBtn.hidden = true;
+    }
+
+    if (emptyState) {
+        emptyState.hidden = false;
+        emptyState.focus();
+    }
+}
+
 function toggleControlCenter(e) {
     if (e) e.stopPropagation();
     const cc = document.getElementById('control-center');
@@ -962,6 +981,7 @@ if (typeof module !== 'undefined') {
         toggleFocusMode,
         snapWindow,
         updateClock,
-        setupSliders
+        setupSliders,
+        clearNotifications
     };
 }
