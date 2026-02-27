@@ -149,6 +149,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/mm/heap.c             \
               $(KERNEL_DIR)/apps/santitravel.c     \
               $(KERNEL_DIR)/apps/sysmon.c          \
+              $(KERNEL_DIR)/apps/gui_demo.c        \
               $(KERNEL_DIR)/apps/user_loader.c     \
               $(KERNEL_DIR)/drivers/pci/pci.c      \
               $(KERNEL_DIR)/fs/initrd.c            \
