@@ -265,13 +265,18 @@ static int fat32_update_dirent(fat32_volume_t* vol, uint32_t sector, uint32_t of
     return 0;
 }
 
-/* Helper: Find a free directory entry slot in a cluster chain */
-static int fat32_find_free_dirent_in_chain(fat32_volume_t* vol, uint32_t start_cluster, uint32_t* out_sector, uint32_t* out_offset) {
+/* Callback for directory iteration */
+typedef int (*fat32_dir_cb_t)(fat32_volume_t* vol, fat32_dir_entry_t* entry, uint32_t sector, uint32_t offset, void* ctx);
+
+/* Helper: Iterate through directory entries in a cluster chain */
+static int fat32_iterate_dir(fat32_volume_t* vol, uint32_t start_cluster, fat32_dir_cb_t callback, void* ctx, uint32_t* last_cluster_out) {
     uint32_t current_cluster = start_cluster;
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
     if (!buffer) return -1;
 
     while (current_cluster < FAT32_EOC) {
+        if (last_cluster_out) *last_cluster_out = current_cluster;
+
         uint32_t lba = fat32_cluster_to_lba(vol, current_cluster);
 
         for (uint32_t i = 0; i < vol->sectors_per_cluster; i++) {
@@ -284,32 +289,84 @@ static int fat32_find_free_dirent_in_chain(fat32_volume_t* vol, uint32_t start_c
             int entries_per_sector = vol->bytes_per_sector / sizeof(fat32_dir_entry_t);
 
             for (int j = 0; j < entries_per_sector; j++) {
-                if (entry[j].name[0] == DIRENT_END || entry[j].name[0] == DIRENT_DELETED) {
-                    *out_sector = lba + i;
-                    *out_offset = j * sizeof(fat32_dir_entry_t);
+                int res = callback(vol, &entry[j], lba + i, j * sizeof(fat32_dir_entry_t), ctx);
+                if (res != 0) {
                     kfree(buffer);
-                    return 0;
+                    return res;
                 }
             }
         }
 
         uint32_t next = fat32_get_next_cluster(vol, current_cluster);
         if (next >= FAT32_EOC) {
-            // Extend directory
-            uint32_t new_cluster;
-            if (fat32_alloc_cluster(vol, &new_cluster) == 0) {
-                fat32_fat_set(vol, current_cluster, new_cluster);
-                current_cluster = new_cluster;
-            } else {
-                kfree(buffer);
-                return -3; // Disk full
-            }
-        } else {
-            current_cluster = next;
+             break;
         }
+        current_cluster = next;
     }
     kfree(buffer);
-    return -4;
+    return 0; /* Finished chain */
+}
+
+struct find_free_ctx {
+    uint32_t* sector;
+    uint32_t* offset;
+};
+
+static int fat32_find_free_cb(fat32_volume_t* vol, fat32_dir_entry_t* entry, uint32_t sector, uint32_t offset, void* ctx) {
+    (void)vol;
+    struct find_free_ctx* c = (struct find_free_ctx*)ctx;
+    if (entry->name[0] == DIRENT_END || entry->name[0] == DIRENT_DELETED) {
+        *c->sector = sector;
+        *c->offset = offset;
+        return 1; // Found
+    }
+    return 0; // Continue
+}
+
+/* Helper: Find a free directory entry slot in a cluster chain */
+static int fat32_find_free_dirent_in_chain(fat32_volume_t* vol, uint32_t start_cluster, uint32_t* out_sector, uint32_t* out_offset) {
+    struct find_free_ctx ctx = { out_sector, out_offset };
+    uint32_t last_cluster = 0;
+
+    int res = fat32_iterate_dir(vol, start_cluster, fat32_find_free_cb, &ctx, &last_cluster);
+
+    if (res == 1) return 0; // Found
+    if (res < 0) return res; // Error
+
+    // If we are here, we reached EOC without finding a slot. Extend.
+    uint32_t new_cluster;
+    if (fat32_alloc_cluster(vol, &new_cluster) != 0) return -3; // Disk full
+
+    fat32_fat_set(vol, last_cluster, new_cluster);
+
+    *out_sector = fat32_cluster_to_lba(vol, new_cluster);
+    *out_offset = 0;
+    return 0;
+}
+
+struct find_entry_ctx {
+    char* dos_name;
+    uint32_t* out_sector;
+    uint32_t* out_offset;
+    fat32_dir_entry_t* out_entry;
+};
+
+static int fat32_find_entry_cb(fat32_volume_t* vol, fat32_dir_entry_t* entry, uint32_t sector, uint32_t offset, void* ctx) {
+    (void)vol;
+    struct find_entry_ctx* c = (struct find_entry_ctx*)ctx;
+
+    if (entry->name[0] == DIRENT_END) return -3; /* Not Found, stop iteration */
+    if (entry->name[0] == DIRENT_DELETED) return 0;
+    if (entry->attr & ATTR_VOLUME_ID) return 0;
+    if (entry->attr & ATTR_LONG_NAME) return 0;
+
+    if (memcmp(entry->name, c->dos_name, 11) == 0) {
+        if (c->out_entry) *c->out_entry = *entry;
+        if (c->out_sector) *c->out_sector = sector;
+        if (c->out_offset) *c->out_offset = offset;
+        return 1; /* Found */
+    }
+    return 0;
 }
 
 /* Helper: Get Directory Entry Location in Chain */
@@ -317,44 +374,13 @@ static int fat32_find_dirent_in_chain(fat32_volume_t* vol, uint32_t start_cluste
     char dos_name[11];
     fat32_to_dos_name(filename, dos_name);
 
-    uint32_t current_cluster = start_cluster;
-    uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -1;
+    struct find_entry_ctx ctx = { dos_name, out_sector, out_offset, out_entry };
+    int res = fat32_iterate_dir(vol, start_cluster, fat32_find_entry_cb, &ctx, NULL);
 
-    while (current_cluster < FAT32_EOC) {
-        uint32_t lba = fat32_cluster_to_lba(vol, current_cluster);
-
-        for (uint32_t i = 0; i < vol->sectors_per_cluster; i++) {
-            if (fat32_read_sector_cached(vol, lba + i, buffer) != 0) {
-                kfree(buffer);
-                return -2;
-            }
-
-            fat32_dir_entry_t* entry = (fat32_dir_entry_t*)buffer;
-            int entries_per_sector = vol->bytes_per_sector / sizeof(fat32_dir_entry_t);
-
-            for (int j = 0; j < entries_per_sector; j++) {
-                if (entry[j].name[0] == DIRENT_END) {
-                    kfree(buffer);
-                    return -3; // Not found
-                }
-                if (entry[j].name[0] == DIRENT_DELETED) continue;
-                if (entry[j].attr & ATTR_VOLUME_ID) continue;
-                if (entry[j].attr & ATTR_LONG_NAME) continue;
-
-                if (memcmp(entry[j].name, dos_name, 11) == 0) {
-                    if (out_entry) *out_entry = entry[j];
-                    if (out_sector) *out_sector = lba + i;
-                    if (out_offset) *out_offset = j * sizeof(fat32_dir_entry_t);
-                    kfree(buffer);
-                    return 0;
-                }
-            }
-        }
-        current_cluster = fat32_get_next_cluster(vol, current_cluster);
-    }
-    kfree(buffer);
-    return -3;
+    if (res == 1) return 0; // Success
+    if (res == -3) return -3; // Explicit Not Found
+    if (res == 0) return -3; // End of Chain, Not Found
+    return res; // Error
 }
 
 
@@ -576,49 +602,42 @@ uint32_t fat32_write_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t
     return res;
 }
 
+struct readdir_ctx {
+    uint32_t index;
+    uint32_t count;
+    struct dirent* out_entry;
+};
+
+static int fat32_readdir_cb(fat32_volume_t* vol, fat32_dir_entry_t* entry, uint32_t sector, uint32_t offset, void* ctx) {
+    (void)vol;
+    (void)sector;
+    (void)offset;
+    struct readdir_ctx* c = (struct readdir_ctx*)ctx;
+
+    if (entry->name[0] == DIRENT_END) return 1; /* EOF */
+    if (entry->name[0] == DIRENT_DELETED) return 0;
+    if (entry->attr & ATTR_VOLUME_ID) return 0;
+    if (entry->attr & ATTR_LONG_NAME) return 0;
+
+    if (c->count == c->index) {
+        fat32_get_name(entry->name, c->out_entry->name);
+        c->out_entry->inode = (entry->fst_clus_hi << 16) | entry->fst_clus_lo;
+        return 2; /* Success code for callback */
+    }
+    c->count++;
+    return 0;
+}
+
 static int fat32_readdir_fs_impl(fs_node_t *node, uint32_t index, struct dirent *out_entry) {
     fat32_volume_t* vol = (fat32_volume_t*)node->ptr;
-    uint32_t current_cluster = node->inode;
+    struct readdir_ctx ctx = { index, 0, out_entry };
 
-    uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -1;
+    int res = fat32_iterate_dir(vol, node->inode, fat32_readdir_cb, &ctx, NULL);
 
-    uint32_t valid_count = 0;
-
-    while (current_cluster < FAT32_EOC) {
-        uint32_t lba = fat32_cluster_to_lba(vol, current_cluster);
-
-        for (uint32_t i = 0; i < vol->sectors_per_cluster; i++) {
-            if (fat32_read_sector_cached(vol, lba + i, buffer) != 0) {
-                kfree(buffer);
-                return -1;
-            }
-
-            fat32_dir_entry_t* entry = (fat32_dir_entry_t*)buffer;
-            int entries_per_sector = vol->bytes_per_sector / sizeof(fat32_dir_entry_t);
-
-            for (int j = 0; j < entries_per_sector; j++) {
-                if (entry[j].name[0] == DIRENT_END) {
-                    kfree(buffer);
-                    return 1; /* EOF */
-                }
-                if (entry[j].name[0] == DIRENT_DELETED) continue;
-                if (entry[j].attr & ATTR_VOLUME_ID) continue;
-                if (entry[j].attr & ATTR_LONG_NAME) continue;
-
-                if (valid_count == index) {
-                    fat32_get_name(entry[j].name, out_entry->name);
-                    out_entry->inode = (entry[j].fst_clus_hi << 16) | entry[j].fst_clus_lo;
-                    kfree(buffer);
-                    return 0; /* Success */
-                }
-                valid_count++;
-            }
-        }
-        current_cluster = fat32_get_next_cluster(vol, current_cluster);
-    }
-    kfree(buffer);
-    return 1; /* EOF */
+    if (res == 2) return 0; /* Success */
+    if (res == 1) return 1; /* EOF */
+    if (res == 0) return 1; /* EOF (end of chain) */
+    return -1; /* Error */
 }
 
 int fat32_readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) {
