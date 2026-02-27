@@ -165,7 +165,7 @@ void terminal_set_color(uint8_t color) {
 
 void terminal_scroll(void) {
     if (use_framebuffer) {
-        // Implementación de scroll real en framebuffer
+        /* Optimized hardware scroll: Shift memory up and clear bottom line */
         framebuffer_scroll(16, fb_bg);
 
         // Mantenernos en la última fila (calculada como height / 16 - 1)
