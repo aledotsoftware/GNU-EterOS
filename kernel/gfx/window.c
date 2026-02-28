@@ -100,16 +100,34 @@ static void draw_window(window_t* win) {
         int32_t win_y_start = draw_y_start - win->y;
         int32_t win_x_start = draw_x_start - win->x;
 
-        for (int32_t i = 0; i < height; i++) {
-            uint32_t* dest = (uint32_t*)((uint8_t*)fb_buf + ((draw_y_start + i) * fb_pitch) + (draw_x_start * 4));
-            uint32_t* src = win->buffer + ((win_y_start + i) * win->width) + win_x_start;
+        /* ⚡ BOLT Optimization: Hoist pointer arithmetic out of the inner loop
+           and unroll the alpha-blend pixel copy loop by 4x for speed. */
+        uint8_t* dest_row = (uint8_t*)fb_buf + (draw_y_start * fb_pitch) + (draw_x_start * 4);
+        uint32_t* src_row = win->buffer + (win_y_start * win->width) + win_x_start;
 
-            for (int32_t j = 0; j < width; j++) {
-                uint32_t color = src[j];
-                if (color != 0) {
-                    dest[j] = color;
+        for (int32_t i = 0; i < height; i++) {
+            uint32_t* dest = (uint32_t*)dest_row;
+            uint32_t* src = src_row;
+
+            int32_t j = 0;
+            /* Unrolled loop (4x) */
+            for (; j <= width - 4; j += 4) {
+                if (src[j] != 0) dest[j] = src[j];
+                if (src[j+1] != 0) dest[j+1] = src[j+1];
+                if (src[j+2] != 0) dest[j+2] = src[j+2];
+                if (src[j+3] != 0) dest[j+3] = src[j+3];
+            }
+
+            /* Remainder */
+            for (; j < width; j++) {
+                if (src[j] != 0) {
+                    dest[j] = src[j];
                 }
             }
+
+            /* Advance pointers by one row */
+            dest_row += fb_pitch;
+            src_row += win->width;
         }
     } else {
         /* Fallback for other depths */
