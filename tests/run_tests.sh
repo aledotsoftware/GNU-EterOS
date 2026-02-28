@@ -137,6 +137,19 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o te
 rm tests/test_sys_open
 
 echo "---------------------------------------------------"
+# Test Syscall Dispatch
+
+echo "---------------------------------------------------"
+
+echo "Running test_syscall_dispatch..."
+
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_dispatch.c kernel/string.c -o tests/test_syscall_dispatch
+
+./tests/test_syscall_dispatch
+
+rm tests/test_syscall_dispatch
+
+
 echo "All tests passed!"
 
 # Test Omni Gradient Math
