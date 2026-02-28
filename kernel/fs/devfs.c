@@ -7,6 +7,7 @@
 #include <vga.h>
 #include <input/event.h>
 #include <lock.h>
+#include <drivers/tty.h>
 
 /* Global root node for DevFS */
 static fs_node_t* devfs_root = NULL;
@@ -36,27 +37,6 @@ static ssize_t dev_zero_read(fs_node_t *node, uint32_t offset, uint32_t size, ui
 static uint32_t dev_zero_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset; (void)size; (void)buffer;
     return size; /* Discard */
-}
-
-/* ========================================================================= */
-/* /dev/tty Implementation                                                   */
-/* ========================================================================= */
-static ssize_t dev_tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset;
-    for (uint32_t i = 0; i < size; i++) {
-        buffer[i] = (uint8_t)keyboard_getchar();
-        /* Line buffered simulation (optional) */
-        if (buffer[i] == '\n') return i+1;
-    }
-    return size;
-}
-
-static uint32_t dev_tty_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset;
-    for (uint32_t i = 0; i < size; i++) {
-        terminal_putchar((char)buffer[i]);
-    }
-    return size;
 }
 
 /* ========================================================================= */
@@ -235,10 +215,8 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->write = dev_zero_write;
         fnode->inode = 1;
     } else if (strcmp(name, "tty") == 0) {
-        strlcpy(fnode->name, "tty", sizeof(fnode->name));
-        fnode->read = dev_tty_read;
-        fnode->write = dev_tty_write;
-        fnode->inode = 2;
+        kfree(fnode);
+        return tty_create_node();
     } else if (strcmp(name, "random") == 0) {
         strlcpy(fnode->name, "random", sizeof(fnode->name));
         fnode->read = dev_random_read;
