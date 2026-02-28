@@ -102,12 +102,17 @@ void tcp_input(socket_entry_t* sock, struct tcp_header* tcp, int len, uint32_t s
         }
     } else if (sock->state == SOCKET_STATE_ESTABLISHED) {
         if (data_len > 0) {
+            int available = (sock->rx_tail - sock->rx_head - 1 + RX_BUFFER_SIZE) % RX_BUFFER_SIZE;
+            if (data_len > available) {
+                hal_console_write("[TCP] Warning: Receive buffer full, dropping packet.\n");
+                return; /* Drop packet, do not ACK */
+            }
+
             /* Copy data to rx_buf */
             uint8_t* data = (uint8_t*)tcp + doff;
             for (int i=0; i<data_len; i++) {
                 sock->rx_buf[sock->rx_head] = data[i];
                 sock->rx_head = (sock->rx_head + 1) % RX_BUFFER_SIZE;
-                /* Handle overflow? Overwrite or drop? Ring buffer. */
             }
 
             sock->ack_num += data_len;
