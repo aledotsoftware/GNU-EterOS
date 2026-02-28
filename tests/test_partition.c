@@ -161,10 +161,83 @@ void test_io() {
     printf("PASSED\n");
 }
 
+void test_partition_write_edge_cases() {
+    printf("Running test_partition_write_edge_cases...\n");
+    fs_node_t *passive = partition_get_passive_root();
+
+    char write_buf[512];
+    memset(write_buf, 0xAA, sizeof(write_buf));
+
+    // Null checks
+    if (passive->write(NULL, 0, 512, (uint8_t*)write_buf) != 0) {
+        printf("FAILED: NULL node should return 0\n"); exit(1);
+    }
+    if (passive->write(passive, 0, 512, NULL) != 0) {
+        printf("FAILED: NULL buffer should return 0\n"); exit(1);
+    }
+
+    // Invalid partition index
+    fs_node_t invalid_node;
+    memcpy(&invalid_node, passive, sizeof(fs_node_t));
+    invalid_node.impl = 999;
+    if (invalid_node.write(&invalid_node, 0, 512, (uint8_t*)write_buf) != 0) {
+        printf("FAILED: Invalid partition index should return 0\n"); exit(1);
+    }
+
+    // Sector size 0
+    uint32_t original_sector_size = global_disk.sector_size;
+    global_disk.sector_size = 0;
+    if (passive->write(passive, 0, 512, (uint8_t*)write_buf) != 0) {
+        printf("FAILED: Sector size 0 should return 0\n"); exit(1);
+    }
+    global_disk.sector_size = original_sector_size;
+
+    // The passive partition starts at LBA 101, so sector size is 512.
+    // LBA 101 byte offset in disk_image is 101 * 512 = 51712.
+    uint32_t passive_start_byte = 101 * 512;
+
+    // Unaligned write: smaller than a sector, not starting on a boundary
+    char small_buf[20];
+    memset(small_buf, 0xBB, sizeof(small_buf));
+    uint32_t written = passive->write(passive, 10, 20, (uint8_t*)small_buf);
+    if (written != 20) {
+        printf("FAILED: Unaligned write returned %d\n", written); exit(1);
+    }
+    if (memcmp(&disk_image[passive_start_byte + 10], small_buf, 20) != 0) {
+        printf("FAILED: Unaligned write data mismatch\n"); exit(1);
+    }
+
+    // Unaligned write: crossing a sector boundary
+    char cross_buf[30];
+    memset(cross_buf, 0xCC, sizeof(cross_buf));
+    written = passive->write(passive, 500, 30, (uint8_t*)cross_buf);
+    if (written != 30) {
+        printf("FAILED: Cross-boundary write returned %d\n", written); exit(1);
+    }
+    if (memcmp(&disk_image[passive_start_byte + 500], cross_buf, 30) != 0) {
+        printf("FAILED: Cross-boundary write data mismatch\n"); exit(1);
+    }
+
+    // Write that gets truncated at the end of the partition
+    // Passive partition is 100 sectors = 51200 bytes
+    char trunc_buf[20];
+    memset(trunc_buf, 0xDD, sizeof(trunc_buf));
+    written = passive->write(passive, 51190, 20, (uint8_t*)trunc_buf);
+    if (written != 10) {
+        printf("FAILED: Truncated write returned %d, expected 10\n", written); exit(1);
+    }
+    if (memcmp(&disk_image[passive_start_byte + 51190], trunc_buf, 10) != 0) {
+         printf("FAILED: Truncated write data mismatch\n"); exit(1);
+    }
+
+    printf("PASSED\n");
+}
+
 int main() {
     test_partition_scan();
     test_ab_logic();
     test_io();
+    test_partition_write_edge_cases();
     printf("All partition tests passed!\n");
     return 0;
 }
