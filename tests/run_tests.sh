@@ -122,6 +122,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_procfs.c -o tests/test_procfs
 ./tests/test_procfs
 rm tests/test_procfs
 
+# Test VMM Flush
+echo "---------------------------------------------------"
+echo "Running test_vmm_flush..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vmm_flush.c -o tests/test_vmm_flush
+./tests/test_vmm_flush
+rm tests/test_vmm_flush
+
 # Test Framebuffer Scroll
 echo "---------------------------------------------------"
 echo "Running test_framebuffer_scroll..."

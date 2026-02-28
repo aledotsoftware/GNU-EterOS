@@ -30,7 +30,14 @@ spinlock_t tlb_lock = 0;
 
 /* Invalida una página en el TLB */
 static inline void invlpg(uint64_t addr) {
+#ifdef __ETEROS_HOST_TEST__
+    extern uint64_t mock_invlpg_addr;
+    extern int mock_invlpg_called;
+    mock_invlpg_addr = addr;
+    mock_invlpg_called++;
+#else
     __asm__ volatile("invlpg (%0)" : : "r" (addr) : "memory");
+#endif
 }
 
 void vmm_flush_tlb_local(uint64_t addr) {
