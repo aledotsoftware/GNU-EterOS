@@ -129,6 +129,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_framebuffer_scroll.c kernel/driv
 ./tests/test_framebuffer_scroll
 rm tests/test_framebuffer_scroll
 
+# Test Sem Logic
+echo "---------------------------------------------------"
+echo "Running test_sem_logic..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sem_logic.c -o tests/test_sem_logic
+./tests/test_sem_logic
+rm tests/test_sem_logic
+
 # Test Sys Open (Security Fix)
 echo "---------------------------------------------------"
 echo "Running test_sys_open..."
