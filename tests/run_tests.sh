@@ -122,6 +122,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_procfs.c -o tests/test_procfs
 ./tests/test_procfs
 rm tests/test_procfs
 
+# Test DevFS
+echo "---------------------------------------------------"
+echo "Running test_devfs..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c -o tests/test_devfs
+./tests/test_devfs
+rm tests/test_devfs
+
 # Test Framebuffer Scroll
 echo "---------------------------------------------------"
 echo "Running test_framebuffer_scroll..."
