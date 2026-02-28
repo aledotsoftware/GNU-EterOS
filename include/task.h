@@ -69,6 +69,9 @@ typedef struct task {
     struct task*   next_ready;              /* Next task in ready queue */
     struct task*   prev_ready;              /* Previous task in ready queue */
 
+    struct task*   next_sleep;              /* Next task in sleep queue */
+    struct task*   prev_sleep;              /* Previous task in sleep queue */
+
     /* POSIX Compatibility */
     file_descriptor_t fd_table[MAX_FD];     /* File Descriptor Table */
     uint32_t       signal_mask;             /* Mask of blocked signals */
@@ -122,6 +125,12 @@ void task_yield(void);
  * Cede el CPU a otras tareas.
  */
 void task_sleep(uint64_t ms);
+
+/**
+ * Pone la tarea actual en la cola de sleep con un wake_tick específico.
+ * Utilizado por futex u otros primitivos de sincronización.
+ */
+void task_block_with_timeout(uint64_t wake_tick);
 
 /**
  * Verifica si hay tareas dormidas que deban despertar.
