@@ -160,7 +160,7 @@ char *asctime(const struct tm *tm) {
     const char *wday_name[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
     const char *mon_name[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-    sprintf(buf, "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n",
+    snprintf(buf, sizeof(buf), "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n",
         wday_name[tm->tm_wday % 7],
         mon_name[tm->tm_mon % 12],
         tm->tm_mday,
