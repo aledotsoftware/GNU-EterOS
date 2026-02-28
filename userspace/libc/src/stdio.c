@@ -348,8 +348,10 @@ int vfprintf(FILE *stream, const char *format, va_list ap) {
 }
 #endif
 
+#define SPRINTF_MAX_LEN 65536
+
 int vsprintf(char *str, const char *format, va_list ap) {
-    return vsnprintf(str, (size_t)-1, format, ap);
+    return vsnprintf(str, SPRINTF_MAX_LEN, format, ap);
 }
 
 int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
