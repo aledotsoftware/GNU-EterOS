@@ -179,3 +179,10 @@ echo "Running test_xtensa_uart..."
 gcc -D__ETEROS_HOST_TEST__ tests/test_xtensa_uart.c -o tests/test_xtensa_uart
 ./tests/test_xtensa_uart
 rm tests/test_xtensa_uart
+
+# Test Sem
+echo "---------------------------------------------------"
+echo "Running test_sem..."
+gcc -D__ETEROS_HOST_TEST__ -Itests/mocks tests/test_sem.c -o tests/test_sem
+./tests/test_sem
+rm tests/test_sem
