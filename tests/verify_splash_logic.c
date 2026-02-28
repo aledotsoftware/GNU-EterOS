@@ -17,6 +17,12 @@ typedef uint8_t uint8_t;
 uint32_t framebuffer_get_width(void) { return 1024; }
 uint32_t framebuffer_get_height(void) { return 768; }
 
+uint32_t framebuffer_get_bpp(void) { return 32; }
+uint32_t framebuffer_get_pitch(void) { return 1024 * 4; }
+
+static uint32_t mock_fb[1024 * 768];
+uint32_t* framebuffer_get_buffer(void) { return mock_fb; }
+
 void framebuffer_clear(uint32_t color) {
     printf("[MOCK] Framebuffer clear: 0x%08X\n", color);
 }
@@ -85,10 +91,36 @@ static void show_splash(void) {
     /* Simulate the loop but limit iterations for speed in test */
     /* In real kernel code, this iterates all pixels */
     printf("[MOCK] Drawing splash screen at (%d, %d)...\n", start_x, start_y);
-    for (int y = 0; y < 200; y++) {
-        for (int x = 0; x < 200; x++) {
-             uint32_t color = pixel_data[y * 200 + x];
-             framebuffer_putpixel(start_x + x, start_y + y, color);
+
+    /* ⚡ BOLT Optimization: Direct memory access for 32bpp Framebuffer */
+    if (framebuffer_get_bpp() == 32) {
+        uint32_t* fb_buf = framebuffer_get_buffer();
+        uint32_t fb_pitch = framebuffer_get_pitch();
+
+        if (fb_buf) {
+            for (int y = 0; y < 200; y++) {
+                int draw_y = start_y + y;
+                if (draw_y >= (int)screen_h) break;
+
+                uint32_t* dest_row = (uint32_t*)((uint8_t*)fb_buf + (draw_y * fb_pitch) + (start_x * 4));
+                uint32_t* src_row = pixel_data + (y * 200);
+
+                for (int x = 0; x < 200; x++) {
+                    int draw_x = start_x + x;
+                    if (draw_x >= (int)screen_w) break;
+
+                    dest_row[x] = src_row[x];
+                }
+            }
+            printf("[MOCK] Fast 32-bit path executed.\n");
+        }
+    } else {
+        /* Fallback for other depths */
+        for (int y = 0; y < 200; y++) {
+            for (int x = 0; x < 200; x++) {
+                 uint32_t color = pixel_data[y * 200 + x];
+                 framebuffer_putpixel(start_x + x, start_y + y, color);
+            }
         }
     }
 
