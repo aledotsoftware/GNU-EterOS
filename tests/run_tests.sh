@@ -129,6 +129,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_framebuffer_scroll.c kernel/driv
 ./tests/test_framebuffer_scroll
 rm tests/test_framebuffer_scroll
 
+# Test Partition
+echo "---------------------------------------------------"
+echo "Running test_partition..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_partition.c kernel/string.c -o tests/test_partition
+./tests/test_partition
+rm tests/test_partition
+
 # Test Sys Open (Security Fix)
 echo "---------------------------------------------------"
 echo "Running test_sys_open..."

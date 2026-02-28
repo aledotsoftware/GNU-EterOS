@@ -104,6 +104,36 @@ void test_partition_scan() {
     printf("PASSED\n");
 }
 
+void test_create_partition_node() {
+    printf("Running test_create_partition_node...\n");
+
+    // Test valid index (0)
+    fs_node_t *node = create_partition_node(0);
+    if (!node) { printf("FAILED: Node is NULL for valid index\n"); exit(1); }
+    if (strcmp(node->name, "part0") != 0) { printf("FAILED: Node name mismatch\n"); exit(1); }
+    if (node->flags != FS_BLOCKDEVICE) { printf("FAILED: Node flags mismatch\n"); exit(1); }
+    if (node->length != partitions[0].sector_count * partitions[0].disk->sector_size) { printf("FAILED: Node length mismatch\n"); exit(1); }
+    if (node->impl != 0) { printf("FAILED: Node impl mismatch\n"); exit(1); }
+    if (node->ref_count != 1) { printf("FAILED: Node ref_count mismatch\n"); exit(1); }
+    if (node->read != partition_read) { printf("FAILED: Node read mismatch\n"); exit(1); }
+    if (node->write != partition_write) { printf("FAILED: Node write mismatch\n"); exit(1); }
+    if (node->open != 0) { printf("FAILED: Node open mismatch\n"); exit(1); }
+    if (node->close != 0) { printf("FAILED: Node close mismatch\n"); exit(1); }
+    if (node->readdir != 0) { printf("FAILED: Node readdir mismatch\n"); exit(1); }
+    if (node->finddir != 0) { printf("FAILED: Node finddir mismatch\n"); exit(1); }
+    kfree(node);
+
+    // Test out of bounds index (-1)
+    fs_node_t *node_invalid1 = create_partition_node(-1);
+    if (node_invalid1 != NULL) { printf("FAILED: Expected NULL for negative index\n"); exit(1); }
+
+    // Test out of bounds index (partition_count)
+    fs_node_t *node_invalid2 = create_partition_node(partition_count);
+    if (node_invalid2 != NULL) { printf("FAILED: Expected NULL for out-of-bounds index\n"); exit(1); }
+
+    printf("PASSED\n");
+}
+
 void test_ab_logic() {
     printf("Running test_ab_logic...\n");
     fs_node_t *active = partition_get_active_root();
@@ -163,6 +193,7 @@ void test_io() {
 
 int main() {
     test_partition_scan();
+    test_create_partition_node();
     test_ab_logic();
     test_io();
     printf("All partition tests passed!\n");
