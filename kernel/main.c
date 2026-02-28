@@ -316,10 +316,34 @@ static void show_splash(void) {
 
     uint32_t* pixel_data = (uint32_t*)logo_data;
 
-    for (int y = 0; y < 200; y++) {
-        for (int x = 0; x < 200; x++) {
-             uint32_t color = pixel_data[y * 200 + x];
-             framebuffer_putpixel(start_x + x, start_y + y, color);
+    /* ⚡ BOLT Optimization: Direct memory access for 32bpp Framebuffer */
+    if (framebuffer_get_bpp() == 32) {
+        uint32_t* fb_buf = framebuffer_get_buffer();
+        uint32_t fb_pitch = framebuffer_get_pitch();
+
+        if (fb_buf) {
+            for (int y = 0; y < 200; y++) {
+                int draw_y = start_y + y;
+                if (draw_y >= (int)screen_h) break;
+
+                uint32_t* dest_row = (uint32_t*)((uint8_t*)fb_buf + (draw_y * fb_pitch) + (start_x * 4));
+                uint32_t* src_row = pixel_data + (y * 200);
+
+                for (int x = 0; x < 200; x++) {
+                    int draw_x = start_x + x;
+                    if (draw_x >= (int)screen_w) break;
+
+                    dest_row[x] = src_row[x];
+                }
+            }
+        }
+    } else {
+        /* Fallback for other depths */
+        for (int y = 0; y < 200; y++) {
+            for (int x = 0; x < 200; x++) {
+                 uint32_t color = pixel_data[y * 200 + x];
+                 framebuffer_putpixel(start_x + x, start_y + y, color);
+            }
         }
     }
 
