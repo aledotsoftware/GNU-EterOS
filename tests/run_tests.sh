@@ -136,6 +136,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o te
 ./tests/test_sys_open
 rm tests/test_sys_open
 
+# Test Sem Logic
+echo "---------------------------------------------------"
+echo "Running test_sem_logic..."
+gcc -D__ETEROS_HOST_TEST__ -Itests/mocks tests/test_sem_logic.c -o tests/test_sem_logic
+./tests/test_sem_logic
+rm tests/test_sem_logic
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 
