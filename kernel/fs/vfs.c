@@ -2,7 +2,9 @@
 #include <string.h>
 #include <mm.h>
 
+#ifndef __ETEROS_HOST_TEST__
 fs_node_t *fs_root = NULL;
+#endif
 
 struct mount_point {
     uint32_t inode;

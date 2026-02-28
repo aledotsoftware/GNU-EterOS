@@ -136,6 +136,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o te
 ./tests/test_sys_open
 rm tests/test_sys_open
 
+# Test VFS Readdir
+echo "---------------------------------------------------"
+echo "Running test_vfs_readdir..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_readdir.c -o tests/test_vfs_readdir
+./tests/test_vfs_readdir
+rm tests/test_vfs_readdir
+
 echo "---------------------------------------------------"
 echo "All tests passed!"
 
