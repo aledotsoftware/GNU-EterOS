@@ -14,6 +14,7 @@ static void shell_replace_line(char* input, size_t* pos, const char* new_text) {
         terminal_putchar('\b');
         (*pos)--;
     }
+    terminal_update_cursor();
     /* Escribir nueva línea */
     strlcpy(input, new_text, SHELL_MAX_INPUT);
     *pos = strlen(input);
@@ -84,6 +85,7 @@ void shell_run(void) {
             if (pos > 0) {
                 pos--;
                 terminal_putchar('\b');
+                terminal_update_cursor();
             }
 
         } else if ((unsigned char)c == KB_KEY_UP) {
@@ -125,6 +127,7 @@ void shell_run(void) {
             if (pos < SHELL_MAX_INPUT - 1) {
                 input[pos++] = c;
                 terminal_putchar(c);
+                terminal_update_cursor();
             }
         }
         /* Otras teclas especiales (LEFT, RIGHT, etc.) se ignoran por ahora */

@@ -56,6 +56,7 @@ static uint32_t dev_tty_write(fs_node_t *node, uint32_t offset, uint32_t size, u
     for (uint32_t i = 0; i < size; i++) {
         terminal_putchar((char)buffer[i]);
     }
+    terminal_update_cursor();
     return size;
 }
 

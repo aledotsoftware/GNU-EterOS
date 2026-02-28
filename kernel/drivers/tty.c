@@ -40,10 +40,12 @@ static ssize_t tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t
                 serial_putchar(' ');
                 serial_putchar('\b');
             }
+            terminal_update_cursor();
             continue;
         }
 
         buffer[i++] = c;
+        terminal_update_cursor();
         if (c == '\n' || c == '\r') {
             /* Normalize newline */
             if (c == '\r') buffer[i-1] = '\n';
@@ -60,6 +62,7 @@ static uint32_t tty_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8
         terminal_putchar(buffer[i]);
         serial_putchar(buffer[i]);
     }
+    terminal_update_cursor();
     return size;
 }
 

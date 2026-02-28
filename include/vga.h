@@ -111,6 +111,11 @@ void terminal_clear(void);
 void terminal_set_cursor(size_t x, size_t y);
 
 /**
+ * Actualiza la posición visual del cursor en pantalla según el estado interno.
+ */
+void terminal_update_cursor(void);
+
+/**
  * Desplaza el contenido de la pantalla hacia arriba una línea.
  */
 void terminal_scroll(void);

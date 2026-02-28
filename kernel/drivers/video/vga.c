@@ -239,7 +239,6 @@ static void _terminal_putchar(char c) {
 
 void terminal_putchar(char c) {
     _terminal_putchar(c);
-    if (!use_framebuffer) vga_update_cursor();
 }
 
 void terminal_write_string(const char* str) {
@@ -280,4 +279,8 @@ void terminal_set_cursor(size_t x, size_t y) {
         terminal_row = y;
         if (!use_framebuffer) vga_update_cursor();
     }
+}
+
+void terminal_update_cursor(void) {
+    if (!use_framebuffer) vga_update_cursor();
 }
