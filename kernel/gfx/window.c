@@ -123,6 +123,7 @@ static void draw_window(window_t* win) {
                 if (src[j] != 0) {
                     dest[j] = src[j];
                 }
+                dest++;
             }
 
             /* Advance pointers by one row */
