@@ -159,3 +159,10 @@ echo "Running test_xtensa_uart..."
 gcc -D__ETEROS_HOST_TEST__ tests/test_xtensa_uart.c -o tests/test_xtensa_uart
 ./tests/test_xtensa_uart
 rm tests/test_xtensa_uart
+
+# Test VFS Unlink
+echo "---------------------------------------------------"
+echo "Running test_vfs_unlink..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_unlink.c kernel/string.c -o tests/test_vfs_unlink
+./tests/test_vfs_unlink
+rm tests/test_vfs_unlink
