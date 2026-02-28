@@ -137,6 +137,14 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o te
 rm tests/test_sys_open
 
 echo "---------------------------------------------------"
+
+# Test Bcache
+echo "---------------------------------------------------"
+echo "Running test_bcache..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_bcache.c kernel/fs/bcache.c kernel/string.c -o tests/test_bcache
+./tests/test_bcache
+rm tests/test_bcache
+
 echo "All tests passed!"
 
 # Test Omni Gradient Math
