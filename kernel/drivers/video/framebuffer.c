@@ -198,11 +198,11 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
 
     /* Optimized 32-bit path */
     if (fb_bpp == 32) {
+        /* ⚡ BOLT Optimization: Hoist row pointer arithmetic out of the loop */
+        uint8_t* base_addr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * 4);
         for (uint32_t i = 0; i < h; i++) {
-            /* Calculate row pointer directly */
-            uint32_t* row_ptr = (uint32_t*)((uint8_t*)active_buffer + ((y + i) * fb_pitch));
-            row_ptr += x; /* Offset x */
-            memset32(row_ptr, color, w);
+            memset32((uint32_t*)base_addr, color, w);
+            base_addr += fb_pitch;
         }
     } else {
         /* Fallback */
