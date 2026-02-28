@@ -46,7 +46,8 @@ void wget_run(const char* url_in) {
     terminal_write_string("\n");
 
     if (port == 443) {
-        terminal_write_string("[WGET] Warning: TLS (HTTPS) no implementado. Conectando via TCP plano.\n");
+        terminal_write_string("[WGET] Error: TLS (HTTPS) no implementado. Conexión rechazada por seguridad.\n");
+        return;
     }
     
     /* Use safe ip_aton from kernel/net/ip_utils.c (via net/defs.h) */
