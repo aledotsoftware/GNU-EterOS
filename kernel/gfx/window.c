@@ -100,16 +100,42 @@ static void draw_window(window_t* win) {
         int32_t win_y_start = draw_y_start - win->y;
         int32_t win_x_start = draw_x_start - win->x;
 
-        for (int32_t i = 0; i < height; i++) {
-            uint32_t* dest = (uint32_t*)((uint8_t*)fb_buf + ((draw_y_start + i) * fb_pitch) + (draw_x_start * 4));
-            uint32_t* src = win->buffer + ((win_y_start + i) * win->width) + win_x_start;
+        /* ⚡ BOLT Optimization: Hoist row pointer calculation out of the loop and unroll 4x */
+        uint8_t* dest_row = (uint8_t*)fb_buf + (draw_y_start * fb_pitch) + (draw_x_start * 4);
+        uint32_t* src_row = win->buffer + (win_y_start * win->width) + win_x_start;
 
-            for (int32_t j = 0; j < width; j++) {
-                uint32_t color = src[j];
-                if (color != 0) {
-                    dest[j] = color;
-                }
+        for (int32_t i = 0; i < height; i++) {
+            uint32_t* dest = (uint32_t*)dest_row;
+            uint32_t* src = src_row;
+
+            int32_t j = 0;
+            /* Unroll 4x */
+            for (; j <= width - 4; j += 4) {
+                uint32_t c0 = src[0];
+                uint32_t c1 = src[1];
+                uint32_t c2 = src[2];
+                uint32_t c3 = src[3];
+
+                if (c0 != 0) dest[0] = c0;
+                if (c1 != 0) dest[1] = c1;
+                if (c2 != 0) dest[2] = c2;
+                if (c3 != 0) dest[3] = c3;
+
+                src += 4;
+                dest += 4;
             }
+
+            /* Handle remaining pixels */
+            for (; j < width; j++) {
+                uint32_t color = *src++;
+                if (color != 0) {
+                    *dest = color;
+                }
+                dest++;
+            }
+
+            dest_row += fb_pitch;
+            src_row += win->width;
         }
     } else {
         /* Fallback for other depths */
