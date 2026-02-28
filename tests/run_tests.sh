@@ -101,6 +101,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_mmap_fixed.c kernel/string.c -o 
 ./tests/test_mmap_fixed
 rm tests/test_mmap_fixed
 
+# Test VMM Unmap
+echo "---------------------------------------------------"
+echo "Running test_vmm_unmap..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vmm_unmap.c -o tests/test_vmm_unmap
+./tests/test_vmm_unmap
+rm tests/test_vmm_unmap
+
 # Test Reclaimer (Disabled - File Missing)
 # echo "---------------------------------------------------"
 # echo "Running test_reclaimer..."
