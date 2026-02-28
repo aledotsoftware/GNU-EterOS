@@ -96,12 +96,6 @@ static void vga_scroll(void) {
 }
 
 /* ========================================================================= */
-/* Funciones Framebuffer (Privadas - Scroll simple)                          */
-/* ========================================================================= */
-// TODO: Implementar scroll real en framebuffer. Por ahora, si llegamos al final, volvemos arriba (wrap).
-// Scroll de 3MB es pesado sin optimización.
-
-/* ========================================================================= */
 /* Implementación de la API pública                                          */
 /* ========================================================================= */
 
