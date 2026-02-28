@@ -179,10 +179,35 @@ void framebuffer_clear(uint32_t color) {
             }
         }
     } else {
-        /* Genérico */
-        for (uint32_t y = 0; y < fb_height; y++) {
-            for (uint32_t x = 0; x < fb_width; x++) {
-                framebuffer_putpixel(x, y, color);
+        /* Genérico optimizado */
+        if (fb_bpp == 24) {
+            uint8_t r = (color >> 16) & 0xFF;
+            uint8_t g = (color >> 8) & 0xFF;
+            uint8_t b = (color) & 0xFF;
+            for (uint32_t y = 0; y < fb_height; y++) {
+                uint8_t* row = (uint8_t*)active_buffer + (y * fb_pitch);
+                for (uint32_t x = 0; x < fb_width; x++) {
+                    row[x*3] = b;
+                    row[x*3+1] = g;
+                    row[x*3+2] = r;
+                }
+            }
+        } else if (fb_bpp == 16) {
+            uint8_t r = (color >> 16) & 0xFF;
+            uint8_t g = (color >> 8) & 0xFF;
+            uint8_t b = (color) & 0xFF;
+            uint16_t c = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+            for (uint32_t y = 0; y < fb_height; y++) {
+                uint16_t* row = (uint16_t*)((uint8_t*)active_buffer + (y * fb_pitch));
+                for (uint32_t x = 0; x < fb_width; x++) {
+                    row[x] = c;
+                }
+            }
+        } else {
+            for (uint32_t y = 0; y < fb_height; y++) {
+                for (uint32_t x = 0; x < fb_width; x++) {
+                    framebuffer_putpixel(x, y, color);
+                }
             }
         }
     }
@@ -198,11 +223,34 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
 
     /* Optimized 32-bit path */
     if (fb_bpp == 32) {
+        /* ⚡ BOLT Optimization: Hoist row pointer arithmetic out of the loop */
+        uint8_t* base_addr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * 4);
         for (uint32_t i = 0; i < h; i++) {
-            /* Calculate row pointer directly */
-            uint32_t* row_ptr = (uint32_t*)((uint8_t*)active_buffer + ((y + i) * fb_pitch));
-            row_ptr += x; /* Offset x */
-            memset32(row_ptr, color, w);
+            memset32((uint32_t*)base_addr, color, w);
+            base_addr += fb_pitch;
+        }
+    } else if (fb_bpp == 24) {
+        uint8_t r = (color >> 16) & 0xFF;
+        uint8_t g = (color >> 8) & 0xFF;
+        uint8_t b = (color) & 0xFF;
+        for (uint32_t i = 0; i < h; i++) {
+            uint8_t* row_ptr = (uint8_t*)active_buffer + ((y + i) * fb_pitch) + (x * 3);
+            for (uint32_t j = 0; j < w; j++) {
+                *row_ptr++ = b;
+                *row_ptr++ = g;
+                *row_ptr++ = r;
+            }
+        }
+    } else if (fb_bpp == 16) {
+        uint8_t r = (color >> 16) & 0xFF;
+        uint8_t g = (color >> 8) & 0xFF;
+        uint8_t b = (color) & 0xFF;
+        uint16_t c = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+        for (uint32_t i = 0; i < h; i++) {
+            uint16_t* row_ptr = (uint16_t*)((uint8_t*)active_buffer + ((y + i) * fb_pitch) + (x * 2));
+            for (uint32_t j = 0; j < w; j++) {
+                *row_ptr++ = c;
+            }
         }
     } else {
         /* Fallback */
@@ -254,6 +302,57 @@ void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t b
             *row_ptr++ = (bits & 0x01) ? fg : bg;
 
             /* Advance to next row by adding pitch */
+            base_addr += fb_pitch;
+        }
+    } else if (fb_bpp == 24) {
+        uint8_t fg_r = (fg >> 16) & 0xFF;
+        uint8_t fg_g = (fg >> 8) & 0xFF;
+        uint8_t fg_b = (fg) & 0xFF;
+        uint8_t bg_r = (bg >> 16) & 0xFF;
+        uint8_t bg_g = (bg >> 8) & 0xFF;
+        uint8_t bg_b = (bg) & 0xFF;
+
+        uint8_t* base_addr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * 3);
+
+        for (int row = 0; row < 16; row++) {
+            uint8_t bits = glyph[row];
+            uint8_t* pixel_addr = base_addr;
+            for (int col = 0; col < 8; col++) {
+                if (bits & (1 << (7 - col))) {
+                    *pixel_addr++ = fg_b;
+                    *pixel_addr++ = fg_g;
+                    *pixel_addr++ = fg_r;
+                } else {
+                    *pixel_addr++ = bg_b;
+                    *pixel_addr++ = bg_g;
+                    *pixel_addr++ = bg_r;
+                }
+            }
+            base_addr += fb_pitch;
+        }
+    } else if (fb_bpp == 16) {
+        uint8_t fg_r = (fg >> 16) & 0xFF;
+        uint8_t fg_g = (fg >> 8) & 0xFF;
+        uint8_t fg_b = (fg) & 0xFF;
+        uint16_t fg_16 = ((fg_r >> 3) << 11) | ((fg_g >> 2) << 5) | (fg_b >> 3);
+
+        uint8_t bg_r = (bg >> 16) & 0xFF;
+        uint8_t bg_g = (bg >> 8) & 0xFF;
+        uint8_t bg_b = (bg) & 0xFF;
+        uint16_t bg_16 = ((bg_r >> 3) << 11) | ((bg_g >> 2) << 5) | (bg_b >> 3);
+
+        uint8_t* base_addr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * 2);
+
+        for (int row = 0; row < 16; row++) {
+            uint8_t bits = glyph[row];
+            uint16_t* pixel_addr = (uint16_t*)base_addr;
+            for (int col = 0; col < 8; col++) {
+                if (bits & (1 << (7 - col))) {
+                    *pixel_addr++ = fg_16;
+                } else {
+                    *pixel_addr++ = bg_16;
+                }
+            }
             base_addr += fb_pitch;
         }
     } else {

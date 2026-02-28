@@ -30,7 +30,11 @@ spinlock_t tlb_lock = 0;
 
 /* Invalida una página en el TLB */
 static inline void invlpg(uint64_t addr) {
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("invlpg (%0)" : : "r" (addr) : "memory");
+#else
+    (void)addr;
+#endif
 }
 
 void vmm_flush_tlb_local(uint64_t addr) {
@@ -69,7 +73,9 @@ void vmm_flush_tlb_smp(uint64_t addr) {
     if (expected_acks > 0) {
         uint64_t timeout = 10000000; /* ~10ms depends on CPU speed */
         while (tlb_ack_count < expected_acks) {
+#ifndef __ETEROS_HOST_TEST__
             __asm__ volatile("pause");
+#endif
             timeout--;
             if (timeout == 0) {
                 serial_write_string("[VMM] CRITICAL: TLB Shootdown Timeout! System might be unstable.\n");
@@ -87,7 +93,11 @@ void vmm_flush_tlb_smp(uint64_t addr) {
 
 /* Recarga CR3 (flush completo de TLB - costoso) */
 static inline void load_cr3(uint64_t pml4_addr) {
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("mov %0, %%cr3" : : "r" (pml4_addr) : "memory");
+#else
+    (void)pml4_addr;
+#endif
 }
 
 /*
@@ -336,8 +346,13 @@ uint64_t vmm_clone_pml4(int cow) {
     /* If we modified current tables (CoW), we must flush TLB */
     if (cow) {
         uint64_t current_cr3;
+#ifndef __ETEROS_HOST_TEST__
         __asm__ volatile("mov %%cr3, %0" : "=r"(current_cr3));
         __asm__ volatile("mov %0, %%cr3" : : "r"(current_cr3) : "memory");
+#else
+        current_cr3 = (uint64_t)pml4;
+        (void)current_cr3;
+#endif
     }
 
     return (uint64_t)new_pml4;
@@ -417,7 +432,11 @@ int vmm_verify_user_access(const void* addr, size_t size, int write) {
 
     /* Get current PML4 (CR3) */
     uint64_t cr3;
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+#else
+    cr3 = (uint64_t)pml4;
+#endif
     pt_entry_t* pml4_table = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);
 
     for (uint64_t v = start_page; v < end_page; v += PAGE_SIZE) {
@@ -456,7 +475,11 @@ int vmm_verify_user_access(const void* addr, size_t size, int write) {
 int vmm_is_user_page(uint64_t virt_addr) {
     /* Read CR3 to get current PML4 physical address */
     uint64_t cr3;
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+#else
+    cr3 = (uint64_t)pml4;
+#endif
 
     /* In Identity Mapping, Phys == Virt */
     pt_entry_t* pml4 = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);

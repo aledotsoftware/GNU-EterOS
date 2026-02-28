@@ -7,6 +7,7 @@
 #include <vga.h>
 #include <input/event.h>
 #include <lock.h>
+#include <crypto/sha256.h>
 
 /* Global root node for DevFS */
 static fs_node_t* devfs_root = NULL;
@@ -132,44 +133,64 @@ static fs_node_t *devfs_input_finddir(fs_node_t *node, char *name) {
 
 
 /* ========================================================================= */
-/* /dev/random & /dev/urandom Implementation                                 */
+/* /dev/random & /dev/urandom Implementation (CSPRNG)                        */
 /* ========================================================================= */
-static uint32_t rand_seed = 123456789;
+static uint8_t entropy_pool[32] = {
+    0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
+    0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+    0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00,
+    0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89
+};
 static spinlock_t rng_lock = 0;
 
-static uint32_t xorshift32(void) {
-    uint32_t x = rand_seed;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    rand_seed = x;
-    return x;
+void get_random_bytes(uint8_t *buf, size_t len) {
+    spin_lock(&rng_lock);
+    while (len > 0) {
+        /* Mix in TSC for additional entropy */
+        uint32_t lo, hi;
+        __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+        entropy_pool[0] ^= (lo & 0xFF);
+        entropy_pool[1] ^= ((lo >> 8) & 0xFF);
+        entropy_pool[2] ^= ((lo >> 16) & 0xFF);
+        entropy_pool[3] ^= ((lo >> 24) & 0xFF);
+        entropy_pool[4] ^= (hi & 0xFF);
+        entropy_pool[5] ^= ((hi >> 8) & 0xFF);
+
+        /* Hash the pool to generate output and update the state */
+        uint8_t hash[32];
+        sha256(entropy_pool, sizeof(entropy_pool), hash);
+
+        /* Copy up to 32 bytes to the output buffer */
+        size_t copy_len = (len < sizeof(hash)) ? len : sizeof(hash);
+        memcpy(buf, hash, copy_len);
+
+        /* Update the entropy pool with the hash to prevent backtracking */
+        sha256(hash, sizeof(hash), entropy_pool);
+
+        buf += copy_len;
+        len -= copy_len;
+    }
+    spin_unlock(&rng_lock);
 }
 
 static ssize_t dev_random_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
-
-    spin_lock(&rng_lock);
-    /* Mix in TSC for entropy */
-    uint32_t lo, hi;
-    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
-    rand_seed ^= lo ^ hi;
-
-    for (uint32_t i = 0; i < size; i++) {
-        buffer[i] = (uint8_t)(xorshift32() & 0xFF);
-    }
-    spin_unlock(&rng_lock);
+    get_random_bytes(buffer, size);
     return size;
 }
 
 static uint32_t dev_random_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
-    /* Allow writing to mix into pool */
+
+    /* Mix user data into the entropy pool */
     spin_lock(&rng_lock);
-    for (uint32_t i = 0; i < size; i++) {
-        rand_seed ^= buffer[i];
-        xorshift32();
-    }
+
+    SHA256_CTX ctx;
+    sha256_init(&ctx);
+    sha256_update(&ctx, entropy_pool, sizeof(entropy_pool));
+    sha256_update(&ctx, buffer, size);
+    sha256_final(&ctx, entropy_pool);
+
     spin_unlock(&rng_lock);
     return size;
 }

@@ -101,6 +101,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_mmap_fixed.c kernel/string.c -o 
 ./tests/test_mmap_fixed
 rm tests/test_mmap_fixed
 
+# Test VMM Unmap
+echo "---------------------------------------------------"
+echo "Running test_vmm_unmap..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vmm_unmap.c -o tests/test_vmm_unmap
+./tests/test_vmm_unmap
+rm tests/test_vmm_unmap
+
 # Test Reclaimer (Disabled - File Missing)
 # echo "---------------------------------------------------"
 # echo "Running test_reclaimer..."
@@ -137,6 +144,19 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o te
 rm tests/test_sys_open
 
 echo "---------------------------------------------------"
+# Test Syscall Dispatch
+
+echo "---------------------------------------------------"
+
+echo "Running test_syscall_dispatch..."
+
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_dispatch.c kernel/string.c -o tests/test_syscall_dispatch
+
+./tests/test_syscall_dispatch
+
+rm tests/test_syscall_dispatch
+
+
 echo "All tests passed!"
 
 # Test Omni Gradient Math
@@ -160,9 +180,9 @@ gcc -D__ETEROS_HOST_TEST__ tests/test_xtensa_uart.c -o tests/test_xtensa_uart
 ./tests/test_xtensa_uart
 rm tests/test_xtensa_uart
 
-# Test VFS Mkdir
+# Test Sem
 echo "---------------------------------------------------"
-echo "Running test_vfs_mkdir..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_mkdir.c -o tests/test_vfs_mkdir
-./tests/test_vfs_mkdir
-rm tests/test_vfs_mkdir
+echo "Running test_sem..."
+gcc -D__ETEROS_HOST_TEST__ -Itests/mocks tests/test_sem.c -o tests/test_sem
+./tests/test_sem
+rm tests/test_sem

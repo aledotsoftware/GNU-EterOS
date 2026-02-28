@@ -115,6 +115,17 @@ int e1000_send_packet(const void* data, uint16_t len) {
     return 0;
 }
 
+#include <net/nic.h>
+
+nic_driver_t mock_nic = {
+    .name = "mock",
+    .get_mac = e1000_get_mac,
+    .send = e1000_send_packet,
+    .receive = NULL
+};
+
+nic_driver_t* current_nic = &mock_nic;
+
 uint16_t net_checksum(void* vdata, size_t length) { return 0; }
 void hal_console_write(const char* str) { printf("[KERNEL] %s", str); }
 uint64_t timer_get_ticks(void) { return 1000; }
@@ -122,7 +133,7 @@ void task_yield(void) {}
 void net_poll(void) {}
 
 /* Include source */
-#include "../kernel/net/tcp.c"
+#include "../kernel/net/core/tcp.c"
 
 int main() {
     printf("Starting TCP Security Test...\n");
@@ -161,6 +172,34 @@ int main() {
     } else {
         printf("FAILURE: Normal packet blocked.\n");
     }
+
+    /* Test receive buffer overflow */
+    printf("Testing receive buffer overflow...\n");
+    socket_entry_t test_sock;
+    memset(&test_sock, 0, sizeof(test_sock));
+    test_sock.state = SOCKET_STATE_ESTABLISHED;
+    test_sock.rx_head = 0;
+    test_sock.rx_tail = 0;
+
+    struct tcp_header fake_tcp;
+    memset(&fake_tcp, 0, sizeof(fake_tcp));
+    fake_tcp.flags = htons(5 << 12);
+
+    int large_rx_len = 5000; /* Greater than RX_BUFFER_SIZE (4096) */
+    uint8_t* fake_packet = (uint8_t*)malloc(sizeof(struct tcp_header) + large_rx_len);
+    memcpy(fake_packet, &fake_tcp, sizeof(struct tcp_header));
+    memset(fake_packet + sizeof(struct tcp_header), 'C', large_rx_len);
+
+    uint32_t old_rx_head = test_sock.rx_head;
+    tcp_input(&test_sock, (struct tcp_header*)fake_packet, sizeof(struct tcp_header) + large_rx_len, 0);
+
+    if (test_sock.rx_head == old_rx_head) {
+        printf("SUCCESS: Large rx packet dropped correctly.\n");
+    } else {
+        printf("FAILURE: Large rx packet processed (buffer overflowed!).\n");
+        return -1;
+    }
+    free(fake_packet);
 
     return 0;
 }

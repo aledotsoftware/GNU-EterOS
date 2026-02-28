@@ -108,6 +108,10 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout) {
 
     current->state = TASK_BLOCKED;
 
+    if (has_timeout) {
+        task_block_with_timeout(target_tick);
+    }
+
     spin_unlock(&b->lock);
 
     /* 5. Yield CPU */
