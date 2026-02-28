@@ -10,6 +10,11 @@ typedef unsigned char cc_t;
 /* Constants */
 #define NCCS 32
 
+/* Local mode flags (c_lflag) */
+#define ISIG   00000001
+#define ICANON 00000002
+#define ECHO   00000010
+
 /* Struct termios (Standard Layout) */
 struct termios {
     tcflag_t c_iflag;      /* input mode flags */
