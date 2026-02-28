@@ -38,6 +38,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_rtc.c kernel/string.c -o tests/t
 ./tests/test_rtc
 rm tests/test_rtc
 
+# Test BCache
+echo "---------------------------------------------------"
+echo "Running test_bcache..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_bcache.c kernel/string.c -o tests/test_bcache
+./tests/test_bcache
+rm tests/test_bcache
+
 # Test FAT32
 echo "---------------------------------------------------"
 echo "Running test_fat32..."
