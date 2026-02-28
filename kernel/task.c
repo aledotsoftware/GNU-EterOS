@@ -86,6 +86,54 @@ static spinlock_t sched_lock  = 0;    /* SMP protection */
 static task_t*  ready_head = NULL;
 static task_t*  ready_tail = NULL;
 
+static task_t*  sleep_head = NULL;
+
+static void enqueue_sleep(task_t* t) {
+    if (!t) return;
+    /* Only enqueue if not already in queue (or clear it first).
+       We assume caller has cleared it or it's a new sleep request. */
+    t->next_sleep = NULL;
+    t->prev_sleep = NULL;
+
+    if (!sleep_head || sleep_head->wake_tick >= t->wake_tick) {
+        t->next_sleep = sleep_head;
+        t->prev_sleep = NULL;
+        if (sleep_head) sleep_head->prev_sleep = t;
+        sleep_head = t;
+    } else {
+        task_t* curr = sleep_head;
+        while (curr->next_sleep && curr->next_sleep->wake_tick < t->wake_tick) {
+            curr = curr->next_sleep;
+        }
+        t->next_sleep = curr->next_sleep;
+        if (curr->next_sleep) curr->next_sleep->prev_sleep = t;
+        t->prev_sleep = curr;
+        curr->next_sleep = t;
+    }
+}
+
+static void dequeue_sleep(task_t* t) {
+    if (!t) return;
+    /* If not in list, do nothing. We check this by seeing if prev/next are set,
+       or if it is the head. */
+    if (!t->prev_sleep && !t->next_sleep && sleep_head != t) {
+        return;
+    }
+
+    if (t->prev_sleep) {
+        t->prev_sleep->next_sleep = t->next_sleep;
+    } else if (sleep_head == t) {
+        sleep_head = t->next_sleep;
+    }
+
+    if (t->next_sleep) {
+        t->next_sleep->prev_sleep = t->prev_sleep;
+    }
+
+    t->next_sleep = NULL;
+    t->prev_sleep = NULL;
+}
+
 static void enqueue_ready(task_t* t) {
     if (!t) return;
     /* Ensure we don't enqueue something already in queue?
@@ -461,6 +509,7 @@ void schedule(void) {
 
     if (next_task == current) {
         /* Clear any pending timeout if we are resuming a blocked task */
+        dequeue_sleep(current);
         current->wake_tick = 0;
         spin_unlock(&sched_lock);
         __asm__ volatile("sti");
@@ -495,6 +544,7 @@ void schedule(void) {
 
     next_task->state = TASK_RUNNING;
     /* Clear any pending timeout when task is scheduled */
+    dequeue_sleep(next_task);
     next_task->wake_tick = 0;
     cpu->current_task = next_task;
 
@@ -531,6 +581,16 @@ void task_yield(void) {
     schedule();
 }
 
+void task_block_with_timeout(uint64_t wake_tick) {
+    if (!scheduler_active) return;
+
+    spin_lock(&sched_lock);
+    task_t* current = task_get_current();
+    current->wake_tick = wake_tick;
+    enqueue_sleep(current);
+    spin_unlock(&sched_lock);
+}
+
 void task_sleep(uint64_t ms) {
     if (!scheduler_active) {
         timer_wait((uint32_t)ms);
@@ -545,6 +605,7 @@ void task_sleep(uint64_t ms) {
     task_t* current = task_get_current();
     current->wake_tick = timer_get_ticks() + ticks;
     current->state = TASK_SLEEPING;
+    enqueue_sleep(current);
     spin_unlock(&sched_lock);
 
     /* Ceder CPU */
@@ -562,14 +623,13 @@ void task_wake_expired(uint64_t current_tick) {
 
     /* Called from timer interrupt, so interrupts are disabled. */
     spin_lock(&sched_lock);
-    for (int i = 0; i < task_count; i++) {
-        if (tasks[i].state == TASK_SLEEPING ||
-           (tasks[i].state == TASK_BLOCKED && tasks[i].wake_tick > 0)) {
-            if (current_tick >= tasks[i].wake_tick) {
-                tasks[i].state = TASK_READY;
-                enqueue_ready(&tasks[i]);
-            }
-        }
+    task_t* curr = sleep_head;
+    while (curr && curr->wake_tick <= current_tick) {
+        task_t* next = curr->next_sleep;
+        curr->state = TASK_READY;
+        dequeue_sleep(curr);
+        enqueue_ready(curr);
+        curr = next;
     }
     spin_unlock(&sched_lock);
 }
@@ -587,6 +647,7 @@ void task_wakeup(task_t* t) {
        If it is already READY or RUNNING, do nothing. */
     if (t->state == TASK_BLOCKED || t->state == TASK_SLEEPING) {
         t->state = TASK_READY;
+        dequeue_sleep(t);
         enqueue_ready(t);
     }
     spin_unlock(&sched_lock);
