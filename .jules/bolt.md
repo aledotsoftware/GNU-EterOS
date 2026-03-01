@@ -21,3 +21,7 @@
 ## 2026-11-25 - [Unaligned Access on x86_64]
 **Learning:** On modern x86_64 processors, unaligned 64-bit memory access has negligible performance penalty for general purpose operations. Explicit alignment checks in `memcmp` add complexity without significant benefit compared to a simple cast-and-loop approach.
 **Action:** When optimizing `memcmp` or similar functions for x86_64, straightforward 64-bit loops (checking for equality) are preferred over complex alignment handling logic, yielding massive speedups (~5x) over byte-wise loops.
+
+## 2026-12-04 - [Framebuffer Flush Optimizations]
+**Learning:** In software rendering, copying memory row-by-row (e.g., from a back buffer to a front buffer) inside a loop recalculates the pointer address for the destination and source each time (e.g. `(y + i) * pitch + x * bpp`). This recalculation inside a tight loop creates unnecessary CPU overhead.
+**Action:** Always hoist loop-invariant pointer arithmetic out of the inner loop. Calculate the starting pointer once before the loop, and simply increment the pointers by the row `pitch` (bytes per line) at the end of each iteration to achieve a measurable speedup.
