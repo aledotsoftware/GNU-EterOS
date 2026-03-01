@@ -158,6 +158,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/fs/devfs.c             \
               $(KERNEL_DIR)/fs/procfs.c            \
               $(KERNEL_DIR)/fs/jfs.c               \
+              $(KERNEL_DIR)/crypto/sha256.c        \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
