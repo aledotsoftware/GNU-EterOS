@@ -139,7 +139,7 @@ rm tests/test_procfs
 # Test DevFS
 echo "---------------------------------------------------"
 echo "Running test_devfs..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c -o tests/test_devfs
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c kernel/crypto/sha256.c -o tests/test_devfs
 ./tests/test_devfs
 rm tests/test_devfs
 
