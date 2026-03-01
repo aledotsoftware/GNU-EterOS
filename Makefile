@@ -176,6 +176,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/disk/partition.c \
               $(KERNEL_DIR)/fs/elf.c \
               $(KERNEL_DIR)/drivers/net/e1000.c \
+                  $(KERNEL_DIR)/crypto/sha256.c \
               $(KERNEL_DIR)/apps/wget.c
 
 NET_CORE_SRCS = $(KERNEL_DIR)/net/core/stack.c \

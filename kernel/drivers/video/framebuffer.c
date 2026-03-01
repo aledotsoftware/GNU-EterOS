@@ -283,27 +283,32 @@ void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t b
            Calculate the starting address for the first row of the character. */
         uint8_t* base_addr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * 4);
 
+        /* ⚡ BOLT Optimization: Pre-calculate 32-bit fast paths to avoid branching */
         for (int row = 0; row < 16; row++) {
-            uint32_t* row_ptr = (uint32_t*)base_addr;
             uint8_t bits = glyph[row];
-            
-            /* Unroll loop manually for 8 pixels - massive speedup over loops + checks + calls */
-            /* Bit 7 */
-            *row_ptr++ = (bits & 0x80) ? fg : bg;
-            /* Bit 6 */
-            *row_ptr++ = (bits & 0x40) ? fg : bg;
-            /* Bit 5 */
-            *row_ptr++ = (bits & 0x20) ? fg : bg;
-            /* Bit 4 */
-            *row_ptr++ = (bits & 0x10) ? fg : bg;
-            /* Bit 3 */
-            *row_ptr++ = (bits & 0x08) ? fg : bg;
-            /* Bit 2 */
-            *row_ptr++ = (bits & 0x04) ? fg : bg;
-            /* Bit 1 */
-            *row_ptr++ = (bits & 0x02) ? fg : bg;
-            /* Bit 0 */
-            *row_ptr++ = (bits & 0x01) ? fg : bg;
+            uint32_t* row_ptr = (uint32_t*)base_addr;
+
+            if (bits == 0) {
+                /* Fast path for empty rows (common in fonts) */
+                row_ptr[0] = bg;
+                row_ptr[1] = bg;
+                row_ptr[2] = bg;
+                row_ptr[3] = bg;
+                row_ptr[4] = bg;
+                row_ptr[5] = bg;
+                row_ptr[6] = bg;
+                row_ptr[7] = bg;
+            } else {
+                /* Unroll loop manually for 8 pixels - massive speedup over loops + checks + calls */
+                row_ptr[0] = (bits & 0x80) ? fg : bg;
+                row_ptr[1] = (bits & 0x40) ? fg : bg;
+                row_ptr[2] = (bits & 0x20) ? fg : bg;
+                row_ptr[3] = (bits & 0x10) ? fg : bg;
+                row_ptr[4] = (bits & 0x08) ? fg : bg;
+                row_ptr[5] = (bits & 0x04) ? fg : bg;
+                row_ptr[6] = (bits & 0x02) ? fg : bg;
+                row_ptr[7] = (bits & 0x01) ? fg : bg;
+            }
 
             /* Advance to next row by adding pitch */
             base_addr += fb_pitch;
