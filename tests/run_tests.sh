@@ -164,6 +164,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o te
 ./tests/test_sys_open
 rm tests/test_sys_open
 
+# Test Socket Security
+echo "---------------------------------------------------"
+echo "Running test_socket_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_socket_security.c kernel/string.c -o tests/test_socket_security
+./tests/test_socket_security
+rm tests/test_socket_security
+
 # Test VFS Readdir
 echo "---------------------------------------------------"
 echo "Running test_vfs_readdir..."

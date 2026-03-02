@@ -703,6 +703,7 @@ static int64_t sys_dup2(int oldfd, int newfd) {
 
 static int64_t sys_bind(int fd, const struct sockaddr* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
+    if (addrlen < (int)sizeof(struct sockaddr_in)) return -EINVAL;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
@@ -731,13 +732,15 @@ static int64_t sys_listen(int fd, int backlog) {
 }
 
 static int64_t sys_accept(int fd, struct sockaddr* addr, int* addrlen) {
-    (void)fd; (void)addr; (void)addrlen;
+    (void)fd;
+    if (addr && !vmm_verify_user_access(addr, sizeof(struct sockaddr), 1)) return -EFAULT;
+    if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
     return -ENOSYS;
 }
 
 static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr* dest_addr, int addrlen) {
-    (void)dest_addr; (void)addrlen;
     if (!vmm_verify_user_access(buf, len, 0)) return -EFAULT;
+    if (dest_addr && !vmm_verify_user_access(dest_addr, addrlen, 0)) return -EFAULT;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
@@ -749,8 +752,9 @@ static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const 
 }
 
 static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr* src_addr, int* addrlen) {
-    (void)src_addr; (void)addrlen;
     if (!vmm_verify_user_access(buf, len, 1)) return -EFAULT;
+    if (src_addr && !vmm_verify_user_access(src_addr, sizeof(struct sockaddr), 1)) return -EFAULT;
+    if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
