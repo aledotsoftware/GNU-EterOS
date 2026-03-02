@@ -214,6 +214,7 @@ int main() {
     memset(current_task_mock.fd_table[0].node, 0, sizeof(fs_node_t));
     current_task_mock.fd_table[0].node->flags = 0; // File
     current_task_mock.fd_table[0].node->read = read_fs; // Important!
+    current_task_mock.fd_table[0].flags = O_RDWR; // Added permissions to pass sys_read/sys_write tests
 
     // Setup iovec
     struct iovec iovs[2];
