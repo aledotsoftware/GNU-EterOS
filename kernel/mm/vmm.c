@@ -587,7 +587,7 @@ int vmm_validate_user_ptr(const void* addr, size_t size) {
     uint64_t end = start + size;
 
     /* Check for overflow (end < start) */
-    if (end < start) return 0;
+    if (end < start || size > (USER_LIMIT - start + 1)) return 0;
 
     /* Check bounds: [start, end) must be within [USER_BASE, USER_LIMIT] */
     if (start < USER_BASE) return 0;

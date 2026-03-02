@@ -252,6 +252,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
 
     uint64_t start = PAGE_ALIGN_DOWN(virt);
     uint64_t end = PAGE_ALIGN_UP(virt + len);
+    if (end < start || (virt + len) < virt) return -ENOMEM; /* Overflow check */
 
     for (uint64_t v = start; v < end; v += PAGE_SIZE) {
         /* SECURITY FIX: Check if page is already mapped. If so, unmap it to prevent data leaks or reuse. */
@@ -551,6 +552,9 @@ static int64_t sys_brk(uint64_t brk) {
     if (brk < current->brk) { current->brk = brk; return current->brk; }
     uint64_t old_page = PAGE_ALIGN_UP(current->brk);
     uint64_t new_page = PAGE_ALIGN_UP(brk);
+
+    /* Check for integer overflow during page alignment */
+    if (new_page < brk) return current->brk;
     if (new_page > old_page) {
         for (uint64_t addr = old_page; addr < new_page; addr += PAGE_SIZE) {
              if (hal_mem_get_phys(addr) == 0) {

@@ -44,6 +44,7 @@ int input_read_mouse(input_event_t* events, int count) {
 }
 
 /* Include DevFS source directly to test static functions */
+#include "../kernel/crypto/sha256.c"
 #include "../kernel/fs/devfs.c"
 
 void test_devfs_finddir() {
