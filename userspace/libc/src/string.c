@@ -315,13 +315,19 @@ char *strchr(const char *s, int c) {
 }
 
 char *strrchr(const char *s, int c) {
-    const char *last = (void*)0;
-    while (*s) {
-        if (*s == (char)c) last = s;
-        s++;
+    /* ⚡ BOLT Optimization: Use optimized strlen to find length and search backwards.
+       Avoids full string forward traversal when searching for characters near the end. */
+    size_t len = strlen(s);
+    if (c == 0) return (char *)(s + len);
+
+    const char *p = s + len;
+    char ch = (char)c;
+
+    while (p > s) {
+        p--;
+        if (*p == ch) return (char *)p;
     }
-    if (c == 0) return (char *)s;
-    return (char *)last;
+    return (void*)0;
 }
 
 char *strstr(const char *haystack, const char *needle) {
