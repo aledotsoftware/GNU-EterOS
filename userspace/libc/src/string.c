@@ -355,12 +355,57 @@ char *strcat(char *dest, const char *src) {
 }
 
 void *memchr(const void *s, int c, size_t n) {
+#ifdef __x86_64__
+    const unsigned char *p = (const unsigned char *)s;
+    const uint64_t one_bits = 0x0101010101010101ULL;
+    const uint64_t high_bits = 0x8080808080808080ULL;
+
+    /* Align to 8 bytes */
+    while (n && ((uintptr_t)p & 7)) {
+        if (*p == (unsigned char)c) return (void *)p;
+        p++;
+        n--;
+    }
+
+    /* Process 8 bytes at a time */
+    typedef uint64_t __attribute__((__may_alias__)) u64_alias;
+    const u64_alias *lp = (const u64_alias *)p;
+
+    uint64_t v;
+    uint64_t char_mask = (unsigned char)c * one_bits;
+
+    while (n >= 8) {
+        v = *lp;
+
+        /* Check if any byte matches c:
+           We XOR with char_mask, then detect zero bytes in result */
+        uint64_t match_bytes = ((v ^ char_mask) - one_bits) & ~(v ^ char_mask) & high_bits;
+
+        if (match_bytes) {
+            /* Found something, break to byte loop */
+            p = (const unsigned char *)lp;
+            break;
+        }
+        lp++;
+        n -= 8;
+    }
+
+    p = (const unsigned char *)lp;
+    /* Byte-wise loop to find exact location */
+    while (n--) {
+        if (*p == (unsigned char)c) return (void *)p;
+        p++;
+    }
+
+    return (void *)0;
+#else
     const unsigned char *p = (const unsigned char *)s;
     while (n--) {
         if (*p == (unsigned char)c) return (void *)p;
         p++;
     }
     return (void *)0;
+#endif
 }
 
 char *strerror(int errnum) {
