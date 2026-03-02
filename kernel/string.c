@@ -673,10 +673,6 @@ int atoi_s(const char* str, int32_t* out) {
 void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
     if (buffer_size == 0) return;
 
-    char temp[65];
-    int i = 0;
-    int is_negative = 0;
-
     if (value == 0) {
         if (buffer_size > 1) {
             buffer[0] = '0';
@@ -687,6 +683,9 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
         return;
     }
 
+    char temp[65];
+    int i = 64; /* Fill backwards to avoid string reversal */
+    int is_negative = 0;
     uint64_t uvalue;
 
     /* Manejar números negativos solo en base 10.
@@ -700,30 +699,40 @@ void itoa_s(int64_t value, char* buffer, size_t buffer_size, int base) {
         uvalue = (uint64_t)value;
     }
     
-    while (uvalue != 0) {
-        int remainder = (int)(uvalue % base);
-        temp[i++] = (remainder > 9) ? (remainder - 10 + 'A') : (remainder + '0');
-        uvalue /= base;
+    /* ⚡ BOLT Optimization: Fast paths for common bases (10, 16) and backward filling
+       to eliminate the string reversal loop. */
+    if (base == 10) {
+        while (uvalue != 0) {
+            temp[--i] = '0' + (uvalue % 10);
+            uvalue /= 10;
+        }
+    } else if (base == 16) {
+        const char hex_chars[] = "0123456789ABCDEF";
+        while (uvalue != 0) {
+            temp[--i] = hex_chars[uvalue & 0xF];
+            uvalue >>= 4;
+        }
+    } else {
+        while (uvalue != 0) {
+            int remainder = (int)(uvalue % base);
+            temp[--i] = (remainder > 9) ? (remainder - 10 + 'A') : (remainder + '0');
+            uvalue /= base;
+        }
     }
 
     /* Agregar signo negativo si es necesario */
     if (is_negative) {
-        temp[i++] = '-';
+        temp[--i] = '-';
     }
 
-    /* Invertir la cadena y copiar con límite */
-    int j = 0;
-    size_t chars_to_copy = (size_t)i;
-
-    if (chars_to_copy >= buffer_size) {
-        chars_to_copy = buffer_size - 1;
+    /* Copiar con límite */
+    size_t len = 64 - i;
+    if (len >= buffer_size) {
+        len = buffer_size - 1;
     }
 
-    while (chars_to_copy > 0) {
-        buffer[j++] = temp[--i];
-        chars_to_copy--;
-    }
-    buffer[j] = '\0';
+    memcpy(buffer, &temp[i], len);
+    buffer[len] = '\0';
 }
 
 void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
