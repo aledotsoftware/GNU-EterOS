@@ -139,24 +139,51 @@ void gfx_draw_pixels(const gfx_point_t* pixels, size_t count) {
 
     uint32_t screen_w = framebuffer_get_width();
     uint32_t screen_h = framebuffer_get_height();
+    uint32_t fb_bpp = framebuffer_get_bpp();
+    uint32_t* fb_buf = framebuffer_get_buffer();
+    uint32_t fb_pitch = framebuffer_get_pitch();
 
-    for (size_t i = 0; i < count; i++) {
-        int32_t px = pixels[i].x;
-        int32_t py = pixels[i].y;
+    /* ⚡ BOLT Optimization: Bypass framebuffer_putpixel for 32bpp fast path */
+    if (fb_buf && fb_bpp == 32) {
+        for (size_t i = 0; i < count; i++) {
+            int32_t px = pixels[i].x;
+            int32_t py = pixels[i].y;
 
-        /* Safety check: Clip to screen bounds */
-        if (px < 0 || px >= (int32_t)screen_w || py < 0 || py >= (int32_t)screen_h) {
-            continue;
+            /* Safety check: Clip to screen bounds */
+            if (px < 0 || px >= (int32_t)screen_w || py < 0 || py >= (int32_t)screen_h) {
+                continue;
+            }
+
+            /* Direct memory access */
+            uint32_t* pixel_addr = (uint32_t*)((uint8_t*)fb_buf + (py * fb_pitch) + (px * 4));
+            *pixel_addr = pixels[i].color;
+
+            /* Update bounding box */
+            if (px < min_x) min_x = px;
+            if (px > max_x) max_x = px;
+            if (py < min_y) min_y = py;
+            if (py > max_y) max_y = py;
         }
+    } else {
+        /* Fallback for other depths */
+        for (size_t i = 0; i < count; i++) {
+            int32_t px = pixels[i].x;
+            int32_t py = pixels[i].y;
 
-        /* Draw directly to framebuffer (avoids repeated dirty tracking per pixel) */
-        framebuffer_putpixel((uint32_t)px, (uint32_t)py, pixels[i].color);
+            /* Safety check: Clip to screen bounds */
+            if (px < 0 || px >= (int32_t)screen_w || py < 0 || py >= (int32_t)screen_h) {
+                continue;
+            }
 
-        /* Update bounding box */
-        if (px < min_x) min_x = px;
-        if (px > max_x) max_x = px;
-        if (py < min_y) min_y = py;
-        if (py > max_y) max_y = py;
+            /* Draw directly to framebuffer (avoids repeated dirty tracking per pixel) */
+            framebuffer_putpixel((uint32_t)px, (uint32_t)py, pixels[i].color);
+
+            /* Update bounding box */
+            if (px < min_x) min_x = px;
+            if (px > max_x) max_x = px;
+            if (py < min_y) min_y = py;
+            if (py > max_y) max_y = py;
+        }
     }
 
     /* Add single dirty rect for all pixels */

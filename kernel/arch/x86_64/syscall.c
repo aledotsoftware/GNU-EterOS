@@ -414,6 +414,9 @@ static int64_t sys_write(int fd, const void* buf, size_t count) {
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
+
+    if ((current->fd_table[fd].flags & O_ACCMODE) == O_RDONLY) return -EBADF;
+
     uint32_t written = write_fs(current->fd_table[fd].node, current->fd_table[fd].offset, count, (uint8_t*)buf);
     current->fd_table[fd].offset += written;
     return written;
@@ -424,6 +427,9 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
+
+    if ((current->fd_table[fd].flags & O_ACCMODE) == O_WRONLY) return -EBADF;
+
     ssize_t read = read_fs(current->fd_table[fd].node, current->fd_table[fd].offset, count, (uint8_t*)buf);
     if (read > 0) {
         current->fd_table[fd].offset += read;

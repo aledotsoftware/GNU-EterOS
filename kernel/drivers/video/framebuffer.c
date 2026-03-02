@@ -97,12 +97,6 @@ void framebuffer_flush_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
 
     if (w == 0 || h == 0) return;
 
-    /* ⚡ BOLT Optimization: Hoist row pointer arithmetic out of the loop */
-    size_t bytes_per_pixel = fb_bpp / 8;
-    size_t row_len = w * bytes_per_pixel;
-    uint8_t* dest = (uint8_t*)fb_buffer + (y * fb_pitch) + (x * bytes_per_pixel);
-    uint8_t* src  = (uint8_t*)back_buffer + (y * fb_pitch) + (x * bytes_per_pixel);
-
     /* Copy row by row to support pitch */
     /* ⚡ BOLT Optimization: Hoist pointer arithmetic out of the loop */
     size_t bytes_per_pixel = fb_bpp / 8;

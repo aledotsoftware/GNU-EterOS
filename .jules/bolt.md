@@ -26,6 +26,6 @@
 **Learning:** In bare-metal C kernels without libc, formatting functions (`itoa_s` / `snprintf`) are hot paths, particularly for logging and `sysinfo`. The naive approach computes characters forward, then copies/reverses them into the buffer. A better approach is to fill the temporary buffer backwards, completely avoiding the string reversal overhead, and special-casing hot bases (10 and 16).
 **Action:** When optimizing kernel string utilities, avoid reversal loops and optimize specific bases.
 
-## 2026-12-02 - [SWAR Memory Search]
-**Learning:** Searching memory byte-by-byte (`memchr`) is extremely slow. SWAR (SIMD Within A Register) operations can process 8 bytes simultaneously on x86_64 architectures using XOR and zero-byte detection.
-**Action:** Use SWAR optimization for character searching in standard library functions (`memchr`, `strchr`) to significantly improve memory bandwidth.
+## 2026-12-02 - [strrchr Optimization via Backward Search]
+**Learning:** The naive implementation of `strrchr` traverses the entire string forward to find the last occurrence of a character. For very long strings, this is highly inefficient if the target character is near the end (or not present).
+**Action:** Optimize `strrchr` by first determining the string's length using an optimized `strlen` (e.g., SWAR-based), then starting the search from the end of the string and iterating backwards, which drastically reduces search time for long strings.
