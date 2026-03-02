@@ -139,7 +139,7 @@ rm tests/test_procfs
 # Test DevFS
 echo "---------------------------------------------------"
 echo "Running test_devfs..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c kernel/crypto/sha256.c -o tests/test_devfs
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c -o tests/test_devfs
 ./tests/test_devfs
 rm tests/test_devfs
 
@@ -163,6 +163,13 @@ echo "Running test_sys_open..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o tests/test_sys_open
 ./tests/test_sys_open
 rm tests/test_sys_open
+
+# Test Sys Read/Write Permissions
+echo "---------------------------------------------------"
+echo "Running test_sys_rw_perms..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_rw_perms.c kernel/string.c -o tests/test_sys_rw_perms
+./tests/test_sys_rw_perms
+rm tests/test_sys_rw_perms
 
 # Test Socket Security
 echo "---------------------------------------------------"
