@@ -332,6 +332,8 @@ void task_init_ap(void) {
     memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
     tasks[slot].fs_base = 0;
     tasks[slot].gs_base = 0;
+    tasks[slot].uid = 0;
+    tasks[slot].gid = 0;
 
     if (slot >= task_count) {
         task_count = slot + 1;
@@ -402,6 +404,8 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].brk = 0;
     tasks[slot].fs_base = 0;
     tasks[slot].gs_base = 0;
+    tasks[slot].uid = 0;
+    tasks[slot].gid = 0;
     tasks[slot].mmap_base = 0x700000000000ULL;
 
     /*
@@ -832,6 +836,8 @@ int task_fork(void* regs_ptr) {
     tasks[slot].fs_base = parent->fs_base;
     tasks[slot].gs_base = parent->gs_base;
     tasks[slot].os_abi = parent->os_abi;
+    tasks[slot].uid = parent->uid;
+    tasks[slot].gid = parent->gid;
     tasks[slot].user_rsp = parent->user_rsp; /* Saved from syscall entry */
     tasks[slot].mmap_base = parent->mmap_base;
 

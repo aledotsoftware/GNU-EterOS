@@ -21,3 +21,7 @@
 ## 2026-11-25 - [Unaligned Access on x86_64]
 **Learning:** On modern x86_64 processors, unaligned 64-bit memory access has negligible performance penalty for general purpose operations. Explicit alignment checks in `memcmp` add complexity without significant benefit compared to a simple cast-and-loop approach.
 **Action:** When optimizing `memcmp` or similar functions for x86_64, straightforward 64-bit loops (checking for equality) are preferred over complex alignment handling logic, yielding massive speedups (~5x) over byte-wise loops.
+
+## 2026-12-01 - [Integer to String Optimization]
+**Learning:** In bare-metal C kernels without libc, formatting functions (`itoa_s` / `snprintf`) are hot paths, particularly for logging and `sysinfo`. The naive approach computes characters forward, then copies/reverses them into the buffer. A better approach is to fill the temporary buffer backwards, completely avoiding the string reversal overhead, and special-casing hot bases (10 and 16).
+**Action:** When optimizing kernel string utilities, avoid reversal loops and optimize specific bases.

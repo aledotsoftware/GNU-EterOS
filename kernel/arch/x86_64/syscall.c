@@ -938,21 +938,53 @@ static int64_t sys_exit_group(int status) { task_exit(status); __builtin_unreach
 static int64_t sys_munmap(void* addr, size_t len) { (void)addr; (void)len; return 0; }
 static int64_t sys_mprotect(void* addr, size_t len, int prot) { (void)addr; (void)len; (void)prot; return 0; }
 static int64_t sys_madvise(void* addr, size_t len, int advice) { (void)addr; (void)len; (void)advice; return 0; }
-static int64_t sys_getuid(void)  { return 0; }
-static int64_t sys_getgid(void)  { return 0; }
-static int64_t sys_geteuid(void) { return 0; }
-static int64_t sys_getegid(void) { return 0; }
+static int64_t sys_getuid(void)  { return task_get_current()->uid; }
+static int64_t sys_getgid(void)  { return task_get_current()->gid; }
+static int64_t sys_geteuid(void) { return task_get_current()->uid; }
+static int64_t sys_getegid(void) { return task_get_current()->gid; }
+#ifndef F_OK
+#define F_OK 0
+#define X_OK 1
+#define W_OK 2
+#define R_OK 4
+#endif
+
 static int64_t sys_access(const char* path, int mode) {
     char* kpath = NULL;
     int res = copy_user_string(path, &kpath, 4096);
     if (res < 0) return res;
 
-    (void)mode;
     fs_node_t* node = vfs_lookup(fs_root, kpath);
     if (!node) { kfree(kpath); return -ENOENT; }
+
+    int allowed = 1;
+    if (mode != F_OK) {
+        uint32_t req_read = (mode & R_OK) ? 4 : 0;
+        uint32_t req_write = (mode & W_OK) ? 2 : 0;
+        uint32_t req_exec = (mode & X_OK) ? 1 : 0;
+        uint32_t req_mask = req_read | req_write | req_exec;
+
+        uint32_t task_uid = task_get_current()->uid;
+        uint32_t task_gid = task_get_current()->gid;
+
+        if (task_uid == 0) {
+            /* Root has full access except for execute without any execute bits */
+            if (req_exec && !(node->mask & 0111) && !((node->flags & 0x7) == FS_DIRECTORY)) {
+                allowed = 0;
+            }
+        } else {
+            uint32_t granted = 0;
+            if (task_uid == node->uid) granted = (node->mask >> 6) & 7;
+            else if (task_gid == node->gid) granted = (node->mask >> 3) & 7;
+            else granted = node->mask & 7;
+
+            if ((granted & req_mask) != req_mask) allowed = 0;
+        }
+    }
+
     kfree(node);
     kfree(kpath);
-    return 0;
+    return allowed ? 0 : -EACCES;
 }
 static int64_t sys_fcntl(int fd, int cmd, int64_t arg) {
     (void)arg;
