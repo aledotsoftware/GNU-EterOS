@@ -29,8 +29,8 @@
 #define PT_INDEX(addr)   (((addr) >> 12) & 0x1FF)
 
 /* Dirección base del PML4 configurado por el bootloader */
-/* Nota: En boot.asm configuramos esto en 0x70000 */
-#define BOOT_PML4_ADDR  0x70000
+/* Nota: En boot.asm configuramos esto en 0x54000 */
+#define BOOT_PML4_ADDR  0x54000
 /* Tamaño de las tablas de paginación iniciales (24 KB = PML4 + PDPT + 4*PD) */
 #define BOOT_PAGE_TABLE_SIZE 0x6000
 
