@@ -168,6 +168,12 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
 }
 
 fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
+    char addr_buf[32];
+    hal_console_write("[INITRD] Check at 0x");
+    utoa_hex_s(start_addr, addr_buf, sizeof(addr_buf));
+    hal_console_write(addr_buf);
+    hal_console_write("\n");
+
     if (start_addr == 0 || size == 0) {
         hal_console_write("[INITRD] No Initrd detected (Address 0 or Size 0).\n");
         return NULL;
@@ -210,9 +216,9 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     file_headers = (initrd_file_header_t*)(initrd_start + sizeof(initrd_header_t));
 
     hal_console_write("[INITRD] Initialized at 0x");
-    char addr_buf[32];
-    utoa_hex_s(start_addr, addr_buf, sizeof(addr_buf));
-    hal_console_write(addr_buf);
+    char tmp_buf[32];
+    utoa_hex_s(start_addr, tmp_buf, sizeof(tmp_buf));
+    hal_console_write(tmp_buf);
 
     hal_console_write(". Found ");
     char count_buf[16];
