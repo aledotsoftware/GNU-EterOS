@@ -206,9 +206,12 @@ void pmm_init(void) {
 
     /* 4. Marcar regiones críticas como OCUPADAS de nuevo */
     
-    /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel) */
+    /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel Loader) */
     pmm_mark_region_used(0x0, 0x100000); 
 
+    /* b) Kernel (ahora en 1MB+) */
+    extern uint8_t _kernel_start[], _kernel_end[];
+    pmm_mark_region_used((uint64_t)_kernel_start, (uint64_t)_kernel_end - (uint64_t)_kernel_start);
     /* b) Reservar explícitamente el espacio del Bitmap y RefCounts */
     uint64_t ref_counts_size = total_pages * sizeof(uint16_t);
     uint64_t pmm_end = (uint64_t)pmm_ref_counts + ref_counts_size;
