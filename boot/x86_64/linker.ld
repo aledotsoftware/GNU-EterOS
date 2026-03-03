@@ -18,8 +18,8 @@ OUTPUT_FORMAT(elf64-x86-64)
 
 SECTIONS
 {
-    /* El kernel comienza en 0x10000 */
-    . = 0x10000;
+    /* El kernel comienza en 1 MB */
+    . = 0x100000;
 
     _kernel_start = .;
 
@@ -43,6 +43,10 @@ SECTIONS
     {
         *(.data)
         *(.data.*)
+        *(.sdata)
+        *(.sdata.*)
+        *(.ldata)
+        *(.ldata.*)
     }
 
     /* Sección BSS (datos no inicializados) */
@@ -52,6 +56,11 @@ SECTIONS
         *(COMMON)
         *(.bss)
         *(.bss.*)
+        *(.sbss)
+        *(.sbss.*)
+        *(.lbss)
+        *(.lbss.*)
+        _bss_end = .;
     }
 
     /* Símbolo para marcar el final del kernel */
