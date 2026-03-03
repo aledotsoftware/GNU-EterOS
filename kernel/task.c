@@ -60,7 +60,9 @@ static void* alloc_kernel_stack(int slot) {
             }
             return NULL;
         }
-        vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE);
+        if (vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE) < 0) {
+             return NULL;
+        }
     }
 
     memset((void*)stack_start, 0, TASK_STACK_SIZE);
@@ -269,8 +271,8 @@ void scheduler_init(void) {
     /* current_task = 0; removed */
     scheduler_active = true;
 
-    /* Configurar stack inicial para Task 0 (Boot Stack en 0x90000) */
-    kernel_stack_top = 0x90000;
+    /* Configurar stack inicial para Task 0 (Boot Stack en 0x7FF000) */
+    kernel_stack_top = 0x7FF000;
     /* tss_set_rsp0(kernel_stack_top); -> Moved to later or per-cpu */
 
     /* Update per-CPU current_task pointer if GS_BASE is valid */
