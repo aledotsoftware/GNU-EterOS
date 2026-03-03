@@ -98,18 +98,16 @@ static void init_network(void) {
  * Inicializa el HAL y los subsistemas del kernel.
  */
 void __attribute__((section(".text.boot"))) kmain(void) {
+    char dbg_buf[64];
     /* ---- 0. Limpiar BSS (el bootloader no lo hace) ---- */
     {
-        extern char _bss_start[], _kernel_end[];
-        char buf[32];
-        serial_write_string("[DEBUG] _bss_start: 0x");
-        utoa_hex_s((uint64_t)_bss_start, buf, sizeof(buf));
-        serial_write_string(buf);
-        serial_write_string("\n[DEBUG] _kernel_end: 0x");
-        utoa_hex_s((uint64_t)_kernel_end, buf, sizeof(buf));
-        serial_write_string(buf);
-        serial_write_string("\n");
-        char *p = _bss_start;
+        extern uint8_t _kernel_start[], _bss_start[], _kernel_end[];
+        serial_write_string("[DEBUG] _kernel_start: 0x"); utoa_hex_s((uint64_t)_kernel_start, dbg_buf, sizeof(dbg_buf)); serial_write_string(dbg_buf); serial_write_string("\n");
+        serial_write_string("[DEBUG] _bss_start: 0x"); utoa_hex_s((uint64_t)_bss_start, dbg_buf, sizeof(dbg_buf)); serial_write_string(dbg_buf); serial_write_string("\n");
+        serial_write_string("[DEBUG] _kernel_end: 0x"); utoa_hex_s((uint64_t)_kernel_end, dbg_buf, sizeof(dbg_buf)); serial_write_string(dbg_buf); serial_write_string("\n");
+        serial_write_string("[DEBUG] kmain: 0x"); utoa_hex_s((uint64_t)kmain, dbg_buf, sizeof(dbg_buf)); serial_write_string(dbg_buf); serial_write_string("\n");
+
+        uint8_t* p = _bss_start;
         while (p < _kernel_end) *p++ = 0;
     }
 
@@ -209,16 +207,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* For now, assume simple stack usage or static buffers */
     #endif
 
-    /* ---- 4. Inicializar Red ---- */
-    hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
-    if (e1000_init(NULL) == 0) {
-        hal_console_write("  [NET]  Hardware inicializado.\n");
-        init_network();
-        task_create("Network", network_task);
-    } else {
-        hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
-        hal_console_write("         (El sistema continuara sin red)\n");
-    }
+    /* Network initialization moved after scheduler_init */
 
     /* ---- 5. Mostrar banner de éterOS ---- */
     kernel_print_banner();
@@ -238,6 +227,29 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("  [INIT] Scheduler Round-Robin\n");
     scheduler_init();
     
+    /* ---- 7.1 Inicializar Red (Ahora podemos crear tareas) ---- */
+    hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
+    if (e1000_init(NULL) == 0) {
+        hal_console_write("  [NET]  Hardware inicializado.\n");
+        init_network();
+        task_create("Network", network_task);
+    } else {
+        hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
+        hal_console_write("         (El sistema continuara sin red)\n");
+    }
+    
+    serial_write_string("[DEBUG] boot_info ptr: 0x");
+    utoa_hex_s((uint64_t)boot_info, dbg_buf, sizeof(dbg_buf));
+    serial_write_string(dbg_buf);
+    serial_write_string("\n");
+
+    if (boot_info) {
+        serial_write_string("[DEBUG] boot_info->fb_addr: 0x");
+        utoa_hex_s((uint64_t)boot_info->fb_addr, dbg_buf, sizeof(dbg_buf));
+        serial_write_string(dbg_buf);
+        serial_write_string("\n");
+    }
+
     /* ---- 7.1 Inicializar Futex ---- */
     futex_init();
 
