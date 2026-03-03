@@ -46,3 +46,8 @@
 **Vulnerability:** `sys_read` and `sys_write` in `kernel/arch/x86_64/syscall.c` did not validate if a file descriptor was opened with the appropriate access modes (`O_RDONLY`, `O_WRONLY`, `O_RDWR`). A process could open a file as read-only but still successfully write to it using `sys_write`.
 **Learning:** System calls that operate on file descriptors must independently verify the access permissions established during the `sys_open` call, rather than trusting the user program or assuming the file system layer will catch the violation.
 **Prevention:** Always check `fd_table[fd].flags & O_ACCMODE` before performing read/write operations on a file descriptor to ensure the action is explicitly permitted.
+
+## 2026-03-03 - [TCP Data Offset Integer Underflow]
+**Vulnerability:** In `tcp_input`, an invalid TCP Data Offset (`doff`) value less than 5 (20 bytes) could result in an integer underflow when calculating `data_len` (`len - doff`). This could cause out-of-bounds reads and memory corruption when processing manipulated network packets.
+**Learning:** Network header parsers are a critical entry point and highly susceptible to mathematical errors. Malformed packets with syntactically impossible values (like a header size smaller than the protocol's minimum) can exploit trust in calculated lengths to bypass subsequent bounds checks.
+**Prevention:** Implement strict, defensive validation of all parsed header lengths (e.g., ensuring `doff >= 20` and `doff <= len`) at the very beginning of the packet processing function, before any pointer arithmetic or data length calculations occur.

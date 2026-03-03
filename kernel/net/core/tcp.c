@@ -90,6 +90,13 @@ void tcp_input(socket_entry_t* sock, struct tcp_header* tcp, int len, uint32_t s
 
     /* Calculate Header Length and Data Length */
     int doff = (flags >> 12) * 4;
+
+    /* SECURITY FIX: Validate TCP Data Offset (doff) to prevent integer underflow and out-of-bounds reads */
+    if (doff < 20 || doff > len) {
+        hal_console_write("[TCP] Warning: Invalid TCP Data Offset or Length, dropping packet.\n");
+        return;
+    }
+
     int data_len = len - doff;
 
     if (sock->state == SOCKET_STATE_SYN_SENT) {

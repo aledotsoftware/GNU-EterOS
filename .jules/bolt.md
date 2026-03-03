@@ -25,3 +25,6 @@
 ## 2026-03-03 - [Opaque Window Fast Path]
 **Learning:** Software compositing loops that perform per-pixel alpha blending (transparency checks) are extremely slow for large opaque regions. A standard 800x600 window requires evaluating nearly half a million pixels individually.
 **Action:** Use a property flag (e.g., `WIN_OPAQUE`) to identify fully opaque windows at creation time. This allows the compositor to skip pixel-by-pixel rendering and utilize massive, highly-optimized `memcpy` operations for rendering, reducing drawing time by more than 50%.
+## 2026-11-26 - [Framebuffer Block Copy Optimization]
+**Learning:** Flushing rectangles row-by-row in the framebuffer introduces overhead from loop iterations and multiple function calls even with optimized `memcpy`. When a dirty rectangle spans the full width of the framebuffer (`row_len == fb_pitch`), the region is perfectly contiguous in memory.
+**Action:** Always check if the drawing area spans the full pitch width, and if so, use a single, highly efficient `memcpy` block operation to copy the entire contiguous memory region at once.
