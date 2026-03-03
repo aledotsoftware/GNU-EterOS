@@ -97,9 +97,16 @@ static void init_network(void) {
  */
 void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 0. Limpiar BSS (el bootloader no lo hace) ---- */
-    /* Sin esto, variables globales como total_cpus contienen basura */
     {
         extern char _bss_start[], _kernel_end[];
+        char buf[32];
+        serial_write_string("[DEBUG] _bss_start: 0x");
+        utoa_hex_s((uint64_t)_bss_start, buf, sizeof(buf));
+        serial_write_string(buf);
+        serial_write_string("\n[DEBUG] _kernel_end: 0x");
+        utoa_hex_s((uint64_t)_kernel_end, buf, sizeof(buf));
+        serial_write_string(buf);
+        serial_write_string("\n");
         char *p = _bss_start;
         while (p < _kernel_end) *p++ = 0;
     }
