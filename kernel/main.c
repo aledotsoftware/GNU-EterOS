@@ -60,7 +60,12 @@ static void show_splash(void);
 extern void net_poll(void);
 extern uint32_t my_ip;
 
+extern void dhcp_discover(void);
+
 static void network_task(void) {
+    /* Ejecutar DHCP Discover ahora que las interrupciones y el scheduler están activos */
+    dhcp_discover();
+
     /* Process any pending packets before entering loop */
     net_poll();
 
@@ -78,11 +83,8 @@ static void network_task(void) {
     }
 }
 
-extern void dhcp_discover(void);
-
 static void init_network(void) {
     net_init();
-    dhcp_discover();
 }
 
 /* ========================================================================= */
