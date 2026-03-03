@@ -47,9 +47,10 @@ void framebuffer_init(boot_info_t* info) {
     fb_buffer = (uint32_t*)(virt_base + offset);
     
     char buf[64];
-    serial_write_string("[FB] LFB Address: 0x");
+    serial_write_string("[FB] LFB Physical: ");
     utoa_hex_s((uint64_t)phys_addr, buf, sizeof(buf));
-    serial_write_string(" mapped to 0x");
+    serial_write_string(buf);
+    serial_write_string(" mapped to Virtual: ");
     utoa_hex_s((uint64_t)fb_buffer, buf, sizeof(buf));
     serial_write_string(buf);
     serial_write_string("\n");
