@@ -8,6 +8,7 @@
 #include <mm.h>
 #include <hal.h>
 #include <sem.h>
+#include <serial.h>
 
 /* Global Network Info */
 sem_t net_sem;
