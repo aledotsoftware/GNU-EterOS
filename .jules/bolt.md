@@ -21,3 +21,7 @@
 ## 2026-11-25 - [Unaligned Access on x86_64]
 **Learning:** On modern x86_64 processors, unaligned 64-bit memory access has negligible performance penalty for general purpose operations. Explicit alignment checks in `memcmp` add complexity without significant benefit compared to a simple cast-and-loop approach.
 **Action:** When optimizing `memcmp` or similar functions for x86_64, straightforward 64-bit loops (checking for equality) are preferred over complex alignment handling logic, yielding massive speedups (~5x) over byte-wise loops.
+
+## 2026-12-05 - [Framebuffer Bulk Copy]
+**Learning:** In operations that flush rectangular regions to the framebuffer (`framebuffer_flush_rect`), copying line-by-line is inefficient if the rectangle width matches the screen width (pitch). Full-screen flushes represent a single contiguous memory block.
+**Action:** Add a fast-path to check if the row length equals the framebuffer pitch (`row_len == fb_pitch`). If so, copy the entire block using a single `memcpy` call instead of iterating row by row. This provides measurable speedups for full-screen compositing.
