@@ -215,7 +215,7 @@ void pmm_init(void) {
     pmm_mark_region_used((uint64_t)pmm_bitmap, pmm_bitmap_size);
     pmm_mark_region_used((uint64_t)pmm_ref_counts, ref_counts_size);
     
-    /* c) Tablas de paginación del bootloader (0x70000-0x76000, ya dentro del 1MB) */
+    /* c) Tablas de paginación del bootloader (0x54000-0x5A000, ya dentro del 1MB) */
 
     free_mem_start = PAGE_ALIGN_UP(pmm_end);
 
