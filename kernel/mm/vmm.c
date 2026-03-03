@@ -128,6 +128,12 @@ static pt_entry_t* get_next_table(pt_entry_t* table, uint64_t index, int alloc) 
         return NULL;
     }
 
+    char dbg_buf[64];
+    serial_write_string("[VMM] Allocating new page table at ");
+    utoa_hex_s((uintptr_t)new_table_phys, dbg_buf, sizeof(dbg_buf));
+    serial_write_string(dbg_buf);
+    serial_write_string("\n");
+
     /* Limpiar la nueva tabla (crítico para evitar entradas basura) */
     memset(new_table_phys, 0, PAGE_SIZE);
 
@@ -145,7 +151,11 @@ void vmm_init(void) {
     /* Por ahora, seguimos usando ese PML4. */
     /* En el futuro, aquí crearíamos un nuevo PML4 limpio y cambiaríamos a él. */
     
-    serial_write_string("[VMM] Usando PML4 del bootloader en 0x54000\n");
+    char pml4_addr_buf[32];
+    serial_write_string("[VMM] Usando PML4 del bootloader en 0x");
+    utoa_hex_s((uint64_t)pml4, pml4_addr_buf, sizeof(pml4_addr_buf));
+    serial_write_string(pml4_addr_buf);
+    serial_write_string("\n");
 }
 
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
@@ -201,16 +211,27 @@ uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
-    if (!pdpt) return 0;
+    /* 1. Walk PML4 */
+    if (!(pml4[pml4_idx] & PAGE_PRESENT)) return 0;
+    pt_entry_t* pdpt = (pt_entry_t*)(pml4[pml4_idx] & PAGE_ADDR_MASK);
 
-    pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
-    if (!pd) return 0;
+    /* 2. Walk PDPT */
+    if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) return 0;
+    /* Check for 1GB Huge Page */
+    if (pdpt[pdpt_idx] & PAGE_HUGE) {
+        return (pdpt[pdpt_idx] & 0xFFFFFC0000000ULL) + (virt_addr & 0x3FFFFFFF);
+    }
+    pt_entry_t* pd = (pt_entry_t*)(pdpt[pdpt_idx] & PAGE_ADDR_MASK);
 
-    pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
-    if (!pt) return 0;
-    
-    /* Verificar si la página está presente */
+    /* 3. Walk PD */
+    if (!(pd[pd_idx] & PAGE_PRESENT)) return 0;
+    /* Check for 2MB Huge Page */
+    if (pd[pd_idx] & PAGE_HUGE) {
+        return (pd[pd_idx] & 0xFFFFFFFFFE00000ULL) + (virt_addr & 0x1FFFFF);
+    }
+    pt_entry_t* pt = (pt_entry_t*)(pd[pd_idx] & PAGE_ADDR_MASK);
+
+    /* 4. Walk PT */
     if (!(pt[pt_idx] & PAGE_PRESENT)) return 0;
     
     return (pt[pt_idx] & PAGE_ADDR_MASK) + (virt_addr & 0xFFF);
