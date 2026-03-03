@@ -228,3 +228,10 @@ echo "Running test_sem..."
 gcc -D__ETEROS_HOST_TEST__ -Itests/mocks tests/test_sem.c -o tests/test_sem
 ./tests/test_sem
 rm tests/test_sem
+
+# Test Bench Draw Window Fastpath
+echo "---------------------------------------------------"
+echo "Running bench_draw_window_fastpath..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_draw_window_fastpath.c -o tests/bench_draw_window_fastpath
+./tests/bench_draw_window_fastpath
+rm tests/bench_draw_window_fastpath

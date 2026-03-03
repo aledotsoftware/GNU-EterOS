@@ -18,6 +18,7 @@ typedef struct window {
 /* Window Flags */
 #define WIN_VISIBLE     (1 << 0)
 #define WIN_FOCUSED     (1 << 1)
+#define WIN_OPAQUE      (1 << 2)
 
 /* API */
 void compositor_init(void);
