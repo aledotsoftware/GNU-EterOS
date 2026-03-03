@@ -105,23 +105,14 @@ void framebuffer_flush_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
     uint8_t* src  = (uint8_t*)back_buffer + (y * fb_pitch) + (x * bytes_per_pixel);
 
     /* ⚡ BOLT Optimization: Contiguous memory fast path */
-    /* ⚡ BOLT Optimization: Fast-path for contiguous memory blocks.
-       If the copied row spans the entire pitch (e.g. full screen flush),
+    /* If the copied row spans the entire pitch (e.g. full screen flush),
        we can copy the entire block in one single operation. */
-    if (row_len == fb_pitch) {
-        memcpy(dest, src, row_len * h);
-    } else {
-        for (uint32_t i = 0; i < h; i++) {
-            memcpy(dest, src, row_len);
-            dest += fb_pitch;
-            src += fb_pitch;
-        }
-    /* ⚡ BOLT Optimization: Fast-path for contiguous memory block flush */
     if (row_len == fb_pitch) {
         memcpy(dest, src, row_len * h);
         return;
     }
 
+    /* Otherwise, copy row by row */
     for (uint32_t i = 0; i < h; i++) {
         memcpy(dest, src, row_len);
         dest += fb_pitch;
