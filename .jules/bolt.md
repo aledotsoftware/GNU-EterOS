@@ -22,6 +22,9 @@
 **Learning:** On modern x86_64 processors, unaligned 64-bit memory access has negligible performance penalty for general purpose operations. Explicit alignment checks in `memcmp` add complexity without significant benefit compared to a simple cast-and-loop approach.
 **Action:** When optimizing `memcmp` or similar functions for x86_64, straightforward 64-bit loops (checking for equality) are preferred over complex alignment handling logic, yielding massive speedups (~5x) over byte-wise loops.
 
+## 2026-12-05 - [Framebuffer Bulk Copy]
+**Learning:** In operations that flush rectangular regions to the framebuffer (`framebuffer_flush_rect`), copying line-by-line is inefficient if the rectangle width matches the screen width (pitch). Full-screen flushes represent a single contiguous memory block.
+**Action:** Add a fast-path to check if the row length equals the framebuffer pitch (`row_len == fb_pitch`). If so, copy the entire block using a single `memcpy` call instead of iterating row by row. This provides measurable speedups for full-screen compositing.
 ## 2026-12-04 - [x86_64 rep movsq Setup Overhead]
 **Learning:** While `rep movsq` combined with `rep movsb` provides excellent block copy performance for large strings on x86_64 (due to hardware fast-string optimizations), it introduces noticeable setup overhead for very small block copies (< 64 bytes). For small allocations, relying strictly on `rep movsq` incurs a performance penalty compared to a simple unrolled assignment loop.
 **Action:** Always include a fast-path fallback utilizing unrolled 64-bit assignments for small copy sizes (< 64 bytes) in fundamental memory operations like `memcpy` before falling back to `rep` instructions for bulk operations.
