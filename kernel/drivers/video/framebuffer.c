@@ -115,6 +115,16 @@ void framebuffer_flush_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
             dest += fb_pitch;
             src += fb_pitch;
         }
+    /* ⚡ BOLT Optimization: Fast-path for contiguous memory block flush */
+    if (row_len == fb_pitch) {
+        memcpy(dest, src, row_len * h);
+        return;
+    }
+
+    for (uint32_t i = 0; i < h; i++) {
+        memcpy(dest, src, row_len);
+        dest += fb_pitch;
+        src += fb_pitch;
     }
 }
 
