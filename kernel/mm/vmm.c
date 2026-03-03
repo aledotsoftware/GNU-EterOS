@@ -145,7 +145,7 @@ void vmm_init(void) {
     /* Por ahora, seguimos usando ese PML4. */
     /* En el futuro, aquí crearíamos un nuevo PML4 limpio y cambiaríamos a él. */
     
-    serial_write_string("[VMM] Usando PML4 del bootloader en 0x70000\n");
+    serial_write_string("[VMM] Usando PML4 del bootloader en 0x54000\n");
 }
 
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
