@@ -354,7 +354,7 @@ load_kernel:
 ; -----------------------------------------------------------------------------
 ; load_initrd: Carga el Initrd desde disco
 ; -----------------------------------------------------------------------------
-INITRD_LOAD_ADDR    equ 0x40000     ; ⚡ BOLT: Restored to safe sub-1MB zone
+INITRD_LOAD_ADDR    equ 0x5A000     ; ⚡ BOLT: Move to 0x5A000 (after PAGE_TABLE_ADDR)
 %ifndef INITRD_SECTORS
 INITRD_SECTORS      equ 512         ; Keep the increased limit (default)
 %endif
@@ -706,7 +706,7 @@ protected_mode_start:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x90000                    ; Stack alto para modo protegido
+    mov esp, 0x9F000                    ; Stack alto para modo protegido
 
     ; Indicador visual en VGA: "PM" (Protected Mode) en verde
     mov word [0xB8000], 0x2F50          ; 'P' verde
@@ -748,7 +748,7 @@ protected_mode_start:
 ;     PDPT[0] → PD   (en PAGE_TABLE_ADDR + 0x2000)
 ;     PD[0-3] → 4 páginas de 2 MB cada una = 8 MB
 ; -----------------------------------------------------------------------------
-PAGE_TABLE_ADDR equ 0x70000             ; ⚡ BOLT: Restored to safe sub-1MB zone
+PAGE_TABLE_ADDR equ 0x54000             ; Move down to avoid Kernel BSS overlap and make space for Initrd
 
 setup_page_tables:
     ; 1. Limpiar 6 páginas de 4 KB (PML4 + PDPT + 4*PD = 24 KB)
@@ -860,7 +860,7 @@ long_mode_start:
     mov ss, ax
 
     ; Configurar stack de 64 bits
-    mov rsp, 0x90000
+    mov rsp, 0x9F000
 
     ; ---- Habilitar SSE (Requerido por GCC en x86_64) ----
     mov rax, cr0
