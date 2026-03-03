@@ -104,10 +104,15 @@ void framebuffer_flush_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
     uint8_t* dest = (uint8_t*)fb_buffer + (y * fb_pitch) + (x * bytes_per_pixel);
     uint8_t* src  = (uint8_t*)back_buffer + (y * fb_pitch) + (x * bytes_per_pixel);
 
-    for (uint32_t i = 0; i < h; i++) {
-        memcpy(dest, src, row_len);
-        dest += fb_pitch;
-        src += fb_pitch;
+    /* ⚡ BOLT Optimization: Contiguous memory fast path */
+    if (row_len == fb_pitch) {
+        memcpy(dest, src, row_len * h);
+    } else {
+        for (uint32_t i = 0; i < h; i++) {
+            memcpy(dest, src, row_len);
+            dest += fb_pitch;
+            src += fb_pitch;
+        }
     }
 }
 
@@ -229,9 +234,15 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
     if (fb_bpp == 32) {
         /* ⚡ BOLT Optimization: Hoist row pointer arithmetic out of the loop */
         uint8_t* base_addr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * 4);
-        for (uint32_t i = 0; i < h; i++) {
-            memset32((uint32_t*)base_addr, color, w);
-            base_addr += fb_pitch;
+
+        /* ⚡ BOLT Optimization: Contiguous memory fast path */
+        if (w * 4 == fb_pitch) {
+            memset32((uint32_t*)base_addr, color, w * h);
+        } else {
+            for (uint32_t i = 0; i < h; i++) {
+                memset32((uint32_t*)base_addr, color, w);
+                base_addr += fb_pitch;
+            }
         }
     } else if (fb_bpp == 24) {
         uint8_t r = (color >> 16) & 0xFF;

@@ -21,3 +21,7 @@
 ## 2026-11-25 - [Unaligned Access on x86_64]
 **Learning:** On modern x86_64 processors, unaligned 64-bit memory access has negligible performance penalty for general purpose operations. Explicit alignment checks in `memcmp` add complexity without significant benefit compared to a simple cast-and-loop approach.
 **Action:** When optimizing `memcmp` or similar functions for x86_64, straightforward 64-bit loops (checking for equality) are preferred over complex alignment handling logic, yielding massive speedups (~5x) over byte-wise loops.
+
+## 2026-03-03 - [Framebuffer Contiguous Fast Path]
+**Learning:** Drawing operations on framebuffers (like flushing or clearing rects) often span the entire width of the screen. When the width of the rectangle multiplied by the bytes per pixel equals the framebuffer pitch (`w * bytes_per_pixel == fb_pitch`), the rows are completely contiguous in memory.
+**Action:** Instead of looping over rows and calling `memcpy` or `memset32` for each row, detect the contiguous case and use a single block operation (`memcpy` or `memset32`) for the entire area (`w * h`). This eliminates loop overhead and maximizes memory bandwidth utilization.
