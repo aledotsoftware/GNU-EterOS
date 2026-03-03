@@ -25,3 +25,6 @@
 ## 2026-12-04 - [x86_64 rep movsq Setup Overhead]
 **Learning:** While `rep movsq` combined with `rep movsb` provides excellent block copy performance for large strings on x86_64 (due to hardware fast-string optimizations), it introduces noticeable setup overhead for very small block copies (< 64 bytes). For small allocations, relying strictly on `rep movsq` incurs a performance penalty compared to a simple unrolled assignment loop.
 **Action:** Always include a fast-path fallback utilizing unrolled 64-bit assignments for small copy sizes (< 64 bytes) in fundamental memory operations like `memcpy` before falling back to `rep` instructions for bulk operations.
+## 2026-11-26 - [Framebuffer Block Copy Optimization]
+**Learning:** Flushing rectangles row-by-row in the framebuffer introduces overhead from loop iterations and multiple function calls even with optimized `memcpy`. When a dirty rectangle spans the full width of the framebuffer (`row_len == fb_pitch`), the region is perfectly contiguous in memory.
+**Action:** Always check if the drawing area spans the full pitch width, and if so, use a single, highly efficient `memcpy` block operation to copy the entire contiguous memory region at once.
