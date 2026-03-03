@@ -105,30 +105,45 @@ static void draw_window(window_t* win) {
         uint8_t* dest_row = (uint8_t*)fb_buf + (draw_y_start * fb_pitch) + (draw_x_start * 4);
         uint32_t* src_row = win->buffer + (win_y_start * win->width) + win_x_start;
 
-        for (int32_t i = 0; i < height; i++) {
-            uint32_t* dest = (uint32_t*)dest_row;
-            uint32_t* src = src_row;
-
-            int32_t j = 0;
-            /* Unrolled loop (4x) */
-            for (; j <= width - 4; j += 4) {
-                if (src[j] != 0) dest[j] = src[j];
-                if (src[j+1] != 0) dest[j+1] = src[j+1];
-                if (src[j+2] != 0) dest[j+2] = src[j+2];
-                if (src[j+3] != 0) dest[j+3] = src[j+3];
-            }
-
-            /* Remainder */
-            for (; j < width; j++) {
-                if (src[j] != 0) {
-                    dest[j] = src[j];
+        if (win->flags & WIN_OPAQUE) {
+            /* Fast path for completely opaque windows: skip per-pixel transparency check */
+            if (width * 4 == (int32_t)fb_pitch && width == win->width) {
+                /* If window perfectly spans the framebuffer, do one massive copy */
+                memcpy(dest_row, src_row, width * height * 4);
+            } else {
+                /* Copy row by row */
+                for (int32_t i = 0; i < height; i++) {
+                    memcpy(dest_row, src_row, width * 4);
+                    dest_row += fb_pitch;
+                    src_row += win->width;
                 }
-                dest++;
             }
+        } else {
+            for (int32_t i = 0; i < height; i++) {
+                uint32_t* dest = (uint32_t*)dest_row;
+                uint32_t* src = src_row;
 
-            /* Advance pointers by one row */
-            dest_row += fb_pitch;
-            src_row += win->width;
+                int32_t j = 0;
+                /* Unrolled loop (4x) */
+                for (; j <= width - 4; j += 4) {
+                    if (src[j] != 0) dest[j] = src[j];
+                    if (src[j+1] != 0) dest[j+1] = src[j+1];
+                    if (src[j+2] != 0) dest[j+2] = src[j+2];
+                    if (src[j+3] != 0) dest[j+3] = src[j+3];
+                }
+
+                /* Remainder */
+                for (; j < width; j++) {
+                    if (src[j] != 0) {
+                        dest[j] = src[j];
+                    }
+                    dest++;
+                }
+
+                /* Advance pointers by one row */
+                dest_row += fb_pitch;
+                src_row += win->width;
+            }
         }
     } else {
         /* Fallback for other depths */
