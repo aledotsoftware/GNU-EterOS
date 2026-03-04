@@ -118,6 +118,42 @@ static void draw_window(window_t* win) {
                     src_row += win->width;
                 }
             }
+        } else if (win->flags & WIN_GLASS) {
+            /* Glassmorphism mode */
+            for (int32_t i = 0; i < height; i++) {
+                uint32_t* dest = (uint32_t*)dest_row;
+                uint32_t* src = src_row;
+
+                for (int32_t j = 0; j < width; j++) {
+                    uint32_t sc = src[j];
+                    if (sc != 0) {
+                        uint32_t a = (sc >> 24) & 0xFF;
+                        if (a == 255) {
+                            dest[j] = sc;
+                        } else if (a > 0) {
+                            uint32_t dc = dest[j];
+                            uint32_t sr = (sc >> 16) & 0xFF;
+                            uint32_t sg = (sc >> 8) & 0xFF;
+                            uint32_t sb = sc & 0xFF;
+
+                            uint32_t dr = (dc >> 16) & 0xFF;
+                            uint32_t dg = (dc >> 8) & 0xFF;
+                            uint32_t db = dc & 0xFF;
+
+                            /* Fast alpha blending using bitwise shifts (x >> 8 is approx x / 255) */
+                            uint32_t r = (sr * a + dr * (255 - a)) >> 8;
+                            uint32_t g = (sg * a + dg * (255 - a)) >> 8;
+                            uint32_t b = (sb * a + db * (255 - a)) >> 8;
+
+                            dest[j] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                        }
+                    }
+                }
+
+                /* Advance pointers by one row */
+                dest_row += fb_pitch;
+                src_row += win->width;
+            }
         } else {
             for (int32_t i = 0; i < height; i++) {
                 uint32_t* dest = (uint32_t*)dest_row;
@@ -170,9 +206,26 @@ static void draw_windows_recursive(window_t* w) {
     draw_window(w);
 }
 
+int display_sleep_mode = 0;
+uint64_t last_input_ticks = 0;
+int dark_mode_enabled = 1;
+
+void compositor_wake(void) {
+    if (display_sleep_mode) {
+        display_sleep_mode = 0;
+        gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());
+        gfx_present();
+    }
+}
+
 void compositor_render(void) {
-    /* Clear screen to dark gray */
-    framebuffer_rect(0, 0, framebuffer_get_width(), framebuffer_get_height(), 0xFF202020);
+    if (display_sleep_mode) {
+        return;
+    }
+
+    /* Clear screen to dark gray or light gray depending on dark mode */
+    uint32_t bg_color = dark_mode_enabled ? 0xFF202020 : 0xFFE0E0E0;
+    framebuffer_rect(0, 0, framebuffer_get_width(), framebuffer_get_height(), bg_color);
 
     /* Draw windows back to front */
     draw_windows_recursive(window_list);

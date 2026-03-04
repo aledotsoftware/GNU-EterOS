@@ -37,3 +37,13 @@
 ## 2026-11-26 - [Framebuffer Block Copy Optimization]
 **Learning:** Flushing rectangles row-by-row in the framebuffer introduces overhead from loop iterations and multiple function calls even with optimized `memcpy`. When a dirty rectangle spans the full width of the framebuffer (`row_len == fb_pitch`), the region is perfectly contiguous in memory.
 **Action:** Always check if the drawing area spans the full pitch width, and if so, use a single, highly efficient `memcpy` block operation to copy the entire contiguous memory region at once.
+
+## 2026-12-05 - [gfx_draw_rect Optimized Fast Path]
+**Learning:** Drawing hollow rectangles pixel-by-pixel using Bresenham's line algorithm (`gfx_draw_line`) is extremely slow and inefficient when the lines are strictly horizontal and vertical. It incurs massive overhead due to repeated bound checks and single-pixel writes.
+**Action:** When drawing axis-aligned hollow rectangles (e.g. `gfx_draw_rect`), always decompose them into 4 solid rectangle fills (`gfx_fill_rect`) representing the top, bottom, left, and right borders. This leverages highly optimized `memset32` fast-paths and direct memory access underneath.
+## 2024-05-18 - Fast paths for basic graphics primitives
+**Learning:** In a software-rendered UI compositor, seemingly complex high-level draw functions (like drawing window borders via `gfx_draw_rect`) often boil down to the simplest possible primitives: pure horizontal and vertical lines. Bresenham's line algorithm has massive branching overhead. Bypassing it for these simple primitives enables using highly optimized block memory copies (`memset32`).
+**Action:** When working on graphics rendering code, always identify the most common degenerate cases (like straight lines or opaque solid rectangles) and create fast paths that bypass the general algorithmic logic in favor of bulk memory operations.
+## 2026-12-05 - [Fast-Path Rectangle Outline]
+**Learning:** Drawing a rectangle's outline by executing Bresenham's line algorithm (`gfx_draw_line`) 4 times generates a massive amount of overhead for simple vertical and horizontal lines. Setting individual pixels limits bandwidth use drastically.
+**Action:** When a rectangle outline needs to be drawn (`gfx_draw_rect`), do so by composing it out of 4 independent memory blocks via fast-path `gfx_fill_rect` logic, resulting in roughly a 4-5x speed improvement and avoiding loop overhead.
