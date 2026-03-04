@@ -256,6 +256,8 @@ void scheduler_init(void) {
 
     /* POSIX Init for Kernel Task */
     memset(tasks[0].fd_table, 0, sizeof(tasks[0].fd_table));
+    tasks[0].cwd_node = fs_root;
+    if (tasks[0].cwd_node) tasks[0].cwd_node->ref_count++;
     tasks[0].signal_mask = 0;
     tasks[0].signal_pending = 0;
     memset(tasks[0].signal_handlers, 0, sizeof(tasks[0].signal_handlers));
@@ -265,6 +267,10 @@ void scheduler_init(void) {
     tasks[0].brk = 0;
     tasks[0].fs_base = 0;
     tasks[0].gs_base = 0;
+    tasks[0].uid = 0;
+    tasks[0].gid = 0;
+    tasks[0].euid = 0;
+    tasks[0].egid = 0;
     tasks[0].mmap_base = 0x700000000000ULL;
 
     task_count = 1;
@@ -397,10 +403,13 @@ int task_create(const char* name, void (*entry)(void)) {
 
     /* POSIX Init for New Task */
     memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
+    tasks[slot].cwd_node = fs_root;
+    if (tasks[slot].cwd_node) tasks[slot].cwd_node->ref_count++;
     tasks[slot].signal_mask = 0;
     tasks[slot].signal_pending = 0;
     memset(tasks[slot].signal_handlers, 0, sizeof(tasks[slot].signal_handlers));
     memset(tasks[slot].signal_restorers, 0, sizeof(tasks[slot].signal_restorers));
+    memset(tasks[slot].signal_flags, 0, sizeof(tasks[slot].signal_flags));
 
     /* Linux Init */
     tasks[slot].brk = 0;
@@ -408,6 +417,8 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].gs_base = 0;
     tasks[slot].uid = 0;
     tasks[slot].gid = 0;
+    tasks[slot].euid = 0;
+    tasks[slot].egid = 0;
     tasks[slot].mmap_base = 0x700000000000ULL;
 
     /*
@@ -831,15 +842,21 @@ int task_fork(void* regs_ptr) {
         }
     }
 
+    tasks[slot].cwd_node = parent->cwd_node;
+    if (tasks[slot].cwd_node) __atomic_fetch_add(&tasks[slot].cwd_node->ref_count, 1, __ATOMIC_SEQ_CST);
+
     tasks[slot].signal_mask = parent->signal_mask;
     memcpy(tasks[slot].signal_handlers, parent->signal_handlers, sizeof(parent->signal_handlers));
     memcpy(tasks[slot].signal_restorers, parent->signal_restorers, sizeof(parent->signal_restorers));
+    memcpy(tasks[slot].signal_flags, parent->signal_flags, sizeof(parent->signal_flags));
     tasks[slot].brk = parent->brk;
     tasks[slot].fs_base = parent->fs_base;
     tasks[slot].gs_base = parent->gs_base;
     tasks[slot].os_abi = parent->os_abi;
     tasks[slot].uid = parent->uid;
     tasks[slot].gid = parent->gid;
+    tasks[slot].euid = parent->euid;
+    tasks[slot].egid = parent->egid;
     tasks[slot].user_rsp = parent->user_rsp; /* Saved from syscall entry */
     tasks[slot].mmap_base = parent->mmap_base;
 
