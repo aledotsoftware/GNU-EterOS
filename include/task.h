@@ -21,7 +21,7 @@ struct syscall_regs;
 #define MAX_TASKS       64
 #define TASK_STACK_SIZE  32768   /* 32 KB por tarea (GUI requires more) */
 #define SCHEDULER_HZ     10    /* Switch cada 10 ticks (100ms a 100Hz PIT) */
-#define MAX_FD           16    /* Máximo de descriptores de archivo por tarea */
+#define MAX_FD           256   /* Máximo de descriptores de archivo por tarea */
 
 #define KERNEL_STACK_BASE       0xFFFFFF0000000000ULL
 #define KERNEL_STACK_GUARD_SIZE 4096  /* 4KB Guard Page */
@@ -36,6 +36,7 @@ typedef struct file_descriptor {
     struct fs_node* node;
     uint32_t offset;
     int flags;
+    char path[128]; // Store resolved absolute path to support dirfd
 } file_descriptor_t;
 
 /* ========================================================================= */
@@ -65,16 +66,27 @@ typedef struct task {
     uint64_t       wake_tick;               /* Tick para despertar si duerme */
     struct semaphore* waiting_sem;          /* Semaphore waiting on (if blocked) */
     char           name[32];                /* Nombre descriptivo */
+    char           executable_path[256];    /* Absolute path to the loaded ELF */
 
     struct task*   next_ready;              /* Next task in ready queue */
     struct task*   prev_ready;              /* Previous task in ready queue */
 
+    struct task*   next_sleep;              /* Next task in sleep queue */
+    struct task*   prev_sleep;              /* Previous task in sleep queue */
+
     /* POSIX Compatibility */
     file_descriptor_t fd_table[MAX_FD];     /* File Descriptor Table */
+    char           cwd[256];                /* Current Working Directory */
+    struct fs_node* cwd_node;               /* Current Working Directory Node */
     uint32_t       signal_mask;             /* Mask of blocked signals */
+    uint32_t       uid;                     /* User ID */
+    uint32_t       gid;                     /* Group ID */
+    uint32_t       euid;                    /* Effective User ID */
+    uint32_t       egid;                    /* Effective Group ID */
     uint32_t       signal_pending;          /* Bitmap of pending signals */
     void           (*signal_handlers[32])(int); /* Signal Handlers */
     void           (*signal_restorers[32])(void); /* Signal Restorer Trampolines */
+    uint32_t       signal_flags[32];        /* Signal Flags (e.g. SA_SIGINFO) */
 
     /* Linux Compatibility (TLS & Heap) */
     uint64_t       brk;                     /* Program break (end of data segment) */
@@ -122,6 +134,12 @@ void task_yield(void);
  * Cede el CPU a otras tareas.
  */
 void task_sleep(uint64_t ms);
+
+/**
+ * Pone la tarea actual en la cola de sleep con un wake_tick específico.
+ * Utilizado por futex u otros primitivos de sincronización.
+ */
+void task_block_with_timeout(uint64_t wake_tick);
 
 /**
  * Verifica si hay tareas dormidas que deban despertar.

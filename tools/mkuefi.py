@@ -218,9 +218,7 @@ def create_fat32_image(output_file, files):
         efi_cluster = alloc_cluster()
 
         # Fix .. in EFI/BOOT to point to EFI
-        # High Cluster at offset 20, Low Cluster at offset 26
-        struct.pack_into('<H', dir_data, 32+20, efi_cluster >> 16)
-        struct.pack_into('<H', dir_data, 32+26, efi_cluster & 0xFFFF)
+        dir_data[32:64] = create_dir_entry(b'..      ', b'   ', ATTR_DIRECTORY, efi_cluster, 0)
         write_cluster(efi_boot_cluster, dir_data) # Update EFI/BOOT
 
         dir_data = bytearray(CLUSTER_SIZE)

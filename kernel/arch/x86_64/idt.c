@@ -232,46 +232,47 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     for (;;) { __asm__ volatile ("hlt"); }
 }
 
-/* ========================================================================= */
-/* Exception Handlers (sin error code)                                       */
-/* ========================================================================= */
+struct int_regs {
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
+    uint64_t int_no, err_code;
+    uint64_t rip, cs, rflags, rsp, ss;
+};
 
-#define EXCEPTION_HANDLER(num) \
-    __attribute__((interrupt)) \
-    static void isr_##num(struct interrupt_frame *frame) { \
-        handle_exception(num, frame, 0); \
-    }
+void exception_handler_c(struct int_regs *regs) {
+    struct interrupt_frame frame = {
+        .rip = regs->rip,
+        .cs = regs->cs,
+        .rflags = regs->rflags,
+        .rsp = regs->rsp,
+        .ss = regs->ss
+    };
+    handle_exception(regs->int_no, &frame, regs->err_code);
+}
 
-#define EXCEPTION_HANDLER_ERR(num) \
-    __attribute__((interrupt)) \
-    static void isr_##num(struct interrupt_frame *frame, uint64_t error_code) { \
-        handle_exception(num, frame, error_code); \
-    }
-
-/* Excepciones sin error code */
-EXCEPTION_HANDLER(0)
-EXCEPTION_HANDLER(1)
-EXCEPTION_HANDLER(2)
-EXCEPTION_HANDLER(3)
-EXCEPTION_HANDLER(4)
-EXCEPTION_HANDLER(5)
-EXCEPTION_HANDLER(6)
-EXCEPTION_HANDLER(7)
-EXCEPTION_HANDLER(9)
-EXCEPTION_HANDLER(16)
-EXCEPTION_HANDLER(18)
-EXCEPTION_HANDLER(19)
-EXCEPTION_HANDLER(20)
-
-/* Excepciones con error code */
-EXCEPTION_HANDLER_ERR(8)
-EXCEPTION_HANDLER_ERR(10)
-EXCEPTION_HANDLER_ERR(11)
-EXCEPTION_HANDLER_ERR(12)
-EXCEPTION_HANDLER_ERR(13)
-EXCEPTION_HANDLER_ERR(14)
-EXCEPTION_HANDLER_ERR(17)
-EXCEPTION_HANDLER_ERR(21)
+/* Stubs definidos en exceptions.asm */
+extern void exception_stub_0(void);
+extern void exception_stub_1(void);
+extern void exception_stub_2(void);
+extern void exception_stub_3(void);
+extern void exception_stub_4(void);
+extern void exception_stub_5(void);
+extern void exception_stub_6(void);
+extern void exception_stub_7(void);
+extern void exception_stub_8(void);
+extern void exception_stub_9(void);
+extern void exception_stub_10(void);
+extern void exception_stub_11(void);
+extern void exception_stub_12(void);
+extern void exception_stub_13(void);
+extern void exception_stub_14(void);
+extern void exception_stub_15(void);
+extern void exception_stub_16(void);
+extern void exception_stub_17(void);
+extern void exception_stub_18(void);
+extern void exception_stub_19(void);
+extern void exception_stub_20(void);
+extern void exception_stub_21(void);
 
 /* ========================================================================= */
 /* ========================================================================= */
@@ -362,27 +363,28 @@ void idt_init(void) {
     memset(idt, 0, sizeof(idt));
 
     /* --- Instalar handlers de excepciones --- */
-    idt_set_gate(0,  (void*)isr_0,  IDT_GATE_INTERRUPT);
-    idt_set_gate(1,  (void*)isr_1,  IDT_GATE_INTERRUPT);
-    idt_set_gate(2,  (void*)isr_2,  IDT_GATE_INTERRUPT);
-    idt_set_gate(3,  (void*)isr_3,  IDT_GATE_INTERRUPT);
-    idt_set_gate(4,  (void*)isr_4,  IDT_GATE_INTERRUPT);
-    idt_set_gate(5,  (void*)isr_5,  IDT_GATE_INTERRUPT);
-    idt_set_gate(6,  (void*)isr_6,  IDT_GATE_INTERRUPT);
-    idt_set_gate(7,  (void*)isr_7,  IDT_GATE_INTERRUPT);
-    idt_set_gate(8,  (void*)isr_8,  IDT_GATE_INTERRUPT);
-    idt_set_gate(9,  (void*)isr_9,  IDT_GATE_INTERRUPT);
-    idt_set_gate(10, (void*)isr_10, IDT_GATE_INTERRUPT);
-    idt_set_gate(11, (void*)isr_11, IDT_GATE_INTERRUPT);
-    idt_set_gate(12, (void*)isr_12, IDT_GATE_INTERRUPT);
-    idt_set_gate(13, (void*)isr_13, IDT_GATE_INTERRUPT);
-    idt_set_gate(14, (void*)isr_14, IDT_GATE_INTERRUPT);
-    idt_set_gate(16, (void*)isr_16, IDT_GATE_INTERRUPT);
-    idt_set_gate(17, (void*)isr_17, IDT_GATE_INTERRUPT);
-    idt_set_gate(18, (void*)isr_18, IDT_GATE_INTERRUPT);
-    idt_set_gate(19, (void*)isr_19, IDT_GATE_INTERRUPT);
-    idt_set_gate(20, (void*)isr_20, IDT_GATE_INTERRUPT);
-    idt_set_gate(21, (void*)isr_21, IDT_GATE_INTERRUPT);
+    idt_set_gate(0,  (void*)exception_stub_0,  IDT_GATE_INTERRUPT);
+    idt_set_gate(1,  (void*)exception_stub_1,  IDT_GATE_INTERRUPT);
+    idt_set_gate(2,  (void*)exception_stub_2,  IDT_GATE_INTERRUPT);
+    idt_set_gate(3,  (void*)exception_stub_3,  IDT_GATE_INTERRUPT);
+    idt_set_gate(4,  (void*)exception_stub_4,  IDT_GATE_INTERRUPT);
+    idt_set_gate(5,  (void*)exception_stub_5,  IDT_GATE_INTERRUPT);
+    idt_set_gate(6,  (void*)exception_stub_6,  IDT_GATE_INTERRUPT);
+    idt_set_gate(7,  (void*)exception_stub_7,  IDT_GATE_INTERRUPT);
+    idt_set_gate(8,  (void*)exception_stub_8,  IDT_GATE_INTERRUPT);
+    idt_set_gate(9,  (void*)exception_stub_9,  IDT_GATE_INTERRUPT);
+    idt_set_gate(10, (void*)exception_stub_10, IDT_GATE_INTERRUPT);
+    idt_set_gate(11, (void*)exception_stub_11, IDT_GATE_INTERRUPT);
+    idt_set_gate(12, (void*)exception_stub_12, IDT_GATE_INTERRUPT);
+    idt_set_gate(13, (void*)exception_stub_13, IDT_GATE_INTERRUPT);
+    idt_set_gate(14, (void*)exception_stub_14, IDT_GATE_INTERRUPT);
+    idt_set_gate(15, (void*)exception_stub_15, IDT_GATE_INTERRUPT);
+    idt_set_gate(16, (void*)exception_stub_16, IDT_GATE_INTERRUPT);
+    idt_set_gate(17, (void*)exception_stub_17, IDT_GATE_INTERRUPT);
+    idt_set_gate(18, (void*)exception_stub_18, IDT_GATE_INTERRUPT);
+    idt_set_gate(19, (void*)exception_stub_19, IDT_GATE_INTERRUPT);
+    idt_set_gate(20, (void*)exception_stub_20, IDT_GATE_INTERRUPT);
+    idt_set_gate(21, (void*)exception_stub_21, IDT_GATE_INTERRUPT);
 
     /* --- Instalar handlers de IRQs (32-47) --- */
     /* Usamos isr_stub_timer (assembly) -> irq_timer_handler (C) */

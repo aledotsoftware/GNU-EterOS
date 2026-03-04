@@ -38,6 +38,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_rtc.c kernel/string.c -o tests/t
 ./tests/test_rtc
 rm tests/test_rtc
 
+# Test BCache
+echo "---------------------------------------------------"
+echo "Running test_bcache..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_bcache.c kernel/string.c -o tests/test_bcache
+./tests/test_bcache
+rm tests/test_bcache
+
 # Test FAT32
 echo "---------------------------------------------------"
 echo "Running test_fat32..."
@@ -118,6 +125,12 @@ gcc -g -O0 -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vmm_unmap.c -o tests/test
 ./tests/test_vmm_unmap
 rm tests/test_vmm_unmap
 rm tests/vmm_mock.c
+# Test VMM Unmap
+echo "---------------------------------------------------"
+echo "Running test_vmm_unmap..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vmm_unmap.c -o tests/test_vmm_unmap
+./tests/test_vmm_unmap
+rm tests/test_vmm_unmap
 
 # Test Reclaimer (Disabled - File Missing)
 # echo "---------------------------------------------------"
@@ -140,12 +153,26 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_procfs.c -o tests/test_procfs
 ./tests/test_procfs
 rm tests/test_procfs
 
+# Test DevFS
+echo "---------------------------------------------------"
+echo "Running test_devfs..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c -o tests/test_devfs
+./tests/test_devfs
+rm tests/test_devfs
+
 # Test Framebuffer Scroll
 echo "---------------------------------------------------"
 echo "Running test_framebuffer_scroll..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_framebuffer_scroll.c kernel/drivers/video/font.c -o tests/test_framebuffer_scroll
 ./tests/test_framebuffer_scroll
 rm tests/test_framebuffer_scroll
+
+# Test Sem Logic
+echo "---------------------------------------------------"
+echo "Running test_sem_logic..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sem_logic.c -o tests/test_sem_logic
+./tests/test_sem_logic
+rm tests/test_sem_logic
 
 # Test Sys Open (Security Fix)
 echo "---------------------------------------------------"
@@ -154,7 +181,41 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o te
 ./tests/test_sys_open
 rm tests/test_sys_open
 
+# Test Sys Read/Write Permissions
 echo "---------------------------------------------------"
+echo "Running test_sys_rw_perms..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_rw_perms.c kernel/string.c -o tests/test_sys_rw_perms
+./tests/test_sys_rw_perms
+rm tests/test_sys_rw_perms
+
+# Test Socket Security
+echo "---------------------------------------------------"
+echo "Running test_socket_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_socket_security.c kernel/string.c -o tests/test_socket_security
+./tests/test_socket_security
+rm tests/test_socket_security
+
+# Test VFS Readdir
+echo "---------------------------------------------------"
+echo "Running test_vfs_readdir..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_readdir.c -o tests/test_vfs_readdir
+./tests/test_vfs_readdir
+rm tests/test_vfs_readdir
+
+echo "---------------------------------------------------"
+# Test Syscall Dispatch
+
+echo "---------------------------------------------------"
+
+echo "Running test_syscall_dispatch..."
+
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_dispatch.c kernel/string.c -o tests/test_syscall_dispatch
+
+./tests/test_syscall_dispatch
+
+rm tests/test_syscall_dispatch
+
+
 echo "All tests passed!"
 
 # Test Omni Gradient Math
@@ -177,3 +238,30 @@ echo "Running test_xtensa_uart..."
 gcc -D__ETEROS_HOST_TEST__ tests/test_xtensa_uart.c -o tests/test_xtensa_uart
 ./tests/test_xtensa_uart
 rm tests/test_xtensa_uart
+
+# Test Sem
+echo "---------------------------------------------------"
+echo "Running test_sem..."
+gcc -D__ETEROS_HOST_TEST__ -Itests/mocks tests/test_sem.c -o tests/test_sem
+./tests/test_sem
+rm tests/test_sem
+
+# Test Bench Draw Window Fastpath
+echo "---------------------------------------------------"
+echo "Running bench_draw_window_fastpath..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_draw_window_fastpath.c -o tests/bench_draw_window_fastpath
+./tests/bench_draw_window_fastpath
+rm tests/bench_draw_window_fastpath
+
+# Test Bench GFX Draw Rect Fastpath
+echo "---------------------------------------------------"
+echo "Running bench_gfx_draw_rect..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_gfx_draw_rect.c -o tests/bench_gfx_draw_rect
+./tests/bench_gfx_draw_rect
+rm tests/bench_gfx_draw_rect
+# Test Bench Gfx Rect Fastpath
+echo "---------------------------------------------------"
+echo "Running bench_gfx_rect..."
+gcc -O3 -D__ETEROS_HOST_TEST__ -Iinclude tests/bench_gfx_rect.c kernel/string.c -o tests/bench_gfx_rect
+./tests/bench_gfx_rect
+rm tests/bench_gfx_rect

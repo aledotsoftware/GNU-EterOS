@@ -30,7 +30,11 @@ spinlock_t tlb_lock = 0;
 
 /* Invalida una página en el TLB */
 static inline void invlpg(uint64_t addr) {
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("invlpg (%0)" : : "r" (addr) : "memory");
+#else
+    (void)addr;
+#endif
 }
 
 void vmm_flush_tlb_local(uint64_t addr) {
@@ -69,7 +73,9 @@ void vmm_flush_tlb_smp(uint64_t addr) {
     if (expected_acks > 0) {
         uint64_t timeout = 10000000; /* ~10ms depends on CPU speed */
         while (tlb_ack_count < expected_acks) {
+#ifndef __ETEROS_HOST_TEST__
             __asm__ volatile("pause");
+#endif
             timeout--;
             if (timeout == 0) {
                 serial_write_string("[VMM] CRITICAL: TLB Shootdown Timeout! System might be unstable.\n");
@@ -87,7 +93,11 @@ void vmm_flush_tlb_smp(uint64_t addr) {
 
 /* Recarga CR3 (flush completo de TLB - costoso) */
 static inline void load_cr3(uint64_t pml4_addr) {
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("mov %0, %%cr3" : : "r" (pml4_addr) : "memory");
+#else
+    (void)pml4_addr;
+#endif
 }
 
 /*
@@ -118,6 +128,12 @@ static pt_entry_t* get_next_table(pt_entry_t* table, uint64_t index, int alloc) 
         return NULL;
     }
 
+    char dbg_buf[64];
+    serial_write_string("[VMM] Allocating new page table at ");
+    utoa_hex_s((uintptr_t)new_table_phys, dbg_buf, sizeof(dbg_buf));
+    serial_write_string(dbg_buf);
+    serial_write_string("\n");
+
     /* Limpiar la nueva tabla (crítico para evitar entradas basura) */
     memset(new_table_phys, 0, PAGE_SIZE);
 
@@ -135,7 +151,11 @@ void vmm_init(void) {
     /* Por ahora, seguimos usando ese PML4. */
     /* En el futuro, aquí crearíamos un nuevo PML4 limpio y cambiaríamos a él. */
     
-    serial_write_string("[VMM] Usando PML4 del bootloader en 0x70000\n");
+    char pml4_addr_buf[32];
+    serial_write_string("[VMM] Usando PML4 del bootloader en 0x");
+    utoa_hex_s((uint64_t)pml4, pml4_addr_buf, sizeof(pml4_addr_buf));
+    serial_write_string(pml4_addr_buf);
+    serial_write_string("\n");
 }
 
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
@@ -194,16 +214,27 @@ uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
-    if (!pdpt) return 0;
+    /* 1. Walk PML4 */
+    if (!(pml4[pml4_idx] & PAGE_PRESENT)) return 0;
+    pt_entry_t* pdpt = (pt_entry_t*)(pml4[pml4_idx] & PAGE_ADDR_MASK);
 
-    pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
-    if (!pd) return 0;
+    /* 2. Walk PDPT */
+    if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) return 0;
+    /* Check for 1GB Huge Page */
+    if (pdpt[pdpt_idx] & PAGE_HUGE) {
+        return (pdpt[pdpt_idx] & 0xFFFFFC0000000ULL) + (virt_addr & 0x3FFFFFFF);
+    }
+    pt_entry_t* pd = (pt_entry_t*)(pdpt[pdpt_idx] & PAGE_ADDR_MASK);
 
-    pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
-    if (!pt) return 0;
-    
-    /* Verificar si la página está presente */
+    /* 3. Walk PD */
+    if (!(pd[pd_idx] & PAGE_PRESENT)) return 0;
+    /* Check for 2MB Huge Page */
+    if (pd[pd_idx] & PAGE_HUGE) {
+        return (pd[pd_idx] & 0xFFFFFFFFFE00000ULL) + (virt_addr & 0x1FFFFF);
+    }
+    pt_entry_t* pt = (pt_entry_t*)(pd[pd_idx] & PAGE_ADDR_MASK);
+
+    /* 4. Walk PT */
     if (!(pt[pt_idx] & PAGE_PRESENT)) return 0;
     
     return (pt[pt_idx] & PAGE_ADDR_MASK) + (virt_addr & 0xFFF);
@@ -339,8 +370,13 @@ uint64_t vmm_clone_pml4(int cow) {
     /* If we modified current tables (CoW), we must flush TLB */
     if (cow) {
         uint64_t current_cr3;
+#ifndef __ETEROS_HOST_TEST__
         __asm__ volatile("mov %%cr3, %0" : "=r"(current_cr3));
         __asm__ volatile("mov %0, %%cr3" : : "r"(current_cr3) : "memory");
+#else
+        current_cr3 = (uint64_t)pml4;
+        (void)current_cr3;
+#endif
     }
 
     return (uint64_t)new_pml4;
@@ -420,7 +456,11 @@ int vmm_verify_user_access(const void* addr, size_t size, int write) {
 
     /* Get current PML4 (CR3) */
     uint64_t cr3;
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+#else
+    cr3 = (uint64_t)pml4;
+#endif
     pt_entry_t* pml4_table = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);
 
     for (uint64_t v = start_page; v < end_page; v += PAGE_SIZE) {
@@ -459,7 +499,11 @@ int vmm_verify_user_access(const void* addr, size_t size, int write) {
 int vmm_is_user_page(uint64_t virt_addr) {
     /* Read CR3 to get current PML4 physical address */
     uint64_t cr3;
+#ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+#else
+    cr3 = (uint64_t)pml4;
+#endif
 
     /* In Identity Mapping, Phys == Virt */
     pt_entry_t* pml4 = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);
@@ -567,7 +611,7 @@ int vmm_validate_user_ptr(const void* addr, size_t size) {
     uint64_t end = start + size;
 
     /* Check for overflow (end < start) */
-    if (end < start) return 0;
+    if (end < start || size > (USER_LIMIT - start + 1)) return 0;
 
     /* Check bounds: [start, end) must be within [USER_BASE, USER_LIMIT] */
     if (start < USER_BASE) return 0;

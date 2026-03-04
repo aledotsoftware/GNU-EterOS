@@ -206,17 +206,23 @@ void pmm_init(void) {
 
     /* 4. Marcar regiones críticas como OCUPADAS de nuevo */
     
-    /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel) */
+    /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel Loader) */
     pmm_mark_region_used(0x0, 0x100000); 
 
-    /* b) Reservar explícitamente el espacio del Bitmap y RefCounts */
-    uint64_t ref_counts_size = total_pages * sizeof(uint16_t);
-    uint64_t pmm_end = (uint64_t)pmm_ref_counts + ref_counts_size;
-    pmm_mark_region_used((uint64_t)pmm_bitmap, pmm_bitmap_size);
-    pmm_mark_region_used((uint64_t)pmm_ref_counts, ref_counts_size);
-    
-    /* c) Tablas de paginación del bootloader (0x70000-0x76000, ya dentro del 1MB) */
+    /* b) Kernel (ahora en 1MB+) */
+    extern uint8_t _kernel_start, _kernel_end;
+    uint64_t k_start = (uint64_t)&_kernel_start;
+    uint64_t k_end = (uint64_t)&_kernel_end;
+    pmm_mark_region_used(k_start, k_end - k_start);
 
+    /* c) Reservar explícitamente el espacio del Bitmap y RefCounts */
+    uint64_t ref_counts_size = total_pages * sizeof(uint16_t);
+    uint64_t p_bitmap = (uint64_t)pmm_bitmap;
+    uint64_t p_ref_counts = (uint64_t)pmm_ref_counts;
+    pmm_mark_region_used(p_bitmap, pmm_bitmap_size);
+    pmm_mark_region_used(p_ref_counts, ref_counts_size);
+    
+    uint64_t pmm_end = p_ref_counts + ref_counts_size;
     free_mem_start = PAGE_ALIGN_UP(pmm_end);
 
     /* Stats Report */
