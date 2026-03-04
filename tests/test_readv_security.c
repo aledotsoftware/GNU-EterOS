@@ -127,6 +127,7 @@ void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {}
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int unlink_fs(fs_node_t *parent, char *name) { return 0; }
 int ioctl_fs(fs_node_t *node, int request, void *arg) { return 0; }
+int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) { return -1; }
 
 /* Stub MSR functions */
 uint64_t rdmsr(uint32_t msr) { return 0; }

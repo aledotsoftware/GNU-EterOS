@@ -41,3 +41,6 @@
 ## 2026-12-05 - [String Copy Bulk Operations]
 **Learning:** Manual byte-by-byte loops for standard library string functions like `strncpy` are highly inefficient compared to utilizing block memory operations. The old implementation iterated twice per character (copy, then pad).
 **Action:** Replace byte-by-byte loops in string manipulation primitives with combinations of optimized operations (`strnlen`, `memcpy`, `memset`). This allows the underlying architecture to use hardware fast-string operations (e.g., `rep movsq`, `rep stosq`), yielding >20x performance improvements for large strings.
+## 2026-12-05 - [Fast-Path Rectangle Outline]
+**Learning:** Drawing a rectangle's outline by executing Bresenham's line algorithm (`gfx_draw_line`) 4 times generates a massive amount of overhead for simple vertical and horizontal lines. Setting individual pixels limits bandwidth use drastically.
+**Action:** When a rectangle outline needs to be drawn (`gfx_draw_rect`), do so by composing it out of 4 independent memory blocks via fast-path `gfx_fill_rect` logic, resulting in roughly a 4-5x speed improvement and avoiding loop overhead.
