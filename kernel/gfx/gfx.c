@@ -94,6 +94,22 @@ void gfx_put_pixel(int32_t x, int32_t y, uint32_t color) {
 }
 
 void gfx_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color) {
+    /* ⚡ BOLT Optimization: Fast path for horizontal and vertical lines */
+    if (y0 == y1) {
+        int32_t x = x0 < x1 ? x0 : x1;
+        int32_t w = (x0 < x1 ? x1 - x0 : x0 - x1) + 1;
+        gfx_fill_rect(x, y0, w, 1, color);
+        return;
+    }
+
+    if (x0 == x1) {
+        int32_t y = y0 < y1 ? y0 : y1;
+        int32_t h = (y0 < y1 ? y1 - y0 : y0 - y1) + 1;
+        gfx_fill_rect(x0, y, 1, h, color);
+        return;
+    }
+
+    /* Fallback to Bresenham's algorithm */
     /* Dirty the bounding box of the line */
     int32_t min_x = min(x0, x1);
     int32_t min_y = min(y0, y1);
@@ -115,10 +131,25 @@ void gfx_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t colo
 }
 
 void gfx_draw_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
-    gfx_draw_line(x, y, x + w - 1, y, color);
-    gfx_draw_line(x + w - 1, y, x + w - 1, y + h - 1, color);
-    gfx_draw_line(x + w - 1, y + h - 1, x, y + h - 1, color);
-    gfx_draw_line(x, y + h - 1, x, y, color);
+    /* ⚡ BOLT Optimization: Use fast path block fills directly for the 4 edges
+       instead of calling gfx_draw_line to avoid branching overhead */
+    if (w <= 0 || h <= 0) return;
+
+    if (w == 1 && h == 1) {
+        gfx_fill_rect(x, y, 1, 1, color);
+        return;
+    }
+
+    /* Top edge */
+    gfx_fill_rect(x, y, w, 1, color);
+    /* Bottom edge */
+    if (h > 1) gfx_fill_rect(x, y + h - 1, w, 1, color);
+
+    /* Left edge (excluding corners already drawn by top/bottom) */
+    if (h > 2) gfx_fill_rect(x, y + 1, 1, h - 2, color);
+
+    /* Right edge (excluding corners) */
+    if (w > 1 && h > 2) gfx_fill_rect(x + w - 1, y + 1, 1, h - 2, color);
 }
 
 void gfx_fill_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
