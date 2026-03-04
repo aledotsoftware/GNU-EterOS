@@ -37,3 +37,6 @@
 ## 2026-11-26 - [Framebuffer Block Copy Optimization]
 **Learning:** Flushing rectangles row-by-row in the framebuffer introduces overhead from loop iterations and multiple function calls even with optimized `memcpy`. When a dirty rectangle spans the full width of the framebuffer (`row_len == fb_pitch`), the region is perfectly contiguous in memory.
 **Action:** Always check if the drawing area spans the full pitch width, and if so, use a single, highly efficient `memcpy` block operation to copy the entire contiguous memory region at once.
+## 2026-12-05 - [Fast-Path Rectangle Outline]
+**Learning:** Drawing a rectangle's outline by executing Bresenham's line algorithm (`gfx_draw_line`) 4 times generates a massive amount of overhead for simple vertical and horizontal lines. Setting individual pixels limits bandwidth use drastically.
+**Action:** When a rectangle outline needs to be drawn (`gfx_draw_rect`), do so by composing it out of 4 independent memory blocks via fast-path `gfx_fill_rect` logic, resulting in roughly a 4-5x speed improvement and avoiding loop overhead.
