@@ -108,9 +108,11 @@ typedef struct {
     spinlock_t lock;
 } pipe_t;
 
-#define PIPE_SIZE 4096
+#define PIPE_SIZE 65536
 #define PIPE_READ_END  1
 #define PIPE_WRITE_END 2
+
+static int64_t sys_kill(int pid, int sig);
 
 static ssize_t pipe_read(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
@@ -124,6 +126,10 @@ static ssize_t pipe_read(fs_node_t* node, uint32_t offset, uint32_t size, uint8_
         if (pipe->bytes_available == 0) {
             spin_unlock(&pipe->lock);
             if (pipe->writers == 0) return read; /* EOF */
+            if (node->flags & O_NONBLOCK) {
+                if (read > 0) return read;
+                return -EAGAIN;
+            }
             task_yield(); /* Block */
             continue;
         }
@@ -150,7 +156,14 @@ static uint32_t pipe_write(fs_node_t* node, uint32_t offset, uint32_t size, uint
 
         if (pipe->bytes_available == pipe->size) {
             spin_unlock(&pipe->lock);
-            if (pipe->readers == 0) return written; /* Broken pipe */
+            if (pipe->readers == 0) {
+                sys_kill(task_get_current()->id, SIGPIPE);
+                return -EPIPE; /* Broken pipe */
+            }
+            if (node->flags & O_NONBLOCK) {
+                if (written > 0) return written;
+                return -EAGAIN;
+            }
             task_yield(); /* Block */
             continue;
         }
@@ -217,24 +230,35 @@ static int split_path(const char* path, char* parent, char* name) {
     return 0;
 }
 
-static int copy_user_string(const char* user_path, char** out_kpath, int max_len) {
-    if (!user_path) return -EFAULT;
-    char* kpath = (char*)kmalloc(max_len);
-    if (!kpath) return -ENOMEM;
-    int res = vmm_strncpy_from_user(kpath, user_path, max_len);
-    if (res < 0) {
-        kfree(kpath);
-        return res;
+static int resolve_path(int dirfd, const char* user_path, char* out_path, int size) {
+    char kpath[256];
+    char base_dir[256];
+
+    int res = vmm_strncpy_from_user(kpath, user_path, sizeof(kpath));
+    if (res < 0) return res;
+
+    task_t* current = task_get_current();
+    base_dir[0] = '\0';
+
+    if (kpath[0] != '/') {
+        if (dirfd == AT_FDCWD) {
+            strlcpy(base_dir, current->cwd, sizeof(base_dir));
+        } else {
+            if (dirfd < 0 || dirfd >= MAX_FD) return -EBADF;
+            if (!current->fd_table[dirfd].node) return -EBADF;
+            if ((current->fd_table[dirfd].node->flags & 0x7) != FS_DIRECTORY) return -ENOTDIR;
+            strlcpy(base_dir, current->fd_table[dirfd].path, sizeof(base_dir));
+        }
+        return vfs_normalize_path(out_path, size, kpath, base_dir);
+    } else {
+        return vfs_normalize_path(out_path, size, kpath, NULL);
     }
-    kpath[max_len - 1] = '\0'; /* Ensure null termination */
-    *out_kpath = kpath;
-    return 0;
 }
 
+
 static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
-    (void)fd; (void)offset;
     if (len == 0) return -EINVAL;
-    if (!(flags & 0x20)) return -ENODEV;
+    if (!(flags & 0x23)) return -ENODEV; // MAP_PRIVATE (0x02), MAP_SHARED (0x01) or MAP_ANONYMOUS (0x20)
 
     task_t* current = task_get_current();
     uint64_t virt;
@@ -258,6 +282,14 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     uint64_t end = PAGE_ALIGN_UP(virt + len);
     if (end < start || (virt + len) < virt) return -ENOMEM; /* Overflow check */
 
+    fs_node_t* file_node = NULL;
+    if (fd != -1) {
+        if (fd < 0 || fd >= MAX_FD) return -EBADF;
+        if (!current->fd_table[fd].node) return -EBADF;
+        file_node = current->fd_table[fd].node;
+        __atomic_fetch_add(&file_node->ref_count, 1, __ATOMIC_SEQ_CST);
+    }
+
     for (uint64_t v = start; v < end; v += PAGE_SIZE) {
         /* SECURITY FIX: Check if page is already mapped. If so, unmap it to prevent data leaks or reuse. */
         uint64_t existing_phys = hal_mem_get_phys(v);
@@ -274,6 +306,17 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
             if (prot & 4) map_flags |= HAL_MEM_EXEC;
             hal_mem_map((uint64_t)phys, v, map_flags);
             memset((void*)v, 0, PAGE_SIZE);
+
+            if (file_node) {
+                uint64_t current_offset = offset + (v - start);
+                if (current_offset < file_node->length) {
+                    uint64_t read_len = PAGE_SIZE;
+                    if (current_offset + read_len > file_node->length) {
+                        read_len = file_node->length - current_offset;
+                    }
+                    read_fs(file_node, current_offset, read_len, (uint8_t*)v);
+                }
+            }
         }
     }
     return virt;
@@ -342,7 +385,7 @@ static int64_t sys_connect(int fd, const struct sockaddr* addr, int addrlen) {
     return 0;
 }
 
-static int64_t sys_pipe(int* pipefd) {
+static int64_t sys_pipe2(int* pipefd, int flags) {
     if (!vmm_verify_user_access(pipefd, 2 * sizeof(int), 1)) return -EFAULT;
     task_t* current = task_get_current();
     int fd[2] = {-1, -1};
@@ -372,10 +415,28 @@ static int64_t sys_pipe(int* pipefd) {
     strlcpy(writer->name, "pipe_w", 32); writer->flags = FS_PIPE; writer->write = pipe_write; writer->close = pipe_close; writer->open = pipe_open; writer->ptr = (struct fs_node*)pipe;
     writer->impl = PIPE_WRITE_END;
 
-    current->fd_table[fd[0]].node = reader; current->fd_table[fd[0]].offset = 0; current->fd_table[fd[0]].flags = O_RDONLY;
-    current->fd_table[fd[1]].node = writer; current->fd_table[fd[1]].offset = 0; current->fd_table[fd[1]].flags = O_WRONLY;
+    int rflags = O_RDONLY;
+    int wflags = O_WRONLY;
+
+    if (flags & O_CLOEXEC) {
+        rflags |= O_CLOEXEC;
+        wflags |= O_CLOEXEC;
+    }
+    if (flags & O_NONBLOCK) {
+        rflags |= O_NONBLOCK;
+        wflags |= O_NONBLOCK;
+        reader->flags |= O_NONBLOCK;
+        writer->flags |= O_NONBLOCK;
+    }
+
+    current->fd_table[fd[0]].node = reader; current->fd_table[fd[0]].offset = 0; current->fd_table[fd[0]].flags = rflags;
+    current->fd_table[fd[1]].node = writer; current->fd_table[fd[1]].offset = 0; current->fd_table[fd[1]].flags = wflags;
     pipefd[0] = fd[0]; pipefd[1] = fd[1];
     return 0;
+}
+
+static int64_t sys_pipe(int* pipefd) {
+    return sys_pipe2(pipefd, 0);
 }
 
 #define ARCH_SET_GS 0x1001
@@ -441,6 +502,9 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
     return read;
 }
 
+static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
+    char kpath[256];
+    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
 #define AT_FDCWD -100
 #define AT_EMPTY_PATH 0x1000
 
@@ -452,7 +516,7 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     task_t* current = task_get_current();
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) { if (current->fd_table[i].node == NULL) { fd = i; break; } }
-    if (fd == -1) { kfree(kpath); return -EMFILE; }
+    if (fd == -1) { return -EMFILE; }
 
     fs_node_t* base_node;
     if (kpath[0] == '/') {
@@ -471,16 +535,20 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     if (!node) {
         if (flags & O_CREAT) {
             char parent_path[128]; char filename[128];
+            if (split_path(kpath, parent_path, filename) != 0) { return -ENAMETOOLONG; }
+            fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+            if (!parent) { return -ENOENT; }
+            if (create_fs(parent, filename, (uint16_t)mode) != 0) { kfree(parent); return -EACCES; }
+            node = vfs_lookup(fs_root, kpath);
             if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
             fs_node_t* parent = vfs_lookup(base_node, parent_path);
             if (!parent) { kfree(kpath); return -ENOENT; }
             if (create_fs(parent, filename, (uint16_t)mode) != 0) { kfree(parent); kfree(kpath); return -EACCES; }
             node = vfs_lookup(base_node, kpath);
             kfree(parent);
-            if (!node) { kfree(kpath); return -ENOENT; }
-        } else { kfree(kpath); return -ENOENT; }
+            if (!node) { return -ENOENT; }
+        } else { return -ENOENT; }
     }
-    kfree(kpath);
 
     uint8_t read_mode = 0; uint8_t write_mode = 0;
     if ((flags & O_ACCMODE) == O_RDONLY) { read_mode = 1; }
@@ -497,6 +565,7 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
 
     open_fs(node, read_mode, write_mode);
     current->fd_table[fd].node = node; current->fd_table[fd].offset = 0; current->fd_table[fd].flags = flags;
+    strlcpy(current->fd_table[fd].path, kpath, sizeof(current->fd_table[fd].path));
     return fd;
 }
 
@@ -554,34 +623,85 @@ static int64_t sys_close(int fd) {
     return 0;
 }
 
-static int64_t sys_mkdir(const char* path, int mode) {
-    char* kpath = NULL;
-    int res = copy_user_string(path, &kpath, 4096);
+static int64_t sys_mkdirat(int dirfd, const char* path, int mode) {
+    char kpath[256];
+    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
     if (res < 0) return res;
 
     char parent_path[128]; char filename[128];
-    if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
+    if (split_path(kpath, parent_path, filename) != 0) { return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
-    if (!parent) { kfree(kpath); return -ENOENT; }
+    if (!parent) { return -ENOENT; }
     int res2 = mkdir_fs(parent, filename, (uint16_t)mode);
     kfree(parent);
-    kfree(kpath);
+    return res2;
+}
+
+static int64_t sys_mkdir(const char* path, int mode) {
+    return sys_mkdirat(AT_FDCWD, path, mode);
+}
+
+static int64_t sys_unlinkat(int dirfd, const char* path, int flags) {
+    (void)flags;
+    char kpath[256];
+    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
+    if (res < 0) return res;
+
+    char parent_path[128]; char filename[128];
+    if (split_path(kpath, parent_path, filename) != 0) { return -ENAMETOOLONG; }
+    fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) { return -ENOENT; }
+    int res2 = unlink_fs(parent, filename);
+    kfree(parent);
     return res2;
 }
 
 static int64_t sys_unlink(const char* path) {
-    char* kpath = NULL;
-    int res = copy_user_string(path, &kpath, 4096);
+    return sys_unlinkat(AT_FDCWD, path, 0);
+}
+
+static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
+    if (!vmm_verify_user_access(buf, bufsiz, 1)) return -EFAULT;
+
+    char kpath[256];
+    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
     if (res < 0) return res;
 
-    char parent_path[128]; char filename[128];
-    if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
-    fs_node_t* parent = vfs_lookup(fs_root, parent_path);
-    if (!parent) { kfree(kpath); return -ENOENT; }
-    int res2 = unlink_fs(parent, filename);
-    kfree(parent);
-    kfree(kpath);
-    return res2;
+    fs_node_t* node = vfs_lookup_ext(fs_root, kpath, 0); // 0 means do not follow the last symlink
+    if (!node) return -ENOENT;
+
+    ssize_t read_bytes = 0;
+    if ((node->flags & 0x7) == FS_SYMLINK && node->read != NULL) {
+         read_bytes = node->read(node, 0, bufsiz, (uint8_t*)buf);
+    } else {
+        kfree(node);
+        return -EINVAL; // Not a symlink
+    }
+
+    kfree(node);
+    return read_bytes;
+}
+
+static int64_t sys_readlink(const char* path, char* buf, size_t bufsiz) {
+    return sys_readlinkat(AT_FDCWD, path, buf, bufsiz);
+}
+
+static int64_t sys_renameat(int olddirfd, const char* oldpath, int newdirfd, const char* newpath) {
+    // Basic stub, real implementation requires vfs_rename
+    (void)olddirfd; (void)oldpath; (void)newdirfd; (void)newpath;
+    return -ENOSYS;
+}
+
+static int64_t sys_symlinkat(const char* target, int newdirfd, const char* linkpath) {
+    // Basic stub, real implementation requires vfs_symlink
+    (void)target; (void)newdirfd; (void)linkpath;
+    return -ENOSYS;
+}
+
+static int64_t sys_utimensat(int dirfd, const char* pathname, const struct timespec times[2], int flags) {
+    // Basic stub, real implementation requires modifying node timestamps
+    (void)dirfd; (void)pathname; (void)times; (void)flags;
+    return 0; // Return 0 to fake success for coreutils like touch/cp
 }
 
 static int64_t sys_lseek(int fd, int64_t offset, int whence) {
@@ -729,20 +849,24 @@ static int64_t sys_fstat(int fd, struct stat* buf) {
     return 0;
 }
 
-static int64_t sys_stat(const char* path, struct stat* buf) {
-    char* kpath = NULL;
-    int res = copy_user_string(path, &kpath, 4096);
+static int64_t sys_newfstatat(int dirfd, const char* path, struct stat* buf, int flags) {
+    (void)flags;
+    char kpath[256];
+    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
     if (res < 0) return res;
 
-    if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) { kfree(kpath); return -EFAULT; }
+    if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) { return -EFAULT; }
     fs_node_t* node = vfs_lookup(fs_root, kpath);
-    if (!node) { kfree(kpath); return -ENOENT; }
+    if (!node) { return -ENOENT; }
     memset(buf, 0, sizeof(struct stat));
     buf->st_ino = node->inode; buf->st_size = node->length; buf->st_mode = 0100644;
     if ((node->flags & 0x7) == FS_DIRECTORY) buf->st_mode = 0040755;
     kfree(node);
-    kfree(kpath);
     return 0;
+}
+
+static int64_t sys_stat(const char* path, struct stat* buf) {
+    return sys_newfstatat(AT_FDCWD, path, buf, 0);
 }
 
 static int64_t sys_futex(uint32_t *uaddr, int op, uint32_t val, void *timeout, uint32_t *uaddr2, uint32_t val3) {
@@ -1062,13 +1186,14 @@ static int64_t sys_getegid(void) { return task_get_current()->gid; }
 #define R_OK 4
 #endif
 
-static int64_t sys_access(const char* path, int mode) {
-    char* kpath = NULL;
-    int res = copy_user_string(path, &kpath, 4096);
+static int64_t sys_faccessat(int dirfd, const char* path, int mode, int flags) {
+    (void)flags;
+    char kpath[256];
+    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
     if (res < 0) return res;
 
     fs_node_t* node = vfs_lookup(fs_root, kpath);
-    if (!node) { kfree(kpath); return -ENOENT; }
+    if (!node) { return -ENOENT; }
 
     int allowed = 1;
     if (mode != F_OK) {
@@ -1148,10 +1273,12 @@ static int64_t sys_faccessat(int dirfd, const char* path, int mode, int flags) {
     }
 
     kfree(node);
-    kfree(kpath);
     return allowed ? 0 : -EACCES;
 }
 
+static int64_t sys_access(const char* path, int mode) {
+    return sys_faccessat(AT_FDCWD, path, mode, 0);
+}
 static int64_t sys_fcntl(int fd, int cmd, int64_t arg) {
     (void)arg;
     task_t* current = task_get_current();
@@ -1180,10 +1307,81 @@ static int64_t sys_dup(int oldfd) {
     }
     return -EMFILE;
 }
+static int64_t sys_getdents64(int fd, struct linux_dirent64* dirp, unsigned int count) {
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    task_t* current = task_get_current();
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_DIRECTORY) return -ENOTDIR;
+    if (!vmm_verify_user_access(dirp, count, 1)) return -EFAULT;
+
+    unsigned int bpos = 0;
+    struct dirent entry;
+
+    // We use the fd's offset as the directory index.
+    while (bpos < count) {
+        int res = readdir_fs(node, current->fd_table[fd].offset, &entry);
+        if (res == -1) break; // Error reading
+        if (res == 1) break;  // EOF
+
+        int name_len = strlen(entry.name);
+
+        // d_ino + d_off + d_reclen + d_type = 8 + 8 + 2 + 1 = 19 bytes
+        // Then d_name + null terminator. Then align to 8 bytes.
+        int reclen = 19 + name_len + 1;
+        reclen = (reclen + 7) & ~7;
+
+        if (bpos + reclen > count) {
+            if (bpos == 0) return -EINVAL; // Buffer too small for even one entry
+            break;
+        }
+
+        // We need to look up the node to get its type if we want to be perfectly accurate,
+        // but for now let's do a basic lookup or guess based on the node,
+        // however readdir_fs doesn't return type. Let's do finddir_fs.
+        uint8_t d_type = DT_UNKNOWN;
+        fs_node_t* child = finddir_fs(node, entry.name);
+        if (child) {
+            uint32_t type = child->flags & 0x7;
+            if (type == FS_DIRECTORY) d_type = DT_DIR;
+            else if (type == FS_FILE) d_type = DT_REG;
+            else if (type == FS_CHARDEVICE) d_type = DT_CHR;
+            else if (type == FS_BLOCKDEVICE) d_type = DT_BLK;
+            else if (type == FS_PIPE) d_type = DT_FIFO;
+            else if (type == FS_SYMLINK) d_type = DT_LNK;
+            else if (type == FS_SOCKET) d_type = DT_SOCK;
+
+            // Sub refcount since finddir allocates/returns a clone/pointer
+            if (__atomic_sub_fetch(&child->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+                close_fs(child);
+                kfree(child);
+            }
+        }
+
+        // Write directly to user memory
+        struct linux_dirent64* user_ent = (struct linux_dirent64*)((uint8_t*)dirp + bpos);
+        user_ent->d_ino = entry.inode;
+
+        current->fd_table[fd].offset++;
+        user_ent->d_off = current->fd_table[fd].offset;
+
+        user_ent->d_reclen = reclen;
+        user_ent->d_type = d_type;
+        strlcpy(user_ent->d_name, entry.name, name_len + 1);
+
+        bpos += reclen;
+    }
+
+    return bpos;
+}
+
 static int64_t sys_getcwd(char* buf, size_t size) {
     if (!buf || size == 0) return -EINVAL;
     if (!vmm_verify_user_access(buf, size, 1)) return -EFAULT;
     task_t* current = task_get_current();
+    if (strlen(current->cwd) + 1 > size) return -ERANGE;
+    strlcpy(buf, current->cwd, size);
 
     char temp_path[256];
     temp_path[0] = '\0';
@@ -1249,6 +1447,22 @@ static int64_t sys_getcwd(char* buf, size_t size) {
 }
 
 static int64_t sys_chdir(const char* path) {
+    char kpath[256];
+    int res = resolve_path(AT_FDCWD, path, kpath, sizeof(kpath));
+    if (res < 0) return res;
+
+    fs_node_t* node = vfs_lookup(fs_root, kpath);
+    if (!node) return -ENOENT;
+    if ((node->flags & 0x7) != FS_DIRECTORY) {
+        kfree(node);
+        return -ENOTDIR;
+    }
+    kfree(node);
+
+    task_t* current = task_get_current();
+    strlcpy(current->cwd, kpath, sizeof(current->cwd));
+    return 0;
+}
     char* kpath = NULL;
     int res = copy_user_string(path, &kpath, 4096);
     if (res < 0) return res;
@@ -1361,10 +1575,20 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [158] = (syscall_ptr_t)sys_arch_prctl,
     [186] = (syscall_ptr_t)sys_gettid,
     [202] = (syscall_ptr_t)sys_futex,
+    [217] = (syscall_ptr_t)sys_getdents64,
     [218] = (syscall_ptr_t)sys_set_tid_address,
     [228] = (syscall_ptr_t)sys_clock_gettime,
     [269] = (syscall_ptr_t)sys_faccessat,
     [231] = (syscall_ptr_t)sys_exit_group,
+    [257] = (syscall_ptr_t)sys_openat,
+    [258] = (syscall_ptr_t)sys_mkdirat,
+    [262] = (syscall_ptr_t)sys_newfstatat,
+    [264] = (syscall_ptr_t)sys_renameat,
+    [266] = (syscall_ptr_t)sys_symlinkat,
+    [263] = (syscall_ptr_t)sys_unlinkat,
+    [269] = (syscall_ptr_t)sys_faccessat,
+    [280] = (syscall_ptr_t)sys_utimensat,
+    [293] = (syscall_ptr_t)sys_pipe2,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
 };

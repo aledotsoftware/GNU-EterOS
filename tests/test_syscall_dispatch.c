@@ -28,6 +28,33 @@ void syscall_entry(void) { printf("syscall_entry referenced\n"); }
 cpu_info_t cpu_mock_struct;
 #define get_current_cpu() (&cpu_mock_struct)
 
+int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir) {
+    (void)base_dir;
+    if (!out_path || !path || size <= 0) return -1;
+    size_t i = 0;
+    while (path[i] && i < (size_t)(size - 1)) {
+        out_path[i] = path[i];
+        i++;
+    }
+    out_path[i] = '\0';
+    return 0;
+}
+
+int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) {
+    (void)node; (void)index; (void)entry;
+    return -1;
+}
+
+fs_node_t *finddir_fs(fs_node_t *node, char *name) {
+    (void)node; (void)name;
+    return NULL;
+}
+
+fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) {
+    (void)root; (void)path; (void)follow_symlink;
+    return NULL;
+}
+
 #include "../kernel/arch/x86_64/syscall.c"
 
 fs_node_t *fs_root = NULL;
