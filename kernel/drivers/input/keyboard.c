@@ -77,10 +77,15 @@ static const char scancode_to_ascii_shift[128] = {
 /* Procesamiento de Scancodes                                                */
 /* ========================================================================= */
 
+#include <gfx/window.h>
+
 /* Estado para scancodes extendidos (prefijo 0xE0) */
 static volatile bool extended_scancode = false;
 
 void keyboard_process_scancode(uint8_t scancode) {
+    /* Wake up the compositor on input */
+    compositor_wake();
+
     /* Detectar prefijo de scancode extendido */
     if (scancode == 0xE0) {
         extended_scancode = true;

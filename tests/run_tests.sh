@@ -242,3 +242,9 @@ echo "Running bench_gfx_draw_rect..."
 gcc -D__ETEROS_HOST_TEST__ tests/bench_gfx_draw_rect.c -o tests/bench_gfx_draw_rect
 ./tests/bench_gfx_draw_rect
 rm tests/bench_gfx_draw_rect
+# Test Bench Gfx Rect Fastpath
+echo "---------------------------------------------------"
+echo "Running bench_gfx_rect..."
+gcc -O3 -D__ETEROS_HOST_TEST__ -Iinclude tests/bench_gfx_rect.c kernel/string.c -o tests/bench_gfx_rect
+./tests/bench_gfx_rect
+rm tests/bench_gfx_rect
