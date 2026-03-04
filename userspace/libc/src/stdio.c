@@ -332,7 +332,8 @@ int snprintf(char *str, size_t size, const char *format, ...) {
 int sprintf(char *str, const char *format, ...) {
     va_list ap;
     va_start(ap, format);
-    int ret = vsprintf(str, format, ap);
+    // Use a reasonable max buffer size instead of (size_t)-1
+    int ret = vsnprintf(str, 4096, format, ap);
     va_end(ap);
     return ret;
 }
@@ -349,7 +350,7 @@ int vfprintf(FILE *stream, const char *format, va_list ap) {
 #endif
 
 int vsprintf(char *str, const char *format, va_list ap) {
-    return vsnprintf(str, (size_t)-1, format, ap);
+    return vsnprintf(str, 4096, format, ap);
 }
 
 int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
