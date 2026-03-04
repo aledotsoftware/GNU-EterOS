@@ -135,6 +135,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/shell/cmd_net.c      \
               $(KERNEL_DIR)/shell/cmd_task.c     \
               $(KERNEL_DIR)/shell/cmd_misc.c     \
+              $(KERNEL_DIR)/shell/cmd_ota.c      \
               $(KERNEL_DIR)/drivers/video/vga.c  \
               $(KERNEL_DIR)/drivers/serial/serial.c \
               $(KERNEL_DIR)/drivers/input/keyboard.c \
@@ -158,11 +159,14 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/fs/devfs.c             \
               $(KERNEL_DIR)/fs/procfs.c            \
               $(KERNEL_DIR)/fs/jfs.c               \
+              $(KERNEL_DIR)/crypto/sha256.c        \
+              $(KERNEL_DIR)/crypto/ed25519.c       \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
               $(KERNEL_DIR)/gfx/gfx.c              \
               $(KERNEL_DIR)/gfx/window.c           \
+              $(KERNEL_DIR)/gfx/png.c              \
               $(KERNEL_DIR)/mm/pmm.c               \
               $(KERNEL_DIR)/mm/vmm.c               \
               $(KERNEL_DIR)/drivers/input/mouse.c  \
@@ -194,7 +198,8 @@ KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/trampoline.asm \
                   $(KERNEL_DIR)/arch/x86_64/smp_trampoline_wrapper.asm \
                   $(KERNEL_DIR)/arch/x86_64/user_mode.asm \
-                  $(KERNEL_DIR)/arch/x86_64/user_payload.asm
+                  $(KERNEL_DIR)/arch/x86_64/user_payload.asm \
+                  $(KERNEL_DIR)/arch/x86_64/exceptions.asm
 
 # ---- Archivos objeto ----
 # Mapear .c -> .o en el directorio de build

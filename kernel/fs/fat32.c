@@ -129,16 +129,24 @@ static uint32_t fat32_get_next_cluster(fat32_volume_t* vol, uint32_t current_clu
     uint32_t fat_sector = vol->fat_start_lba + (fat_offset / vol->bytes_per_sector);
     uint32_t ent_offset = fat_offset % vol->bytes_per_sector;
 
-    uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return 0xFFFFFFFF;
+    /* ⚡ BOLT Optimization: Use stack buffer for typical sector sizes (<=512) to avoid kmalloc overhead */
+    uint8_t stack_buffer[512];
+    uint8_t* buffer = stack_buffer;
+    int use_kmalloc = 0;
+
+    if (vol->bytes_per_sector > sizeof(stack_buffer)) {
+        buffer = kmalloc(vol->bytes_per_sector);
+        if (!buffer) return 0xFFFFFFFF;
+        use_kmalloc = 1;
+    }
 
     if (fat32_read_sector_cached(vol, fat_sector, buffer) != 0) {
-        kfree(buffer);
+        if (use_kmalloc) kfree(buffer);
         return 0xFFFFFFFF;
     }
 
     uint32_t next_cluster = *(uint32_t*)&buffer[ent_offset];
-    kfree(buffer);
+    if (use_kmalloc) kfree(buffer);
 
     return next_cluster & 0x0FFFFFFF;
 }

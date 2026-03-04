@@ -9,6 +9,30 @@
 void *memcpy(void *dest, const void *src, size_t n) {
 #ifdef __x86_64__
     void *original_dest = dest;
+    uint8_t *d = (uint8_t *)dest;
+    const uint8_t *s = (const uint8_t *)src;
+
+    /* ⚡ BOLT Optimization: Fast path for small blocks (< 64 bytes) to avoid
+       the setup overhead of the `rep` microcode on modern x86_64. */
+    if (n < 64) {
+        while (n >= 8) {
+            *(uint64_t *)d = *(const uint64_t *)s;
+            d += 8; s += 8; n -= 8;
+        }
+        if (n >= 4) {
+            *(uint32_t *)d = *(const uint32_t *)s;
+            d += 4; s += 4; n -= 4;
+        }
+        if (n >= 2) {
+            *(uint16_t *)d = *(const uint16_t *)s;
+            d += 2; s += 2; n -= 2;
+        }
+        if (n) {
+            *d = *s;
+        }
+        return original_dest;
+    }
+
     size_t qwords = n / 8;
     size_t remainder = n % 8;
 
@@ -17,7 +41,7 @@ void *memcpy(void *dest, const void *src, size_t n) {
         "rep movsq\n\t"
         "movq %3, %%rcx\n\t"
         "rep movsb"
-        : "+D"(dest), "+S"(src), "+c"(qwords)
+        : "+D"(d), "+S"(s), "+c"(qwords)
         : "r"(remainder)
         : "memory"
     );
@@ -315,13 +339,19 @@ char *strchr(const char *s, int c) {
 }
 
 char *strrchr(const char *s, int c) {
-    const char *last = (void*)0;
-    while (*s) {
-        if (*s == (char)c) last = s;
-        s++;
+    /* ⚡ BOLT Optimization: Use optimized strlen to find length and search backwards.
+       Avoids full string forward traversal when searching for characters near the end. */
+    size_t len = strlen(s);
+    if (c == 0) return (char *)(s + len);
+
+    const char *p = s + len;
+    char ch = (char)c;
+
+    while (p > s) {
+        p--;
+        if (*p == ch) return (char *)p;
     }
-    if (c == 0) return (char *)s;
-    return (char *)last;
+    return (void*)0;
 }
 
 char *strstr(const char *haystack, const char *needle) {
@@ -349,12 +379,57 @@ char *strcat(char *dest, const char *src) {
 }
 
 void *memchr(const void *s, int c, size_t n) {
+#ifdef __x86_64__
+    const unsigned char *p = (const unsigned char *)s;
+    const uint64_t one_bits = 0x0101010101010101ULL;
+    const uint64_t high_bits = 0x8080808080808080ULL;
+
+    /* Align to 8 bytes */
+    while (n && ((uintptr_t)p & 7)) {
+        if (*p == (unsigned char)c) return (void *)p;
+        p++;
+        n--;
+    }
+
+    /* Process 8 bytes at a time */
+    typedef uint64_t __attribute__((__may_alias__)) u64_alias;
+    const u64_alias *lp = (const u64_alias *)p;
+
+    uint64_t v;
+    uint64_t char_mask = (unsigned char)c * one_bits;
+
+    while (n >= 8) {
+        v = *lp;
+
+        /* Check if any byte matches c:
+           We XOR with char_mask, then detect zero bytes in result */
+        uint64_t match_bytes = ((v ^ char_mask) - one_bits) & ~(v ^ char_mask) & high_bits;
+
+        if (match_bytes) {
+            /* Found something, break to byte loop */
+            p = (const unsigned char *)lp;
+            break;
+        }
+        lp++;
+        n -= 8;
+    }
+
+    p = (const unsigned char *)lp;
+    /* Byte-wise loop to find exact location */
+    while (n--) {
+        if (*p == (unsigned char)c) return (void *)p;
+        p++;
+    }
+
+    return (void *)0;
+#else
     const unsigned char *p = (const unsigned char *)s;
     while (n--) {
         if (*p == (unsigned char)c) return (void *)p;
         p++;
     }
     return (void *)0;
+#endif
 }
 
 char *strerror(int errnum) {

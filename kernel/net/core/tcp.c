@@ -5,6 +5,7 @@
 #include <timer.h>
 #include <task.h>
 #include <hal.h>
+#include <fs/devfs.h>
 
 extern uint32_t my_ip;
 extern uint8_t gateway_mac[6];
@@ -89,6 +90,13 @@ void tcp_input(socket_entry_t* sock, struct tcp_header* tcp, int len, uint32_t s
 
     /* Calculate Header Length and Data Length */
     int doff = (flags >> 12) * 4;
+
+    /* SECURITY FIX: Validate TCP Data Offset (doff) to prevent integer underflow and out-of-bounds reads */
+    if (doff < 20 || doff > len) {
+        hal_console_write("[TCP] Warning: Invalid TCP Data Offset or Length, dropping packet.\n");
+        return;
+    }
+
     int data_len = len - doff;
 
     if (sock->state == SOCKET_STATE_SYN_SENT) {
@@ -102,12 +110,17 @@ void tcp_input(socket_entry_t* sock, struct tcp_header* tcp, int len, uint32_t s
         }
     } else if (sock->state == SOCKET_STATE_ESTABLISHED) {
         if (data_len > 0) {
+            int available = (sock->rx_tail - sock->rx_head - 1 + RX_BUFFER_SIZE) % RX_BUFFER_SIZE;
+            if (data_len > available) {
+                hal_console_write("[TCP] Warning: Receive buffer full, dropping packet.\n");
+                return; /* Drop packet, do not ACK */
+            }
+
             /* Copy data to rx_buf */
             uint8_t* data = (uint8_t*)tcp + doff;
             for (int i=0; i<data_len; i++) {
                 sock->rx_buf[sock->rx_head] = data[i];
                 sock->rx_head = (sock->rx_head + 1) % RX_BUFFER_SIZE;
-                /* Handle overflow? Overwrite or drop? Ring buffer. */
             }
 
             sock->ack_num += data_len;
@@ -153,7 +166,12 @@ void tcp_input(socket_entry_t* sock, struct tcp_header* tcp, int len, uint32_t s
 int tcp_connect(socket_entry_t* sock, uint32_t dest_ip, uint16_t dest_port) {
     sock->remote_ip = dest_ip;
     sock->remote_port = dest_port;
-    sock->seq_num = 0x1000 + (timer_get_ticks() & 0xFFFF);
+
+    /* Security Fix: Generate a secure random Initial Sequence Number */
+    uint32_t secure_isn = 0;
+    get_random_bytes((uint8_t*)&secure_isn, sizeof(secure_isn));
+    sock->seq_num = secure_isn;
+
     sock->ack_num = 0;
     sock->state = SOCKET_STATE_SYN_SENT;
 

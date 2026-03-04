@@ -13,9 +13,14 @@ static void buffer_append(char* str, size_t size, size_t* pos, char c) {
 }
 
 /* Helper for numbers */
+/* ⚡ BOLT Optimization: Use backward filling to avoid string reversal, fast paths for base 10/16,
+   and memcpy for faster buffer writing when space permits. */
+static const char hex_chars_upper[] = "0123456789ABCDEF";
+static const char hex_chars_lower[] = "0123456789abcdef";
+
 static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int base, int width, int zeropad, int left_justify, int uppercase, int is_signed) {
     char temp[65];
-    int i = 0;
+    int i = 64; /* Fill backwards */
     int is_neg = 0;
 
     if (is_signed && base == 10 && (int64_t)val < 0) {
@@ -24,17 +29,30 @@ static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int ba
     }
 
     if (val == 0) {
-        temp[i++] = '0';
+        temp[--i] = '0';
     } else {
-        while (val != 0) {
-            int rem = val % base;
-            if (rem < 10) temp[i++] = rem + '0';
-            else temp[i++] = (uppercase ? 'A' : 'a') + rem - 10;
-            val /= base;
+        if (base == 10) {
+            while (val != 0) {
+                temp[--i] = '0' + (val % 10);
+                val /= 10;
+            }
+        } else if (base == 16) {
+            const char* hex_chars = uppercase ? hex_chars_upper : hex_chars_lower;
+            while (val != 0) {
+                temp[--i] = hex_chars[val & 0xF];
+                val >>= 4;
+            }
+        } else {
+            while (val != 0) {
+                int rem = val % base;
+                if (rem < 10) temp[--i] = rem + '0';
+                else temp[--i] = (uppercase ? 'A' : 'a') + rem - 10;
+                val /= base;
+            }
         }
     }
 
-    int len = i + (is_neg ? 1 : 0);
+    int len = 64 - i + (is_neg ? 1 : 0);
     int padding = width - len;
 
     if (!left_justify && !zeropad && padding > 0) {
@@ -47,7 +65,14 @@ static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int ba
         while (padding-- > 0) buffer_append(str, size, pos, '0');
     }
 
-    while (i > 0) buffer_append(str, size, pos, temp[--i]);
+    /* Direct copy to str if it fits to avoid character-by-character append overhead */
+    size_t copy_len = 64 - i;
+    if (size > 0 && *pos + copy_len < size) {
+        memcpy(&str[*pos], &temp[i], copy_len);
+        *pos += copy_len;
+    } else {
+        while (i < 64) buffer_append(str, size, pos, temp[i++]);
+    }
 
     if (left_justify && padding > 0) {
         while (padding-- > 0) buffer_append(str, size, pos, ' ');
