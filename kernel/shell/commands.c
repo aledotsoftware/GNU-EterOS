@@ -36,6 +36,7 @@ static const shell_command_t commands[] = {
     { "net",      "Informacion de red (MAC/IP)",                 cmd_net     },
     { "dhcp",     "Obtener IP via DHCP",                         cmd_dhcp    },
     { "wget",     "Descargar archivo via HTTP",                  cmd_wget    },
+    { "ota",      "Actualizaciones de sistema (OTA)",            cmd_ota     },
     { "uptime",   "Tiempo desde el arranque",                    cmd_uptime  },
     { "ps",       "Lista tareas activas",                         cmd_ps      },
     { "kill",     "Matar tarea (uso: kill <pid>)",                cmd_kill    },
