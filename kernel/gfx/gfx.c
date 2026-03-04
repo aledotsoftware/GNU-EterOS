@@ -128,6 +128,21 @@ void gfx_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t colo
 void gfx_draw_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
     if (w <= 0 || h <= 0) return;
 
+    /* ⚡ BOLT Optimization: Use gfx_fill_rect for horizontal/vertical lines
+       instead of pixel-by-pixel gfx_draw_line. This leverages memset32 fast paths. */
+
+    /* 1px thick edge cases */
+    if (w == 1 || h == 1) {
+        gfx_fill_rect(x, y, w, h, color);
+        return;
+    }
+
+    gfx_fill_rect(x, y, w, 1, color);                  /* Top */
+    gfx_fill_rect(x, y + h - 1, w, 1, color);          /* Bottom */
+
+    if (h > 2) {
+        gfx_fill_rect(x, y + 1, 1, h - 2, color);          /* Left */
+        gfx_fill_rect(x + w - 1, y + 1, 1, h - 2, color);  /* Right */
     /* ⚡ BOLT Optimization: Use gfx_fill_rect directly for the 4 edges.
        This bypasses the function overhead of gfx_draw_line and takes
        advantage of optimized contiguous memory block operations. */

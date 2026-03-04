@@ -31,3 +31,4 @@ __pycache__/
 
 # Node
 web_ui/node_modules/
+tests/bench_gfx_draw_rect
