@@ -195,7 +195,8 @@ KERNEL_ASM_SRCS = $(KERNEL_DIR)/arch/x86_64/context_switch.asm \
                   $(KERNEL_DIR)/arch/x86_64/trampoline.asm \
                   $(KERNEL_DIR)/arch/x86_64/smp_trampoline_wrapper.asm \
                   $(KERNEL_DIR)/arch/x86_64/user_mode.asm \
-                  $(KERNEL_DIR)/arch/x86_64/user_payload.asm
+                  $(KERNEL_DIR)/arch/x86_64/user_payload.asm \
+                  $(KERNEL_DIR)/arch/x86_64/exceptions.asm
 
 # ---- Archivos objeto ----
 # Mapear .c -> .o en el directorio de build

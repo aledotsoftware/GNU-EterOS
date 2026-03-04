@@ -35,6 +35,11 @@ void* eteros_memcpy(void* dest, const void* src, size_t n) { return std_memcpy(d
 
 /* Mock Kernel/Hardware functions */
 void serial_write_string(const char* str) { (void)str; }
+void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
+    if (buffer && buffer_size > 0) {
+        snprintf(buffer, buffer_size, "%lx", value);
+    }
+}
 
 int total_cpus = 1;
 
