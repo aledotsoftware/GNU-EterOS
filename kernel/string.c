@@ -424,12 +424,12 @@ size_t strnlen(const char* s, size_t maxlen) {
 }
 
 char* strncpy(char* dest, const char* src, size_t n) {
-    size_t i;
-    for (i = 0; i < n && src[i] != '\0'; i++) {
-        dest[i] = src[i];
-    }
-    for (; i < n; i++) {
-        dest[i] = '\0';
+    /* ⚡ BOLT Optimization: Leverage optimized strnlen and block memory operations (memcpy/memset)
+       instead of a slow byte-by-byte copy loop. This yields massive speedups on bulk copies. */
+    size_t len = strnlen(src, n);
+    memcpy(dest, src, len);
+    if (len < n) {
+        memset(dest + len, 0, n - len);
     }
     return dest;
 }
