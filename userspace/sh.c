@@ -29,6 +29,14 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(cmd_buf, "exit") == 0) break;
 
+        if (strcmp(cmd_buf, "help") == 0) {
+            printf("Built-in commands:\n");
+            printf("  help  - Show this message\n");
+            printf("  exit  - Exit the shell\n");
+            printf("Other commands will be executed as external programs.\n");
+            continue;
+        }
+
         /* Parse args */
         int i = 0;
         char *token = strtok(cmd_buf, " ");
@@ -45,7 +53,7 @@ int main(int argc, char *argv[]) {
         if (pid == 0) {
             /* Child */
             if (execve(args[0], args, NULL) < 0) {
-                printf("Error: Command not found: %s\n", args[0]);
+                printf("Error: Command not found: %s. Type 'help' for built-in commands.\n", args[0]);
                 exit(1);
             }
         } else if (pid > 0) {

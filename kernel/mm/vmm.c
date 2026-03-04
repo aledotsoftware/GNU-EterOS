@@ -199,6 +199,9 @@ void vmm_unmap_page(uint64_t virt_addr) {
     pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
     if (!pt) return;
 
+    /* Verificar si la página está presente */
+    if (!(pt[pt_idx] & PAGE_PRESENT)) return;
+
     /* Marcar como no presente */
     pt[pt_idx] = 0;
     

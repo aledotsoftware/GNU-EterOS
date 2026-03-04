@@ -20,6 +20,24 @@ struct dirent {
     uint32_t inode;
 };
 
+struct linux_dirent64 {
+    uint64_t d_ino;
+    int64_t  d_off;
+    uint16_t d_reclen;
+    uint8_t  d_type;
+    char     d_name[];
+};
+
+#define DT_UNKNOWN 0
+#define DT_FIFO    1
+#define DT_CHR     2
+#define DT_DIR     4
+#define DT_BLK     6
+#define DT_REG     8
+#define DT_LNK     10
+#define DT_SOCK    12
+#define DT_WHT     14
+
 typedef ssize_t (*read_type_t)(struct fs_node*, uint32_t, uint32_t, uint8_t*);
 typedef uint32_t (*write_type_t)(struct fs_node*, uint32_t, uint32_t, uint8_t*);
 typedef void (*open_type_t)(struct fs_node*);
@@ -81,12 +99,30 @@ int vfs_mkdir(const char *path, uint16_t permission);
  *
  * @param root The root node to start the search from (usually fs_root).
  * @param path The path string to look up.
+ * @param follow_symlink If 0, does not resolve the final symlink component. If 1, resolves it.
  * @return A pointer to the found fs_node_t, or NULL if not found.
  *
  * @note The returned node is allocated with kmalloc() and MUST be freed
  *       by the caller using kfree() when it is no longer needed to prevent memory leaks.
  */
+fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink);
+
+/**
+ * Backwards compatible vfs_lookup that always follows symlinks.
+ */
 fs_node_t *vfs_lookup(fs_node_t *root, const char *path);
+
+/**
+ * Normalizes a path, resolving relative components like '..' and '.',
+ * and handles relative paths based on a provided directory string.
+ *
+ * @param out_path The buffer to store the normalized absolute path.
+ * @param size The size of out_path buffer.
+ * @param path The path to normalize.
+ * @param base_dir The base directory to use if path is relative. If NULL, task CWD is used.
+ * @return 0 on success, -1 on error (e.g. path too long or going above root).
+ */
+int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir);
 
 extern fs_node_t *fs_root;
 
