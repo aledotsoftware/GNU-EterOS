@@ -115,10 +115,24 @@ void gfx_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t colo
 }
 
 void gfx_draw_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
-    gfx_draw_line(x, y, x + w - 1, y, color);
-    gfx_draw_line(x + w - 1, y, x + w - 1, y + h - 1, color);
-    gfx_draw_line(x + w - 1, y + h - 1, x, y + h - 1, color);
-    gfx_draw_line(x, y + h - 1, x, y, color);
+    if (w <= 0 || h <= 0) return;
+
+    /* ⚡ BOLT Optimization: Use gfx_fill_rect for horizontal/vertical lines
+       instead of pixel-by-pixel gfx_draw_line. This leverages memset32 fast paths. */
+
+    /* 1px thick edge cases */
+    if (w == 1 || h == 1) {
+        gfx_fill_rect(x, y, w, h, color);
+        return;
+    }
+
+    gfx_fill_rect(x, y, w, 1, color);                  /* Top */
+    gfx_fill_rect(x, y + h - 1, w, 1, color);          /* Bottom */
+
+    if (h > 2) {
+        gfx_fill_rect(x, y + 1, 1, h - 2, color);          /* Left */
+        gfx_fill_rect(x + w - 1, y + 1, 1, h - 2, color);  /* Right */
+    }
 }
 
 void gfx_fill_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {
