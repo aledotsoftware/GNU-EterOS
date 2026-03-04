@@ -584,6 +584,23 @@ void schedule(void) {
     wrmsr(MSR_FS_BASE, next_task->fs_base);
     wrmsr(MSR_KERNEL_GS_BASE, next_task->gs_base);
 
+    /* Switch Address Space (CR3) if necessary */
+    uint64_t current_cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(current_cr3));
+    if (next_task->cr3 != current_cr3 && next_task->cr3 != 0) {
+        char buf1[32], buf2[32];
+        serial_write_string("[SCHED] CR3 Switch: ");
+        utoa_hex_s(current_cr3, buf1, sizeof(buf1));
+        serial_write_string(buf1);
+        serial_write_string(" -> ");
+        utoa_hex_s(next_task->cr3, buf2, sizeof(buf2));
+        serial_write_string(buf2);
+        serial_write_string(" (Task: ");
+        serial_write_string(next_task->name);
+        serial_write_string(")\n");
+        __asm__ volatile("mov %0, %%cr3" : : "r"(next_task->cr3) : "memory");
+    }
+
     /* Context Switch holding the lock! */
     /* The next task will release it in schedule() return or task_entry_wrapper */
     context_switch(&current->rsp, next_task->rsp);

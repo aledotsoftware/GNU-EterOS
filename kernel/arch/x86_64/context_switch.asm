@@ -57,17 +57,21 @@ context_switch:
 ; -----------------------------------------------------------------------------
 global fork_return
 fork_return:
-    ; Restaurar registros en orden inverso al push en syscall_entry
-    pop r11     ; RFLAGS
-    pop rcx     ; RIP
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
     pop rbp
     pop rdi
     pop rsi
     pop rdx
-    pop r10
-    pop r8
-    pop r9
-    pop rax     ; Return Value (0 para el hijo)
+    pop rcx
+    pop rbx
+    pop rax
 
     ; Restaurar User Stack Pointer desde Per-CPU Data (offset 56)
     ; schedule() se aseguró de que gs:56 tenga el user_rsp del hijo.

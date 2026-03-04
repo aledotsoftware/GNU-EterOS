@@ -21,14 +21,6 @@ syscall_entry:
     ; include/cpu.h: offsetof(cpu_info_t, kernel_stack_top) = 48 (0x30)
     mov rsp, [gs:48]
 
-    ; DEBUG: Print '!' to serial (Now safe on Kernel Stack)
-    push rax
-    push rdx
-    mov dx, 0x3F8
-    mov al, '!'
-    out dx, al
-    pop rdx
-    pop rax
 
     ; 4. Save All Registers (Context)
     ; Matches struct syscall_regs in include/syscall.h (UPDATED)

@@ -100,6 +100,16 @@ static inline void load_cr3(uint64_t pml4_addr) {
 #endif
 }
 
+static inline pt_entry_t* get_active_pml4() {
+    uint64_t cr3_val;
+#ifndef __ETEROS_HOST_TEST__
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3_val));
+#else
+    cr3_val = (uint64_t)pml4;
+#endif
+    return (pt_entry_t*)(cr3_val & PAGE_ADDR_MASK);
+}
+
 /*
  * Obtiene o crea la siguiente tabla en la jerarquía.
  * Si la entrada no existe, asigna una nueva página física del PMM,
@@ -166,7 +176,8 @@ int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 1);
+    pt_entry_t* active_pml4 = get_active_pml4();
+    pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 1);
     if (!pdpt) return -1;
 
     pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 1);
@@ -190,7 +201,8 @@ void vmm_unmap_page(uint64_t virt_addr) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
+    pt_entry_t* active_pml4 = get_active_pml4();
+    pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 0);
     if (!pdpt) return;
 
     pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
@@ -214,9 +226,11 @@ uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
+    pt_entry_t* active_pml4 = get_active_pml4();
+
     /* 1. Walk PML4 */
-    if (!(pml4[pml4_idx] & PAGE_PRESENT)) return 0;
-    pt_entry_t* pdpt = (pt_entry_t*)(pml4[pml4_idx] & PAGE_ADDR_MASK);
+    if (!(active_pml4[pml4_idx] & PAGE_PRESENT)) return 0;
+    pt_entry_t* pdpt = (pt_entry_t*)(active_pml4[pml4_idx] & PAGE_ADDR_MASK);
 
     /* 2. Walk PDPT */
     if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) return 0;
