@@ -135,6 +135,8 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/shell/cmd_net.c      \
               $(KERNEL_DIR)/shell/cmd_task.c     \
               $(KERNEL_DIR)/shell/cmd_misc.c     \
+              $(KERNEL_DIR)/shell/cmd_devices.c  \
+              $(KERNEL_DIR)/shell/cmd_time.c     \
               $(KERNEL_DIR)/shell/cmd_ota.c      \
               $(KERNEL_DIR)/drivers/video/vga.c  \
               $(KERNEL_DIR)/drivers/serial/serial.c \

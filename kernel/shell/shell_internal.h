@@ -38,4 +38,13 @@ void cmd_test_compositor(const char* args);
 void wget_run(const char* url_in);
 void cmd_ota(const char* args);
 
+void cmd_keymap(const char* args);
+void cmd_typematic(const char* args);
+void cmd_mouse(const char* args);
+void cmd_storage(const char* args);
+
+void cmd_ntp(const char* args);
+void cmd_time(const char* args);
+void cmd_timezone(const char* args);
+
 #endif

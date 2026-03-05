@@ -9,6 +9,8 @@
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA    0x71
 
+static int8_t current_timezone = -3; // Default UTC-3 (Argentina)
+
 static int rtc_is_updating() {
     outb(CMOS_ADDRESS, 0x0A);
     return (inb(CMOS_DATA) & 0x80);
@@ -17,6 +19,11 @@ static int rtc_is_updating() {
 static unsigned char rtc_read_register(int reg) {
     outb(CMOS_ADDRESS, reg);
     return inb(CMOS_DATA);
+}
+
+static void rtc_write_register(int reg, unsigned char val) {
+    outb(CMOS_ADDRESS, reg);
+    outb(CMOS_DATA, val);
 }
 
 void rtc_init(void) {
@@ -87,6 +94,66 @@ void rtc_get_time(rtc_time_t* time) {
     time->year    = 2000 + year; // Assume 20xx
 }
 
+void rtc_set_time(rtc_time_t* time) {
+    unsigned char registerB;
+    unsigned char second, minute, hour, day, month, year;
+
+    while (rtc_is_updating());
+
+    registerB = rtc_read_register(0x0B);
+
+    int is_bcd = !(registerB & 0x04);
+    int is_12h = !(registerB & 0x02);
+
+    second = time->seconds;
+    minute = time->minutes;
+    hour   = time->hours;
+    day    = time->day;
+    month  = time->month;
+    year   = time->year % 100; // Assume 20xx
+
+    int pm = 0;
+    if (is_12h) {
+        if (hour >= 12) {
+            pm = 1;
+            if (hour > 12) hour -= 12;
+        } else if (hour == 0) {
+            hour = 12;
+        }
+    }
+
+    if (is_bcd) {
+        second = ((second / 10) << 4) | (second % 10);
+        minute = ((minute / 10) << 4) | (minute % 10);
+        hour   = ((hour / 10) << 4) | (hour % 10);
+        day    = ((day / 10) << 4) | (day % 10);
+        month  = ((month / 10) << 4) | (month % 10);
+        year   = ((year / 10) << 4) | (year % 10);
+    }
+
+    if (is_12h && pm) {
+        hour |= 0x80;
+    }
+
+    // Disable interrupts/NMI while updating? For simplicity, we just wait and write.
+    // In a real OS we should disable NMI by writing port 0x70 with 0x80 bit set, but
+    // since we do a fast write it's usually fine. We must set register B SET bit
+    // to prevent updates during our writes.
+
+    // Set 'SET' bit (bit 7) of register B to pause RTC updates
+    rtc_write_register(0x0B, registerB | 0x80);
+
+    rtc_write_register(0x00, second);
+    rtc_write_register(0x02, minute);
+    rtc_write_register(0x04, hour);
+    rtc_write_register(0x07, day);
+    rtc_write_register(0x08, month);
+    rtc_write_register(0x09, year);
+
+    // Clear 'SET' bit of register B to resume updates
+    rtc_write_register(0x0B, registerB);
+}
+
 static int is_leap_year(uint16_t year) {
     return (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
 }
@@ -106,14 +173,19 @@ static uint8_t get_days_in_month(uint8_t month, uint16_t year) {
 }
 
 void rtc_to_argentina(const rtc_time_t* utc, rtc_time_t* local) {
+    rtc_get_local_time(utc, local);
+}
+
+void rtc_get_local_time(const rtc_time_t* utc, rtc_time_t* local) {
     *local = *utc;
 
-    // Argentina is UTC-3
-    if (local->hours >= 3) {
-        local->hours -= 3;
-    } else {
+    if (current_timezone == 0) return;
+
+    int new_hour = (int)local->hours + current_timezone;
+
+    if (new_hour < 0) {
         // Go back one day
-        local->hours = 24 - (3 - local->hours);
+        local->hours = 24 + new_hour;
 
         if (local->day > 1) {
             local->day--;
@@ -128,5 +200,33 @@ void rtc_to_argentina(const rtc_time_t* utc, rtc_time_t* local) {
             }
             local->day = get_days_in_month(local->month, local->year);
         }
+    } else if (new_hour >= 24) {
+        // Go forward one day
+        local->hours = new_hour - 24;
+
+        uint8_t days_this_month = get_days_in_month(local->month, local->year);
+        if (local->day < days_this_month) {
+            local->day++;
+        } else {
+            local->day = 1;
+            if (local->month < 12) {
+                local->month++;
+            } else {
+                local->month = 1;
+                local->year++;
+            }
+        }
+    } else {
+        local->hours = new_hour;
     }
+}
+
+void rtc_set_timezone(int8_t offset) {
+    if (offset >= -12 && offset <= 14) {
+        current_timezone = offset;
+    }
+}
+
+int8_t rtc_get_timezone(void) {
+    return current_timezone;
 }
