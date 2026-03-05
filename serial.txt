@@ -86,14 +86,16 @@
 [VMM] Allocating new page table at 0x00000000063A9000
 [VMM] Allocating new page table at 0x00000000063AA000
 [SCHED] Tarea creada: Network
-[DEBUG] boot_info ptr: 0x0x0000000000009E00
+[DEBUG] boo[DHCP] Enviando Discover...
+t_info ptr: 0x0x0000000000009E00
 [DEBUG] boot_info->fb_addr: 0x0x00000000E0000000
-  [INIT] Lanzando User Mode[DHCP] Enviando Discover...
- Test...
-[SCHED] Tarea creada: UserLoader
-[USER] Starting User Mode Loader...
-[ELF] Loading file: sh.elf
-[ELF] File not found.
+  [INIT] Lanzando User Mode Test...
+[SCHED] T[USER] Starting User area creada: UserLoader
+Mode Loader...
+[ELF
+] Loading file: sh.[NET]elf
+[ELF] File n Paquete enviado.
+ot found.
 [ELF] Loading file: /sh.elf
 [ELF] File not found.
 [USER] sh.elf not found, falling back to test.elf
@@ -105,9 +107,10 @@
 [ELF] Set process BRK to 0x0x00000002000043D8
 [USER] ELF Loaded Successfully. Entry: 0x0000000200000B2F
 [VMM] Allocating new page table at 0x00000000063C2000
-[VMM] Allocating new page table at 0x000[NET] Paquete enviado.
-00000063C3000
+[VMM] Allocating new page table at 0x00000000063C3000
 [VMM] Allocating new page table at 0x00000000063C5000
 [VMM] Allocating new page table at 0x00000000063C6000
 [USER] Jumping to Ring 3...
-user
+userspace test starting...
+[TEST] Testing fork() and execve()...
+[SC[SCHED] CR3 Switch: 0x000000000000A000 -> 0x00000000063CF000 (Task: UserLoader)
