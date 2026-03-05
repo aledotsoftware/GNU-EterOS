@@ -378,8 +378,9 @@ uint64_t vmm_clone_pml4(int cow) {
     if (!new_pml4) return 0;
     memset(new_pml4, 0, PAGE_SIZE);
 
+    pt_entry_t* active_pml4 = get_active_pml4();
     /* Start recursion from Level 4 */
-    clone_pt_recursive(new_pml4, pml4, 4, cow);
+    clone_pt_recursive(new_pml4, active_pml4, 4, cow);
 
     /* If we modified current tables (CoW), we must flush TLB */
     if (cow) {
@@ -448,7 +449,8 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
         uint64_t pd_idx   = PD_INDEX(addr);
         uint64_t pt_idx   = PT_INDEX(addr);
 
-        pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
+        pt_entry_t* active_pml4 = get_active_pml4();
+        pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 0);
         if (!pdpt) return 0;
         pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
         if (!pd) return 0;
