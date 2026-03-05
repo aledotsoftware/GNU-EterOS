@@ -63,19 +63,13 @@ jobs:
           echo "Tamaño total del sistema:"
           du -sh build/
 
+      - name: "Ejecutar Unit Tests"
+        run: bash tests/run_tests.sh
+
       - name: "Test rápido en QEMU (boot check)"
         run: |
-          # Ejecutar QEMU por 3 segundos para verificar que arranca
-          timeout 3 qemu-system-x86_64 \
-            -drive format=raw,file=build/eteros.img,if=floppy \
-            -serial file:build/serial_output.log \
-            -display none \
-            -m 128M \
-            -no-reboot \
-            -no-shutdown || true
-          
-          echo "=== Serial Output ==="
-          cat build/serial_output.log 2>/dev/null || echo "(sin salida serial)"
+          chmod +x tests/run_integration.sh
+          bash tests/run_integration.sh
 
       - name: "Subir artefactos de build"
         uses: actions/upload-artifact@v4

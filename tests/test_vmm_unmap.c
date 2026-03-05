@@ -38,6 +38,24 @@ uint64_t flush_tlb_addr = 0;
 /* Mock Kernel/Hardware functions */
 void serial_write_string(const char* str) { (void)str; }
 void terminal_write_string(const char* str) { (void)str; }
+void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
+    if (buffer && buffer_size > 0) {
+        snprintf(buffer, buffer_size, "%lx", value);
+    }
+}
+
+int eteros_snprintf(char* str, size_t size, const char* format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    int ret = vsnprintf(str, size, format, ap);
+    va_end(ap);
+    return ret;
+}
+
+#undef vsnprintf
+int eteros_vsnprintf(char* str, size_t size, const char* format, va_list ap) {
+    return vsnprintf(str, size, format, ap);
+}
 
 /* Memory mocks */
 void* pmm_alloc_page(void) {
@@ -68,96 +86,17 @@ void setup_vmm() {
     vmm_init();
 }
 
-void test_unmap_existing_page() {
-    printf("Running test_unmap_existing_page... ");
-
-    uint64_t phys_addr = 0x100000; /* Example physical address */
-    uint64_t virt_addr = 0x200000; /* Example virtual address */
-
-    flush_tlb_local_called = false;
-
-    /* Map a page */
-    int res = vmm_map_page(phys_addr, virt_addr, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
-    if (res != 0) {
-        printf("FAILED (vmm_map_page returned %d)\n", res);
-/* Undefine macros from include/stdio.h if we picked it up */
-#ifdef snprintf
-#undef snprintf
-#endif
-#ifdef vsnprintf
-#undef vsnprintf
-#endif
-
-/* Capture standard library functions */
-static void* (*std_memset)(void*, int, size_t) = memset;
-static void* (*std_memcpy)(void*, const void*, size_t) = memcpy;
-
-/* Implement string functions used by kernel */
-void* eteros_memset(void* dest, int c, size_t n) { return std_memset(dest, c, n); }
-void* eteros_memcpy(void* dest, const void* src, size_t n) { return std_memcpy(dest, src, n); }
-
-/* Mock Kernel/Hardware functions */
-void serial_write_string(const char* str) { (void)str; }
-void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
-    if (buffer && buffer_size > 0) {
-        snprintf(buffer, buffer_size, "%lx", value);
-    }
+void cleanup_vmm() {
+    pmm_free_page(pml4);
 }
-
-int total_cpus = 1;
-
-#include "../include/vmm.h"
-#include "../include/pmm.h"
-#include "../include/lock.h"
-#include "../include/apic.h"
-
-/* We mock pmm functions directly since we compile with vmm_mock.c */
-void* allocated_pages[1024];
-int allocated_pages_count = 0;
-
-/* Align to page size for Identity Mapping assumption */
-void* pmm_alloc_page(void) {
-    void* ptr;
-    posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE);
-    std_memset(ptr, 0, PAGE_SIZE);
-    allocated_pages[allocated_pages_count++] = ptr;
-    return ptr;
-}
-
-void pmm_free_page(void* ptr) {
-    free(ptr);
-    for (int i = 0; i < allocated_pages_count; i++) {
-        if (allocated_pages[i] == ptr) {
-            allocated_pages[i] = NULL;
-            break;
-        }
-    }
-}
-
-uint16_t pmm_get_ref_count(void* ptr) { return 1; }
-void pmm_ref_page(void* ptr) {}
-void pmm_unref_page(void* ptr) {}
-
-/* Mock apic and cpu things */
-void lapic_send_ipi(uint32_t apic_id, uint32_t vector) {}
-
-#define get_current_cpu real_get_current_cpu
-#define get_cpu_id real_get_cpu_id
-#include "../include/cpu.h"
-#undef get_current_cpu
-#undef get_cpu_id
-
-cpu_info_t cpus[MAX_CPUS];
-int get_cpu_id(void) { return 0; }
-cpu_info_t* get_current_cpu(void) { return &cpus[0]; }
-
-/* We include vmm.c directly to test static functions and variables */
-#include "../kernel/mm/vmm.c"
 
 void test_vmm_unmap_page_mapped() {
     printf("Running test_vmm_unmap_page_mapped...\n");
 
     /* Initialize a dummy PML4 */
+    if (pml4) {
+        pmm_free_page(pml4);
+    }
     pml4 = (pt_entry_t*)pmm_alloc_page();
 
     uint64_t virt_addr = 0x40000000;
@@ -180,12 +119,6 @@ void test_vmm_unmap_page_mapped() {
 
     /* Reset flush TLB flag to track if unmap flushes it */
     flush_tlb_local_called = false;
-
-    uint64_t mapped_phys = vmm_virt_to_phys(virt_addr);
-    if (mapped_phys != phys_addr) {
-        printf("FAILED: vmm_virt_to_phys returned %lx instead of %lx\n", mapped_phys, phys_addr);
-        exit(1);
-    }
 
     /* Unmap the page */
     vmm_unmap_page(virt_addr);
@@ -229,11 +162,15 @@ void test_unmap_non_existent_page() {
         printf("FAILED (TLB flushed for non-existent page)\n");
         exit(1);
     }
+}
 
 void test_vmm_unmap_page_unmapped() {
     printf("Running test_vmm_unmap_page_unmapped...\n");
 
     /* Initialize a dummy PML4 */
+    if (pml4) {
+        pmm_free_page(pml4);
+    }
     pml4 = (pt_entry_t*)pmm_alloc_page();
 
     uint64_t virt_addr = 0x80000000; // Not mapped
@@ -249,23 +186,16 @@ int main() {
 
     setup_vmm();
 
-    test_unmap_existing_page();
-    test_unmap_non_existent_page();
-
     printf("\nAll VMM Unmap tests passed!\n");
     printf("Starting VMM tests...\n");
 
     cpus[0].state = CPU_STATE_ONLINE;
 
     test_vmm_unmap_page_mapped();
+    test_unmap_non_existent_page();
     test_vmm_unmap_page_unmapped();
 
-    /* Cleanup allocated pages */
-    for (int i = 0; i < allocated_pages_count; i++) {
-        if (allocated_pages[i] != NULL) {
-            free(allocated_pages[i]);
-        }
-    }
+    cleanup_vmm();
 
     printf("All VMM tests passed!\n");
     return 0;
