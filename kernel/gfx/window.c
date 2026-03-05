@@ -132,20 +132,16 @@ static void draw_window(window_t* win) {
                             dest[j] = sc;
                         } else if (a > 0) {
                             uint32_t dc = dest[j];
-                            uint32_t sr = (sc >> 16) & 0xFF;
-                            uint32_t sg = (sc >> 8) & 0xFF;
-                            uint32_t sb = sc & 0xFF;
 
-                            uint32_t dr = (dc >> 16) & 0xFF;
-                            uint32_t dg = (dc >> 8) & 0xFF;
-                            uint32_t db = dc & 0xFF;
+                            /* ⚡ BOLT Optimization: SWAR (SIMD Within A Register) Alpha Blending.
+                               Process Red and Blue channels together in a single 32-bit operation,
+                               reducing multiplications from 6 to 4 per pixel and eliminating
+                               costly bitwise shifts for individual component extraction. */
+                            uint32_t inv_a = 255 - a;
+                            uint32_t rb = (((sc & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
+                            uint32_t g = (((sc & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
 
-                            /* Fast alpha blending using bitwise shifts (x >> 8 is approx x / 255) */
-                            uint32_t r = (sr * a + dr * (255 - a)) >> 8;
-                            uint32_t g = (sg * a + dg * (255 - a)) >> 8;
-                            uint32_t b = (sb * a + db * (255 - a)) >> 8;
-
-                            dest[j] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                            dest[j] = 0xFF000000 | rb | g;
                         }
                     }
                 }
