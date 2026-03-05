@@ -765,6 +765,12 @@ static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
 
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
+        /* Validate each buffer before writing */
+        if (!vmm_verify_user_access(kiov[i].iov_base, kiov[i].iov_len, 0)) {
+            kfree(kiov);
+            return -EFAULT;
+        }
+
         int64_t r = sys_write(fd, kiov[i].iov_base, kiov[i].iov_len);
         if (r < 0) {
             kfree(kiov);
@@ -786,6 +792,12 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
 
     int64_t total = 0;
     for (int i=0; i<iovcnt; i++) {
+        /* Validate each buffer before reading into it */
+        if (!vmm_verify_user_access(kiov[i].iov_base, kiov[i].iov_len, 1)) {
+            kfree(kiov);
+            return -EFAULT;
+        }
+
         int64_t r = sys_read(fd, kiov[i].iov_base, kiov[i].iov_len);
         if (r < 0) {
             kfree(kiov);
