@@ -44,6 +44,11 @@ void shell_run(void) {
     for (;;) {
         char c = 0;
 
+        /* Add a visual text input affordance (Cursor) */
+        /* Print cursor and immediately move back */
+        terminal_putchar('_');
+        terminal_putchar('\b');
+
         /* Esperar input de Teclado O Serial */
         while (1) {
             if (keyboard_has_input()) {
@@ -58,9 +63,14 @@ void shell_run(void) {
                 if (c == 127) c = '\b';
                 break;
             }
+
             /* Dormir hasta la próxima interrupción */
             __asm__ volatile("hlt");
         }
+
+        /* Clear the cursor before processing the new character */
+        terminal_putchar(' ');
+        terminal_putchar('\b');
 
         if (c == '\n') {
             /* ---- Enter: procesar comando ---- */
