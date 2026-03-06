@@ -84,6 +84,7 @@ typedef uint64_t Elf64_Xword;
 #define PF_W 0x2
 #define PF_X 0x1
 #define EI_OSABI 7
+#define ELFOSABI_NONE 0
 #define ELFOSABI_LINUX 3
 
 typedef struct {

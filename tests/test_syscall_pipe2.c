@@ -93,7 +93,6 @@ int vmm_validate_user_ptr(const void* addr, size_t size) {
 int vmm_check_user_string(const char* str, size_t max_len) { return 1; }
 
 uint64_t vmm_virt_to_phys(uint64_t virt) { return virt; }
-int vmm_map_page(uint64_t phys, uint64_t virt, uint64_t flags) { return 0; }
 void vmm_destroy_pml4(uint64_t pml4) {}
 uint64_t vmm_clone_pml4(int cow) { return 0; }
 

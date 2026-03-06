@@ -161,6 +161,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* Now that PMM, VMM, and heap are ready, switch console to framebuffer */
         if (boot_info && boot_info->fb_addr != 0) {
             terminal_switch_to_framebuffer(boot_info);
+            terminal_set_silent(true);
         }
     #endif
 
@@ -265,6 +266,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     show_splash();
 
     /* Kernel shell (fallback until userspace shell is ready) */
+    terminal_set_silent(false);
+    terminal_clear();
     shell_run();
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
@@ -350,11 +353,17 @@ static void show_splash(void) {
                 uint32_t* dest_row = (uint32_t*)((uint8_t*)fb_buf + (draw_y * fb_pitch) + (start_x * 4));
                 uint32_t* src_row = pixel_data + (y * 200);
 
-                for (int x = 0; x < 200; x++) {
-                    int draw_x = start_x + x;
-                    if (draw_x >= (int)screen_w) break;
-
-                    dest_row[x] = src_row[x];
+                /* Check if entire row fits */
+                if (start_x + 200 <= (int)screen_w) {
+                    /* Fast path: full row copy */
+                    memcpy(dest_row, src_row, 200 * 4);
+                } else {
+                    /* Slow path: clipping required */
+                    for (int x = 0; x < 200; x++) {
+                        int draw_x = start_x + x;
+                        if (draw_x >= (int)screen_w) break;
+                        dest_row[x] = src_row[x];
+                    }
                 }
             }
         }
@@ -373,7 +382,4 @@ static void show_splash(void) {
     while (timer_get_ticks() < end_ticks) {
         __asm__ volatile("hlt");
     }
-
-    /* Clear screen to black and reset cursor for shell */
-    terminal_clear();
 }

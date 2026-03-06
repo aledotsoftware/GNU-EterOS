@@ -13,6 +13,7 @@ unsigned int shell_history_count(void);
 
 // Commands logic
 const char* match_command(const char* input, const char* cmd);
+const char* shell_autocomplete(const char* prefix);
 
 // Command handlers
 void cmd_help(const char* args);

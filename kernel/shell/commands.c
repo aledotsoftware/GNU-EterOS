@@ -77,6 +77,29 @@ const char* match_command(const char* input, const char* cmd) {
     return (void*)0;
 }
 
+const char* shell_autocomplete(const char* prefix) {
+    if (!prefix || !*prefix) return (void*)0;
+    size_t len = strlen(prefix);
+    const char* match = (void*)0;
+    int matches = 0;
+
+    for (size_t i = 0; i < NUM_COMMANDS; i++) {
+        if (strncmp(prefix, commands[i].name, len) == 0) {
+            match = commands[i].name;
+            matches++;
+        }
+    }
+
+    for (size_t i = 0; i < NUM_APPS; i++) {
+        if (strncmp(prefix, apps[i].name, len) == 0) {
+            match = apps[i].name;
+            matches++;
+        }
+    }
+
+    return (matches == 1) ? match : (void*)0;
+}
+
 void cmd_help(const char* args) {
     (void)args;
     terminal_write_string("\n");
@@ -115,6 +138,12 @@ void cmd_help(const char* args) {
         terminal_write_string("\n");
     }
 
+    terminal_write_string("\n");
+    terminal_write_colored("  Atajos de teclado:\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("    [Tab]      Autocompletar comando\n");
+    terminal_write_string("    [Up/Down]  Navegar historial\n");
+    terminal_write_string("    [Ctrl+L]   Limpiar pantalla\n");
+    terminal_write_string("    [Ctrl+C]   Cancelar linea\n");
     terminal_write_string("\n");
 }
 
