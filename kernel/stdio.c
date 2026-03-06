@@ -56,13 +56,23 @@ static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int ba
     int padding = width - len;
 
     if (!left_justify && !zeropad && padding > 0) {
-        while (padding-- > 0) buffer_append(str, size, pos, ' ');
+        if (size > 0 && *pos + padding < size) {
+            memset(&str[*pos], ' ', padding);
+            *pos += padding;
+        } else {
+            while (padding-- > 0) buffer_append(str, size, pos, ' ');
+        }
     }
 
     if (is_neg) buffer_append(str, size, pos, '-');
 
     if (zeropad && padding > 0) {
-        while (padding-- > 0) buffer_append(str, size, pos, '0');
+        if (size > 0 && *pos + padding < size) {
+            memset(&str[*pos], '0', padding);
+            *pos += padding;
+        } else {
+            while (padding-- > 0) buffer_append(str, size, pos, '0');
+        }
     }
 
     /* Direct copy to str if it fits to avoid character-by-character append overhead */
@@ -75,7 +85,12 @@ static void format_int(char* str, size_t size, size_t* pos, uint64_t val, int ba
     }
 
     if (left_justify && padding > 0) {
-        while (padding-- > 0) buffer_append(str, size, pos, ' ');
+        if (size > 0 && *pos + padding < size) {
+            memset(&str[*pos], ' ', padding);
+            *pos += padding;
+        } else {
+            while (padding-- > 0) buffer_append(str, size, pos, ' ');
+        }
     }
 }
 
