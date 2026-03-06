@@ -118,6 +118,18 @@ int getpid(void) {
     return (int)syscall0(SYS_getpid);
 }
 
+int setuid(int uid) {
+    long ret = syscall1(SYS_setuid, uid);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int setgid(int gid) {
+    long ret = syscall1(SYS_setgid, gid);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
 int kill(int pid, int sig) {
     long ret = syscall2(SYS_kill, pid, sig);
     if (ret < 0) { errno = -ret; return -1; }
