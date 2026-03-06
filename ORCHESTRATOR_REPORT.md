@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2024-05-15
-**Commit:** 5715f15ae4c99ca17e6d3d5a6eb61faaddd05d6c
+**Commit:** HEAD
 **Estado de build:** ✅ COMPILA
 **Estado de boot:** ✅ ARRANCA (Boot a Ring 3 exitoso)
 
@@ -28,6 +28,7 @@ No hay errores de compilación actualmente.
 - **TSS RSP0 Context Switch Bug:** Corregido un bug crítico ("Triple Fault / Exception 6 (#UD) después de Timer Interrupt"). `TSS.RSP0` no se actualizaba correctamente al hacer context switch a tareas en Ring 0 (`kernel_stack == 0`), lo que causaba corrupción de pila y un RIP inválido apuntando a la sección `.bss`. Se inicializó el `kernel_stack` para la Tarea 0 (kernel) a `0x7FF000` y se eliminó la comprobación condicional en `schedule()` para que `tss_set_rsp0(next_task->kernel_stack)` se aplique de forma incondicional, solucionando el crash.
 - **Context Switch Offsets:** Corregido `[gs:56]` a `[gs:72]` (`user_stack_scratch`) en `kernel/arch/x86_64/context_switch.asm` basándose en el tamaño real de `cpu_info_t` (bug "ASM Struct Offset Mismatch").
 - **GDT Flush:** Removido la recarga del registro `gs` en `kernel/arch/x86_64/gdt_flush.asm` para evitar sobrescribir a 0 el MSR de GS Base seteado para SMP per-CPU data.
+- **memcpy undefined variable pattern:** Eliminado variable `pattern` que no estaba definida en el fallback de memcpy (`userspace/libc/src/string.c`).
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |

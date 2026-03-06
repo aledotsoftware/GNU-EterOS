@@ -36,28 +36,6 @@ void *memcpy(void *dest, const void *src, size_t n) {
     size_t qwords = n / 8;
     size_t remainder = n % 8;
 
-    /* ⚡ BOLT Optimization: Fast path for small blocks (< 64 bytes) to avoid
-       the setup overhead of the `rep` microcode on modern x86_64. */
-    if (n < 64) {
-        uint8_t *d = (uint8_t *)s;
-        while (n >= 8) {
-            *(uint64_t *)d = pattern;
-            d += 8; n -= 8;
-        }
-        if (n >= 4) {
-            *(uint32_t *)d = (uint32_t)pattern;
-            d += 4; n -= 4;
-        }
-        if (n >= 2) {
-            *(uint16_t *)d = (uint16_t)pattern;
-            d += 2; n -= 2;
-        }
-        if (n) {
-            *d = (uint8_t)pattern;
-        }
-        return original_dest;
-    }
-
     __asm__ volatile (
         "cld\n\t"
         "rep movsq\n\t"
