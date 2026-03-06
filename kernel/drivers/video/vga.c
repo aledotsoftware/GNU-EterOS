@@ -19,8 +19,8 @@ static size_t   terminal_col;
 static uint8_t  terminal_color;
 static volatile uint16_t* terminal_buffer;
 static bool     use_framebuffer = false;
-static uint32_t fb_fg = 0xFFFFFFFF; // Blanco por defecto
-static uint32_t fb_bg = 0xFF000000; // Negro por defecto
+static uint32_t fb_fg = 0xFF000000; // Negro por defecto
+static uint32_t fb_bg = 0xFFFFFFFF; // Blanco por defecto
 
 /*
  * Hardware Scrolling State

@@ -161,6 +161,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* Now that PMM, VMM, and heap are ready, switch console to framebuffer */
         if (boot_info && boot_info->fb_addr != 0) {
             terminal_switch_to_framebuffer(boot_info);
+            terminal_set_silent(true);
         }
     #endif
 
@@ -265,6 +266,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     show_splash();
 
     /* Kernel shell (fallback until userspace shell is ready) */
+    terminal_set_silent(false);
+    terminal_clear();
     shell_run();
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
@@ -379,7 +382,4 @@ static void show_splash(void) {
     while (timer_get_ticks() < end_ticks) {
         __asm__ volatile("hlt");
     }
-
-    /* Clear screen to black and reset cursor for shell */
-    terminal_clear();
 }
