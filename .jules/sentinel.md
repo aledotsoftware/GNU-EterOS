@@ -47,6 +47,11 @@
 **Learning:** System calls that operate on file descriptors must independently verify the access permissions established during the `sys_open` call, rather than trusting the user program or assuming the file system layer will catch the violation.
 **Prevention:** Always check `fd_table[fd].flags & O_ACCMODE` before performing read/write operations on a file descriptor to ensure the action is explicitly permitted.
 
+## 2024-05-20 - Unbounded formatting in userspace tools
+**Vulnerability:** Core security utilities like `useradd`, `passwd`, and `login` used unbounded `sprintf` functions to format security hashes and shadow file entries. A sufficiently long user input or generated hash could overflow the target arrays (`hash_str`, `entry`) and cause arbitrary code execution or memory corruption in privileged applications.
+**Learning:** Utilities that deal with user authentication or password management must be thoroughly vetted to ensure all buffer writes, especially string formatting, explicitly enforce bounds limits. The use of `sprintf` without checks is a pervasive vulnerability pattern.
+**Prevention:** Strictly enforce the use of `snprintf` with `sizeof(buffer)` limits instead of `sprintf` for all string formatting operations, particularly those constructing shadow file entries or dealing with user-controlled input.
+
 ## 2026-03-03 - [TCP Data Offset Integer Underflow]
 **Vulnerability:** In `tcp_input`, an invalid TCP Data Offset (`doff`) value less than 5 (20 bytes) could result in an integer underflow when calculating `data_len` (`len - doff`). This could cause out-of-bounds reads and memory corruption when processing manipulated network packets.
 **Learning:** Network header parsers are a critical entry point and highly susceptible to mathematical errors. Malformed packets with syntactically impossible values (like a header size smaller than the protocol's minimum) can exploit trust in calculated lengths to bypass subsequent bounds checks.
