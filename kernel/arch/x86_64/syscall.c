@@ -266,10 +266,10 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     task_t* current = task_get_current();
     uint64_t virt;
 
-    if (addr && (flags & 0x10)) {
+    if (flags & 0x10) { /* MAP_FIXED */
         virt = (uint64_t)addr;
         if (virt & 0xFFF) return -EINVAL;
-        if (!vmm_validate_user_ptr(addr, len)) return -ENOMEM;
+        if (!vmm_validate_user_ptr((void*)virt, len)) return -ENOMEM;
     } else {
         virt = current->mmap_base;
         uint64_t aligned_len = PAGE_ALIGN_UP(len);
@@ -664,6 +664,71 @@ static int64_t sys_utimensat(int dirfd, const char* pathname, const struct times
     return 0; // Return 0 to fake success for coreutils like touch/cp
 }
 
+static int64_t sys_dup3(int oldfd, int newfd, int flags) {
+    if (oldfd == newfd) return -EINVAL;
+    if (oldfd < 0 || oldfd >= MAX_FD || newfd < 0 || newfd >= MAX_FD) return -EBADF;
+    task_t* current = task_get_current();
+    if (!current->fd_table[oldfd].node) return -EBADF;
+
+    if (current->fd_table[newfd].node) sys_close(newfd);
+
+    current->fd_table[newfd].node = current->fd_table[oldfd].node;
+    if (current->fd_table[newfd].node) __atomic_fetch_add(&current->fd_table[newfd].node->ref_count, 1, __ATOMIC_SEQ_CST);
+    current->fd_table[newfd].offset = current->fd_table[oldfd].offset;
+
+    int new_flags = current->fd_table[oldfd].flags;
+    if (flags & O_CLOEXEC) new_flags |= O_CLOEXEC;
+    else new_flags &= ~O_CLOEXEC;
+
+    current->fd_table[newfd].flags = new_flags;
+    return newfd;
+}
+
+static int64_t sys_pread64(int fd, void* buf, size_t count, int64_t offset) {
+    if (!vmm_verify_user_access(buf, count, 1)) return -EFAULT;
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    if ((current->fd_table[fd].flags & O_ACCMODE) == O_WRONLY) return -EBADF;
+
+    ssize_t read = read_fs(current->fd_table[fd].node, offset, count, (uint8_t*)buf);
+    return read;
+}
+
+static int64_t sys_pwrite64(int fd, const void* buf, size_t count, int64_t offset) {
+    if (!vmm_verify_user_access(buf, count, 0)) return -EFAULT;
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    if ((current->fd_table[fd].flags & O_ACCMODE) == O_RDONLY) return -EBADF;
+
+    uint32_t written = write_fs(current->fd_table[fd].node, offset, count, (uint8_t*)buf);
+    return written;
+}
+
+static int64_t sys_ftruncate(int fd, int64_t length) {
+    if (length < 0) return -EINVAL;
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    if ((current->fd_table[fd].flags & O_ACCMODE) == O_RDONLY) return -EINVAL;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) == FS_DIRECTORY) return -EISDIR;
+
+    /* If the VFS node lacks a proper truncate mechanism,
+       just modifying the length is unsafe because blocks aren't freed.
+       If it exists, call it; otherwise, return -ENOSYS to avoid corruption. */
+    if (node->truncate) {
+        return node->truncate(node, (uint32_t)length);
+    }
+
+    return -ENOSYS;
+}
+
 static int64_t sys_lseek(int fd, int64_t offset, int whence) {
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -673,6 +738,68 @@ static int64_t sys_lseek(int fd, int64_t offset, int whence) {
     else if (whence == 2) current->fd_table[fd].offset = current->fd_table[fd].node->length + offset;
     else return -EINVAL;
     return current->fd_table[fd].offset;
+}
+
+struct rlimit {
+    uint64_t rlim_cur;
+    uint64_t rlim_max;
+};
+#define RLIM_INFINITY (~0ULL)
+
+typedef struct {
+    void* ss_sp;
+    int ss_flags;
+    size_t ss_size;
+} stack_t;
+
+struct robust_list_head {
+    void* list;
+    long futex_offset;
+    void* list_op_pending;
+};
+
+static int64_t sys_set_robust_list(struct robust_list_head* head, size_t len) {
+    (void)head; (void)len;
+    return 0; /* Stub */
+}
+
+static int64_t sys_getrlimit(int resource, struct rlimit* rlim) {
+    (void)resource;
+    if (!vmm_verify_user_access(rlim, sizeof(struct rlimit), 1)) return -EFAULT;
+    /* Basic stub returning infinity */
+    rlim->rlim_cur = RLIM_INFINITY;
+    rlim->rlim_max = RLIM_INFINITY;
+    return 0;
+}
+
+static int64_t sys_prlimit64(int pid, int resource, const struct rlimit* new_limit, struct rlimit* old_limit) {
+    (void)pid; (void)resource;
+    if (old_limit) {
+        if (!vmm_verify_user_access(old_limit, sizeof(struct rlimit), 1)) return -EFAULT;
+        old_limit->rlim_cur = RLIM_INFINITY;
+        old_limit->rlim_max = RLIM_INFINITY;
+    }
+    if (new_limit) {
+        if (!vmm_verify_user_access(new_limit, sizeof(struct rlimit), 0)) return -EFAULT;
+    }
+    return 0;
+}
+
+static int64_t sys_sigaltstack(const stack_t* ss, stack_t* old_ss) {
+    if (old_ss) {
+        if (!vmm_verify_user_access(old_ss, sizeof(stack_t), 1)) return -EFAULT;
+        memset(old_ss, 0, sizeof(stack_t));
+    }
+    if (ss) {
+        if (!vmm_verify_user_access(ss, sizeof(stack_t), 0)) return -EFAULT;
+    }
+    return 0; /* Stub */
+}
+
+static int64_t sys_tgkill(int tgid, int tid, int sig) {
+    /* Since we don't distinguish thread groups yet, map to kill */
+    (void)tgid;
+    return sys_kill(tid, sig);
 }
 
 static int64_t sys_getpid(void) { return task_get_current()->id; }
@@ -904,6 +1031,11 @@ static int64_t sys_accept(int fd, struct sockaddr* addr, int* addrlen) {
     return -ENOSYS;
 }
 
+static int64_t sys_accept4(int fd, struct sockaddr* addr, int* addrlen, int flags) {
+    (void)flags;
+    return sys_accept(fd, addr, addrlen);
+}
+
 static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr* dest_addr, int addrlen) {
     if (!vmm_verify_user_access(buf, len, 0)) return -EFAULT;
     if (dest_addr && !vmm_verify_user_access(dest_addr, addrlen, 0)) return -EFAULT;
@@ -1131,6 +1263,110 @@ static int64_t sys_nanosleep(const struct timespec* req, struct timespec* rem) {
     return 0;
 }
 
+struct msghdr {
+    void*         msg_name;
+    int           msg_namelen;
+    struct iovec* msg_iov;
+    int           msg_iovlen;
+    void*         msg_control;
+    int           msg_controllen;
+    int           msg_flags;
+};
+
+static int64_t sys_sendmsg(int fd, const struct msghdr* msg, int flags) {
+    (void)fd; (void)msg; (void)flags;
+    return -ENOSYS; /* Stub */
+}
+
+static int64_t sys_recvmsg(int fd, struct msghdr* msg, int flags) {
+    (void)fd; (void)msg; (void)flags;
+    return -ENOSYS; /* Stub */
+}
+
+static int64_t sys_setsockopt(int fd, int level, int optname, const void* optval, int optlen) {
+    (void)fd; (void)level; (void)optname; (void)optval; (void)optlen;
+    return 0; /* Stub */
+}
+
+static int64_t sys_getsockopt(int fd, int level, int optname, void* optval, int* optlen) {
+    (void)fd; (void)level; (void)optname; (void)optval; (void)optlen;
+    return -ENOSYS; /* Stub */
+}
+
+static int64_t sys_getpeername(int fd, struct sockaddr* addr, int* addrlen) {
+    (void)fd; (void)addr; (void)addrlen;
+    return -ENOSYS; /* Stub */
+}
+
+static int64_t sys_getsockname(int fd, struct sockaddr* addr, int* addrlen) {
+    (void)fd; (void)addr; (void)addrlen;
+    return -ENOSYS; /* Stub */
+}
+
+static int64_t sys_shutdown(int fd, int how) {
+    (void)fd; (void)how;
+    return 0; /* Stub */
+}
+
+struct pollfd {
+    int   fd;
+    short events;
+    short revents;
+};
+
+static int64_t sys_poll(struct pollfd* fds, int nfds, int timeout) {
+    (void)fds; (void)nfds; (void)timeout;
+    return -ENOSYS; /* Needs proper VFS waitqueue implementation */
+}
+
+static int64_t sys_ppoll(struct pollfd* fds, int nfds, const struct timespec* tmo_p, const uint64_t* sigmask) {
+    (void)fds; (void)nfds; (void)tmo_p; (void)sigmask;
+    return -ENOSYS; /* Needs proper VFS waitqueue implementation */
+}
+
+#ifndef __ETEROS_HOST_TEST__
+typedef struct {
+    unsigned long fds_bits[1024 / (8 * sizeof(unsigned long))];
+} fd_set;
+#endif
+
+static int64_t sys_select(int nfds, void* readfds, void* writefds, void* exceptfds, struct timespec* timeout) {
+    (void)nfds; (void)readfds; (void)writefds; (void)exceptfds; (void)timeout;
+    return -ENOSYS; /* Needs proper VFS waitqueue implementation */
+}
+
+static int64_t sys_pselect6(int nfds, void* readfds, void* writefds, void* exceptfds, const struct timespec* timeout, const void* sigmask) {
+    (void)nfds; (void)readfds; (void)writefds; (void)exceptfds; (void)timeout; (void)sigmask;
+    return -ENOSYS; /* Needs proper VFS waitqueue implementation */
+}
+
+static int64_t sys_epoll_create1(int flags) {
+    (void)flags;
+    return -ENOSYS; /* Stub */
+}
+
+#pragma pack(push, 1)
+struct epoll_event {
+    uint32_t events;
+    uint64_t data;
+};
+#pragma pack(pop)
+
+static int64_t sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event* event) {
+    (void)epfd; (void)op; (void)fd; (void)event;
+    return -ENOSYS; /* Stub */
+}
+
+static int64_t sys_epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout) {
+    (void)epfd; (void)events; (void)maxevents; (void)timeout;
+    return -ENOSYS; /* Needs proper VFS waitqueue implementation */
+}
+
+static int64_t sys_eventfd2(unsigned int initval, int flags) {
+    (void)initval; (void)flags;
+    return -ENOSYS; /* Stub */
+}
+
 static int64_t sys_clock_gettime(int clock_id, struct timespec* tp) {
     (void)clock_id;
     if (!vmm_verify_user_access(tp, sizeof(struct timespec), 1)) return -EFAULT;
@@ -1140,12 +1376,84 @@ static int64_t sys_clock_gettime(int clock_id, struct timespec* tp) {
     return 0;
 }
 
+static int64_t sys_clock_getres(int clock_id, struct timespec* res) {
+    (void)clock_id;
+    if (res) {
+        if (!vmm_verify_user_access(res, sizeof(struct timespec), 1)) return -EFAULT;
+        res->tv_sec = 0;
+        res->tv_nsec = 10000000; /* 10ms based on timer HZ */
+    }
+    return 0;
+}
+
+#ifndef __ETEROS_HOST_TEST__
+extern void get_random_bytes(uint8_t *buf, size_t len);
+#else
+void get_random_bytes(uint8_t *buf, size_t len) {
+    memset(buf, 0, len);
+}
+#endif
+
+static int64_t sys_getrandom(void* buf, size_t buflen, unsigned int flags) {
+    (void)flags;
+    if (!vmm_verify_user_access(buf, buflen, 1)) return -EFAULT;
+    get_random_bytes((uint8_t*)buf, buflen);
+    return buflen;
+}
+
 static int64_t sys_getppid(void) { return 1; }
 static int64_t sys_gettid(void) { return task_get_current()->id; }
 static int64_t sys_set_tid_address(int* tidptr) { (void)tidptr; return task_get_current()->id; }
 static int64_t sys_exit_group(int status) { task_exit(status); __builtin_unreachable(); }
-static int64_t sys_munmap(void* addr, size_t len) { (void)addr; (void)len; return 0; }
-static int64_t sys_mprotect(void* addr, size_t len, int prot) { (void)addr; (void)len; (void)prot; return 0; }
+static int64_t sys_munmap(void* addr, size_t len) {
+    if ((uint64_t)addr % PAGE_SIZE != 0) return -EINVAL;
+    if (len == 0) return -EINVAL;
+
+    uint64_t start = (uint64_t)addr;
+    uint64_t end = PAGE_ALIGN_UP(start + len);
+
+    /* Enforce user space limits */
+    if (start < USER_BASE || end > USER_LIMIT + 1 || end < start) {
+        return -EINVAL;
+    }
+
+    for (uint64_t v = start; v < end; v += PAGE_SIZE) {
+        uint64_t phys = hal_mem_get_phys(v);
+        if (phys != 0) {
+            pmm_unref_page((void*)phys);
+            vmm_unmap_page(v);
+        }
+    }
+
+    return 0;
+}
+static int64_t sys_mprotect(void* addr, size_t len, int prot) {
+    if ((uint64_t)addr % PAGE_SIZE != 0) return -EINVAL;
+    if (len == 0) return 0;
+
+    uint64_t start = (uint64_t)addr;
+    uint64_t end = PAGE_ALIGN_UP(start + len);
+
+    /* Enforce user space limits */
+    if (start < USER_BASE || end > USER_LIMIT + 1 || end < start) {
+        return -ENOMEM;
+    }
+
+    uint64_t new_flags = PAGE_USER | PAGE_PRESENT;
+    if (prot & 2) new_flags |= PAGE_WRITE;
+
+    for (uint64_t v = start; v < end; v += PAGE_SIZE) {
+        uint64_t phys = hal_mem_get_phys(v);
+        if (phys != 0) {
+            /* Keep existing physical mapping, update flags */
+            vmm_map_page(phys, v, new_flags);
+        } else {
+            return -ENOMEM; // Page not mapped
+        }
+    }
+
+    return 0;
+}
 static int64_t sys_madvise(void* addr, size_t len, int advice) { (void)addr; (void)len; (void)advice; return 0; }
 static int64_t sys_getuid(void)  { return task_get_current()->uid; }
 static int64_t sys_getgid(void)  { return task_get_current()->gid; }
@@ -1427,6 +1735,7 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [3] = (syscall_ptr_t)sys_close,
     [4] = (syscall_ptr_t)sys_stat,
     [5] = (syscall_ptr_t)sys_fstat,
+    [7] = (syscall_ptr_t)sys_poll,
     [8] = (syscall_ptr_t)sys_lseek,
     [9] = (syscall_ptr_t)sys_mmap,
     [10] = (syscall_ptr_t)sys_mprotect,
@@ -1435,10 +1744,13 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [13] = (syscall_ptr_t)sys_rt_sigaction,
     [14] = (syscall_ptr_t)sys_rt_sigprocmask,
     [16] = (syscall_ptr_t)sys_ioctl,
+    [17] = (syscall_ptr_t)sys_pread64,
+    [18] = (syscall_ptr_t)sys_pwrite64,
     [19] = (syscall_ptr_t)sys_readv,
     [20] = (syscall_ptr_t)sys_writev,
     [21] = (syscall_ptr_t)sys_access,
     [22] = (syscall_ptr_t)sys_pipe,
+    [23] = (syscall_ptr_t)sys_select,
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
     [33] = (syscall_ptr_t)sys_dup2,
@@ -1449,12 +1761,22 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [43] = (syscall_ptr_t)sys_accept,
     [44] = (syscall_ptr_t)sys_sendto,
     [45] = (syscall_ptr_t)sys_recvfrom,
+    [46] = (syscall_ptr_t)sys_sendmsg,
+    [47] = (syscall_ptr_t)sys_recvmsg,
+    [48] = (syscall_ptr_t)sys_shutdown,
     [49] = (syscall_ptr_t)sys_bind,
     [50] = (syscall_ptr_t)sys_listen,
+    [51] = (syscall_ptr_t)sys_getsockname,
+    [52] = (syscall_ptr_t)sys_getpeername,
+    [54] = (syscall_ptr_t)sys_setsockopt,
+    [55] = (syscall_ptr_t)sys_getsockopt,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
     [72] = (syscall_ptr_t)sys_fcntl,
+    [77] = (syscall_ptr_t)sys_ftruncate,
+    [97] = (syscall_ptr_t)sys_getrlimit,
+    [131] = (syscall_ptr_t)sys_sigaltstack,
     [79] = (syscall_ptr_t)sys_getcwd,
     [80] = (syscall_ptr_t)sys_chdir,
     [83] = (syscall_ptr_t)sys_mkdir,
@@ -1470,8 +1792,11 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [217] = (syscall_ptr_t)sys_getdents64,
     [218] = (syscall_ptr_t)sys_set_tid_address,
     [228] = (syscall_ptr_t)sys_clock_gettime,
-    [269] = (syscall_ptr_t)sys_faccessat,
+    [229] = (syscall_ptr_t)sys_clock_getres,
     [231] = (syscall_ptr_t)sys_exit_group,
+    [232] = (syscall_ptr_t)sys_epoll_wait,
+    [233] = (syscall_ptr_t)sys_epoll_ctl,
+    [234] = (syscall_ptr_t)sys_tgkill,
     [257] = (syscall_ptr_t)sys_openat,
     [258] = (syscall_ptr_t)sys_mkdirat,
     [262] = (syscall_ptr_t)sys_newfstatat,
@@ -1479,8 +1804,17 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [266] = (syscall_ptr_t)sys_symlinkat,
     [263] = (syscall_ptr_t)sys_unlinkat,
     [269] = (syscall_ptr_t)sys_faccessat,
+    [270] = (syscall_ptr_t)sys_pselect6,
+    [271] = (syscall_ptr_t)sys_ppoll,
+    [273] = (syscall_ptr_t)sys_set_robust_list,
     [280] = (syscall_ptr_t)sys_utimensat,
+    [288] = (syscall_ptr_t)sys_accept4,
+    [290] = (syscall_ptr_t)sys_eventfd2,
+    [291] = (syscall_ptr_t)sys_epoll_create1,
+    [292] = (syscall_ptr_t)sys_dup3,
     [293] = (syscall_ptr_t)sys_pipe2,
+    [302] = (syscall_ptr_t)sys_prlimit64,
+    [318] = (syscall_ptr_t)sys_getrandom,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
 };
@@ -1510,6 +1844,10 @@ static void syscall_native_handler(struct syscall_regs* regs) {
     }
     if (regs->rax == SYS_fork || regs->rax == SYS_vfork || regs->rax == SYS_clone) {
         regs->rax = (uint64_t)task_fork((void*)regs);
+        return;
+    }
+    if (regs->rax == SYS_clone3) {
+        regs->rax = (uint64_t)-ENOSYS;
         return;
     }
     if (regs->rax == SYS_execve) {

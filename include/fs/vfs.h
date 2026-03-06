@@ -48,6 +48,7 @@ typedef int (*create_type_t)(struct fs_node*, char*, uint16_t);
 typedef int (*mkdir_type_t)(struct fs_node*, char*, uint16_t);
 typedef int (*unlink_type_t)(struct fs_node*, char*);
 typedef int (*ioctl_type_t)(struct fs_node*, int, void*);
+typedef int (*truncate_type_t)(struct fs_node*, uint32_t);
 
 typedef struct fs_node {
     char name[128];
@@ -71,6 +72,7 @@ typedef struct fs_node {
     create_type_t create;
     mkdir_type_t mkdir;
     unlink_type_t unlink;
+    truncate_type_t truncate;
     struct fs_node *ptr; /* Used by mountpoints and symlinks */
     uint32_t ref_count;   /* Reference counting for shared nodes */
     spinlock_t lock;      /* SMP lock for this node */
