@@ -37,3 +37,6 @@
 ## 2026-11-26 - [Framebuffer Block Copy Optimization]
 **Learning:** Flushing rectangles row-by-row in the framebuffer introduces overhead from loop iterations and multiple function calls even with optimized `memcpy`. When a dirty rectangle spans the full width of the framebuffer (`row_len == fb_pitch`), the region is perfectly contiguous in memory.
 **Action:** Always check if the drawing area spans the full pitch width, and if so, use a single, highly efficient `memcpy` block operation to copy the entire contiguous memory region at once.
+## 2026-12-05 - [x86_64 rep stosq Setup Overhead]
+**Learning:** Similar to `rep movsq`, the `rep stosq` combined with `rep stosb` provides excellent block fill performance for large allocations on x86_64 (due to hardware fast-string optimizations). However, it introduces noticeable setup overhead for very small block fills (< 64 bytes). For small initializations, relying strictly on `rep stosq` incurs a massive performance penalty (~8x slower) compared to a simple unrolled assignment loop.
+**Action:** Always include a fast-path fallback utilizing unrolled 64-bit assignments for small fill sizes (< 64 bytes) in fundamental memory operations like `memset` before falling back to `rep` instructions for bulk operations.
