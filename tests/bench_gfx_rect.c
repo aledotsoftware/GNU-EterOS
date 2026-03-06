@@ -7,7 +7,6 @@
 
 #include <boot.h>
 
-#define __ETEROS_HOST_TEST__
 
 #define abs my_abs
 

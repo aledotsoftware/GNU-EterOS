@@ -251,9 +251,13 @@ int strncmp(const char *s1, const char *s2, size_t n) {
 }
 
 char *strncpy(char *dest, const char *src, size_t n) {
-    char *d = dest;
-    while (n && (*d++ = *src++)) n--;
-    while (n--) *d++ = '\0';
+    /* ⚡ BOLT Optimization: Leverage strnlen and block memory operations (memcpy/memset)
+       instead of a slow byte-by-byte copy loop. */
+    size_t len = strnlen(src, n);
+    memcpy(dest, src, len);
+    if (len < n) {
+        memset(dest + len, 0, n - len);
+    }
     return dest;
 }
 

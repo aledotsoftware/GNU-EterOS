@@ -46,6 +46,13 @@ static const shell_command_t commands[] = {
     { "halt",     "Detiene la CPU",                              cmd_halt    },
     { "test_compositor", "Test Basic Compositor",                cmd_test_compositor },
     { "gui_demo", "Test Batch Drawing",                          (cmd_handler_t)gui_demo_run },
+    { "keymap",   "Cambiar distribucion (uso: keymap <en|es>)",  cmd_keymap  },
+    { "typematic","Ajuste de teclado (uso: typematic <d> <r>)",  cmd_typematic },
+    { "mouse",    "Configurar mouse (sens / handed)",            cmd_mouse   },
+    { "storage",  "Estado de almacenamiento / A/B Slots",        cmd_storage },
+    { "time",     "Ver la hora actual del sistema",              cmd_time    },
+    { "timezone", "Configurar zona horaria (offset UTC)",        cmd_timezone},
+    { "ntp",      "Sincronizar RTC via red (NTP)",               cmd_ntp     },
 };
 
 #define NUM_COMMANDS  (sizeof(commands) / sizeof(commands[0]))

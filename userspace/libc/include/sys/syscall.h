@@ -108,6 +108,8 @@
 #define SYS_times               100
 #define SYS_getuid              102
 #define SYS_getgid              104
+#define SYS_setuid              105
+#define SYS_setgid              106
 #define SYS_geteuid             107
 #define SYS_getegid             108
 #define SYS_clock_gettime       228

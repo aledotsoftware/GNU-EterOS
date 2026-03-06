@@ -1,4 +1,3 @@
-#define __ETEROS_HOST_TEST__
 
 #include <stdio.h>
 #include <stdlib.h>

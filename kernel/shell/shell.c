@@ -2,6 +2,7 @@
 #include "../../include/keyboard.h"
 #include "../../include/serial.h"
 #include "../../include/string.h"
+#include "../../include/timer.h"
 
 static void shell_print_prompt(void) {
     terminal_write_colored(SHELL_PROMPT, VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
@@ -43,14 +44,18 @@ void shell_run(void) {
 
     for (;;) {
         char c = 0;
-
-        /* Add a visual text input affordance (Cursor) */
-        /* Print cursor and immediately move back */
-        terminal_putchar('_');
-        terminal_putchar('\b');
+        bool last_cursor_visible = false;
 
         /* Esperar input de Teclado O Serial */
         while (1) {
+            /* Add a visual text input affordance (Blinking Cursor) */
+            bool cursor_visible = (timer_get_ticks() % 1000) < 500;
+            if (cursor_visible != last_cursor_visible) {
+                terminal_putchar(cursor_visible ? '_' : ' ');
+                terminal_putchar('\b');
+                last_cursor_visible = cursor_visible;
+            }
+
             if (keyboard_has_input()) {
                 c = keyboard_getchar();
                 break;
