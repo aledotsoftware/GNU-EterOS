@@ -3,10 +3,10 @@ LD = ld
 CFLAGS = -m64 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -Ilibc/include
 LDFLAGS = -T linker.ld -nostdlib -m elf_x86_64
 
-LIBC_SRC = libc/src/start.c libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/stdlib.c libc/src/signal.c
+LIBC_SRC = libc/src/start.c libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/stdlib.c libc/src/signal.c libc/src/sha256.c libc/src/strtok.c
 LIBC_OBJ = $(LIBC_SRC:.c=.o)
 
-all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf
+all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf useradd.elf userdel.elf passwd.elf login.elf
 
 libc/src/%.o: libc/src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -46,6 +46,30 @@ test_futex_security.o: test_futex_security.c
 
 test_futex_security.elf: $(LIBC_OBJ) test_futex_security.o
 	$(LD) $(LDFLAGS) -o test_futex_security.elf $(LIBC_OBJ) test_futex_security.o
+
+useradd.o: useradd.c
+	$(CC) $(CFLAGS) -c useradd.c -o useradd.o
+
+useradd.elf: $(LIBC_OBJ) useradd.o
+	$(LD) $(LDFLAGS) -o useradd.elf $(LIBC_OBJ) useradd.o
+
+userdel.o: userdel.c
+	$(CC) $(CFLAGS) -c userdel.c -o userdel.o
+
+userdel.elf: $(LIBC_OBJ) userdel.o
+	$(LD) $(LDFLAGS) -o userdel.elf $(LIBC_OBJ) userdel.o
+
+passwd.o: passwd.c
+	$(CC) $(CFLAGS) -c passwd.c -o passwd.o
+
+passwd.elf: $(LIBC_OBJ) passwd.o
+	$(LD) $(LDFLAGS) -o passwd.elf $(LIBC_OBJ) passwd.o
+
+login.o: login.c
+	$(CC) $(CFLAGS) -c login.c -o login.o
+
+login.elf: $(LIBC_OBJ) login.o
+	$(LD) $(LDFLAGS) -o login.elf $(LIBC_OBJ) login.o
 
 clean:
 	rm -f *.o *.elf libc/src/*.o
