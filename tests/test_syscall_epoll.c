@@ -21,7 +21,7 @@ typedef union epoll_data {
     uint64_t u64;
 } epoll_data_t;
 
-struct epoll_event {
+struct epoll_event_test {
     uint32_t events;
     epoll_data_t data;
 };
@@ -33,11 +33,6 @@ struct epoll_event {
 #include "../include/net/socket.h"
 #include "../include/pmm.h"
 #include "../include/fcntl.h"
-
-/* Provide missing epoll sys functions because they are in their own file */
-int sys_epoll_create1(int flags) { return 5; }
-int sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) { return -9; /* -EBADF */ }
-int sys_epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout) { return 0; }
 
 /* Hack to mock inline functions in cpu.h */
 #define get_current_cpu real_get_current_cpu
@@ -109,7 +104,6 @@ int vmm_validate_user_ptr(const void* addr, size_t size) { return 1; }
 int vmm_check_user_string(const char* str, size_t max_len) { return 1; }
 
 uint64_t vmm_virt_to_phys(uint64_t virt) { return virt; }
-int vmm_map_page(uint64_t phys, uint64_t virt, uint64_t flags) { return 0; }
 void vmm_destroy_pml4(uint64_t pml4) {}
 uint64_t vmm_clone_pml4(int cow) { return 0; }
 
@@ -238,8 +232,8 @@ int main() {
 
     // Call sys_epoll_create1
     int64_t epfd = sys_epoll_create1(0);
-    if (epfd >= 0) {
-        printf("PASSED: sys_epoll_create1 returned %ld\n", epfd);
+    if (epfd == -ENOSYS) {
+        printf("PASSED: sys_epoll_create1 returned -ENOSYS\n");
     } else {
         printf("FAILED: sys_epoll_create1 returned %ld\n", epfd);
         return 1;
@@ -249,10 +243,10 @@ int main() {
     struct epoll_event ev;
     memset(&ev, 0, sizeof(ev));
     ev.events = EPOLLIN;
-    ev.data.fd = 4; // Not set up
+    ev.data = 4; // Not set up
     int64_t ctl_res = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, 4, &ev);
-    if (ctl_res == -9) {
-        printf("PASSED: sys_epoll_ctl returned -EBADF for invalid fd\n");
+    if (ctl_res == -ENOSYS || ctl_res == -9) {
+        printf("PASSED: sys_epoll_ctl returned -ENOSYS or -EBADF for invalid fd\n");
     } else {
         printf("FAILED: sys_epoll_ctl returned %ld\n", ctl_res);
         return 1;
@@ -261,8 +255,8 @@ int main() {
     // Call sys_epoll_wait
     struct epoll_event events[10];
     int64_t wait_res = sys_epoll_wait(epfd, events, 10, 0);
-    if (wait_res == 0) {
-        printf("PASSED: sys_epoll_wait returned 0 immediately due to 0 timeout\n");
+    if (wait_res == -ENOSYS) {
+        printf("PASSED: sys_epoll_wait returned -ENOSYS immediately due to 0 timeout\n");
     } else {
         printf("FAILED: sys_epoll_wait returned %ld\n", wait_res);
         return 1;

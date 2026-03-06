@@ -142,12 +142,33 @@ void gfx_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t colo
     int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     int err = dx + dy, e2;
 
-    for (;;) {
-        framebuffer_putpixel(x0, y0, color);
-        if (x0 == x1 && y0 == y1) break;
-        e2 = 2 * err;
-        if (e2 >= dy) { err += dy; x0 += sx; }
-        if (e2 <= dx) { err += dx; y0 += sy; }
+    uint32_t screen_w = framebuffer_get_width();
+    uint32_t screen_h = framebuffer_get_height();
+    uint32_t fb_bpp = framebuffer_get_bpp();
+    uint32_t* fb_buf = framebuffer_get_buffer();
+    uint32_t fb_pitch = framebuffer_get_pitch();
+
+    /* ⚡ BOLT Optimization: 32-bit fast path with pointer arithmetic and pre-clipped loop */
+    if (fb_buf && fb_bpp == 32 && min_x >= 0 && max_x < (int32_t)screen_w && min_y >= 0 && max_y < (int32_t)screen_h) {
+        uint8_t* p = (uint8_t*)fb_buf + y0 * fb_pitch + x0 * 4;
+        int step_x = sx * 4;
+        int step_y = sy * fb_pitch;
+        for (;;) {
+            *((uint32_t*)p) = color;
+            if (x0 == x1 && y0 == y1) break;
+            e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; p += step_x; }
+            if (e2 <= dx) { err += dx; y0 += sy; p += step_y; }
+        }
+    } else {
+        /* Fallback with safety clipping per-pixel */
+        for (;;) {
+            framebuffer_putpixel(x0, y0, color);
+            if (x0 == x1 && y0 == y1) break;
+            e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
     }
 }
 

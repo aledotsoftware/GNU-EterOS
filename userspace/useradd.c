@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
     char hash_str[SHA256_BLOCK_SIZE * 2 + 1];
     for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-        sprintf(&hash_str[i*2], "%02x", hash[i]);
+        snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
     }
 
     /* Assign next UID/GID */
@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     }
 
     char entry[MAX_LINE];
-    sprintf(entry, "%s:%s:%d:%d\n", username, hash_str, next_uid, next_uid);
+    snprintf(entry, sizeof(entry), "%s:%s:%d:%d\n", username, hash_str, next_uid, next_uid);
     write(fd, entry, strlen(entry));
     close(fd);
 

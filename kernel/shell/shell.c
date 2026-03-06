@@ -94,6 +94,20 @@ void shell_run(void) {
             shell_print_prompt();
             history_nav_idx = shell_history_count();
 
+        } else if (c == '\t') {
+            /* ---- Tab: Autocompletar comando ---- */
+            if (pos > 0) {
+                input[pos] = '\0';
+                const char* match = shell_autocomplete(input);
+                if (match) {
+                    shell_replace_line(input, &pos, match);
+                    if (pos < SHELL_MAX_INPUT - 1) {
+                        input[pos++] = ' ';
+                        terminal_putchar(' ');
+                    }
+                }
+            }
+
         } else if (c == '\b') {
             /* ---- Backspace ---- */
             if (pos > 0) {

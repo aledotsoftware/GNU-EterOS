@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
             uint8_t hash[SHA256_BLOCK_SIZE];
             sha256((const uint8_t*)password, strlen(password), hash);
             for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-                sprintf(&hash_str[i*2], "%02x", hash[i]);
+                snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
             }
         } else {
             hash_str[0] = '\0';

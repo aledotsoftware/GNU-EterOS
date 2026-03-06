@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
 
     char hash_str[SHA256_BLOCK_SIZE * 2 + 1];
     for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-        sprintf(&hash_str[i*2], "%02x", hash[i]);
+        snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
     }
 
     int fd = open("/etc/shadow", O_RDONLY);
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
         if (strcmp(user, username) == 0) {
             found = 1;
             char entry[MAX_LINE];
-            sprintf(entry, "%s:%s:%s:%s\n", user, hash_str, uid_str, gid_str);
+            snprintf(entry, sizeof(entry), "%s:%s:%s:%s\n", user, hash_str, uid_str, gid_str);
             write(temp_fd, entry, strlen(entry));
         } else {
             write(temp_fd, line, strlen(line));
