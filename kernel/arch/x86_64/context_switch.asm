@@ -73,9 +73,9 @@ fork_return:
     pop rbx
     pop rax
 
-    ; Restaurar User Stack Pointer desde Per-CPU Data (offset 56)
-    ; schedule() se aseguró de que gs:56 tenga el user_rsp del hijo.
-    mov rsp, [gs:56]
+    ; Restaurar User Stack Pointer desde Per-CPU Data (offset 72 - user_stack_scratch)
+    ; schedule() se aseguró de que gs:72 tenga el user_rsp del hijo.
+    mov rsp, [gs:72]
 
     ; Restaurar User GS Base
     swapgs

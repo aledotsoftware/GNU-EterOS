@@ -251,7 +251,10 @@ void scheduler_init(void) {
     uint64_t cr3;
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
     tasks[0].cr3 = cr3;
-    tasks[0].kernel_stack = 0;   /* No necesario para tarea kernel pura */
+
+    /* Configurar stack inicial para Task 0 (Boot Stack en 0x7FF000) */
+    kernel_stack_top = 0x7FF000;
+    tasks[0].kernel_stack = kernel_stack_top;
 
     strlcpy(tasks[0].name, "kernel", sizeof(tasks[0].name));
 
@@ -279,10 +282,6 @@ void scheduler_init(void) {
     task_count = 1;
     /* current_task = 0; removed */
     scheduler_active = true;
-
-    /* Configurar stack inicial para Task 0 (Boot Stack en 0x7FF000) */
-    kernel_stack_top = 0x7FF000;
-    /* tss_set_rsp0(kernel_stack_top); -> Moved to later or per-cpu */
 
     /* Update per-CPU current_task pointer if GS_BASE is valid */
     cpu_info_t* cpu = get_current_cpu();
@@ -572,13 +571,11 @@ void schedule(void) {
     cpu->current_task = next_task;
 
     /* Actualizar TSS RSP0 y Per-CPU Kernel Stack para Syscalls */
-    if (next_task->kernel_stack != 0) {
-        tss_set_rsp0(next_task->kernel_stack);
-        cpu->kernel_stack_top = next_task->kernel_stack;
+    tss_set_rsp0(next_task->kernel_stack);
+    cpu->kernel_stack_top = next_task->kernel_stack;
 
-        /* Restore User Stack Pointer (for syscall exit / fork_return) */
-        cpu->user_stack_scratch = next_task->user_rsp;
-    }
+    /* Restore User Stack Pointer (for syscall exit / fork_return) */
+    cpu->user_stack_scratch = next_task->user_rsp;
 
     /* Restore TLS state */
     wrmsr(MSR_FS_BASE, next_task->fs_base);

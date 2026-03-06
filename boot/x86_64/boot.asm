@@ -907,8 +907,8 @@ long_mode_start:
     mov word [abs 0xB800C], 0x2F4B          ; 'K'
 
     ; ---- Saltar al kernel de éterOS ----
-    ; El kernel fue cargado en 0x10000 por Stage 1
-    mov rax, KERNEL_LOAD_ADDR
+    ; El kernel fue reubicado a FINAL_KERNEL_ADDR (0x100000) por Stage 2
+    mov rax, FINAL_KERNEL_ADDR
     call rax
 
     ; Si el kernel retorna, detener la CPU
