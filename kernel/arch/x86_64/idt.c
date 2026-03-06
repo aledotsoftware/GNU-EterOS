@@ -239,7 +239,14 @@ struct int_regs {
     uint64_t rip, cs, rflags, rsp, ss;
 };
 
+extern void syscall_int80_handler(struct syscall_regs* regs);
+
 void exception_handler_c(struct int_regs *regs) {
+    if (regs->int_no == 128) {
+        syscall_int80_handler((struct syscall_regs*)regs);
+        return;
+    }
+
     struct interrupt_frame frame = {
         .rip = regs->rip,
         .cs = regs->cs,
@@ -273,6 +280,7 @@ extern void exception_stub_18(void);
 extern void exception_stub_19(void);
 extern void exception_stub_20(void);
 extern void exception_stub_21(void);
+extern void exception_stub_128(void);
 
 /* ========================================================================= */
 /* ========================================================================= */
@@ -385,6 +393,9 @@ void idt_init(void) {
     idt_set_gate(19, (void*)exception_stub_19, IDT_GATE_INTERRUPT);
     idt_set_gate(20, (void*)exception_stub_20, IDT_GATE_INTERRUPT);
     idt_set_gate(21, (void*)exception_stub_21, IDT_GATE_INTERRUPT);
+
+    /* Syscall int 0x80 (128) - with DPL=3 to allow userspace calls */
+    idt_set_gate(128, (void*)exception_stub_128, 0xEE);
 
     /* --- Instalar handlers de IRQs (32-47) --- */
     /* Usamos isr_stub_timer (assembly) -> irq_timer_handler (C) */

@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <ioctl.h>
 #include <termios.h>
+#include <linux_compat.h>
 
 #ifndef offsetof
 #define offsetof(type, member) ((size_t) &((type *)0)->member)
@@ -261,6 +262,7 @@ static int resolve_path(int dirfd, const char* user_path, char* out_path, int si
 
 static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
     if (len == 0) return -EINVAL;
+    /* flags & 0x22 (MAP_PRIVATE or MAP_ANONYMOUS) or 0x01 (MAP_SHARED) */
     if (!(flags & 0x23)) return -ENODEV; // MAP_PRIVATE (0x02), MAP_SHARED (0x01) or MAP_ANONYMOUS (0x20)
 
     task_t* current = task_get_current();
@@ -472,10 +474,6 @@ static int copy_from_user_iovec(const struct iovec* user_iov, int iovcnt, struct
     *out_kiov = kiov;
     return 0;
 }
-
-struct stat {
-    uint64_t st_dev; uint64_t st_ino; uint64_t st_nlink; uint32_t st_mode; uint32_t st_uid; uint32_t st_gid; uint32_t __pad0; uint64_t st_rdev; int64_t  st_size; int64_t  st_blksize; int64_t  st_blocks; uint64_t st_atime; uint64_t st_atime_nsec; uint64_t st_mtime; uint64_t st_mtime_nsec; uint64_t st_ctime; uint64_t st_ctime_nsec; int64_t  __unused[3];
-};
 
 static int64_t sys_write(int fd, const void* buf, size_t count) {
     if (!vmm_verify_user_access(buf, count, 0)) return -EFAULT;
@@ -936,35 +934,37 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
     return total;
 }
 
-static int64_t sys_fstat(int fd, struct stat* buf) {
-    if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) return -EFAULT;
+static int64_t sys_fstat(int fd, struct linux_stat* buf) {
+    if (!vmm_verify_user_access(buf, sizeof(struct linux_stat), 1)) return -EFAULT;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
     fs_node_t* node = current->fd_table[fd].node;
-    memset(buf, 0, sizeof(struct stat));
+    memset(buf, 0, sizeof(struct linux_stat));
     buf->st_ino = node->inode; buf->st_size = node->length; buf->st_mode = 0100644;
+    buf->st_blksize = 4096; buf->st_blocks = (node->length + 511) / 512;
     if ((node->flags & 0x7) == FS_DIRECTORY) buf->st_mode = 0040755;
     return 0;
 }
 
-static int64_t sys_newfstatat(int dirfd, const char* path, struct stat* buf, int flags) {
+static int64_t sys_newfstatat(int dirfd, const char* path, struct linux_stat* buf, int flags) {
     (void)flags;
     char kpath[256];
     int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
     if (res < 0) return res;
 
-    if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) { return -EFAULT; }
+    if (!vmm_verify_user_access(buf, sizeof(struct linux_stat), 1)) { return -EFAULT; }
     fs_node_t* node = vfs_lookup(fs_root, kpath);
     if (!node) { return -ENOENT; }
-    memset(buf, 0, sizeof(struct stat));
+    memset(buf, 0, sizeof(struct linux_stat));
     buf->st_ino = node->inode; buf->st_size = node->length; buf->st_mode = 0100644;
+    buf->st_blksize = 4096; buf->st_blocks = (node->length + 511) / 512;
     if ((node->flags & 0x7) == FS_DIRECTORY) buf->st_mode = 0040755;
     kfree(node);
     return 0;
 }
 
-static int64_t sys_stat(const char* path, struct stat* buf) {
+static int64_t sys_stat(const char* path, struct linux_stat* buf) {
     return sys_newfstatat(AT_FDCWD, path, buf, 0);
 }
 
@@ -1727,7 +1727,7 @@ static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4
 #pragma GCC diagnostic ignored "-Wcast-function-type"
 #pragma GCC diagnostic ignored "-Woverride-init"
 
-static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
+static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
     [0] = (syscall_ptr_t)sys_read,
     [1] = (syscall_ptr_t)sys_write,
@@ -1819,6 +1819,71 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
     [60] = (syscall_ptr_t)sys_exit_wrapper,
 };
 
+static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
+    [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
+    [0] = (syscall_ptr_t)sys_read,
+    [1] = (syscall_ptr_t)sys_write,
+    [2] = (syscall_ptr_t)sys_open,
+    [3] = (syscall_ptr_t)sys_close,
+    [4] = (syscall_ptr_t)sys_stat,
+    [5] = (syscall_ptr_t)sys_fstat,
+    [8] = (syscall_ptr_t)sys_lseek,
+    [9] = (syscall_ptr_t)sys_mmap,
+    [10] = (syscall_ptr_t)sys_mprotect,
+    [11] = (syscall_ptr_t)sys_munmap,
+    [12] = (syscall_ptr_t)sys_brk,
+    [13] = (syscall_ptr_t)sys_rt_sigaction,
+    [14] = (syscall_ptr_t)sys_rt_sigprocmask,
+    [16] = (syscall_ptr_t)sys_ioctl,
+    [19] = (syscall_ptr_t)sys_readv,
+    [20] = (syscall_ptr_t)sys_writev,
+    [21] = (syscall_ptr_t)sys_access,
+    [22] = (syscall_ptr_t)sys_pipe,
+    [28] = (syscall_ptr_t)sys_madvise,
+    [32] = (syscall_ptr_t)sys_dup,
+    [33] = (syscall_ptr_t)sys_dup2,
+    [35] = (syscall_ptr_t)sys_nanosleep,
+    [39] = (syscall_ptr_t)sys_getpid,
+    [41] = (syscall_ptr_t)sys_socket,
+    [42] = (syscall_ptr_t)sys_connect,
+    [43] = (syscall_ptr_t)sys_accept,
+    [44] = (syscall_ptr_t)sys_sendto,
+    [45] = (syscall_ptr_t)sys_recvfrom,
+    [49] = (syscall_ptr_t)sys_bind,
+    [50] = (syscall_ptr_t)sys_listen,
+    [61] = (syscall_ptr_t)sys_wait4,
+    [62] = (syscall_ptr_t)sys_kill,
+    [63] = (syscall_ptr_t)sys_uname,
+    [72] = (syscall_ptr_t)sys_fcntl,
+    [79] = (syscall_ptr_t)sys_getcwd,
+    [80] = (syscall_ptr_t)sys_chdir,
+    [83] = (syscall_ptr_t)sys_mkdir,
+    [87] = (syscall_ptr_t)sys_unlink,
+    [102] = (syscall_ptr_t)sys_getuid,
+    [104] = (syscall_ptr_t)sys_getgid,
+    [107] = (syscall_ptr_t)sys_geteuid,
+    [108] = (syscall_ptr_t)sys_getegid,
+    [110] = (syscall_ptr_t)sys_getppid,
+    [158] = (syscall_ptr_t)sys_arch_prctl,
+    [186] = (syscall_ptr_t)sys_gettid,
+    [202] = (syscall_ptr_t)sys_futex,
+    [217] = (syscall_ptr_t)sys_getdents64,
+    [218] = (syscall_ptr_t)sys_set_tid_address,
+    [228] = (syscall_ptr_t)sys_clock_gettime,
+    [269] = (syscall_ptr_t)sys_faccessat,
+    [231] = (syscall_ptr_t)sys_exit_group,
+    [257] = (syscall_ptr_t)sys_openat,
+    [258] = (syscall_ptr_t)sys_mkdirat,
+    [262] = (syscall_ptr_t)sys_newfstatat,
+    [264] = (syscall_ptr_t)sys_renameat,
+    [266] = (syscall_ptr_t)sys_symlinkat,
+    [263] = (syscall_ptr_t)sys_unlinkat,
+    [280] = (syscall_ptr_t)sys_utimensat,
+    [293] = (syscall_ptr_t)sys_pipe2,
+    [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
+    [60] = (syscall_ptr_t)sys_exit_wrapper,
+};
+
 #pragma GCC diagnostic pop
 static void syscall_native_handler(struct syscall_regs* regs) {
     uint64_t ret = (uint64_t)-ENOSYS;
@@ -1855,7 +1920,7 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         return;
     }
 
-    syscall_ptr_t handler = syscall_table[regs->rax];
+    syscall_ptr_t handler = syscall_native_table[regs->rax];
     if (handler) {
         ret = handler(regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8, regs->r9);
     }
@@ -1865,7 +1930,60 @@ static void syscall_native_handler(struct syscall_regs* regs) {
 }
 
 static void syscall_linux_handler(struct syscall_regs* regs) {
-    syscall_native_handler(regs);
+    uint64_t ret = (uint64_t)-ENOSYS;
+    task_t* current = task_get_current();
+    cpu_info_t* cpu = get_current_cpu();
+    if (current && cpu) {
+        current->user_rsp = cpu->user_stack_scratch;
+    }
+
+    if (regs->rax >= MAX_SYSCALL_NUM) {
+        regs->rax = (uint64_t)-ENOSYS;
+        return;
+    }
+
+    if (regs->rax == SYS_rt_sigreturn) {
+        sys_rt_sigreturn(regs);
+        return;
+    }
+    if (regs->rax == SYS_fork || regs->rax == SYS_vfork || regs->rax == SYS_clone) {
+        regs->rax = (uint64_t)task_fork((void*)regs);
+        return;
+    }
+    if (regs->rax == SYS_execve) {
+        regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
+        return;
+    }
+
+    syscall_ptr_t handler = syscall_linux_table[regs->rax];
+    if (handler) {
+        ret = handler(regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8, regs->r9);
+    }
+
+    regs->rax = ret;
+    handle_signal(regs);
+}
+
+void syscall_int80_handler(struct syscall_regs* regs) {
+    /* Mapeo del ABI i386 Linux a nuestra convencion x86_64 interna: */
+    /* eax -> rax, ebx -> rdi, ecx -> rsi, edx -> rdx, esi -> r10, edi -> r8, ebp -> r9 */
+
+    struct syscall_regs mapped_regs;
+    memcpy(&mapped_regs, regs, sizeof(struct syscall_regs));
+
+    mapped_regs.rax = regs->rax & 0xFFFFFFFF;
+    mapped_regs.rdi = regs->rbx & 0xFFFFFFFF;
+    mapped_regs.rsi = regs->rcx & 0xFFFFFFFF;
+    mapped_regs.rdx = regs->rdx & 0xFFFFFFFF;
+    mapped_regs.r10 = regs->rsi & 0xFFFFFFFF;
+    mapped_regs.r8  = regs->rdi & 0xFFFFFFFF;
+    mapped_regs.r9  = regs->rbp & 0xFFFFFFFF;
+
+    /* Call the linux handler directly */
+    syscall_linux_handler(&mapped_regs);
+
+    /* Return result in RAX */
+    regs->rax = mapped_regs.rax;
 }
 
 void syscall_handler(struct syscall_regs* regs) {
