@@ -1519,14 +1519,49 @@ static int64_t sys_access(const char* path, int mode) {
     return sys_faccessat(AT_FDCWD, path, mode, 0);
 }
 static int64_t sys_fcntl(int fd, int cmd, int64_t arg) {
-    (void)arg;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (cmd == 1) return 0;
-    if (cmd == 2) return 0;
-    if (cmd == 3) return current->fd_table[fd].flags;
-    if (cmd == 4) {
-        current->fd_table[fd].flags = (int)arg;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
+        int minfd = (int)arg;
+        if (minfd < 0 || minfd >= MAX_FD) return -EINVAL;
+        int newfd = -1;
+        for (int i = minfd; i < MAX_FD; i++) {
+            if (current->fd_table[i].node == NULL) {
+                newfd = i;
+                break;
+            }
+        }
+        if (newfd == -1) return -EMFILE;
+
+        current->fd_table[newfd].node = current->fd_table[fd].node;
+        __atomic_fetch_add(&current->fd_table[newfd].node->ref_count, 1, __ATOMIC_SEQ_CST);
+        current->fd_table[newfd].offset = current->fd_table[fd].offset;
+        current->fd_table[newfd].flags = current->fd_table[fd].flags;
+        strlcpy(current->fd_table[newfd].path, current->fd_table[fd].path, sizeof(current->fd_table[newfd].path));
+
+        if (cmd == F_DUPFD_CLOEXEC) {
+            current->fd_table[newfd].flags |= O_CLOEXEC;
+        } else {
+            current->fd_table[newfd].flags &= ~O_CLOEXEC;
+        }
+        return newfd;
+    } else if (cmd == F_GETFD) {
+        return (current->fd_table[fd].flags & O_CLOEXEC) ? FD_CLOEXEC : 0;
+    } else if (cmd == F_SETFD) {
+        if (arg & FD_CLOEXEC) {
+            current->fd_table[fd].flags |= O_CLOEXEC;
+        } else {
+            current->fd_table[fd].flags &= ~O_CLOEXEC;
+        }
+        return 0;
+    } else if (cmd == F_GETFL) {
+        return current->fd_table[fd].flags;
+    } else if (cmd == F_SETFL) {
+        /* Only O_APPEND, O_NONBLOCK, O_ASYNC and O_DIRECT can be changed */
+        int mask = O_APPEND | O_NONBLOCK;
+        current->fd_table[fd].flags = (current->fd_table[fd].flags & ~mask) | (arg & mask);
         if (current->fd_table[fd].node) {
             if (arg & O_NONBLOCK)
                 current->fd_table[fd].node->flags |= O_NONBLOCK;
