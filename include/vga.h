@@ -120,4 +120,9 @@ void terminal_scroll(void);
  */
 void terminal_set_silent(bool silent);
 
+/**
+ * Habilita el modo splash screen, limpiando a blanco y ocultando texto.
+ */
+void terminal_set_splash_mode(bool active);
+
 #endif /* ETEROS_VGA_H */

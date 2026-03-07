@@ -28,6 +28,7 @@
 #include <fs/jfs.h>
 #include <vga.h>
 #include <gfx/gfx.h>
+#include <gfx/window.h>
 #include <task.h>
 #include <net/defs.h>
 #include <net/socket.h>
@@ -263,12 +264,15 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_interrupts_enable();
 
     /* Show system splash screen */
+    terminal_set_splash_mode(true);
     show_splash();
 
     /* Kernel shell (fallback until userspace shell is ready) */
+    terminal_set_splash_mode(false);
     terminal_set_silent(false);
     terminal_clear();
-    shell_run();
+    compositor_init();
+    compositor_render();
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
     while(1) {
@@ -356,13 +360,17 @@ static void show_splash(void) {
                 /* Check if entire row fits */
                 if (start_x + 200 <= (int)screen_w) {
                     /* Fast path: full row copy */
-                    memcpy(dest_row, src_row, 200 * 4);
+                    for (int x = 0; x < 200; x++) {
+                        uint32_t color = src_row[x];
+                        dest_row[x] = (color >> 24) == 0 ? 0xFFFFFFFF : color;
+                    }
                 } else {
                     /* Slow path: clipping required */
                     for (int x = 0; x < 200; x++) {
                         int draw_x = start_x + x;
                         if (draw_x >= (int)screen_w) break;
-                        dest_row[x] = src_row[x];
+                        uint32_t color = src_row[x];
+                        dest_row[x] = (color >> 24) == 0 ? 0xFFFFFFFF : color;
                     }
                 }
             }
@@ -372,7 +380,7 @@ static void show_splash(void) {
         for (int y = 0; y < 200; y++) {
             for (int x = 0; x < 200; x++) {
                  uint32_t color = pixel_data[y * 200 + x];
-                 framebuffer_putpixel(start_x + x, start_y + y, color);
+                 framebuffer_putpixel(start_x + x, start_y + y, (color >> 24) == 0 ? 0xFFFFFFFF : color);
             }
         }
     }

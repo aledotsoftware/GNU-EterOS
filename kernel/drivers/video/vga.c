@@ -33,6 +33,17 @@ static uint32_t fb_bg = 0xFFFFFFFF; // Blanco por defecto
 static uint16_t vga_buffer_offset = 0; // Offset in characters/words from 0xB8000
 static terminal_hook_t active_hook = (void*)0;
 static bool terminal_silent = false;
+static bool boot_splash_active = false;
+
+void terminal_set_splash_mode(bool active) {
+    boot_splash_active = active;
+    if (active) {
+        fb_bg = 0xFFFFFFFF;
+        terminal_clear();
+    } else {
+        fb_bg = 0x00000000;
+    }
+}
 
 void terminal_set_hook(terminal_hook_t hook) {
     active_hook = hook;
@@ -177,7 +188,7 @@ static void _terminal_putchar(char c) {
         active_hook(c);
     }
 
-    if (terminal_silent) return;
+    if (terminal_silent || boot_splash_active) return;
 
     size_t width = use_framebuffer ? (framebuffer_get_width() / 8) : VGA_WIDTH;
     size_t height = use_framebuffer ? (framebuffer_get_height() / 16) : VGA_HEIGHT;

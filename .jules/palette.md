@@ -1,0 +1,3 @@
+## 2024-05-18 - Splash Screen UI Transition
+**Learning:** In eterOS, transitioning from the boot splash directly into the GUI requires replacing the default terminal shell initialization (`shell_run()`) with the compositor startup (`compositor_init()` and `compositor_render()`) to provide a seamless, modern experience. Additionally, transparent pixels in the splash logo must explicitly overwrite the background with white (`0xFFFFFFFF`) instead of skipping, otherwise uninitialized memory artifacts appear.
+**Action:** When implementing or modifying graphical splash screens, always fill transparent pixel data with the target background color explicitly, and ensure the GUI compositor is initialized directly from `kmain()` to skip the intermediate text mode step.
