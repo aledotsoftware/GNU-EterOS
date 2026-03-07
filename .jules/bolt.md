@@ -41,3 +41,6 @@
 ## 2026-12-05 - [Framebuffer Image Rendering]
 **Learning:** In scenarios involving rendering fixed-size pixel images to the framebuffer, falling back to pixel-by-pixel assignments using a nested loop limits performance. When 32bpp framebuffers are in use, the entire image can be copied much faster row-by-row utilizing `memcpy` for block memory transfers when no pixel blending or scaling is involved.
 **Action:** When rendering solid pixel maps without alpha channel, use `memcpy` to copy rows directly if the destination BPP matches the source data, bypassing inner loops and significantly reducing CPU instructions.
+## 2026-03-07 - [Framebuffer Putchar Fast Path]
+**Learning:** In character rendering (`framebuffer_putchar`), iterating over individual bits for every glyph row is unnecessarily slow. Specifically, completely empty rows (`bits == 0`) and completely solid rows (`bits == 0xFF`) are extremely common in standard fonts and cursor drawing.
+**Action:** Always implement fast paths for `0` and `0xFF` states in pixel assignment loops, leveraging unrolled immediate assignments instead of branch-heavy loops.
