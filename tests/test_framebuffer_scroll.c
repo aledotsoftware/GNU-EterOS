@@ -12,6 +12,17 @@
 #include "../include/framebuffer.h"
 #include "../include/boot.h"
 
+#undef snprintf
+#undef vsnprintf
+#include <stdarg.h>
+int eteros_snprintf(char* str, size_t size, const char* format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    int ret = vsnprintf(str, size, format, ap);
+    va_end(ap);
+    return ret;
+}
+
 /* Mock I/O functions */
 void outb(uint16_t port, uint8_t value) { (void)port; (void)value; }
 void outw(uint16_t port, uint16_t value) { (void)port; (void)value; }
@@ -145,7 +156,7 @@ int main() {
         terminal_set_color(vga_entry_color((i % 15) + 1, VGA_COLOR_BLACK));
 
         char buf[32];
-        sprintf(buf, "Line %d\n", i);
+        snprintf(buf, sizeof(buf), "Line %d\n", i);
 
         /* We use _terminal_putchar directly or write_string */
         /* Note: terminal_write_string calls _terminal_putchar */
