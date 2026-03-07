@@ -87,7 +87,6 @@
 86      common  link                    sys_link
 87      common  unlink                  sys_unlink
 88      common  symlink                 sys_symlink
-89      common  readlink                sys_readlink
 90      common  chmod                   sys_chmod
 91      common  fchmod                  sys_fchmod
 92      common  chown                   sys_chown

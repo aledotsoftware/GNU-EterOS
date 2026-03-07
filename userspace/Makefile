@@ -103,3 +103,9 @@ sh.elf: $(LIBC_OBJ) sh.o
 
 clean:
 	rm -f *.o *.elf libc/src/*.o
+
+test_net_echo.o: test_net_echo.c
+	$(CC) $(CFLAGS) -c test_net_echo.c -o test_net_echo.o
+
+test_net_echo.elf: $(LIBC_OBJ) test_net_echo.o
+	$(LD) $(LDFLAGS) -o test_net_echo.elf $(LIBC_OBJ) test_net_echo.o

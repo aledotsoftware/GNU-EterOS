@@ -76,8 +76,6 @@ void klog(int level, const char* fmt, ...) {
     /* Calculate remaining space */
     size_t current_len = prefix_len;
     if (current_len < KLOG_BUFFER_SIZE) {
-        /* ⚡ BOLT Optimization: Use the core library vsnprintf from stdio.h instead of a local, slower
-           re-implementation. This leverages existing fast-paths and optimized buffer filling. */
         vsnprintf(klog_buffer + current_len, KLOG_BUFFER_SIZE - current_len, fmt, args);
     }
     va_end(args);

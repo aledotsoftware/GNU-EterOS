@@ -76,7 +76,9 @@ void reset_heap() {
 
     // Reset global state
     heap_start = (block_header_t*)heap_memory;
-    free_list_head = NULL;
+    for (int i = 0; i < NUM_BUCKETS; i++) {
+        free_buckets[i] = NULL;
+    }
     memory_total = HEAP_SIZE;
     memory_used = 0;
 
@@ -140,8 +142,8 @@ void test_kmalloc_basic() {
     assert(memory_used == 0);
 
     // Check free list integrity
-    assert(free_list_head == heap_start);
-    assert(free_list_head->next == NULL); // only one block in total heap
+    int bucket = get_bucket_index(memory_total - sizeof(block_header_t));
+    assert(free_buckets[bucket] == heap_start);
 
     printf("PASSED\n");
 }
@@ -185,7 +187,8 @@ void test_coalescing() {
     // Verify p2 is free
     assert(h2->is_free == 1);
     // h2 should be in free list now
-    assert(free_list_head == h2);
+    int bucket2 = get_bucket_index(h2->size);
+    assert(free_buckets[bucket2] == h2);
 
     // Free p1 (left) -> should merge with p2
     kfree(p1);
@@ -203,7 +206,8 @@ void test_coalescing() {
     // block->next is free (h2). kfree(p1) merges h2 into h1.
     // h2 is removed from free list.
     // h1 is added to free list (at head).
-    assert(free_list_head == h1);
+    int bucket1 = get_bucket_index(h1->size);
+    assert(free_buckets[bucket1] == h1);
 
     // Free p3 (right) -> should merge with h1 (which now includes p2)
     kfree(p3);
