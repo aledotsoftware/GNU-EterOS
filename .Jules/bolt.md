@@ -37,3 +37,7 @@
 ## 2026-11-26 - [Framebuffer Block Copy Optimization]
 **Learning:** Flushing rectangles row-by-row in the framebuffer introduces overhead from loop iterations and multiple function calls even with optimized `memcpy`. When a dirty rectangle spans the full width of the framebuffer (`row_len == fb_pitch`), the region is perfectly contiguous in memory.
 **Action:** Always check if the drawing area spans the full pitch width, and if so, use a single, highly efficient `memcpy` block operation to copy the entire contiguous memory region at once.
+
+## 2026-12-05 - [Framebuffer Image Rendering]
+**Learning:** In scenarios involving rendering fixed-size pixel images to the framebuffer, falling back to pixel-by-pixel assignments using a nested loop limits performance. When 32bpp framebuffers are in use, the entire image can be copied much faster row-by-row utilizing `memcpy` for block memory transfers when no pixel blending or scaling is involved.
+**Action:** When rendering solid pixel maps without alpha channel, use `memcpy` to copy rows directly if the destination BPP matches the source data, bypassing inner loops and significantly reducing CPU instructions.
