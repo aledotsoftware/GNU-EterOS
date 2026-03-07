@@ -168,6 +168,12 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
 }
 
 fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
+    char addr_buf[32];
+    hal_console_write("[INITRD] Check at 0x");
+    utoa_hex_s(start_addr, addr_buf, sizeof(addr_buf));
+    hal_console_write(addr_buf);
+    hal_console_write("\n");
+
     if (start_addr == 0 || size == 0) {
         hal_console_write("[INITRD] No Initrd detected (Address 0 or Size 0).\n");
         return NULL;
@@ -185,7 +191,14 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     /* Verify Magic */
     initrd_header_t* header = (initrd_header_t*)initrd_start;
     if (memcmp(header->magic, INITRD_MAGIC, 4) != 0) {
-        hal_console_write("[INITRD] Error: Invalid Magic.\n");
+        hal_console_write("[INITRD] Error: Invalid Magic: ");
+        char buf[8];
+        for (int i=0; i<4; i++) {
+             utoa_hex_s(initrd_start[i], buf, sizeof(buf));
+             hal_console_write(buf);
+             hal_console_write(" ");
+        }
+        hal_console_write("\n");
         initrd_start = NULL;
         return NULL;
     }
@@ -203,9 +216,9 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     file_headers = (initrd_file_header_t*)(initrd_start + sizeof(initrd_header_t));
 
     hal_console_write("[INITRD] Initialized at 0x");
-    char addr_buf[32];
-    utoa_hex_s(start_addr, addr_buf, sizeof(addr_buf));
-    hal_console_write(addr_buf);
+    char tmp_buf[32];
+    utoa_hex_s(start_addr, tmp_buf, sizeof(tmp_buf));
+    hal_console_write(tmp_buf);
 
     hal_console_write(". Found ");
     char count_buf[16];
@@ -278,3 +291,4 @@ void initrd_list_files(void) {
         hal_console_write(" bytes)\n");
     }
 }
+uint32_t initrd_get_size(void) { return initrd_image_size; }

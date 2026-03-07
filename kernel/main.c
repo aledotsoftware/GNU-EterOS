@@ -60,7 +60,12 @@ static void show_splash(void);
 extern void net_poll(void);
 extern uint32_t my_ip;
 
+extern void dhcp_discover(void);
+
 static void network_task(void) {
+    /* Ejecutar DHCP Discover ahora que las interrupciones y el scheduler están activos */
+    dhcp_discover();
+
     /* Process any pending packets before entering loop */
     net_poll();
 
@@ -78,11 +83,8 @@ static void network_task(void) {
     }
 }
 
-extern void dhcp_discover(void);
-
 static void init_network(void) {
     net_init();
-    dhcp_discover();
 }
 
 /* ========================================================================= */
@@ -96,11 +98,16 @@ static void init_network(void) {
  * Inicializa el HAL y los subsistemas del kernel.
  */
 void __attribute__((section(".text.boot"))) kmain(void) {
+    char dbg_buf[64];
     /* ---- 0. Limpiar BSS (el bootloader no lo hace) ---- */
-    /* Sin esto, variables globales como total_cpus contienen basura */
     {
-        extern char _bss_start[], _kernel_end[];
-        char *p = _bss_start;
+        extern uint8_t _kernel_start[], _bss_start[], _kernel_end[];
+        serial_write_string("[DEBUG] _kernel_start: 0x"); utoa_hex_s((uint64_t)_kernel_start, dbg_buf, sizeof(dbg_buf)); serial_write_string(dbg_buf); serial_write_string("\n");
+        serial_write_string("[DEBUG] _bss_start: 0x"); utoa_hex_s((uint64_t)_bss_start, dbg_buf, sizeof(dbg_buf)); serial_write_string(dbg_buf); serial_write_string("\n");
+        serial_write_string("[DEBUG] _kernel_end: 0x"); utoa_hex_s((uint64_t)_kernel_end, dbg_buf, sizeof(dbg_buf)); serial_write_string(dbg_buf); serial_write_string("\n");
+        serial_write_string("[DEBUG] kmain: 0x"); utoa_hex_s((uint64_t)kmain, dbg_buf, sizeof(dbg_buf)); serial_write_string(dbg_buf); serial_write_string("\n");
+
+        uint8_t* p = _bss_start;
         while (p < _kernel_end) *p++ = 0;
     }
 
@@ -154,6 +161,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* Now that PMM, VMM, and heap are ready, switch console to framebuffer */
         if (boot_info && boot_info->fb_addr != 0) {
             terminal_switch_to_framebuffer(boot_info);
+            terminal_set_silent(true);
         }
     #endif
 
@@ -200,16 +208,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* For now, assume simple stack usage or static buffers */
     #endif
 
-    /* ---- 4. Inicializar Red ---- */
-    hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
-    if (e1000_init(NULL) == 0) {
-        hal_console_write("  [NET]  Hardware inicializado.\n");
-        init_network();
-        task_create("Network", network_task);
-    } else {
-        hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
-        hal_console_write("         (El sistema continuara sin red)\n");
-    }
+    /* Network initialization moved after scheduler_init */
 
     /* ---- 5. Mostrar banner de éterOS ---- */
     kernel_print_banner();
@@ -229,6 +228,29 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("  [INIT] Scheduler Round-Robin\n");
     scheduler_init();
     
+    /* ---- 7.1 Inicializar Red (Ahora podemos crear tareas) ---- */
+    hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
+    if (e1000_init(NULL) == 0) {
+        hal_console_write("  [NET]  Hardware inicializado.\n");
+        init_network();
+        task_create("Network", network_task);
+    } else {
+        hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
+        hal_console_write("         (El sistema continuara sin red)\n");
+    }
+    
+    serial_write_string("[DEBUG] boot_info ptr: 0x");
+    utoa_hex_s((uint64_t)boot_info, dbg_buf, sizeof(dbg_buf));
+    serial_write_string(dbg_buf);
+    serial_write_string("\n");
+
+    if (boot_info) {
+        serial_write_string("[DEBUG] boot_info->fb_addr: 0x");
+        utoa_hex_s((uint64_t)boot_info->fb_addr, dbg_buf, sizeof(dbg_buf));
+        serial_write_string(dbg_buf);
+        serial_write_string("\n");
+    }
+
     /* ---- 7.1 Inicializar Futex ---- */
     futex_init();
 
@@ -244,6 +266,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     show_splash();
 
     /* Kernel shell (fallback until userspace shell is ready) */
+    terminal_set_silent(false);
+    terminal_clear();
     shell_run();
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
@@ -316,10 +340,40 @@ static void show_splash(void) {
 
     uint32_t* pixel_data = (uint32_t*)logo_data;
 
-    for (int y = 0; y < 200; y++) {
-        for (int x = 0; x < 200; x++) {
-             uint32_t color = pixel_data[y * 200 + x];
-             framebuffer_putpixel(start_x + x, start_y + y, color);
+    /* ⚡ BOLT Optimization: Direct memory access for 32bpp Framebuffer */
+    if (framebuffer_get_bpp() == 32) {
+        uint32_t* fb_buf = framebuffer_get_buffer();
+        uint32_t fb_pitch = framebuffer_get_pitch();
+
+        if (fb_buf) {
+            for (int y = 0; y < 200; y++) {
+                int draw_y = start_y + y;
+                if (draw_y >= (int)screen_h) break;
+
+                uint32_t* dest_row = (uint32_t*)((uint8_t*)fb_buf + (draw_y * fb_pitch) + (start_x * 4));
+                uint32_t* src_row = pixel_data + (y * 200);
+
+                /* Check if entire row fits */
+                if (start_x + 200 <= (int)screen_w) {
+                    /* Fast path: full row copy */
+                    memcpy(dest_row, src_row, 200 * 4);
+                } else {
+                    /* Slow path: clipping required */
+                    for (int x = 0; x < 200; x++) {
+                        int draw_x = start_x + x;
+                        if (draw_x >= (int)screen_w) break;
+                        dest_row[x] = src_row[x];
+                    }
+                }
+            }
+        }
+    } else {
+        /* Fallback for other depths */
+        for (int y = 0; y < 200; y++) {
+            for (int x = 0; x < 200; x++) {
+                 uint32_t color = pixel_data[y * 200 + x];
+                 framebuffer_putpixel(start_x + x, start_y + y, color);
+            }
         }
     }
 
@@ -328,7 +382,4 @@ static void show_splash(void) {
     while (timer_get_ticks() < end_ticks) {
         __asm__ volatile("hlt");
     }
-
-    /* Clear screen to black and reset cursor for shell */
-    terminal_clear();
 }

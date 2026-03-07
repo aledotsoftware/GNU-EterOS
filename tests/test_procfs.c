@@ -49,6 +49,13 @@ uint64_t pmm_get_total_ram(void) { return mock_total_ram; }
 uint64_t pmm_get_free_ram(void) { return mock_free_ram; }
 uint64_t pmm_get_used_ram(void) { return mock_used_ram; }
 
+/* Task Mocks */
+#include "../include/task.h"
+task_t current_task_mock;
+task_t* task_get_current(void) {
+    return &current_task_mock;
+}
+
 /* Include implementation under test */
 /* This will include include/string.h which renames memcpy to eteros_memcpy */
 #include "../kernel/string.c"
@@ -167,8 +174,12 @@ void test_proc_directory() {
     assert(root->readdir(root, 2, &entry) == 0);
     assert(eteros_strcmp(entry.name, "meminfo") == 0);
 
-    /* Index 3: EOF */
-    assert(root->readdir(root, 3, &entry) != 0);
+    /* Index 3: self */
+    assert(root->readdir(root, 3, &entry) == 0);
+    assert(eteros_strcmp(entry.name, "self") == 0);
+
+    /* Index 4: EOF */
+    assert(root->readdir(root, 4, &entry) != 0);
 
     /* Find invalid */
     fs_node_t* invalid = root->finddir(root, "invalid");

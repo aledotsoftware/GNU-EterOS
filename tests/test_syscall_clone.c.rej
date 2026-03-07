@@ -1,0 +1,42 @@
+--- tests/test_syscall_clone.c
++++ tests/test_syscall_clone.c
+@@ -27,14 +27,18 @@
+ #include <linux_compat.h>
+
+ int task_fork_called = 0;
++int task_clone_called = 0;
+
+ int task_fork(void* regs) {
+     task_fork_called = 1;
+     return 1234;
+ }
++int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) {
++    task_clone_called = 1;
++    return 5678;
++}
+
+-
+-void context_switch(uint64_t* old, uint64_t new, void* fpu1, void* fpu2) {}
++/* void context_switch is already sedded by tests runner in previous runs, skip if causing issues */
+
+ int main() {
+     printf("Running test_syscall_clone...\n");
+@@ -48,15 +52,15 @@
+     memset(&regs, 0, sizeof(regs));
+     regs.rax = SYS_clone; // 56
+
+-    task_fork_called = 0;
++    task_clone_called = 0;
+     syscall_handler(&regs);
+
+-    if (task_fork_called == 1 && regs.rax == 1234) {
+-        printf("PASSED: sys_clone called task_fork successfully\n");
++    if (task_clone_called == 1 && regs.rax == 5678) {
++        printf("PASSED: sys_clone called task_clone successfully\n");
+         return 0;
+     } else {
+-        printf("FAILED: sys_clone did not call task_fork correctly\n");
++        printf("FAILED: sys_clone did not call task_clone correctly\n");
+         return 1;
+     }
+ }

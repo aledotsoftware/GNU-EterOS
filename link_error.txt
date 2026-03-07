@@ -1,0 +1,47 @@
+﻿x86_64-elf-gcc.exe : kernel\ar
+ch\x86_64\syscall.c:645:16: 
+warning: 'sys_readlink' 
+defined but not used 
+[-Wunused-function]
+En P:\EterOS\build.ps1: 393 
+Carácter: 9
++         & $CC @CFLAGS -c 
+$src -o $obj 2>&1
++         ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (kernel\ar  
+  ch\x86...nused-function]:   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+  645 | static int64_t 
+sys_readlink(const char* 
+path, char* buf, size_t 
+bufsiz) {
+      |                
+^~~~~~~~~~~~
+x86_64-elf-ld.exe : C:\x86_64-
+elf-tools\bin\x86_64-elf-ld.ex
+e: build\x86_64\kernel\shell\c
+ommands.o:(.rodata+0x170): 
+undefined reference to 
+`cmd_ota'
+En P:\EterOS\build.ps1: 404 
+Carácter: 5
++     & $LD @LDFLAGS_ARCH -T 
+"$BOOT_DIR\linker.ld" 
+-nostdlib -o $KERNEL ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (C:\x86_64  
+  -elf-t...ce to `cmd_ota':   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 

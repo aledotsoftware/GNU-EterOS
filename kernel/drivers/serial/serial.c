@@ -102,16 +102,7 @@ static int serial_is_transmit_empty(void) {
 void serial_irq_handler(void) {
     /* Leer registro de identificación de interrupción */
     uint8_t iir = inb(COM1_PORT + UART_IIR);
-
-    /* Nota: bit 0 de IIR es "Interrupt Pending" (0 = pendiente, 1 = no pendiente) */
-    /* Pero en modo FIFO, los bits pueden variar. Comprobamos estado de línea también. */
-    if (iir & 1) {
-        /* Aunque IIR diga que no hay interrupción, a veces es mejor verificar LSR por seguridad
-           en entornos con IRQs compartidas o condiciones de carrera,
-           pero aquí confiamos en IIR o verificamos LSR abajo. */
-        // return;
-        /* Comentado porque a veces LSR tiene datos y IIR no se actualizó todavía o viceversa */
-    }
+    (void)iir; /* IIR se lee para limpiar ciertas interrupciones, pero confiamos en LSR */
 
     /* Verificar si hay datos recibidos (RX) */
     if (inb(COM1_PORT + UART_LINE_STATUS) & LSR_DATA_READY) {
