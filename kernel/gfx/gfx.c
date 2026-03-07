@@ -142,7 +142,6 @@ void gfx_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t colo
 
     int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-    int err = dx + dy, e2;
 
     uint32_t screen_w = framebuffer_get_width();
     uint32_t screen_h = framebuffer_get_height();
@@ -155,15 +154,39 @@ void gfx_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t colo
         uint8_t* p = (uint8_t*)fb_buf + y0 * fb_pitch + x0 * 4;
         int step_x = sx * 4;
         int step_y = sy * fb_pitch;
-        for (;;) {
-            *((uint32_t*)p) = color;
-            if (x0 == x1 && y0 == y1) break;
-            e2 = 2 * err;
-            if (e2 >= dy) { err += dy; x0 += sx; p += step_x; }
-            if (e2 <= dx) { err += dx; y0 += sy; p += step_y; }
+
+        /* ⚡ BOLT Optimization: Split Bresenham loop based on dominant axis to halve branch evaluations */
+        if (dx > -dy) {
+            int err = dx / 2;
+            while (x0 != x1) {
+                *((uint32_t*)p) = color;
+                err -= -dy;
+                if (err < 0) {
+                    y0 += sy;
+                    p += step_y;
+                    err += dx;
+                }
+                x0 += sx;
+                p += step_x;
+            }
+        } else {
+            int err = -dy / 2;
+            while (y0 != y1) {
+                *((uint32_t*)p) = color;
+                err -= dx;
+                if (err < 0) {
+                    x0 += sx;
+                    p += step_x;
+                    err += -dy;
+                }
+                y0 += sy;
+                p += step_y;
+            }
         }
+        *((uint32_t*)p) = color; /* Draw the final pixel */
     } else {
         /* Fallback with safety clipping per-pixel */
+        int err = dx + dy, e2;
         for (;;) {
             framebuffer_putpixel(x0, y0, color);
             if (x0 == x1 && y0 == y1) break;
