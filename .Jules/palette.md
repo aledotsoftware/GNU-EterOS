@@ -73,3 +73,7 @@
 ## 2027-05-20 - [Feedback for Existing State]
 **Learning:** When a user attempts to open an app that is already running but obscured, doing nothing (or just focusing it) feels like a broken interaction. A subtle "shake" animation provides immediate, non-intrusive feedback that the system acknowledged the request but the state remains unchanged.
 **Action:** Implement "negative" or "attention" animations for idempotent actions that don't result in a new visual state.
+
+## 2026-03-03 - [Transparent Boot Splash Artifacts]
+**Learning:** When rendering a boot splash logo with alpha blending over a background, skipping transparent pixels (`alpha == 0`) assumes the framebuffer is already fully initialized to the correct background color. If double buffering isn't used or the framebuffer has garbage, this leaves a black box around the logo. Writing solid background color (e.g. `0xFFFFFFFF`) explicitly for transparent pixels ensures visual correctness regardless of underlying memory state.
+**Action:** Always explicitly write the target background color for fully transparent logo pixels when writing directly to an uncomposited framebuffer during early boot.

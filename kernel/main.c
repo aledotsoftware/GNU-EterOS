@@ -32,6 +32,7 @@
 #include <net/defs.h>
 #include <net/socket.h>
 #include <cpu.h>
+#include <gfx/window.h>
 
 #include <net/e1000.h>
 #include <acpi.h>
@@ -250,8 +251,9 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* Show system splash screen */
     show_splash();
 
-    /* Kernel shell (fallback until userspace shell is ready) */
-    shell_run();
+    /* Start GUI instead of shell */
+    compositor_init();
+    compositor_render();
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
     while(1) {
@@ -340,7 +342,18 @@ static void show_splash(void) {
                     int draw_x = start_x + x;
                     if (draw_x >= (int)screen_w) break;
 
-                    dest_row[x] = src_row[x];
+                    uint32_t color = src_row[x];
+                    uint32_t alpha = (color >> 24) & 0xFF;
+                    if (alpha == 255) {
+                        dest_row[x] = color;
+                    } else if (alpha > 0) {
+                        uint32_t r = (((color >> 16) & 0xFF) * alpha + 255 * (255 - alpha)) / 255;
+                        uint32_t g = (((color >> 8) & 0xFF) * alpha + 255 * (255 - alpha)) / 255;
+                        uint32_t b = (((color) & 0xFF) * alpha + 255 * (255 - alpha)) / 255;
+                        dest_row[x] = (0xFF << 24) | (r << 16) | (g << 8) | b;
+                    } else {
+                        dest_row[x] = 0xFFFFFFFF; /* Solid white for transparent pixels */
+                    }
                 }
             }
         }
@@ -349,7 +362,17 @@ static void show_splash(void) {
         for (int y = 0; y < 200; y++) {
             for (int x = 0; x < 200; x++) {
                  uint32_t color = pixel_data[y * 200 + x];
-                 framebuffer_putpixel(start_x + x, start_y + y, color);
+                 uint32_t alpha = (color >> 24) & 0xFF;
+                 if (alpha == 255) {
+                     framebuffer_putpixel(start_x + x, start_y + y, color);
+                 } else if (alpha > 0) {
+                     uint32_t r = (((color >> 16) & 0xFF) * alpha + 255 * (255 - alpha)) / 255;
+                     uint32_t g = (((color >> 8) & 0xFF) * alpha + 255 * (255 - alpha)) / 255;
+                     uint32_t b = (((color) & 0xFF) * alpha + 255 * (255 - alpha)) / 255;
+                     framebuffer_putpixel(start_x + x, start_y + y, (0xFF << 24) | (r << 16) | (g << 8) | b);
+                 } else {
+                     framebuffer_putpixel(start_x + x, start_y + y, 0xFFFFFFFF); /* Solid white */
+                 }
             }
         }
     }
@@ -359,7 +382,4 @@ static void show_splash(void) {
     while (timer_get_ticks() < end_ticks) {
         __asm__ volatile("hlt");
     }
-
-    /* Clear screen to black and reset cursor for shell */
-    terminal_clear();
 }
