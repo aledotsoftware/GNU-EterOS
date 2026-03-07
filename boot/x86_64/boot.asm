@@ -801,15 +801,15 @@ setup_page_tables:
     add eax, 0x1000                     ; Siguiente página fisica (+4KB)
     loop .loop_pts
 
-    ; 6. Llenar PD0 con Huge Pages (0 a 1GB) - Identity Mapping
+    ; 6. Llenar los 4 PDs (PD0 a PD3) con Huge Pages (0 a 4GB) - Identity Mapping
     mov edi, PAGE_TABLE_ADDR + 0x2000
-    mov eax, 0x00000083                 ; Phys 0MB + Present + RW + Huge (2MB)
-    mov ecx, 512                        ; 512 * 2MB = 1GB
-.loop_pd0:
+    mov eax, 0x00000087                 ; Phys 0MB + Present + RW + USER + Huge (2MB)
+    mov ecx, 2048                       ; 2048 * 2MB = 4GB
+.loop_pds:
     mov [edi], eax
     add edi, 8
     add eax, 0x200000
-    loop .loop_pd0
+    loop .loop_pds
 
     ret
 

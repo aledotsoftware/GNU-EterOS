@@ -142,7 +142,7 @@ void shell_run(void) {
 
         } else if (c == 12) {
             /* ---- Ctrl+L: clear screen ---- */
-            terminal_initialize(NULL);
+            terminal_clear();
             pos = 0;
             shell_print_prompt();
 

@@ -71,7 +71,7 @@ void vmm_flush_tlb_smp(uint64_t addr) {
     /* Wait for ACKs (Strict Consistency) */
     /* We wait for other cores to acknowledge invalidation. */
     if (expected_acks > 0) {
-        uint64_t timeout = 10000000; /* ~10ms depends on CPU speed */
+        uint64_t timeout = 100000; /* ~100us depends on CPU speed */
         while (tlb_ack_count < expected_acks) {
 #ifndef __ETEROS_HOST_TEST__
             __asm__ volatile("pause");
@@ -119,13 +119,32 @@ static pt_entry_t* get_next_table(pt_entry_t* table, uint64_t index, int alloc) 
     if (table[index] & PAGE_PRESENT) {
         /* Check for Huge Page (Identity Mapped by Bootloader) */
         if (table[index] & PAGE_HUGE) {
-             serial_write_string("[VMM] Error: Cannot traverse Huge Page\n");
-             return NULL;
+             /* 
+              * Huge Page Splitting: 
+              * If we hit a 2MB page but need a 4KB mapping, we must split it.
+              */
+             void* new_pt_phys = pmm_alloc_page();
+             if (!new_pt_phys) return NULL;
+             memset(new_pt_phys, 0, PAGE_SIZE);
+
+             pt_entry_t* new_pt = (pt_entry_t*)new_pt_phys;
+             uint64_t phys_base = table[index] & PAGE_ADDR_MASK;
+             uint64_t flags = table[index] & ~PAGE_ADDR_MASK;
+             flags &= ~PAGE_HUGE; /* Remove PS bit for entries in PT */
+
+             /* Fill PT with 4KB entries mapping the same 2MB region */
+             for (int i = 0; i < 512; i++) {
+                 new_pt[i] = (phys_base + i * PAGE_SIZE) | flags;
+             }
+
+             /* Replace Huge Page entry with PT pointer */
+             table[index] = (uint64_t)new_pt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+             
+             /* Success, return the new PT */
+             return new_pt;
         }
     
         /* La tabla existe, devolver su dirección virtual (Identity Mapping) */
-        /* NOTA: Como usamos Identity Mapping para el kernel, Physical == Virtual */
-        /* En un kernel Higher Half, necesitaríamos convertir Phys -> Virt aquí */
         return (pt_entry_t*)(table[index] & PAGE_ADDR_MASK);
     }
 

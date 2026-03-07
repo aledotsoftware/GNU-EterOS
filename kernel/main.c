@@ -161,7 +161,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* Now that PMM, VMM, and heap are ready, switch console to framebuffer */
         if (boot_info && boot_info->fb_addr != 0) {
             terminal_switch_to_framebuffer(boot_info);
-            terminal_set_silent(true);
+            // terminal_set_silent(true); /* Deshabilitado para depuración visual completa */
         }
     #endif
 
@@ -255,19 +255,23 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     futex_init();
 
     /* ---- 7.5 Lanzar Test de Espacio de Usuario ---- */
-    hal_console_write("  [INIT] Lanzando User Mode Test...\n");
-    extern void user_loader_entry(void);
-    task_create("UserLoader", user_loader_entry);
-
+    // hal_console_write("  [INIT] Lanzando User Mode Test...\n");
+    // extern void user_loader_entry(void);
+    // task_create("UserLoader", user_loader_entry);
+ 
     /* ---- 8. Lanzar shell interactivo ---- */
     hal_interrupts_enable();
-
+ 
     /* Show system splash screen */
-    show_splash();
-
+    // show_splash();
+ 
     /* Kernel shell (fallback until userspace shell is ready) */
     terminal_set_silent(false);
     terminal_clear();
+ 
+    serial_write_string("[ETER] Entering shell_run()...\n");
+    hal_console_write("  [INIT] Sistema listo. Iniciando Shell...\n");
+ 
     shell_run();
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */

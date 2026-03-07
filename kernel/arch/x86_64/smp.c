@@ -127,7 +127,9 @@ void smp_init(void) {
         lapic_send_startup(cpu->apic_id, 0x08);
 
         /* Esperar a que el AP se marque como ONLINE */
-        int timeout = 1000000;
+        /* Bajo virtualizacion (sin aceleracion VT-x estable), la calibracion del timer
+           en el AP puede tardar mucho mas de lo previsto. 500M es ~0.5s a 1GHz */
+        uint64_t timeout = 500000000; 
         while (cpu->state != CPU_STATE_ONLINE && timeout > 0) {
             timeout--;
             __asm__ volatile("pause");
@@ -140,7 +142,8 @@ void smp_init(void) {
         } else {
             serial_write_string("[SMP] CPU ");
             serial_write_string(b);
-            serial_write_string(" FAILED to boot.\n");
+            serial_write_string(" FAILED to boot. Marking OFFLINE.\n");
+            cpu->state = CPU_STATE_OFFLINE;
         }
     }
 }
@@ -165,11 +168,7 @@ void cpu_init_ap(int index) {
     /* Habilitar interrupciones locales del APIC */
     lapic_init();
 
-    /* Señalizar que estamos listos */
-    cpu->state = CPU_STATE_ONLINE;
-
     /* Inicializar timer del LAPIC (100 Hz) para Scheduling */
-    /* Nota: Esto usa polling del PIT para calibrar, asume que BSP está corriendo timer global */
     lapic_timer_init(100);
 
     /* Inicializar scheduler local */
@@ -178,9 +177,11 @@ void cpu_init_ap(int index) {
     /* Habilitar interrupciones globales y esperar */
     __asm__ volatile("sti");
 
-    /* Enter scheduler loop instead of simply halting.
-       task_init_ap created our idle task, and the local timer
-       will call schedule(). This idle loop yields explicitly. */
+    /* Señalizar que estamos listos SÓLO después de activar interrupciones,
+       así el BSP no espera IPI ACKs de un CPU que tiene interrupts OFF. */
+    cpu->state = CPU_STATE_ONLINE;
+
+    /* Enter scheduler loop instead of simply halting. */
     for(;;) {
         task_yield();
         __asm__ volatile("hlt");
