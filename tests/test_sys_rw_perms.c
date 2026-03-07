@@ -185,10 +185,12 @@ int main() {
 
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
+    current_task_mock.fd_lock = 0;
     current_task_mock.id = 1;
 
     fs_node_t dummy_node;
     memset(&dummy_node, 0, sizeof(fs_node_t));
+    dummy_node.ref_count = 100; // prevent free
 
     current_task_mock.fd_table[0].node = &dummy_node;
     current_task_mock.fd_table[0].flags = O_RDONLY;

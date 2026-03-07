@@ -175,10 +175,12 @@ int main() {
 
     /* Setup task */
     memset(&current_task_mock, 0, sizeof(task_t));
+    current_task_mock.fd_lock = 0;
     current_task_mock.id = 1;
     current_task_mock.fd_table[0].node = (fs_node_t*)malloc(sizeof(fs_node_t));
     memset(current_task_mock.fd_table[0].node, 0, sizeof(fs_node_t));
-    current_task_mock.fd_table[0].node->flags = 0; /* File */
+    current_task_mock.fd_table[0].node->flags = 0;
+    current_task_mock.fd_table[0].node->ref_count = 100; /* File */
 
     /* TEST 1: TCGETS with invalid pointer */
     printf("Test 1: sys_ioctl TCGETS with kernel pointer\n");

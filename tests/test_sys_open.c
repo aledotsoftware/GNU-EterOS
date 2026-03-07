@@ -8,6 +8,15 @@
 #include <errno.h>
 #include <sys/types.h>
 
+/* Map mock functions to standard C library */
+#define eteros_strcmp strcmp
+#define eteros_memset memset
+#define eteros_strncpy strncpy
+#define eteros_strlen strlen
+#define eteros_memcpy memcpy
+
+
+
 /* Defines to handle conflicts with syscall.c */
 #define timespec eteros_timespec
 
@@ -194,6 +203,7 @@ int main() {
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
     current_task_mock.id = 1;
+    current_task_mock.fd_lock = 0;
 
     // Test case: Open directory for writing
     printf("Attempting to open directory '/some/dir' with O_WRONLY...\n");

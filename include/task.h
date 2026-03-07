@@ -74,6 +74,7 @@ typedef struct task {
 
     /* POSIX Compatibility */
     file_descriptor_t fd_table[MAX_FD];     /* File Descriptor Table */
+    spinlock_t     fd_lock;                 /* Protects fd_table */
     uint32_t       signal_mask;             /* Mask of blocked signals */
     uint32_t       uid;                     /* User ID */
     uint32_t       gid;                     /* Group ID */

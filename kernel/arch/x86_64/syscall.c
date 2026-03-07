@@ -69,6 +69,33 @@ void syscall_init(void) {
 
 /* --- Socket VFS Wrappers --- */
 
+
+/* --- File Descriptor Locking Helpers --- */
+
+static fs_node_t* fd_get_and_ref(int fd) {
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return NULL;
+
+    spin_lock(&current->fd_lock);
+    fs_node_t* node = current->fd_table[fd].node;
+    /* (fs_node_t*)1 is a dummy value used to reserve a slot during allocation */
+    if (node && node != (fs_node_t*)1) {
+        __atomic_fetch_add(&node->ref_count, 1, __ATOMIC_SEQ_CST);
+    } else {
+        node = NULL;
+    }
+    spin_unlock(&current->fd_lock);
+    return node;
+}
+
+static void fd_put(fs_node_t* node) {
+    if (!node) return;
+    if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+        close_fs(node);
+        kfree(node);
+    }
+}
+
 static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
@@ -285,12 +312,15 @@ static int64_t sys_socket(int domain, int type, int protocol) {
 
     task_t* current = task_get_current();
     int fd = -1;
+    spin_lock(&current->fd_lock);
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
             fd = i;
+            current->fd_table[i].node = (fs_node_t*)1;
             break;
         }
     }
+    spin_unlock(&current->fd_lock);
     if (fd == -1) {
         net_close(sock_id);
         return -EMFILE;
@@ -299,6 +329,9 @@ static int64_t sys_socket(int domain, int type, int protocol) {
     fs_node_t* node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!node) {
         net_close(sock_id);
+        spin_lock(&current->fd_lock);
+        current->fd_table[fd].node = NULL;
+        spin_unlock(&current->fd_lock);
         return -ENOMEM;
     }
     memset(node, 0, sizeof(fs_node_t));
@@ -310,9 +343,11 @@ static int64_t sys_socket(int domain, int type, int protocol) {
     node->close = socket_close_fs;
     node->ref_count = 1;
 
+    spin_lock(&current->fd_lock);
     current->fd_table[fd].node = node;
     current->fd_table[fd].offset = 0;
     current->fd_table[fd].flags = O_RDWR;
+    spin_unlock(&current->fd_lock);
     return fd;
 }
 
@@ -320,17 +355,21 @@ static int64_t sys_connect(int fd, const struct sockaddr* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
     if (addrlen < (int)sizeof(struct sockaddr_in)) return -EINVAL;
 
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+    if ((node->flags & 0x7) != FS_SOCKET) {
+        fd_put(node);
+        return -ENOTSOCK;
+    }
 
     struct sockaddr_in* sin = (struct sockaddr_in*)addr;
-    if (sin->sin_family != AF_INET) return -EAFNOSUPPORT;
+    if (sin->sin_family != AF_INET) {
+        fd_put(node);
+        return -EAFNOSUPPORT;
+    }
 
     int res = net_connect((int)node->inode, sin, addrlen);
+    fd_put(node);
     if (res < 0) {
         if (res == -2) return -ENETUNREACH;
         return -ECONNREFUSED;
@@ -343,23 +382,34 @@ static int64_t sys_pipe(int* pipefd) {
     task_t* current = task_get_current();
     int fd[2] = {-1, -1};
     int count = 0;
+    spin_lock(&current->fd_lock);
     for (int i = 3; i < MAX_FD && count < 2; i++) {
-        if (current->fd_table[i].node == NULL) fd[count++] = i;
+        if (current->fd_table[i].node == NULL) {
+            fd[count++] = i;
+            current->fd_table[i].node = (fs_node_t*)1; /* Reserve slot */
+        }
     }
-    if (count < 2) return -EMFILE;
+    spin_unlock(&current->fd_lock);
+    if (count < 2) {
+        spin_lock(&current->fd_lock);
+        if (fd[0] != -1) current->fd_table[fd[0]].node = NULL;
+        if (fd[1] != -1) current->fd_table[fd[1]].node = NULL;
+        spin_unlock(&current->fd_lock);
+        return -EMFILE;
+    }
 
     pipe_t* pipe = (pipe_t*)kmalloc(sizeof(pipe_t));
-    if (!pipe) return -ENOMEM;
+    if (!pipe) goto pipe_error;
     memset(pipe, 0, sizeof(pipe_t));
     pipe->buffer = (uint8_t*)kmalloc(PIPE_SIZE);
-    if (!pipe->buffer) { kfree(pipe); return -ENOMEM; }
+    if (!pipe->buffer) { kfree(pipe); goto pipe_error; }
     pipe->size = PIPE_SIZE;
     pipe->readers = 1; pipe->writers = 1;
 
     fs_node_t* reader = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    if (!reader) { kfree(pipe->buffer); kfree(pipe); return -ENOMEM; }
+    if (!reader) { kfree(pipe->buffer); kfree(pipe); goto pipe_error; }
     fs_node_t* writer = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    if (!writer) { kfree(reader); kfree(pipe->buffer); kfree(pipe); return -ENOMEM; }
+    if (!writer) { kfree(reader); kfree(pipe->buffer); kfree(pipe); goto pipe_error; }
     memset(reader, 0, sizeof(fs_node_t)); memset(writer, 0, sizeof(fs_node_t));
     reader->ref_count = 1; writer->ref_count = 1;
     strlcpy(reader->name, "pipe_r", 32); reader->flags = FS_PIPE; reader->read = pipe_read; reader->close = pipe_close; reader->open = pipe_open; reader->ptr = (struct fs_node*)pipe;
@@ -368,10 +418,19 @@ static int64_t sys_pipe(int* pipefd) {
     strlcpy(writer->name, "pipe_w", 32); writer->flags = FS_PIPE; writer->write = pipe_write; writer->close = pipe_close; writer->open = pipe_open; writer->ptr = (struct fs_node*)pipe;
     writer->impl = PIPE_WRITE_END;
 
+    spin_lock(&current->fd_lock);
     current->fd_table[fd[0]].node = reader; current->fd_table[fd[0]].offset = 0; current->fd_table[fd[0]].flags = O_RDONLY;
     current->fd_table[fd[1]].node = writer; current->fd_table[fd[1]].offset = 0; current->fd_table[fd[1]].flags = O_WRONLY;
+    spin_unlock(&current->fd_lock);
     pipefd[0] = fd[0]; pipefd[1] = fd[1];
     return 0;
+
+pipe_error:
+    spin_lock(&current->fd_lock);
+    current->fd_table[fd[0]].node = NULL;
+    current->fd_table[fd[1]].node = NULL;
+    spin_unlock(&current->fd_lock);
+    return -ENOMEM;
 }
 
 #define ARCH_SET_GS 0x1001
@@ -412,28 +471,53 @@ struct stat {
 static int64_t sys_write(int fd, const void* buf, size_t count) {
     if (!vmm_verify_user_access(buf, count, 0)) return -EFAULT;
     task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
 
-    if ((current->fd_table[fd].flags & O_ACCMODE) == O_RDONLY) return -EBADF;
+    spin_lock(&current->fd_lock);
+    int flags = current->fd_table[fd].flags;
+    uint32_t offset = current->fd_table[fd].offset;
+    spin_unlock(&current->fd_lock);
 
-    uint32_t written = write_fs(current->fd_table[fd].node, current->fd_table[fd].offset, count, (uint8_t*)buf);
-    current->fd_table[fd].offset += written;
+    if ((flags & O_ACCMODE) == O_RDONLY) {
+        fd_put(node);
+        return -EBADF;
+    }
+
+    uint32_t written = write_fs(node, offset, count, (uint8_t*)buf);
+
+    spin_lock(&current->fd_lock);
+    if (current->fd_table[fd].node == node) current->fd_table[fd].offset += written;
+    spin_unlock(&current->fd_lock);
+
+    fd_put(node);
     return written;
 }
 
 static int64_t sys_read(int fd, void* buf, size_t count) {
     if (!vmm_verify_user_access(buf, count, 1)) return -EFAULT;
     task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
 
-    if ((current->fd_table[fd].flags & O_ACCMODE) == O_WRONLY) return -EBADF;
+    spin_lock(&current->fd_lock);
+    int flags = current->fd_table[fd].flags;
+    uint32_t offset = current->fd_table[fd].offset;
+    spin_unlock(&current->fd_lock);
 
-    ssize_t read = read_fs(current->fd_table[fd].node, current->fd_table[fd].offset, count, (uint8_t*)buf);
-    if (read > 0) {
-        current->fd_table[fd].offset += read;
+    if ((flags & O_ACCMODE) == O_WRONLY) {
+        fd_put(node);
+        return -EBADF;
     }
+
+    ssize_t read = read_fs(node, offset, count, (uint8_t*)buf);
+    if (read > 0) {
+        spin_lock(&current->fd_lock);
+        if (current->fd_table[fd].node == node) current->fd_table[fd].offset += read;
+        spin_unlock(&current->fd_lock);
+    }
+
+    fd_put(node);
     return read;
 }
 
@@ -444,21 +528,33 @@ static int64_t sys_open(const char* path, int flags, int mode) {
 
     task_t* current = task_get_current();
     int fd = -1;
-    for (int i = 3; i < MAX_FD; i++) { if (current->fd_table[i].node == NULL) { fd = i; break; } }
+    spin_lock(&current->fd_lock);
+    for (int i = 3; i < MAX_FD; i++) {
+        if (current->fd_table[i].node == NULL) {
+            fd = i;
+            current->fd_table[i].node = (fs_node_t*)1; /* Reserve slot */
+            break;
+        }
+    }
+    spin_unlock(&current->fd_lock);
     if (fd == -1) { kfree(kpath); return -EMFILE; }
 
     fs_node_t* node = vfs_lookup(fs_root, kpath);
+    int err = 0;
     if (!node) {
         if (flags & O_CREAT) {
             char parent_path[128]; char filename[128];
-            if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
+            if (split_path(kpath, parent_path, filename) != 0) { err = -ENAMETOOLONG; goto open_error; }
             fs_node_t* parent = vfs_lookup(fs_root, parent_path);
-            if (!parent) { kfree(kpath); return -ENOENT; }
-            if (create_fs(parent, filename, (uint16_t)mode) != 0) { kfree(parent); kfree(kpath); return -EACCES; }
+            if (!parent) { err = -ENOENT; goto open_error; }
+            if (create_fs(parent, filename, (uint16_t)mode) != 0) { kfree(parent); err = -EACCES; goto open_error; }
             node = vfs_lookup(fs_root, kpath);
             kfree(parent);
-            if (!node) { kfree(kpath); return -ENOENT; }
-        } else { kfree(kpath); return -ENOENT; }
+            if (!node) { err = -ENOENT; goto open_error; }
+        } else {
+            err = -ENOENT;
+            goto open_error;
+        }
     }
     kfree(kpath);
 
@@ -472,21 +568,37 @@ static int64_t sys_open(const char* path, int flags, int mode) {
     /* Prevent opening directories for writing */
     if ((node->flags & 0x7) == FS_DIRECTORY && (write_mode != 0)) {
         kfree(node);
-        return -EISDIR;
+        err = -EISDIR;
+        goto open_error_no_kpath;
     }
 
     open_fs(node, read_mode, write_mode);
+    spin_lock(&current->fd_lock);
     current->fd_table[fd].node = node; current->fd_table[fd].offset = 0; current->fd_table[fd].flags = flags;
+    spin_unlock(&current->fd_lock);
     return fd;
+
+open_error:
+    kfree(kpath);
+open_error_no_kpath:
+    spin_lock(&current->fd_lock);
+    current->fd_table[fd].node = NULL;
+    spin_unlock(&current->fd_lock);
+    return err;
 }
 
 static int64_t sys_close(int fd) {
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
+    spin_lock(&current->fd_lock);
     fs_node_t* node = current->fd_table[fd].node;
-    if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { close_fs(node); kfree(node); }
+    if (!node || node == (fs_node_t*)1) {
+        spin_unlock(&current->fd_lock);
+        return -EBADF;
+    }
     current->fd_table[fd].node = NULL;
+    spin_unlock(&current->fd_lock);
+    fd_put(node);
     return 0;
 }
 
@@ -522,13 +634,21 @@ static int64_t sys_unlink(const char* path) {
 
 static int64_t sys_lseek(int fd, int64_t offset, int whence) {
     task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    if (whence == 0) current->fd_table[fd].offset = offset;
-    else if (whence == 1) current->fd_table[fd].offset += offset;
-    else if (whence == 2) current->fd_table[fd].offset = current->fd_table[fd].node->length + offset;
-    else return -EINVAL;
-    return current->fd_table[fd].offset;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+    int64_t ret = -EINVAL;
+    spin_lock(&current->fd_lock);
+    if (current->fd_table[fd].node == node) {
+        if (whence == 0) current->fd_table[fd].offset = offset;
+        else if (whence == 1) current->fd_table[fd].offset += offset;
+        else if (whence == 2) current->fd_table[fd].offset = node->length + offset;
+        ret = current->fd_table[fd].offset;
+    } else {
+        ret = -EBADF;
+    }
+    spin_unlock(&current->fd_lock);
+    fd_put(node);
+    return ret;
 }
 
 static int64_t sys_getpid(void) { return task_get_current()->id; }
@@ -605,10 +725,11 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
         if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
     }
 
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    return ioctl_fs(current->fd_table[fd].node, (int)request, arg);
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+    int64_t ret = ioctl_fs(node, (int)request, arg);
+    fd_put(node);
+    return ret;
 }
 
 static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
@@ -623,8 +744,10 @@ static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
     for (int i=0; i<iovcnt; i++) {
         int64_t r = sys_write(fd, kiov[i].iov_base, kiov[i].iov_len);
         if (r < 0) {
-            kfree(kiov);
-            return r;
+            if (total == 0) {
+                kfree(kiov);
+                return r;
+            } else break;
         }
         total += r;
     }
@@ -644,8 +767,10 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
     for (int i=0; i<iovcnt; i++) {
         int64_t r = sys_read(fd, kiov[i].iov_base, kiov[i].iov_len);
         if (r < 0) {
-            kfree(kiov);
-            return r;
+            if (total == 0) {
+                kfree(kiov);
+                return r;
+            } else break;
         }
         total += r;
     }
@@ -655,13 +780,12 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
 
 static int64_t sys_fstat(int fd, struct stat* buf) {
     if (!vmm_verify_user_access(buf, sizeof(struct stat), 1)) return -EFAULT;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
     memset(buf, 0, sizeof(struct stat));
     buf->st_ino = node->inode; buf->st_size = node->length; buf->st_mode = 0100644;
     if ((node->flags & 0x7) == FS_DIRECTORY) buf->st_mode = 0040755;
+    fd_put(node);
     return 0;
 }
 
@@ -697,79 +821,111 @@ static int64_t sys_futex(uint32_t *uaddr, int op, uint32_t val, void *timeout, u
 static int64_t sys_dup2(int oldfd, int newfd) {
     if (oldfd < 0 || oldfd >= MAX_FD || newfd < 0 || newfd >= MAX_FD) return -EBADF;
     task_t* current = task_get_current();
-    if (!current->fd_table[oldfd].node) return -EBADF;
     if (oldfd == newfd) return newfd;
-    if (current->fd_table[newfd].node) sys_close(newfd);
-    current->fd_table[newfd].node = current->fd_table[oldfd].node;
-    if (current->fd_table[newfd].node) __atomic_fetch_add(&current->fd_table[newfd].node->ref_count, 1, __ATOMIC_SEQ_CST);
-    current->fd_table[newfd].offset = current->fd_table[oldfd].offset;
-    current->fd_table[newfd].flags = current->fd_table[oldfd].flags;
+
+    spin_lock(&current->fd_lock);
+    fs_node_t* old_node = current->fd_table[oldfd].node;
+    if (!old_node || old_node == (fs_node_t*)1) {
+        spin_unlock(&current->fd_lock);
+        return -EBADF;
+    }
+    __atomic_fetch_add(&old_node->ref_count, 1, __ATOMIC_SEQ_CST);
+    int offset = current->fd_table[oldfd].offset;
+    int flags = current->fd_table[oldfd].flags;
+
+    fs_node_t* node_to_close = NULL;
+    if (current->fd_table[newfd].node && current->fd_table[newfd].node != (fs_node_t*)1) {
+        node_to_close = current->fd_table[newfd].node;
+    }
+
+    current->fd_table[newfd].node = old_node;
+    current->fd_table[newfd].offset = offset;
+    current->fd_table[newfd].flags = flags;
+    spin_unlock(&current->fd_lock);
+
+    if (node_to_close) fd_put(node_to_close);
+
     return newfd;
 }
 
 static int64_t sys_bind(int fd, const struct sockaddr* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
     if (addrlen < (int)sizeof(struct sockaddr_in)) return -EINVAL;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    struct sockaddr_in* sin = (struct sockaddr_in*)addr;
-    if (sin->sin_family != AF_INET) return -EAFNOSUPPORT;
-    socket_entry_t* s = get_socket((int)node->inode);
-    if (!s) return -EBADF;
-    if (s->state != SOCKET_STATE_CLOSED) return -EINVAL;
-    s->local_port = ntohs(sin->sin_port);
-    return 0;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+    int64_t ret = 0;
+    if ((node->flags & 0x7) != FS_SOCKET) ret = -ENOTSOCK;
+    else {
+        struct sockaddr_in* sin = (struct sockaddr_in*)addr;
+        if (sin->sin_family != AF_INET) ret = -EAFNOSUPPORT;
+        else {
+            socket_entry_t* s = get_socket((int)node->inode);
+            if (!s) ret = -EBADF;
+            else if (s->state != SOCKET_STATE_CLOSED) ret = -EINVAL;
+            else s->local_port = ntohs(sin->sin_port);
+        }
+    }
+    fd_put(node);
+    return ret;
 }
 
 static int64_t sys_listen(int fd, int backlog) {
     (void)backlog;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    socket_entry_t* s = get_socket((int)node->inode);
-    if (!s) return -EBADF;
-    s->state = SOCKET_STATE_LISTEN;
-    return 0;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+    int64_t ret = 0;
+    if ((node->flags & 0x7) != FS_SOCKET) ret = -ENOTSOCK;
+    else {
+        socket_entry_t* s = get_socket((int)node->inode);
+        if (!s) ret = -EBADF;
+        else s->state = SOCKET_STATE_LISTEN;
+    }
+    fd_put(node);
+    return ret;
 }
 
 static int64_t sys_accept(int fd, struct sockaddr* addr, int* addrlen) {
-    (void)fd;
     if (addr && !vmm_verify_user_access(addr, sizeof(struct sockaddr), 1)) return -EFAULT;
     if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
-    return -ENOSYS;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+    int64_t ret = -ENOSYS;
+    if ((node->flags & 0x7) != FS_SOCKET) ret = -ENOTSOCK;
+    fd_put(node);
+    return ret;
 }
 
 static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr* dest_addr, int addrlen) {
     if (!vmm_verify_user_access(buf, len, 0)) return -EFAULT;
     if (dest_addr && !vmm_verify_user_access(dest_addr, addrlen, 0)) return -EFAULT;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    int res = net_send((int)node->inode, buf, len, flags);
-    if (res < 0) return -EIO;
-    return res;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+    int64_t ret = 0;
+    if ((node->flags & 0x7) != FS_SOCKET) ret = -ENOTSOCK;
+    else {
+        int res = net_send((int)node->inode, buf, len, flags);
+        if (res < 0) ret = -EIO;
+        else ret = res;
+    }
+    fd_put(node);
+    return ret;
 }
 
 static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr* src_addr, int* addrlen) {
     if (!vmm_verify_user_access(buf, len, 1)) return -EFAULT;
     if (src_addr && !vmm_verify_user_access(src_addr, sizeof(struct sockaddr), 1)) return -EFAULT;
     if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    int res = net_recv((int)node->inode, buf, len, flags);
-    if (res < 0) return -EIO;
-    if (res == 0) return 0;
-    return res;
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+    int64_t ret = 0;
+    if ((node->flags & 0x7) != FS_SOCKET) ret = -ENOTSOCK;
+    else {
+        int res = net_recv((int)node->inode, buf, len, flags);
+        if (res < 0) ret = -EIO;
+        else ret = res;
+    }
+    fd_put(node);
+    return ret;
 }
 
 struct kernel_sigaction {
@@ -999,28 +1155,53 @@ static int64_t sys_access(const char* path, int mode) {
 static int64_t sys_fcntl(int fd, int cmd, int64_t arg) {
     (void)arg;
     task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (cmd == 1) return 0;
-    if (cmd == 2) return 0;
-    if (cmd == 3) return current->fd_table[fd].flags;
-    if (cmd == 4) {
+    fs_node_t* node = fd_get_and_ref(fd);
+    if (!node) return -EBADF;
+
+    int64_t ret = -EINVAL;
+    if (cmd == 1) ret = 0;
+    else if (cmd == 2) ret = 0;
+    else if (cmd == 3) {
+        spin_lock(&current->fd_lock);
+        ret = current->fd_table[fd].flags;
+        spin_unlock(&current->fd_lock);
+    } else if (cmd == 4) {
+        spin_lock(&current->fd_lock);
         current->fd_table[fd].flags = (int)arg;
-        if (current->fd_table[fd].node) {
-            if (arg & O_NONBLOCK)
-                current->fd_table[fd].node->flags |= O_NONBLOCK;
-            else
-                current->fd_table[fd].node->flags &= ~O_NONBLOCK;
-        }
-        return 0;
+        if (arg & O_NONBLOCK)
+            node->flags |= O_NONBLOCK;
+        else
+            node->flags &= ~O_NONBLOCK;
+        spin_unlock(&current->fd_lock);
+        ret = 0;
     }
-    return -EINVAL;
+
+    fd_put(node);
+    return ret;
 }
 static int64_t sys_dup(int oldfd) {
     task_t* current = task_get_current();
     if (oldfd < 0 || oldfd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[oldfd].node) return -EBADF;
+    spin_lock(&current->fd_lock);
+    if (!current->fd_table[oldfd].node || current->fd_table[oldfd].node == (fs_node_t*)1) {
+        spin_unlock(&current->fd_lock);
+        return -EBADF;
+    }
+    spin_unlock(&current->fd_lock);
     for (int i = 0; i < MAX_FD; i++) {
-        if (!current->fd_table[i].node) return sys_dup2(oldfd, i);
+        spin_lock(&current->fd_lock);
+        if (!current->fd_table[i].node) {
+            current->fd_table[i].node = (fs_node_t*)1; /* Reserve slot */
+            spin_unlock(&current->fd_lock);
+            int res = sys_dup2(oldfd, i);
+            if (res < 0) {
+                spin_lock(&current->fd_lock);
+                current->fd_table[i].node = NULL;
+                spin_unlock(&current->fd_lock);
+            }
+            return res;
+        }
+        spin_unlock(&current->fd_lock);
     }
     return -EMFILE;
 }

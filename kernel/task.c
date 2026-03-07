@@ -256,6 +256,7 @@ void scheduler_init(void) {
 
     /* POSIX Init for Kernel Task */
     memset(tasks[0].fd_table, 0, sizeof(tasks[0].fd_table));
+    tasks[0].fd_lock = 0;
     tasks[0].signal_mask = 0;
     tasks[0].signal_pending = 0;
     memset(tasks[0].signal_handlers, 0, sizeof(tasks[0].signal_handlers));
@@ -332,6 +333,7 @@ void task_init_ap(void) {
 
     /* Basic Init */
     memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
+    tasks[slot].fd_lock = 0;
     tasks[slot].fs_base = 0;
     tasks[slot].gs_base = 0;
     tasks[slot].uid = 0;
@@ -397,6 +399,7 @@ int task_create(const char* name, void (*entry)(void)) {
 
     /* POSIX Init for New Task */
     memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
+    tasks[slot].fd_lock = 0;
     tasks[slot].signal_mask = 0;
     tasks[slot].signal_pending = 0;
     memset(tasks[slot].signal_handlers, 0, sizeof(tasks[slot].signal_handlers));
@@ -824,6 +827,7 @@ int task_fork(void* regs_ptr) {
 
     /* POSIX/Linux Fields */
     memcpy(tasks[slot].fd_table, parent->fd_table, sizeof(parent->fd_table));
+    tasks[slot].fd_lock = 0;
     /* VFS nodes are shared pointers! Refcounting handled here. */
     for (int i = 0; i < MAX_FD; i++) {
         if (tasks[slot].fd_table[i].node) {

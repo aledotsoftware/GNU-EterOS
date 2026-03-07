@@ -207,12 +207,13 @@ int main() {
 
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
+    current_task_mock.fd_lock = 0;
     current_task_mock.id = 1;
 
     // Setup FD 0 as valid
     current_task_mock.fd_table[0].node = (fs_node_t*)malloc(sizeof(fs_node_t));
     memset(current_task_mock.fd_table[0].node, 0, sizeof(fs_node_t));
-    current_task_mock.fd_table[0].node->flags = 0; // File
+    current_task_mock.fd_table[0].node->flags = 0; current_task_mock.fd_table[0].node->ref_count = 1; // File
     current_task_mock.fd_table[0].node->read = read_fs; // Important!
     current_task_mock.fd_table[0].flags = O_RDWR; // Added permissions to pass sys_read/sys_write tests
 
@@ -323,7 +324,7 @@ int main() {
     }
     printf("PASSED: writev Memory handling correct\n");
 
-    free(current_task_mock.fd_table[0].node);
+    // free handled by fd_put
 
     return 0;
 }
