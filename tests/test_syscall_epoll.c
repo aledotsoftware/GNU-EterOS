@@ -232,8 +232,8 @@ int main() {
 
     // Call sys_epoll_create1
     int64_t epfd = sys_epoll_create1(0);
-    if (epfd == -ENOSYS) {
-        printf("PASSED: sys_epoll_create1 returned -ENOSYS\n");
+    if (epfd >= 0) {
+        printf("PASSED: sys_epoll_create1 returned a valid FD: %ld\n", epfd);
     } else {
         printf("FAILED: sys_epoll_create1 returned %ld\n", epfd);
         return 1;
@@ -245,18 +245,18 @@ int main() {
     ev.events = EPOLLIN;
     ev.data = 4; // Not set up
     int64_t ctl_res = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, 4, &ev);
-    if (ctl_res == -ENOSYS || ctl_res == -9) {
-        printf("PASSED: sys_epoll_ctl returned -ENOSYS or -EBADF for invalid fd\n");
+    if (ctl_res == 0) {
+        printf("PASSED: sys_epoll_ctl stub returned 0\n");
     } else {
-        printf("FAILED: sys_epoll_ctl returned %ld\n", ctl_res);
+        printf("FAILED: sys_epoll_ctl stub returned %ld\n", ctl_res);
         return 1;
     }
 
     // Call sys_epoll_wait
     struct epoll_event events[10];
     int64_t wait_res = sys_epoll_wait(epfd, events, 10, 0);
-    if (wait_res == -ENOSYS) {
-        printf("PASSED: sys_epoll_wait returned -ENOSYS immediately due to 0 timeout\n");
+    if (wait_res == 0) {
+        printf("PASSED: sys_epoll_wait stub returned 0 events immediately due to 0 timeout\n");
     } else {
         printf("FAILED: sys_epoll_wait returned %ld\n", wait_res);
         return 1;

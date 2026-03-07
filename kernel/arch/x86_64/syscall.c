@@ -758,8 +758,10 @@ struct robust_list_head {
 };
 
 static int64_t sys_set_robust_list(struct robust_list_head* head, size_t len) {
-    (void)head; (void)len;
-    return 0; /* Stub */
+    if (len != sizeof(struct robust_list_head)) return -EINVAL;
+    if (head && !vmm_verify_user_access(head, sizeof(struct robust_list_head), 0)) return -EFAULT;
+    /* Basic stub - robust futex list is not fully managed yet */
+    return 0;
 }
 
 static int64_t sys_getrlimit(int resource, struct rlimit* rlim) {
@@ -1074,16 +1076,16 @@ struct kernel_sigaction {
 
 static int64_t sys_rt_sigaction(int sig, const struct kernel_sigaction* act,
                                 struct kernel_sigaction* oldact, size_t sigsetsize) {
-    (void)sigsetsize;
+    if (sigsetsize != 8) return -EINVAL;
     if (sig < 1 || sig > 31) return -EINVAL;
     if (sig == SIGKILL || sig == SIGSTOP) return -EINVAL;
     task_t* current = task_get_current();
     if (oldact) {
         if (!vmm_verify_user_access(oldact, sizeof(struct kernel_sigaction), 1)) return -EFAULT;
         oldact->handler = current->signal_handlers[sig];
-        oldact->flags = 0;
+        oldact->flags = current->signal_flags[sig];
         oldact->restorer = current->signal_restorers[sig];
-        oldact->mask = 0;
+        oldact->mask = 0; /* TODO: Implement proper mask saving */
     }
     if (act) {
         if (!vmm_verify_user_access(act, sizeof(struct kernel_sigaction), 0)) return -EFAULT;
@@ -1100,7 +1102,7 @@ static int64_t sys_rt_sigaction(int sig, const struct kernel_sigaction* act,
 }
 
 static int64_t sys_rt_sigprocmask(int how, const uint64_t* set, uint64_t* oldset, size_t sigsetsize) {
-    (void)sigsetsize;
+    if (sigsetsize != 8) return -EINVAL;
     task_t* current = task_get_current();
     if (oldset) {
         if (!vmm_verify_user_access(oldset, sizeof(uint64_t), 1)) return -EFAULT;
@@ -1343,7 +1345,28 @@ static int64_t sys_pselect6(int nfds, void* readfds, void* writefds, void* excep
 
 static int64_t sys_epoll_create1(int flags) {
     (void)flags;
-    return -ENOSYS; /* Stub */
+    /* Return a fake FD for now to bypass some musl initializations */
+    task_t* current = task_get_current();
+    int fd = -1;
+    for (int i = 3; i < MAX_FD; i++) {
+        if (current->fd_table[i].node == NULL) {
+            fd = i;
+            break;
+        }
+    }
+    if (fd == -1) return -EMFILE;
+
+    fs_node_t* fake_epoll = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!fake_epoll) return -ENOMEM;
+    memset(fake_epoll, 0, sizeof(fs_node_t));
+    fake_epoll->ref_count = 1;
+    strlcpy(fake_epoll->name, "anon_inode:[eventpoll]", 32);
+
+    current->fd_table[fd].node = fake_epoll;
+    current->fd_table[fd].offset = 0;
+    current->fd_table[fd].flags = 0;
+
+    return fd;
 }
 
 #pragma pack(push, 1)
@@ -1355,17 +1378,40 @@ struct epoll_event {
 
 static int64_t sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event* event) {
     (void)epfd; (void)op; (void)fd; (void)event;
-    return -ENOSYS; /* Stub */
+    /* Fake success for now */
+    return 0;
 }
 
 static int64_t sys_epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout) {
     (void)epfd; (void)events; (void)maxevents; (void)timeout;
-    return -ENOSYS; /* Needs proper VFS waitqueue implementation */
+    /* If called with timeout 0, return 0 events. If called with block, sleep a bit */
+    if (timeout > 0) task_sleep(timeout);
+    return 0;
 }
 
 static int64_t sys_eventfd2(unsigned int initval, int flags) {
     (void)initval; (void)flags;
-    return -ENOSYS; /* Stub */
+    task_t* current = task_get_current();
+    int fd = -1;
+    for (int i = 3; i < MAX_FD; i++) {
+        if (current->fd_table[i].node == NULL) {
+            fd = i;
+            break;
+        }
+    }
+    if (fd == -1) return -EMFILE;
+
+    fs_node_t* fake_eventfd = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!fake_eventfd) return -ENOMEM;
+    memset(fake_eventfd, 0, sizeof(fs_node_t));
+    fake_eventfd->ref_count = 1;
+    strlcpy(fake_eventfd->name, "anon_inode:[eventfd]", 32);
+
+    current->fd_table[fd].node = fake_eventfd;
+    current->fd_table[fd].offset = 0;
+    current->fd_table[fd].flags = 0;
+
+    return fd;
 }
 
 static int64_t sys_clock_gettime(int clock_id, struct timespec* tp) {
@@ -1410,8 +1456,10 @@ static int64_t sys_set_tid_address(int* tidptr) {
     return current->id;
 }
 static int64_t sys_exit_group(int status) {
-    /* For now, just exit the current thread.
-       A true exit_group would kill all threads with the same tgid. */
+    task_t* current = task_get_current();
+    if (current->tgid != 0) {
+        task_kill(current->tgid);
+    }
     task_exit(status);
     __builtin_unreachable();
 }
@@ -1894,37 +1942,60 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [43] = (syscall_ptr_t)sys_accept,
     [44] = (syscall_ptr_t)sys_sendto,
     [45] = (syscall_ptr_t)sys_recvfrom,
+    [46] = (syscall_ptr_t)sys_sendmsg,
+    [47] = (syscall_ptr_t)sys_recvmsg,
+    [48] = (syscall_ptr_t)sys_shutdown,
     [49] = (syscall_ptr_t)sys_bind,
     [50] = (syscall_ptr_t)sys_listen,
+    [51] = (syscall_ptr_t)sys_getsockname,
+    [52] = (syscall_ptr_t)sys_getpeername,
+    [54] = (syscall_ptr_t)sys_setsockopt,
+    [55] = (syscall_ptr_t)sys_getsockopt,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
     [72] = (syscall_ptr_t)sys_fcntl,
+    [77] = (syscall_ptr_t)sys_ftruncate,
     [79] = (syscall_ptr_t)sys_getcwd,
     [80] = (syscall_ptr_t)sys_chdir,
     [83] = (syscall_ptr_t)sys_mkdir,
     [87] = (syscall_ptr_t)sys_unlink,
+    [97] = (syscall_ptr_t)sys_getrlimit,
     [102] = (syscall_ptr_t)sys_getuid,
     [104] = (syscall_ptr_t)sys_getgid,
     [107] = (syscall_ptr_t)sys_geteuid,
     [108] = (syscall_ptr_t)sys_getegid,
     [110] = (syscall_ptr_t)sys_getppid,
+    [131] = (syscall_ptr_t)sys_sigaltstack,
     [158] = (syscall_ptr_t)sys_arch_prctl,
     [186] = (syscall_ptr_t)sys_gettid,
     [202] = (syscall_ptr_t)sys_futex,
     [217] = (syscall_ptr_t)sys_getdents64,
     [218] = (syscall_ptr_t)sys_set_tid_address,
     [228] = (syscall_ptr_t)sys_clock_gettime,
-    [269] = (syscall_ptr_t)sys_faccessat,
+    [229] = (syscall_ptr_t)sys_clock_getres,
     [231] = (syscall_ptr_t)sys_exit_group,
+    [232] = (syscall_ptr_t)sys_epoll_wait,
+    [233] = (syscall_ptr_t)sys_epoll_ctl,
+    [234] = (syscall_ptr_t)sys_tgkill,
     [257] = (syscall_ptr_t)sys_openat,
     [258] = (syscall_ptr_t)sys_mkdirat,
     [262] = (syscall_ptr_t)sys_newfstatat,
+    [263] = (syscall_ptr_t)sys_unlinkat,
     [264] = (syscall_ptr_t)sys_renameat,
     [266] = (syscall_ptr_t)sys_symlinkat,
-    [263] = (syscall_ptr_t)sys_unlinkat,
+    [269] = (syscall_ptr_t)sys_faccessat,
+    [270] = (syscall_ptr_t)sys_pselect6,
+    [271] = (syscall_ptr_t)sys_ppoll,
+    [273] = (syscall_ptr_t)sys_set_robust_list,
     [280] = (syscall_ptr_t)sys_utimensat,
+    [288] = (syscall_ptr_t)sys_accept4,
+    [290] = (syscall_ptr_t)sys_eventfd2,
+    [291] = (syscall_ptr_t)sys_epoll_create1,
+    [292] = (syscall_ptr_t)sys_dup3,
     [293] = (syscall_ptr_t)sys_pipe2,
+    [302] = (syscall_ptr_t)sys_prlimit64,
+    [318] = (syscall_ptr_t)sys_getrandom,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
 };
