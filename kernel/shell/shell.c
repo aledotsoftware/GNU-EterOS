@@ -36,7 +36,9 @@ void shell_run(void) {
                           VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     terminal_write_string("Escribe ");
     terminal_write_colored("help", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    terminal_write_string(" para ver comandos.\n\n");
+    terminal_write_string(" para ver comandos, o usa ");
+    terminal_write_colored("[Tab]", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    terminal_write_string(" para autocompletar.\n\n");
 
     shell_print_prompt();
 
