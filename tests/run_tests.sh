@@ -221,3 +221,17 @@ echo "Running test_sem..."
 gcc -D__ETEROS_HOST_TEST__ -Itests/mocks tests/test_sem.c -o tests/test_sem
 ./tests/test_sem
 rm tests/test_sem
+
+# Test Sys Mkdir (Security Fix)
+echo "---------------------------------------------------"
+echo "Running test_sys_mkdir_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_mkdir_security.c kernel/string.c -o tests/test_sys_mkdir_security
+./tests/test_sys_mkdir_security
+rm tests/test_sys_mkdir_security
+
+# Test Sys Unlink (Security Fix)
+echo "---------------------------------------------------"
+echo "Running test_sys_unlink_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_unlink_security.c kernel/string.c -o tests/test_sys_unlink_security
+./tests/test_sys_unlink_security
+rm tests/test_sys_unlink_security

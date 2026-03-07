@@ -42,3 +42,8 @@
 **Vulnerability:** The `sys_access` syscall returned success (0) merely if a file existed, ignoring the requested access modes (read, write, execute) and failing to check the calling task's UID/GID against the file's owner/group/mask.
 **Learning:** In early-stage custom kernels, standard system calls often have stubbed implementations (like returning success without validation) that are easily overlooked and represent severe privilege escalation or information leakage vectors. System states must explicitly map user identity directly within core structures (like `task_t`).
 **Prevention:** Audit all POSIX-compatible syscalls to ensure they don't just mimic the interface but actually enforce the underlying security constraints (e.g. evaluating bitwise permission masks). Ensure user identity (UID/GID) is built into core structures (task scheduler) and not hardcoded to 0 (root).
+
+## 2026-06-05 - [sys_mkdir and sys_unlink Parent Permission Bypass]
+**Vulnerability:** The `sys_mkdir` and `sys_unlink` system calls resolved the parent directory using `vfs_lookup` and immediately called `mkdir_fs` or `unlink_fs` without verifying if the calling task had the requisite write (`W_OK`) permissions on that parent directory.
+**Learning:** VFS-modifying system calls must not implicitly trust that path resolution implies mutation rights. Operations that alter a directory's contents require explicit validation of the caller's privileges against the target directory's POSIX bitmask.
+**Prevention:** Implement and reuse a standard permission evaluation helper (e.g., `node_has_access`) across all syscalls that interact with the Virtual File System. Ensure tests mock unprivileged users (`uid != 0`) attempting unauthorized writes.

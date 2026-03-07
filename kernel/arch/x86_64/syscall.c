@@ -484,6 +484,34 @@ static int64_t sys_close(int fd) {
     return 0;
 }
 
+static int node_has_access(fs_node_t* node, int mode) {
+    if (!node) return 0;
+
+    uint32_t task_uid = task_get_current()->uid;
+    uint32_t task_gid = task_get_current()->gid;
+
+    uint32_t req_read = (mode & 4) ? 4 : 0;
+    uint32_t req_write = (mode & 2) ? 2 : 0;
+    uint32_t req_exec = (mode & 1) ? 1 : 0;
+    uint32_t req_mask = req_read | req_write | req_exec;
+
+    if (task_uid == 0) {
+        /* Root has full access except for execute without any execute bits */
+        if (req_exec && !(node->mask & 0111) && !((node->flags & 0x7) == FS_DIRECTORY)) {
+            return 0;
+        }
+        return 1;
+    }
+
+    uint32_t granted = 0;
+    if (task_uid == node->uid) granted = (node->mask >> 6) & 7;
+    else if (task_gid == node->gid) granted = (node->mask >> 3) & 7;
+    else granted = node->mask & 7;
+
+    if ((granted & req_mask) != req_mask) return 0;
+    return 1;
+}
+
 static int64_t sys_mkdir(const char* path, int mode) {
     char* kpath = NULL;
     int res = copy_user_string(path, &kpath, 4096);
@@ -493,6 +521,13 @@ static int64_t sys_mkdir(const char* path, int mode) {
     if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
     if (!parent) { kfree(kpath); return -ENOENT; }
+
+    if (!node_has_access(parent, 2)) { /* Require W_OK */
+        kfree(parent);
+        kfree(kpath);
+        return -EACCES;
+    }
+
     int res2 = mkdir_fs(parent, filename, (uint16_t)mode);
     kfree(parent);
     kfree(kpath);
@@ -508,6 +543,13 @@ static int64_t sys_unlink(const char* path) {
     if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
     if (!parent) { kfree(kpath); return -ENOENT; }
+
+    if (!node_has_access(parent, 2)) { /* Require W_OK */
+        kfree(parent);
+        kfree(kpath);
+        return -EACCES;
+    }
+
     int res2 = unlink_fs(parent, filename);
     kfree(parent);
     kfree(kpath);
