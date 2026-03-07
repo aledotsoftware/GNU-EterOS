@@ -103,6 +103,13 @@ void cmd_storage(const char* args) {
     terminal_write_string("  [VFS / Initrd]\n");
     terminal_write_string("  Initrd cargado en memoria RAM.\n");
     terminal_write_string("  Estado: Solo-Lectura (Read-Only)\n");
+
+    char size_buf[32];
+    itoa_s(initrd_get_size(), size_buf, sizeof(size_buf), 10);
+    terminal_write_string("  Tamano Total: ");
+    terminal_write_string(size_buf);
+    terminal_write_string(" bytes\n");
+
     terminal_write_string("  Espacio Libre: 0 bytes\n");
     terminal_write_string("\n");
 }
