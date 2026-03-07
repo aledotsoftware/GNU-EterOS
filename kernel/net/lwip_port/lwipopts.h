@@ -2,10 +2,12 @@
 #define __LWIP_OPTS_H__
 
 /* Platform */
-#define NO_SYS                  1
+#define NO_SYS                  0
 #define SYS_LIGHTWEIGHT_PROT    0
-#define LWIP_SOCKET             0
-#define LWIP_NETCONN            0
+#define LWIP_SOCKET             1
+#define LWIP_COMPAT_SOCKETS     0
+#define LWIP_TIMEVAL_PRIVATE    0
+#define LWIP_NETCONN            1
 
 /* Memory */
 #define MEM_ALIGNMENT           4

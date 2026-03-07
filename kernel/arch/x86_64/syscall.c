@@ -626,7 +626,7 @@ static int64_t sys_unlink(const char* path) {
     return sys_unlinkat(AT_FDCWD, path, 0);
 }
 
-static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
+static int64_t __attribute__((unused)) sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
     if (!vmm_verify_user_access(buf, bufsiz, 1)) return -EFAULT;
 
     char kpath[256];
@@ -646,10 +646,6 @@ static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t buf
 
     kfree(node);
     return read_bytes;
-}
-
-static int64_t sys_readlink(const char* path, char* buf, size_t bufsiz) {
-    return sys_readlinkat(AT_FDCWD, path, buf, bufsiz);
 }
 
 static int64_t sys_renameat(int olddirfd, const char* oldpath, int newdirfd, const char* newpath) {

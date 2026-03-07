@@ -175,9 +175,6 @@ void terminal_scroll(void) {
 static void _terminal_putchar(char c) {
     if (active_hook) {
         active_hook(c);
-        /* Si hay hook activo, podríamos evitar escribir en pantalla VGA/FB para evitar "doble print" en la ventanita */
-        /* O podemos dejar que pinte en fondo */
-        // return;  <-- Si queremos silenciar el fondo
     }
 
     if (terminal_silent) return;

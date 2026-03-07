@@ -123,10 +123,16 @@ void net_poll(void) {
                     /* Security Check: Payload Length Validation */
                     /* Calculate payload length based on IP Total Length field */
                     int total_ip_len = ntohs(ip->len);
+
+                    /* Security check: total_ip_len must be at least ip_hdr_len */
+                    if (total_ip_len < ip_hdr_len) return;
+
                     int ip_payload_len = total_ip_len - ip_hdr_len;
 
                     /* Calculate actual available data in the received buffer */
                     int available_len = len - sizeof(struct ethernet_header) - ip_hdr_len;
+
+                    if (available_len < 0) return;
 
                     /* Use the smaller of the two to avoid over-read */
                     int tcp_len = (ip_payload_len < available_len) ? ip_payload_len : available_len;

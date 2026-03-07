@@ -87,6 +87,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_ip_aton.c kernel/net/core/ip_uti
 ./tests/test_ip_aton
 rm tests/test_ip_aton
 
+# Test Stack Security
+echo "---------------------------------------------------"
+echo "Running test_stack_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude -I. tests/test_stack_security.c -o tests/test_stack_security
+./tests/test_stack_security
+rm tests/test_stack_security
+
 # Test Initrd Overflow
 echo "---------------------------------------------------"
 echo "Running test_initrd_overflow..."
@@ -151,7 +158,7 @@ rm tests/test_procfs
 # Test DevFS
 echo "---------------------------------------------------"
 echo "Running test_devfs..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c -o tests/test_devfs
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c kernel/crypto/sha256.c -o tests/test_devfs
 ./tests/test_devfs
 rm tests/test_devfs
 

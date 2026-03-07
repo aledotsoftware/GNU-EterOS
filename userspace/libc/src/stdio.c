@@ -6,21 +6,43 @@
 #include <errno.h>
 #include <sys/syscall.h>
 
-#ifndef __ETEROS_HOST_TEST__
+#ifndef BUFSIZ
+#define BUFSIZ 65536
+#endif
+
+#ifndef _IONBF
+#define _IONBF 0
+#endif
+
+#ifndef _IOLBF
+#define _IOLBF 1
+#endif
+
+#ifndef _IOFBF
+#define _IOFBF 2
+#endif
+
 struct _eteros_IO_FILE {
     int fd;
     int error;
     int eof;
+    char *buf;
+    int buf_size;
+    int buf_pos;
+    int buf_mode;
+    int should_free;
 };
 
-static FILE __stdin = {0, 0, 0};
-static FILE __stdout = {1, 0, 0};
-static FILE __stderr = {2, 0, 0};
+static char __stdin_buf[BUFSIZ];
+static char __stdout_buf[BUFSIZ];
+
+static FILE __stdin = {0, 0, 0, __stdin_buf, BUFSIZ, 0, _IOLBF, 0};
+static FILE __stdout = {1, 0, 0, __stdout_buf, BUFSIZ, 0, _IOFBF, 0};
+static FILE __stderr = {2, 0, 0, NULL, 0, 0, _IONBF, 0};
 
 FILE *stdin = &__stdin;
 FILE *stdout = &__stdout;
 FILE *stderr = &__stderr;
-#endif
 
 /* Syscall primitives */
 static inline long _syscall1(long n, long a1) {
@@ -54,6 +76,34 @@ static void buf_putc(int c, void *arg) {
 static void fd_putc(int c, void *arg) {
     int fd = (int)(long)arg;
     write(fd, &c, 1);
+}
+
+int fflush(FILE *stream) {
+    if (!stream) return 0;
+    if (stream->buf_pos > 0) {
+        if (write(stream->fd, stream->buf, stream->buf_pos) < 0) {
+            stream->error = 1;
+            return EOF;
+        }
+        stream->buf_pos = 0;
+    }
+    return 0;
+}
+
+static void __stdio_putc(int c, void *arg) {
+    FILE *stream = (FILE*)arg;
+    if (stream->buf_mode == _IONBF) {
+        unsigned char uc = (unsigned char)c;
+        if (write(stream->fd, &uc, 1) != 1) stream->error = 1;
+    } else {
+        if (stream->buf_pos >= stream->buf_size) {
+            if (fflush(stream) == EOF) return;
+        }
+        stream->buf[stream->buf_pos++] = (char)c;
+        if (stream->buf_pos >= stream->buf_size || (stream->buf_mode == _IOLBF && c == '\n')) {
+            fflush(stream);
+        }
+    }
 }
 
 static int vcbprintf(putc_func out, void *arg, const char *fmt, va_list ap) {
@@ -338,16 +388,14 @@ int sprintf(char *str, const char *format, ...) {
     return ret;
 }
 
-#ifndef __ETEROS_HOST_TEST__
 int vprintf(const char *format, va_list ap) {
     return vfprintf(stdout, format, ap);
 }
 
 int vfprintf(FILE *stream, const char *format, va_list ap) {
     if (!stream) return -1;
-    return vcbprintf(fd_putc, (void*)(long)stream->fd, format, ap);
+    return vcbprintf(__stdio_putc, stream, format, ap);
 }
-#endif
 
 #define SPRINTF_MAX_LEN 65536
 
@@ -366,12 +414,15 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
     return ret;
 }
 
-#ifndef __ETEROS_HOST_TEST__
+#ifdef __ETEROS_HOST_TEST__
+int eteros_fprintf(FILE *stream, const char *format, ...) {
+#else
 int fprintf(FILE *stream, const char *format, ...) {
+#endif
     if (!stream) return -1;
     va_list ap;
     va_start(ap, format);
-    int ret = vcbprintf(fd_putc, (void*)(long)stream->fd, format, ap);
+    int ret = vcbprintf(__stdio_putc, stream, format, ap);
     va_end(ap);
     return ret;
 }
@@ -411,12 +462,26 @@ FILE *fopen(const char *pathname, const char *mode) {
     f->fd = fd;
     f->error = 0;
     f->eof = 0;
+    f->buf = (char*)malloc(BUFSIZ);
+    f->buf_size = BUFSIZ;
+    f->buf_pos = 0;
+    f->buf_mode = _IOFBF; // Default to full buffering for files
+    f->should_free = 1;
+
+    if (!f->buf) {
+        free(f);
+        close(fd);
+        return NULL;
+    }
+
     return f;
 }
 
 int fclose(FILE *stream) {
     if (!stream) return EOF;
+    fflush(stream);
     int ret = close(stream->fd);
+    if (stream->should_free && stream->buf) free(stream->buf);
     free(stream);
     return (ret < 0) ? EOF : 0;
 }
@@ -444,19 +509,61 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
     if (!stream || !ptr) return 0;
     if (size == 0 || nmemb == 0) return 0;
 
-    size_t bytes_to_write = size * nmemb;
-    ssize_t ret = write(stream->fd, ptr, bytes_to_write);
+    size_t total_bytes = size * nmemb;
+    const char *p = (const char *)ptr;
+    size_t written = 0;
 
-    if (ret < 0) {
-        stream->error = 1;
-        return 0;
+    if (stream->buf_mode == _IONBF) {
+        ssize_t ret = write(stream->fd, p, total_bytes);
+        if (ret < 0) {
+             stream->error = 1;
+             return 0;
+        }
+        return (size_t)ret / size;
     }
 
-    return (size_t)ret / size;
+    while (total_bytes > 0) {
+        if (stream->buf_pos >= stream->buf_size) {
+            if (fflush(stream) == EOF) return written / size;
+        }
+
+        int chunk = stream->buf_size - stream->buf_pos;
+        if (chunk > total_bytes) chunk = total_bytes;
+
+        // Optimize: If buffer is empty and data is large, write directly
+        if (stream->buf_pos == 0 && chunk == stream->buf_size) {
+             ssize_t ret = write(stream->fd, p, total_bytes);
+             if (ret < 0) {
+                 stream->error = 1;
+                 return written / size;
+             }
+             written += ret;
+             return written / size;
+        }
+
+        memcpy(stream->buf + stream->buf_pos, p, chunk);
+        stream->buf_pos += chunk;
+        p += chunk;
+        written += chunk;
+        total_bytes -= chunk;
+
+        if (stream->buf_mode == _IOLBF) {
+             // Scan for newline in the chunk we just added
+             for (int i = 0; i < chunk; i++) {
+                 if (p[-chunk + i] == '\n') {
+                     if (fflush(stream) == EOF) return written / size;
+                     break;
+                 }
+             }
+        }
+    }
+
+    return written / size;
 }
 
 int fseek(FILE *stream, long offset, int whence) {
     if (!stream) return -1;
+    fflush(stream);
     int64_t ret = lseek(stream->fd, offset, whence);
     if (ret < 0) {
         stream->error = 1;
@@ -475,16 +582,13 @@ void rewind(FILE *stream) {
     fseek(stream, 0, SEEK_SET);
 }
 
-int fflush(FILE *stream) {
-    (void)stream;
-    return 0;
-}
+/* fflush is defined above */
 
 int fputc(int c, FILE *stream) {
     if (!stream) return EOF;
-    unsigned char uc = (unsigned char)c;
-    if (fwrite(&uc, 1, 1, stream) != 1) return EOF;
-    return (int)uc;
+    __stdio_putc(c, stream);
+    if (stream->error) return EOF;
+    return (unsigned char)c;
 }
 
 int fgetc(FILE *stream) {
@@ -518,7 +622,6 @@ int fputs(const char *s, FILE *stream) {
     if (fwrite(s, 1, len, stream) != len) return EOF;
     return 1;
 }
-#endif
 
 void perror(const char *s) {
     if (s && *s) {
