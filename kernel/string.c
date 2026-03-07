@@ -6,7 +6,9 @@
  */
 
 #include "../include/string.h"
+#include "../include/serial.h"
 #include "../include/stdlib.h"
+#include "../include/types.h"
 
 /* ========================================================================= */
 /* Funciones de Memoria                                                      */
@@ -73,7 +75,7 @@ void* memset(void* dest, int c, size_t n) {
     
     size_t qwords = n / 8;
     size_t remainder = n % 8;
-
+ 
     /* ⚡ BOLT Optimization: Fast path for small blocks (< 64 bytes) to avoid
        the setup overhead of the `rep` microcode on modern x86_64. */
     if (n < 64) {
@@ -95,14 +97,14 @@ void* memset(void* dest, int c, size_t n) {
         }
         return original_dest;
     }
-
+ 
     __asm__ volatile (
         "cld; rep stosq"
         : "+D"(dest), "+c"(qwords)
         : "a"(pattern)
         : "memory"
     );
-
+ 
     __asm__ volatile (
         "rep stosb"
         : "+D"(dest), "+c"(remainder)

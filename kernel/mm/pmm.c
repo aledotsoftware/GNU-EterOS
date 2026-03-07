@@ -222,7 +222,7 @@ void pmm_init(void) {
     uint64_t p_ref_counts = (uint64_t)pmm_ref_counts;
     pmm_mark_region_used(p_bitmap, pmm_bitmap_size);
     pmm_mark_region_used(p_ref_counts, ref_counts_size);
-    pmm_mark_region_used(0x4000000, 0x1000000); /* Reserve Initrd */
+    /* Initrd is loaded at 0x15000 (below 1MB), already covered by 0-1MB reservation. */
     
     uint64_t pmm_end = p_ref_counts + ref_counts_size;
     free_mem_start = PAGE_ALIGN_UP(pmm_end);

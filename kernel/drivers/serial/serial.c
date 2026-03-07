@@ -39,6 +39,7 @@
 static uint8_t tx_buffer[SERIAL_BUFFER_SIZE];
 static volatile uint16_t tx_head = 0;
 static volatile uint16_t tx_tail = 0;
+static spinlock_t serial_lock = 0;
 
 /* RX Buffer */
 static uint8_t rx_buffer[SERIAL_BUFFER_SIZE];
@@ -102,16 +103,7 @@ static int serial_is_transmit_empty(void) {
 void serial_irq_handler(void) {
     /* Leer registro de identificación de interrupción */
     uint8_t iir = inb(COM1_PORT + UART_IIR);
-
-    /* Nota: bit 0 de IIR es "Interrupt Pending" (0 = pendiente, 1 = no pendiente) */
-    /* Pero en modo FIFO, los bits pueden variar. Comprobamos estado de línea también. */
-    if (iir & 1) {
-        /* Aunque IIR diga que no hay interrupción, a veces es mejor verificar LSR por seguridad
-           en entornos con IRQs compartidas o condiciones de carrera,
-           pero aquí confiamos en IIR o verificamos LSR abajo. */
-        // return;
-        /* Comentado porque a veces LSR tiene datos y IIR no se actualizó todavía o viceversa */
-    }
+    (void)iir; /* IIR se lee para limpiar ciertas interrupciones, pero confiamos en LSR */
 
     /* Verificar si hay datos recibidos (RX) */
     if (inb(COM1_PORT + UART_LINE_STATUS) & LSR_DATA_READY) {
@@ -180,6 +172,7 @@ void serial_putchar(char c) {
 
     /* Save interrupt state and disable them to protect buffer access */
     uint64_t flags = irq_save();
+    spin_lock(&serial_lock);
 
     /* Agregar al buffer */
     tx_buffer[tx_head] = c;
@@ -191,6 +184,7 @@ void serial_putchar(char c) {
         outb(COM1_PORT + UART_INT_ENABLE, ier | IER_TX_EMPTY);
     }
 
+    spin_unlock(&serial_lock);
     /* Restore interrupt state (re-enables interrupts if they were enabled) */
     irq_restore(flags);
 }
