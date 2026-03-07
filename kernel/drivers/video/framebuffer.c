@@ -179,6 +179,8 @@ void framebuffer_scroll(uint32_t pixels, uint32_t bg_color) {
     framebuffer_rect(0, fb_height - pixels, fb_width, pixels, bg_color);
 }
 
+// TODO: dynamic resolution requires GOP protocol support
+
 void framebuffer_clear(uint32_t color) {
     if (!active_buffer) return;
 

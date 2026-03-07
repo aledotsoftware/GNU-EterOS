@@ -167,13 +167,15 @@ uint32_t acpi_get_lapic_addr(void) {
 }
 
 #include <io.h>
+
 void acpi_poweroff(void) {
+    /* Perform ACPI shutdown via FADT PM1a/b control block */
     if (!fadt) {
         serial_write_string("[ACPI] Cannot poweroff, FADT not found.\n");
         return;
     }
 
-    /* Out to PM1a control block */
+    /* Send shutdown SLP_TYPa | SLP_EN command (usually 0x2000) */
     outw(fadt->pm1a_control_block, 0x2000);
 
     if (fadt->pm1b_control_block) {
@@ -182,6 +184,6 @@ void acpi_poweroff(void) {
 
     serial_write_string("[ACPI] Poweroff signal sent.\n");
     while (1) {
-        __asm__ volatile("hlt");
+        __asm__ volatile("cli; hlt");
     }
 }

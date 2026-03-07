@@ -92,13 +92,81 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
         return NULL;
     }
 
-    /* Fill with a simple fallback gradient/color so it "works" visually */
-    for (uint32_t y = 0; y < height; y++) {
-        for (uint32_t x = 0; x < width; x++) {
-            uint8_t r = (x * 255) / width;
-            uint8_t g = (y * 255) / height;
-            uint8_t b = 128;
-            img->pixels[y * width + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
+    /* Attempt to extract uncompressed IDAT blocks if they exist */
+    offset = 8;
+    size_t pixel_idx = 0;
+    size_t total_pixels = width * height;
+
+    size_t scanline_bytes = width * 4;
+    size_t uncompressed_idx = 0;
+
+    while (offset + 8 < size) {
+        uint32_t chunk_len = get_be32(data + offset);
+        const char* chunk_type = (const char*)(data + offset + 4);
+
+        if (offset + 12 > size || chunk_len > size - offset - 12) break;
+
+        if (memcmp(chunk_type, "IDAT", 4) == 0) {
+            /* Basic parser for uncompressed DEFLATE blocks (type 0) */
+            const uint8_t* idat_data = data + offset + 8;
+            if (chunk_len > 2) {
+                size_t idat_offset = 2; /* skip zlib header */
+                while (idat_offset < chunk_len) {
+                    uint8_t header = idat_data[idat_offset];
+                    uint8_t bfinal = header & 1;
+                    uint8_t btype = (header >> 1) & 3;
+
+                    if (btype == 0 && idat_offset + 5 <= chunk_len) {
+                        /* Uncompressed block */
+                        idat_offset++;
+                        uint16_t len = idat_data[idat_offset] | (idat_data[idat_offset + 1] << 8);
+                        idat_offset += 4; /* skip len and nlen */
+
+                        if (idat_offset + len <= chunk_len) {
+                            /* Parse raw RGBA pixels, accounting for 1 byte row filter per scanline */
+                            for (size_t i = 0; i < len; i++) {
+                                if (uncompressed_idx % (scanline_bytes + 1) == 0) {
+                                    /* Skip row filter byte */
+                                    uncompressed_idx++;
+                                    continue;
+                                }
+
+                                if (pixel_idx < total_pixels && i + 3 < len) {
+                                    /* Every 4th uncompressed byte (excluding filter byte) we have a full pixel */
+                                    if ((uncompressed_idx % (scanline_bytes + 1)) % 4 == 1) {
+                                        uint8_t r = idat_data[idat_offset + i];
+                                        uint8_t g = idat_data[idat_offset + i + 1];
+                                        uint8_t b = idat_data[idat_offset + i + 2];
+                                        uint8_t a = idat_data[idat_offset + i + 3];
+                                        img->pixels[pixel_idx++] = (a << 24) | (r << 16) | (g << 8) | b;
+                                        i += 3;
+                                        uncompressed_idx += 3;
+                                    }
+                                }
+                                uncompressed_idx++;
+                            }
+                        }
+                        idat_offset += len;
+                        if (bfinal) break;
+                    } else {
+                        /* Compressed data, abort parsing */
+                        break;
+                    }
+                }
+            }
+        }
+        offset += chunk_len + 12;
+    }
+
+    /* Fallback if no valid uncompressed pixels were read */
+    if (pixel_idx == 0) {
+        for (uint32_t y = 0; y < height; y++) {
+            for (uint32_t x = 0; x < width; x++) {
+                uint8_t r = (x * 255) / width;
+                uint8_t g = (y * 255) / height;
+                uint8_t b = 128;
+                img->pixels[y * width + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
+            }
         }
     }
 

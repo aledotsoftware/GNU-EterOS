@@ -3,6 +3,9 @@
 #include <mm.h>
 #include <string.h>
 #include <framebuffer.h>
+#include <hal.h>
+
+#define SLEEP_TIMEOUT_TICKS 60000
 
 static window_t* window_list = NULL;
 static int32_t next_window_id = 1;
@@ -119,7 +122,7 @@ static void draw_window(window_t* win) {
                 }
             }
         } else if (win->flags & WIN_GLASS) {
-            /* Glassmorphism mode */
+            /* Glassmorphism mode (Alpha Blending) */
             for (int32_t i = 0; i < height; i++) {
                 uint32_t* dest = (uint32_t*)dest_row;
                 uint32_t* src = src_row;
@@ -127,10 +130,10 @@ static void draw_window(window_t* win) {
                 for (int32_t j = 0; j < width; j++) {
                     uint32_t sc = src[j];
                     if (sc != 0) {
-                        uint32_t a = (sc >> 24) & 0xFF;
-                        if (a == 255) {
+                        uint32_t alpha = (sc >> 24) & 0xFF;
+                        if (alpha == 255) {
                             dest[j] = sc;
-                        } else if (a > 0) {
+                        } else if (alpha > 0) {
                             uint32_t dc = dest[j];
                             uint32_t sr = (sc >> 16) & 0xFF;
                             uint32_t sg = (sc >> 8) & 0xFF;
@@ -141,9 +144,9 @@ static void draw_window(window_t* win) {
                             uint32_t db = dc & 0xFF;
 
                             /* Fast alpha blending using bitwise shifts (x >> 8 is approx x / 255) */
-                            uint32_t r = (sr * a + dr * (255 - a)) >> 8;
-                            uint32_t g = (sg * a + dg * (255 - a)) >> 8;
-                            uint32_t b = (sb * a + db * (255 - a)) >> 8;
+                            uint32_t r = (sr * alpha + dr * (255 - alpha)) >> 8;
+                            uint32_t g = (sg * alpha + dg * (255 - alpha)) >> 8;
+                            uint32_t b = (sb * alpha + db * (255 - alpha)) >> 8;
 
                             dest[j] = 0xFF000000 | (r << 16) | (g << 8) | b;
                         }
@@ -210,7 +213,14 @@ int display_sleep_mode = 0;
 uint64_t last_input_ticks = 0;
 int dark_mode_enabled = 1;
 
+void flux_set_theme(int dark_mode) {
+    dark_mode_enabled = dark_mode;
+    gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());
+    gfx_present();
+}
+
 void compositor_wake(void) {
+    last_input_ticks = hal_timer_ticks();
     if (display_sleep_mode) {
         display_sleep_mode = 0;
         gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());
@@ -219,6 +229,16 @@ void compositor_wake(void) {
 }
 
 void compositor_render(void) {
+    if (!display_sleep_mode) {
+        if (hal_timer_ticks() - last_input_ticks > SLEEP_TIMEOUT_TICKS) {
+            display_sleep_mode = 1;
+            /* Sleep screen (black out) */
+            framebuffer_rect(0, 0, framebuffer_get_width(), framebuffer_get_height(), 0xFF000000);
+            gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());
+            gfx_present();
+        }
+    }
+
     if (display_sleep_mode) {
         return;
     }
