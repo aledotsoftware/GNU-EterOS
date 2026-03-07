@@ -1550,12 +1550,19 @@ static int64_t sys_setgid(uint32_t gid) {
 
 static int64_t sys_faccessat(int dirfd, const char* path, int mode, int flags) {
     (void)flags;
-    char kpath[256];
-    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
-    if (res < 0) return res;
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+    int res = resolve_path(dirfd, path, kpath, 256);
+    if (res < 0) {
+        kfree(kpath);
+        return res;
+    }
 
     fs_node_t* node = vfs_lookup(fs_root, kpath);
-    if (!node) { return -ENOENT; }
+    if (!node) {
+        kfree(kpath);
+        return -ENOENT;
+    }
 
     int allowed = 1;
     if (mode != F_OK) {
@@ -1583,6 +1590,7 @@ static int64_t sys_faccessat(int dirfd, const char* path, int mode, int flags) {
     }
 
     kfree(node);
+    kfree(kpath);
     return allowed ? 0 : -EACCES;
 }
 
