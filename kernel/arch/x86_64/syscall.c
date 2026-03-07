@@ -1475,6 +1475,14 @@ static syscall_ptr_t syscall_table[MAX_SYSCALL_NUM] = {
 };
 
 #pragma GCC diagnostic pop
+
+#ifdef __ETEROS_HOST_TEST__
+int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) {
+    (void)node; (void)index; (void)entry;
+    return -1;
+}
+#endif
+
 static void syscall_native_handler(struct syscall_regs* regs) {
     uint64_t ret = (uint64_t)-ENOSYS;
     task_t* current = task_get_current();

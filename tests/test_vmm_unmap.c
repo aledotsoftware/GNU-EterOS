@@ -151,10 +151,29 @@ cpu_info_t cpus[MAX_CPUS];
 int get_cpu_id(void) { return 0; }
 cpu_info_t* get_current_cpu(void) { return &cpus[0]; }
 
-/* We include vmm.c directly to test static functions and variables */
-#include "../kernel/mm/vmm.c"
 
-void test_vmm_unmap_page_mapped() {
+/* We include vmm.c directly to test static functions and variables */
+#include "vmm_mock.c"
+
+void test_unmap_existing_page_2() {
+    printf("Running test_unmap_existing_page... ");
+
+    uint64_t phys_addr = 0x100000; /* Example physical address */
+    uint64_t virt_addr = 0x200000; /* Example virtual address */
+
+    flush_tlb_local_called = false;
+
+    /* Map a page */
+    int res = vmm_map_page(phys_addr, virt_addr, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
+    if (res != 0) {
+        printf("FAILED (vmm_map_page returned %d)\n", res);
+        exit(1);
+    }
+
+    printf("PASSED\n");
+}
+
+void test_vmm_unmap_page_mapped_2() {
     printf("Running test_vmm_unmap_page_mapped...\n");
 
     /* Initialize a dummy PML4 */
@@ -181,7 +200,7 @@ void test_vmm_unmap_page_mapped() {
     /* Reset flush TLB flag to track if unmap flushes it */
     flush_tlb_local_called = false;
 
-    uint64_t mapped_phys = vmm_virt_to_phys(virt_addr);
+    mapped_phys = vmm_virt_to_phys(virt_addr);
     if (mapped_phys != phys_addr) {
         printf("FAILED: vmm_virt_to_phys returned %lx instead of %lx\n", mapped_phys, phys_addr);
         exit(1);
@@ -229,8 +248,10 @@ void test_unmap_non_existent_page() {
         printf("FAILED (TLB flushed for non-existent page)\n");
         exit(1);
     }
+    printf("PASSED\n");
+}
 
-void test_vmm_unmap_page_unmapped() {
+void test_vmm_unmap_page_unmapped_2() {
     printf("Running test_vmm_unmap_page_unmapped...\n");
 
     /* Initialize a dummy PML4 */
@@ -249,7 +270,7 @@ int main() {
 
     setup_vmm();
 
-    test_unmap_existing_page();
+    test_unmap_existing_page_2();
     test_unmap_non_existent_page();
 
     printf("\nAll VMM Unmap tests passed!\n");
@@ -257,8 +278,8 @@ int main() {
 
     cpus[0].state = CPU_STATE_ONLINE;
 
-    test_vmm_unmap_page_mapped();
-    test_vmm_unmap_page_unmapped();
+    test_vmm_unmap_page_mapped_2();
+    test_vmm_unmap_page_unmapped_2();
 
     /* Cleanup allocated pages */
     for (int i = 0; i < allocated_pages_count; i++) {

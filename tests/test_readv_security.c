@@ -127,7 +127,6 @@ void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {}
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int unlink_fs(fs_node_t *parent, char *name) { return 0; }
 int ioctl_fs(fs_node_t *node, int request, void *arg) { return 0; }
-int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) { return -1; }
 
 /* Stub MSR functions */
 uint64_t rdmsr(uint32_t msr) { return 0; }
@@ -205,11 +204,6 @@ int vfs_normalize_path(char* out_path, int size, const char* path, const char* b
     if (!out_path || !path || size <= 0) return -1;
     strlcpy(out_path, path, size);
     return 0;
-}
-
-int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) {
-    (void)node; (void)index; (void)entry;
-    return -1;
 }
 
 fs_node_t *finddir_fs(fs_node_t *node, char *name) {
