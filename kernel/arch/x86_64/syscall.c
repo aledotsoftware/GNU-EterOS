@@ -213,6 +213,30 @@ static int split_path(const char* path, char* parent, char* name) {
     return 0;
 }
 
+
+static int check_node_permission(fs_node_t* node, uint32_t req_mask) {
+    if (req_mask == 0) return 1;
+
+    uint32_t task_uid = task_get_current()->uid;
+    uint32_t task_gid = task_get_current()->gid;
+
+    if (task_uid == 0) {
+        /* Root has full access except for execute without any execute bits */
+        if ((req_mask & 1) && !(node->mask & 0111) && !((node->flags & 0x7) == FS_DIRECTORY)) {
+            return 0;
+        }
+        return 1;
+    } else {
+        uint32_t granted = 0;
+        if (task_uid == node->uid) granted = (node->mask >> 6) & 7;
+        else if (task_gid == node->gid) granted = (node->mask >> 3) & 7;
+        else granted = node->mask & 7;
+
+        if ((granted & req_mask) != req_mask) return 0;
+        return 1;
+    }
+}
+
 static int copy_user_string(const char* user_path, char** out_kpath, int max_len) {
     if (!user_path) return -EFAULT;
     char* kpath = (char*)kmalloc(max_len);
@@ -454,6 +478,8 @@ static int64_t sys_open(const char* path, int flags, int mode) {
             if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
             fs_node_t* parent = vfs_lookup(fs_root, parent_path);
             if (!parent) { kfree(kpath); return -ENOENT; }
+            /* SECURITY FIX: Verify write permission on parent directory for O_CREAT */
+            if (!check_node_permission(parent, 2)) { kfree(parent); kfree(kpath); return -EACCES; }
             if (create_fs(parent, filename, (uint16_t)mode) != 0) { kfree(parent); kfree(kpath); return -EACCES; }
             node = vfs_lookup(fs_root, kpath);
             kfree(parent);
@@ -463,9 +489,16 @@ static int64_t sys_open(const char* path, int flags, int mode) {
     kfree(kpath);
 
     uint8_t read_mode = 0; uint8_t write_mode = 0;
-    if ((flags & O_ACCMODE) == O_RDONLY) { read_mode = 1; }
-    else if ((flags & O_ACCMODE) == O_WRONLY) { write_mode = 1; }
-    else if ((flags & O_ACCMODE) == O_RDWR) { read_mode = 1; write_mode = 1; }
+    uint32_t req_mask = 0;
+    if ((flags & O_ACCMODE) == O_RDONLY) { read_mode = 1; req_mask = 4; }
+    else if ((flags & O_ACCMODE) == O_WRONLY) { write_mode = 1; req_mask = 2; }
+    else if ((flags & O_ACCMODE) == O_RDWR) { read_mode = 1; write_mode = 1; req_mask = 6; }
+
+    /* SECURITY FIX: Verify requested access mode on the node */
+    if (!check_node_permission(node, req_mask)) {
+        kfree(node);
+        return -EACCES;
+    }
 
     if (flags & O_NONBLOCK) node->flags |= O_NONBLOCK;
 
@@ -499,6 +532,11 @@ static int64_t sys_mkdir(const char* path, int mode) {
     if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
     if (!parent) { kfree(kpath); return -ENOENT; }
+
+    if (!check_node_permission(parent, 2)) {
+        kfree(parent); kfree(kpath); return -EACCES;
+    }
+
     int res2 = mkdir_fs(parent, filename, (uint16_t)mode);
     kfree(parent);
     kfree(kpath);
@@ -514,6 +552,11 @@ static int64_t sys_unlink(const char* path) {
     if (split_path(kpath, parent_path, filename) != 0) { kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
     if (!parent) { kfree(kpath); return -ENOENT; }
+
+    if (!check_node_permission(parent, 2)) {
+        kfree(parent); kfree(kpath); return -EACCES;
+    }
+
     int res2 = unlink_fs(parent, filename);
     kfree(parent);
     kfree(kpath);
@@ -974,22 +1017,7 @@ static int64_t sys_access(const char* path, int mode) {
         uint32_t req_exec = (mode & X_OK) ? 1 : 0;
         uint32_t req_mask = req_read | req_write | req_exec;
 
-        uint32_t task_uid = task_get_current()->uid;
-        uint32_t task_gid = task_get_current()->gid;
-
-        if (task_uid == 0) {
-            /* Root has full access except for execute without any execute bits */
-            if (req_exec && !(node->mask & 0111) && !((node->flags & 0x7) == FS_DIRECTORY)) {
-                allowed = 0;
-            }
-        } else {
-            uint32_t granted = 0;
-            if (task_uid == node->uid) granted = (node->mask >> 6) & 7;
-            else if (task_gid == node->gid) granted = (node->mask >> 3) & 7;
-            else granted = node->mask & 7;
-
-            if ((granted & req_mask) != req_mask) allowed = 0;
-        }
+        allowed = check_node_permission(node, req_mask);
     }
 
     kfree(node);
