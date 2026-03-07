@@ -229,6 +229,17 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_epoll.c kernel/string.c 
 rm tests/test_syscall_epoll
 
 echo "---------------------------------------------------"
+echo "---------------------------------------------------"
+
+echo "Running test_syscall_mmap_linux..."
+
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_mmap_linux.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_linux
+
+./tests/test_syscall_mmap_linux
+
+rm tests/test_syscall_mmap_linux
+
+
 echo "Running test_syscall_mmap_fixed..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_mmap_fixed.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_fixed
 ./tests/test_syscall_mmap_fixed

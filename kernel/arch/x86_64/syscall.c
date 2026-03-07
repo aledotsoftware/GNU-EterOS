@@ -263,10 +263,17 @@ static int resolve_path(int dirfd, const char* user_path, char* out_path, int si
 
 static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
     if (len == 0) return -EINVAL;
-    /* flags & 0x22 (MAP_PRIVATE or MAP_ANONYMOUS) or 0x01 (MAP_SHARED) */
-    if (!(flags & 0x23)) return -ENODEV; // MAP_PRIVATE (0x02), MAP_SHARED (0x01) or MAP_ANONYMOUS (0x20)
-
     task_t* current = task_get_current();
+
+    /* flags & 0x22 (MAP_PRIVATE or MAP_ANONYMOUS) or 0x01 (MAP_SHARED) */
+    if (!(flags & 0x23)) {
+        if (current && current->os_abi == ELFOSABI_LINUX && fd != -1) {
+            /* Allow file-backed mmap without MAP_ANONYMOUS in Linux */
+        } else {
+            return -ENODEV; // MAP_PRIVATE (0x02), MAP_SHARED (0x01) or MAP_ANONYMOUS (0x20)
+        }
+    }
+
     uint64_t virt;
 
     if (flags & 0x10) { /* MAP_FIXED */
