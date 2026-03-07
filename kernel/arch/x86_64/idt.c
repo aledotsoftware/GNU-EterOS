@@ -211,19 +211,41 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     itoa_s(vector, buf, sizeof(buf), 10);
     serial_write_string(buf);
     serial_write_string("\n");
-    serial_write_string("RIP: "); utoa_hex_s(frame->rip, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string(" CS: "); utoa_hex_s(frame->cs, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string("\nRFLAGS: "); utoa_hex_s(frame->rflags, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string(" Error: "); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("RIP: 0x"); utoa_hex_s(frame->rip, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" CS: 0x"); utoa_hex_s(frame->cs, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("\nRFLAGS: 0x"); utoa_hex_s(frame->rflags, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" RSP: 0x"); utoa_hex_s(frame->rsp, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" SS: 0x"); utoa_hex_s(frame->ss, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("\nError Code: 0x"); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
+    if (vector == 14) {
+        uint64_t cr2;
+        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        serial_write_string(" CR2: 0x"); utoa_hex_s(cr2, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" [");
+        serial_write_string((error_code & 1) ? "Present" : "Not Present");
+        serial_write_string((error_code & 2) ? ", Write" : ", Read");
+        serial_write_string((error_code & 4) ? ", User]" : ", Supervisor]");
+    }
     serial_write_string("\nTask: ");
     extern task_t* task_get_current(void);
     task_t* panic_task = task_get_current();
     if (panic_task) {
         serial_write_string(panic_task->name);
-        serial_write_string(" (state=");
-        itoa_s(panic_task->state, buf, sizeof(buf), 10);
+        serial_write_string(" (PID=");
+        itoa_s(panic_task->id, buf, sizeof(buf), 10);
         serial_write_string(buf);
         serial_write_string(")");
+    }
+    serial_write_string("\nStack Trace (RBP chain):\n");
+    uint64_t* rbp;
+    __asm__ volatile("mov %%rbp, %0" : "=r"(rbp));
+    for (int i=0; i<10 && rbp != NULL; i++) {
+        if (!vmm_verify_user_access(rbp, 16, 0)) break; /* Basic check to avoid #PF in walk */
+        uint64_t rip_caller = rbp[1];
+        serial_write_string("  ["); itoa_s(i, buf, sizeof(buf), 10); serial_write_string(buf);
+        serial_write_string("] 0x"); utoa_hex_s(rip_caller, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string("\n");
+        rbp = (uint64_t*)rbp[0];
     }
     serial_write_string("\n");
 
