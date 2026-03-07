@@ -178,7 +178,11 @@ void cpu_init_ap(int index) {
     /* Habilitar interrupciones globales y esperar */
     __asm__ volatile("sti");
 
+    /* Enter scheduler loop instead of simply halting.
+       task_init_ap created our idle task, and the local timer
+       will call schedule(). This idle loop yields explicitly. */
     for(;;) {
+        task_yield();
         __asm__ volatile("hlt");
     }
 }

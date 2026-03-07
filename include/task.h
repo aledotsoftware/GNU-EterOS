@@ -62,6 +62,12 @@ typedef struct task {
     uint64_t       cr3;                     /* Directorio de páginas (PML4) */
     uint32_t       id;                      /* Task ID único */
     uint32_t       parent_id;               /* Parent Task ID */
+
+    /* Threading */
+    uint32_t       tgid;                    /* Thread Group ID (PID) */
+    struct task*   group_leader;            /* Puntero al líder del grupo */
+    uint32_t*      clear_child_tid;         /* Dirección para futex_wake al terminar */
+
     task_state_t   state;                   /* Estado actual */
     uint64_t       wake_tick;               /* Tick para despertar si duerme */
     struct semaphore* waiting_sem;          /* Semaphore waiting on (if blocked) */
@@ -95,6 +101,9 @@ typedef struct task {
     uint8_t        os_abi;                  /* ABI (0=SysV/Native, 3=Linux) */
     uint64_t       user_rsp;                /* User Stack Pointer (saved during syscall) */
     uint64_t       mmap_base;               /* Base address for mmap allocator */
+
+    /* FPU Context (512 bytes, aligned to 16 bytes for FXSAVE/FXRSTOR) */
+    uint8_t        fpu_state[512] __attribute__((aligned(16)));
 
     void           (*entry)(void);          /* Entry point for task_entry_wrapper */
     int            exit_code;               /* Exit status code */
@@ -195,6 +204,17 @@ int task_kill(uint32_t pid);
 int task_fork(void* regs);
 
 /**
+ * Crea un hilo (Clone).
+ * @param clone_flags Flags de Linux CLONE_*
+ * @param stack Stack del nuevo hilo
+ * @param parent_tid Dirección donde guardar el TID en el padre
+ * @param child_tid Dirección donde guardar el TID en el hijo (y limpiar al salir)
+ * @param tls TLS a usar (FS base)
+ * @param regs Registros del syscall
+ */
+int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs);
+
+/**
  * Reemplaza la imagen del proceso actual por una nueva (Exec).
  * @param path Ruta al ejecutable ELF.
  * @param argv Argumentos.
@@ -230,7 +250,9 @@ task_t* task_get_by_id(uint32_t id);
  *
  * @param old_rsp Puntero donde guardar el RSP actual.
  * @param new_rsp RSP de la nueva tarea a restaurar.
+ * @param old_fpu Puntero al buffer FPU (fpu_state) de la tarea saliente.
+ * @param new_fpu Puntero al buffer FPU (fpu_state) de la tarea entrante a restaurar.
  */
-extern void context_switch(uint64_t* old_rsp, uint64_t new_rsp);
+extern void context_switch(uint64_t* old_rsp, uint64_t new_rsp, void* old_fpu, void* new_fpu);
 
 #endif /* ETEROS_TASK_H */
