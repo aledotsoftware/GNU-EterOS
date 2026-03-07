@@ -36,6 +36,12 @@ struct sockaddr_in {
     uint8_t  sin_zero[8];
 };
 
+/* Byte Order */
+uint16_t htons(uint16_t v);
+uint16_t ntohs(uint16_t v);
+uint32_t htonl(uint32_t v);
+uint32_t ntohl(uint32_t v);
+
 /* Prototypes */
 int socket(int domain, int type, int protocol);
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);

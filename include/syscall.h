@@ -431,4 +431,9 @@ void syscall_init(void);
  */
 void syscall_handler(struct syscall_regs* regs);
 
+/**
+ * Handler en C para la interrupcion int 0x80
+ */
+void syscall_int80_handler(struct syscall_regs* regs);
+
 #endif /* ETEROS_SYSCALL_H */

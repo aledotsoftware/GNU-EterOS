@@ -211,19 +211,41 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     itoa_s(vector, buf, sizeof(buf), 10);
     serial_write_string(buf);
     serial_write_string("\n");
-    serial_write_string("RIP: "); utoa_hex_s(frame->rip, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string(" CS: "); utoa_hex_s(frame->cs, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string("\nRFLAGS: "); utoa_hex_s(frame->rflags, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string(" Error: "); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("RIP: 0x"); utoa_hex_s(frame->rip, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" CS: 0x"); utoa_hex_s(frame->cs, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("\nRFLAGS: 0x"); utoa_hex_s(frame->rflags, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" RSP: 0x"); utoa_hex_s(frame->rsp, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" SS: 0x"); utoa_hex_s(frame->ss, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("\nError Code: 0x"); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
+    if (vector == 14) {
+        uint64_t cr2;
+        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        serial_write_string(" CR2: 0x"); utoa_hex_s(cr2, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" [");
+        serial_write_string((error_code & 1) ? "Present" : "Not Present");
+        serial_write_string((error_code & 2) ? ", Write" : ", Read");
+        serial_write_string((error_code & 4) ? ", User]" : ", Supervisor]");
+    }
     serial_write_string("\nTask: ");
     extern task_t* task_get_current(void);
     task_t* panic_task = task_get_current();
     if (panic_task) {
         serial_write_string(panic_task->name);
-        serial_write_string(" (state=");
-        itoa_s(panic_task->state, buf, sizeof(buf), 10);
+        serial_write_string(" (PID=");
+        itoa_s(panic_task->id, buf, sizeof(buf), 10);
         serial_write_string(buf);
         serial_write_string(")");
+    }
+    serial_write_string("\nStack Trace (RBP chain):\n");
+    uint64_t* rbp;
+    __asm__ volatile("mov %%rbp, %0" : "=r"(rbp));
+    for (int i=0; i<10 && rbp != NULL; i++) {
+        if (!vmm_verify_user_access(rbp, 16, 0)) break; /* Basic check to avoid #PF in walk */
+        uint64_t rip_caller = rbp[1];
+        serial_write_string("  ["); itoa_s(i, buf, sizeof(buf), 10); serial_write_string(buf);
+        serial_write_string("] 0x"); utoa_hex_s(rip_caller, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string("\n");
+        rbp = (uint64_t*)rbp[0];
     }
     serial_write_string("\n");
 
@@ -232,46 +254,55 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     for (;;) { __asm__ volatile ("hlt"); }
 }
 
-/* ========================================================================= */
-/* Exception Handlers (sin error code)                                       */
-/* ========================================================================= */
+struct int_regs {
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
+    uint64_t int_no, err_code;
+    uint64_t rip, cs, rflags, rsp, ss;
+};
 
-#define EXCEPTION_HANDLER(num) \
-    __attribute__((interrupt)) \
-    static void isr_##num(struct interrupt_frame *frame) { \
-        handle_exception(num, frame, 0); \
+extern void syscall_int80_handler(struct syscall_regs* regs);
+
+void exception_handler_c(struct int_regs *regs) {
+    if (regs->int_no == 128) {
+        syscall_int80_handler((struct syscall_regs*)regs);
+        return;
     }
 
-#define EXCEPTION_HANDLER_ERR(num) \
-    __attribute__((interrupt)) \
-    static void isr_##num(struct interrupt_frame *frame, uint64_t error_code) { \
-        handle_exception(num, frame, error_code); \
-    }
+    struct interrupt_frame frame = {
+        .rip = regs->rip,
+        .cs = regs->cs,
+        .rflags = regs->rflags,
+        .rsp = regs->rsp,
+        .ss = regs->ss
+    };
+    handle_exception(regs->int_no, &frame, regs->err_code);
+}
 
-/* Excepciones sin error code */
-EXCEPTION_HANDLER(0)
-EXCEPTION_HANDLER(1)
-EXCEPTION_HANDLER(2)
-EXCEPTION_HANDLER(3)
-EXCEPTION_HANDLER(4)
-EXCEPTION_HANDLER(5)
-EXCEPTION_HANDLER(6)
-EXCEPTION_HANDLER(7)
-EXCEPTION_HANDLER(9)
-EXCEPTION_HANDLER(16)
-EXCEPTION_HANDLER(18)
-EXCEPTION_HANDLER(19)
-EXCEPTION_HANDLER(20)
-
-/* Excepciones con error code */
-EXCEPTION_HANDLER_ERR(8)
-EXCEPTION_HANDLER_ERR(10)
-EXCEPTION_HANDLER_ERR(11)
-EXCEPTION_HANDLER_ERR(12)
-EXCEPTION_HANDLER_ERR(13)
-EXCEPTION_HANDLER_ERR(14)
-EXCEPTION_HANDLER_ERR(17)
-EXCEPTION_HANDLER_ERR(21)
+/* Stubs definidos en exceptions.asm */
+extern void exception_stub_0(void);
+extern void exception_stub_1(void);
+extern void exception_stub_2(void);
+extern void exception_stub_3(void);
+extern void exception_stub_4(void);
+extern void exception_stub_5(void);
+extern void exception_stub_6(void);
+extern void exception_stub_7(void);
+extern void exception_stub_8(void);
+extern void exception_stub_9(void);
+extern void exception_stub_10(void);
+extern void exception_stub_11(void);
+extern void exception_stub_12(void);
+extern void exception_stub_13(void);
+extern void exception_stub_14(void);
+extern void exception_stub_15(void);
+extern void exception_stub_16(void);
+extern void exception_stub_17(void);
+extern void exception_stub_18(void);
+extern void exception_stub_19(void);
+extern void exception_stub_20(void);
+extern void exception_stub_21(void);
+extern void exception_stub_128(void);
 
 /* ========================================================================= */
 /* ========================================================================= */
@@ -349,9 +380,9 @@ static void irq_default(struct interrupt_frame *frame) {
 extern volatile uint64_t tlb_flush_addr;
 extern volatile uint64_t tlb_ack_count;
 
-__attribute__((interrupt))
-static void isr_tlb_shootdown(struct interrupt_frame *frame) {
-    (void)frame;
+extern void isr_stub_tlb_shootdown(void);
+
+void isr_tlb_shootdown_c(void) {
     vmm_flush_tlb_local(tlb_flush_addr);
     __sync_fetch_and_add(&tlb_ack_count, 1);
     lapic_eoi();
@@ -362,27 +393,31 @@ void idt_init(void) {
     memset(idt, 0, sizeof(idt));
 
     /* --- Instalar handlers de excepciones --- */
-    idt_set_gate(0,  (void*)isr_0,  IDT_GATE_INTERRUPT);
-    idt_set_gate(1,  (void*)isr_1,  IDT_GATE_INTERRUPT);
-    idt_set_gate(2,  (void*)isr_2,  IDT_GATE_INTERRUPT);
-    idt_set_gate(3,  (void*)isr_3,  IDT_GATE_INTERRUPT);
-    idt_set_gate(4,  (void*)isr_4,  IDT_GATE_INTERRUPT);
-    idt_set_gate(5,  (void*)isr_5,  IDT_GATE_INTERRUPT);
-    idt_set_gate(6,  (void*)isr_6,  IDT_GATE_INTERRUPT);
-    idt_set_gate(7,  (void*)isr_7,  IDT_GATE_INTERRUPT);
-    idt_set_gate(8,  (void*)isr_8,  IDT_GATE_INTERRUPT);
-    idt_set_gate(9,  (void*)isr_9,  IDT_GATE_INTERRUPT);
-    idt_set_gate(10, (void*)isr_10, IDT_GATE_INTERRUPT);
-    idt_set_gate(11, (void*)isr_11, IDT_GATE_INTERRUPT);
-    idt_set_gate(12, (void*)isr_12, IDT_GATE_INTERRUPT);
-    idt_set_gate(13, (void*)isr_13, IDT_GATE_INTERRUPT);
-    idt_set_gate(14, (void*)isr_14, IDT_GATE_INTERRUPT);
-    idt_set_gate(16, (void*)isr_16, IDT_GATE_INTERRUPT);
-    idt_set_gate(17, (void*)isr_17, IDT_GATE_INTERRUPT);
-    idt_set_gate(18, (void*)isr_18, IDT_GATE_INTERRUPT);
-    idt_set_gate(19, (void*)isr_19, IDT_GATE_INTERRUPT);
-    idt_set_gate(20, (void*)isr_20, IDT_GATE_INTERRUPT);
-    idt_set_gate(21, (void*)isr_21, IDT_GATE_INTERRUPT);
+    idt_set_gate(0,  (void*)exception_stub_0,  IDT_GATE_INTERRUPT);
+    idt_set_gate(1,  (void*)exception_stub_1,  IDT_GATE_INTERRUPT);
+    idt_set_gate(2,  (void*)exception_stub_2,  IDT_GATE_INTERRUPT);
+    idt_set_gate(3,  (void*)exception_stub_3,  IDT_GATE_INTERRUPT);
+    idt_set_gate(4,  (void*)exception_stub_4,  IDT_GATE_INTERRUPT);
+    idt_set_gate(5,  (void*)exception_stub_5,  IDT_GATE_INTERRUPT);
+    idt_set_gate(6,  (void*)exception_stub_6,  IDT_GATE_INTERRUPT);
+    idt_set_gate(7,  (void*)exception_stub_7,  IDT_GATE_INTERRUPT);
+    idt_set_gate(8,  (void*)exception_stub_8,  IDT_GATE_INTERRUPT);
+    idt_set_gate(9,  (void*)exception_stub_9,  IDT_GATE_INTERRUPT);
+    idt_set_gate(10, (void*)exception_stub_10, IDT_GATE_INTERRUPT);
+    idt_set_gate(11, (void*)exception_stub_11, IDT_GATE_INTERRUPT);
+    idt_set_gate(12, (void*)exception_stub_12, IDT_GATE_INTERRUPT);
+    idt_set_gate(13, (void*)exception_stub_13, IDT_GATE_INTERRUPT);
+    idt_set_gate(14, (void*)exception_stub_14, IDT_GATE_INTERRUPT);
+    idt_set_gate(15, (void*)exception_stub_15, IDT_GATE_INTERRUPT);
+    idt_set_gate(16, (void*)exception_stub_16, IDT_GATE_INTERRUPT);
+    idt_set_gate(17, (void*)exception_stub_17, IDT_GATE_INTERRUPT);
+    idt_set_gate(18, (void*)exception_stub_18, IDT_GATE_INTERRUPT);
+    idt_set_gate(19, (void*)exception_stub_19, IDT_GATE_INTERRUPT);
+    idt_set_gate(20, (void*)exception_stub_20, IDT_GATE_INTERRUPT);
+    idt_set_gate(21, (void*)exception_stub_21, IDT_GATE_INTERRUPT);
+
+    /* Syscall int 0x80 (128) - with DPL=3 to allow userspace calls */
+    idt_set_gate(128, (void*)exception_stub_128, 0xEE);
 
     /* --- Instalar handlers de IRQs (32-47) --- */
     /* Usamos isr_stub_timer (assembly) -> irq_timer_handler (C) */
@@ -400,7 +435,7 @@ void idt_init(void) {
     }
 
     /* --- IPI Handlers --- */
-    idt_set_gate(IPI_TLB_SHOOTDOWN, (void*)isr_tlb_shootdown, IDT_GATE_INTERRUPT);
+    idt_set_gate(IPI_TLB_SHOOTDOWN, (void*)isr_stub_tlb_shootdown, IDT_GATE_INTERRUPT);
 
     /* --- LAPIC Timer --- */
     idt_set_gate(LAPIC_TIMER_VECTOR, (void*)isr_stub_lapic_timer, IDT_GATE_INTERRUPT);

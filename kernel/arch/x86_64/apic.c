@@ -5,6 +5,7 @@
 #include <timer.h>
 #include <string.h>
 #include <task.h>
+#include <vmm.h>
 
 static uint64_t lapic_base = 0;
 
@@ -19,9 +20,12 @@ static void lapic_write(uint32_t reg, uint32_t data) {
 void lapic_init(void) {
     lapic_base = (uint64_t)acpi_get_lapic_addr();
     
+    /* El LAPIC ya esta mapeado por el BSP/Bootloader (Identitiy Map 4GB).
+       Evitamos vmm_map_page aqui para prevenir deadlocks de TLB shootdown durante el boot de APs. */
+    
     char buf[64];
     serial_write_string("[APIC] Initializing Local APIC at 0x");
-    itoa_s((int)lapic_base, buf, 64, 16);
+    utoa_hex_s(lapic_base, buf, 64);
     serial_write_string(buf);
     serial_write_string("\n");
 
@@ -46,6 +50,8 @@ void lapic_send_ipi(uint32_t apic_id, uint32_t vector) {
     while (lapic_read(LAPIC_ICR_LOW) & ICR_SEND_PENDING);
     
     lapic_write(LAPIC_ICR_HIGH, apic_id << 24);
+    /* For Fixed delivery mode (Edge), we just send the vector. 
+       ICR_ASSERT is usually only for Level-triggered INIT/Startup sequences. */
     lapic_write(LAPIC_ICR_LOW, vector);
 }
 
@@ -75,45 +81,46 @@ void lapic_timer_handler(void) {
     schedule();
 }
 
+static uint32_t calibrated_ticks_per_ms = 0;
+
 void lapic_timer_init(uint32_t frequency) {
     if (!lapic_base) return;
 
-    /* 1. Set Divide Configuration Register to /16 */
-    lapic_write(LAPIC_TDCR, 0x03);
+    uint32_t ticks_per_target;
 
-    /* 2. Prepare for calibration */
-    /* Wait for the start of a new tick to align measurement */
-    uint64_t current_tick = timer_get_ticks();
-    while (timer_get_ticks() == current_tick) {
-        __asm__ volatile("pause");
+    /* Si ya hemos calibrado en otro CPU, reutilizamos el valor para evitar
+       esperas redundantes (y posibles deadlocks si los IRQs estan enmascarados). */
+    if (calibrated_ticks_per_ms > 0) {
+        uint64_t ticks_per_second = (uint64_t)calibrated_ticks_per_ms * 1000;
+        ticks_per_target = (uint32_t)(ticks_per_second / frequency);
+    } else {
+        /* 1. Set Divide Configuration Register to /16 */
+        lapic_write(LAPIC_TDCR, 0x03);
+
+        /* 2. Prepare for calibration */
+        /* Wait for the start of a new tick to align measurement */
+        uint64_t current_tick = timer_get_ticks();
+        while (timer_get_ticks() == current_tick) {
+            __asm__ volatile("pause");
+        }
+
+        /* Now we are at the beginning of a tick interval */
+        /* Set Initial Count to Max to start downcounting */
+        lapic_write(LAPIC_TICR, 0xFFFFFFFF);
+
+        /* Wait for ONE full tick (1ms because TIMER_HZ=1000) */
+        current_tick = timer_get_ticks();
+        while (timer_get_ticks() == current_tick) {
+            __asm__ volatile("pause");
+        }
+
+        /* 3. Stop Timer and Read Elapsed */
+        uint32_t current_count = lapic_read(LAPIC_TCCR);
+        calibrated_ticks_per_ms = 0xFFFFFFFF - current_count;
+
+        uint64_t ticks_per_second = (uint64_t)calibrated_ticks_per_ms * 1000;
+        ticks_per_target = (uint32_t)(ticks_per_second / frequency);
     }
-
-    /* Now we are at the beginning of a tick interval */
-    /* Set Initial Count to Max to start downcounting */
-    lapic_write(LAPIC_TICR, 0xFFFFFFFF);
-
-    /* Wait for ONE full tick (10ms) */
-    current_tick = timer_get_ticks();
-    while (timer_get_ticks() == current_tick) {
-        __asm__ volatile("pause");
-    }
-
-    /* 3. Stop Timer and Read Elapsed */
-    /* Read current count */
-    uint32_t current_count = lapic_read(LAPIC_TCCR);
-
-    /* Stop the timer (mask it) */
-    lapic_write(LAPIC_LVT_TIMER, 0x10000);
-
-    uint32_t ticks_in_10ms = 0xFFFFFFFF - current_count;
-
-    /* 4. Calculate ticks for desired frequency */
-    /* ticks_in_10ms corresponds to 100Hz (10ms) */
-    /* Total ticks per second = ticks_in_10ms * 100 */
-    /* Ticks per target frequency = (ticks_in_10ms * 100) / frequency */
-
-    uint64_t ticks_per_second = (uint64_t)ticks_in_10ms * 100;
-    uint32_t ticks_per_target = (uint32_t)(ticks_per_second / frequency);
 
     if (ticks_per_target == 0) ticks_per_target = 1000;
 

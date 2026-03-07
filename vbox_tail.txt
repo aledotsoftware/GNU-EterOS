@@ -1,0 +1,200 @@
+00:19:56.768953 /PDM/CritSectsRw/TM virtual queue alloc lock/R3EnterShared         3 times
+00:19:56.768954 /PDM/CritSectsRw/TM virtual queue alloc lock/RZEnterExcl         0 times
+00:19:56.768954 /PDM/CritSectsRw/TM virtual queue alloc lock/RZEnterShared         0 times
+00:19:56.768954 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/ContentionR3EnterExcl         0 times
+00:19:56.768954 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/ContentionR3EnterShared         0 times
+00:19:56.768955 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/ContentionR3LeaveExcl         0 times
+00:19:56.768955 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/ContentionRZEnterExcl         0 times
+00:19:56.768955 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/ContentionRZEnterShared         0 times
+00:19:56.768955 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/ContentionRZLeaveExcl         0 times
+00:19:56.768955 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/ContentionRZLeaveShared         0 times
+00:19:56.768955 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/R3EnterExcl        10 times
+00:19:56.768956 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/R3EnterShared         3 times
+00:19:56.768956 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/RZEnterExcl         0 times
+00:19:56.768956 /PDM/CritSectsRw/TM virtual_sync queue alloc lock/RZEnterShared         0 times
+00:19:56.768956 /PDM/Queue/DevHlp/AllocFailures                    0 times
+00:19:56.768957 /PDM/Queue/DevHlp/Flush                            0 calls
+00:19:56.768957 /PDM/Queue/DevHlp/FlushLeftovers                   0 times
+00:19:56.768957 /PDM/Queue/DevHlp/Insert                           0 calls
+00:19:56.768957 /PDM/Queue/DevHlp/cItems                           8 count
+00:19:56.768958 /PDM/Queue/DevHlp/cbItem                          56 bytes
+00:19:56.768958 /PDM/Queue/DevHlp/rcOkay                           0 
+00:19:56.768959 /PDM/Queue/Keyboard/AllocFailures                  0 times
+00:19:56.768959 /PDM/Queue/Keyboard/Flush                          0 calls
+00:19:56.768959 /PDM/Queue/Keyboard/FlushLeftovers                 0 times
+00:19:56.768959 /PDM/Queue/Keyboard/Insert                         0 calls
+00:19:56.768959 /PDM/Queue/Keyboard/cItems                        64 count
+00:19:56.768960 /PDM/Queue/Keyboard/cbItem                        16 bytes
+00:19:56.768960 /PDM/Queue/Keyboard/rcOkay                         0 
+00:19:56.768961 /PDM/Queue/Mouse/AllocFailures                     0 times
+00:19:56.768961 /PDM/Queue/Mouse/Flush                             0 calls
+00:19:56.768961 /PDM/Queue/Mouse/FlushLeftovers                    0 times
+00:19:56.768961 /PDM/Queue/Mouse/Insert                            0 calls
+00:19:56.768962 /PDM/Queue/Mouse/cItems                          128 count
+00:19:56.768962 /PDM/Queue/Mouse/cbItem                           32 bytes
+00:19:56.768962 /PDM/Queue/Mouse/rcOkay                            0 
+00:19:56.768963 /PDM/Tasks/000-E1000-Xmit-retriggered              0 times
+00:19:56.768963 /PDM/Tasks/000-E1000-Xmit-runs                     1 times
+00:19:56.768963 /PGM/CPU0/R3/Page/MapTlbMisses                     0 times
+00:19:56.768964 /PGM/CPU0/R3/RamRange/TlbLocking                   2 times
+00:19:56.768964 /PGM/CPU0/R3/RamRange/TlbMisses                    2 times
+00:19:56.768964 /PGM/CPU0/RZ/Page/MapTlbMisses                     0 times
+00:19:56.768964 /PGM/CPU0/RZ/RamRange/TlbLocking                   0 times
+00:19:56.768965 /PGM/CPU0/RZ/RamRange/TlbMisses                    0 times
+00:19:56.768965 /PGM/CPU0/cA20Changes                              2 times
+00:19:56.768965 /PGM/CPU0/cGuestModeChanges                        6 times
+00:19:56.768966 /PGM/ChunkR3Map/Mapped                             0 count
+00:19:56.768966 /PGM/ChunkR3Map/Unmapped                           0 count
+00:19:56.768966 /PGM/ChunkR3Map/c                                  0 count
+00:19:56.768966 /PGM/ChunkR3Map/cMax                       4294967295 count
+00:19:56.768967 /PGM/LargePage/Alloc                               0 ns/call (           0 ns,       0 calls, max         0, min      -1)
+00:19:56.768967 /PGM/LargePage/AllocFailed                         0 times
+00:19:56.768968 /PGM/LargePage/Overflow                            0 times
+00:19:56.768968 /PGM/LargePage/Recheck                             0 times
+00:19:56.768968 /PGM/LargePage/Refused                             0 times
+00:19:56.768969 /PGM/LargePage/Reused                              0 times
+00:19:56.768969 /PGM/LargePage/TlbFlush                            0 times
+00:19:56.768969 /PGM/LargePage/ZeroEvict                           0 times
+00:19:56.768970 /PGM/Mmio2QueryAndResetDirtyBitmap                 0 ticks/call (           0 ticks,       0 calls, max         0, min      -1)
+00:19:56.768970 /PGM/Page/cAllPages                            42031 count
+00:19:56.768970 /PGM/Page/cBalloonedPages                          0 count
+00:19:56.768971 /PGM/Page/cHandyPages                              0 count
+00:19:56.768971 /PGM/Page/cLargePages                              0 count
+00:19:56.768971 /PGM/Page/cLargePagesDisabled                      0 count
+00:19:56.768972 /PGM/Page/cMonitoredPages                          0 count
+00:19:56.768972 /PGM/Page/cPrivatePages                        41963 count
+00:19:56.768972 /PGM/Page/cPureMmioPages                          68 count
+00:19:56.768972 /PGM/Page/cReadLockedPages                         0 count
+00:19:56.768973 /PGM/Page/cReusedSharedPages                       0 count
+00:19:56.768973 /PGM/Page/cSharedPages                             0 count
+00:19:56.768973 /PGM/Page/cWriteLockedPages                        0 count
+00:19:56.768974 /PGM/Page/cWrittenToPages                          0 count
+00:19:56.768974 /PGM/Page/cZeroPages                               0 count
+00:19:56.768974 /PGM/PhysHandlerTree/ErrorsAllocatorR3             0 times
+00:19:56.768975 /PGM/PhysHandlerTree/ErrorsTree                    0 times
+00:19:56.768975 /PGM/PhysHandlerTree/Inserts                      11 times
+00:19:56.768975 /PGM/PhysHandlerTree/MaxHandlers                6144 times
+00:19:56.768976 /PGM/PhysHandlerTree/RebalancingOperations         4 times
+00:19:56.768976 /PGM/PhysHandlerTree/Removals                      0 times
+00:19:56.768976 /PGM/Pool/Grow                                     0 ticks/call (           0 ticks,       0 calls, max         0, min      -1)
+00:19:56.768977 /PGM/ShMod/Check                                   0 ticks/call (           0 ticks,       0 calls, max         0, min      -1)
+00:19:56.768977 /PROF/CPU0/EM/Capped                               0 ticks/call (           0 ticks,       0 calls, max         0, min      -1)
+00:19:56.768978 /PROF/CPU0/EM/ForcedActions                     3036 times
+00:19:56.768978 /PROF/CPU0/EM/HMExec                               0 ticks/call (           0 ticks,       0 calls, max         0, min      -1)
+00:19:56.768979 /PROF/CPU0/EM/HMExecuteCalled                      0 times
+00:19:56.768979 /PROF/CPU0/EM/Halted                             511 times
+00:19:56.768979 /PROF/CPU0/EM/NEMExec                        2942415 ticks/call (  8400596546 ticks,    2855 calls, max  68506049, min   52325)
+00:19:56.768980 /PROF/CPU0/EM/NEMExecuteCalled                   466 times
+00:19:56.768980 /PROF/CPU0/EM/REMTotal                             1 times
+00:19:56.768981 /PROF/CPU0/EM/RecordedExits                    44123 times
+00:19:56.768981 /PROF/CPU0/EM/Total                        20009516504 ticks/call ( 20009516504 ticks,       1 calls, max 20009516504, min 20009516504)
+00:19:56.768982 /PROF/CPU0/VM/Halt/Block                       65270 ns/call (  2398505201 ns,   36747 calls, max  16619570, min       1)
+00:19:56.768982 /PROF/CPU0/VM/Halt/BlockInsomnia               34321 ns/call (  1243312717 ns,   36225 calls, max  15349066, min       1)
+00:19:56.768983 /PROF/CPU0/VM/Halt/BlockOnTime                242231 ns/call (   101252705 ns,     418 calls, max  15193515, min     397)
+00:19:56.768984 /PROF/CPU0/VM/Halt/BlockOverslept             497881 ns/call (    51779625 ns,     104 calls, max   2059458, min   65739)
+00:19:56.768984 /PROF/CPU0/VM/Halt/R0HaltBlock                     0 ns/call (           0 ns,       0 calls, max         0, min      -1)
+00:19:56.768985 /PROF/CPU0/VM/Halt/R0HaltBlockInsomnia             0 ns/call (           0 ns,       0 calls, max         0, min      -1)
+00:19:56.768985 /PROF/CPU0/VM/Halt/R0HaltBlockOnTime               0 ns/call (           0 ns,       0 calls, max         0, min      -1)
+00:19:56.768986 /PROF/CPU0/VM/Halt/R0HaltBlockOverslept            0 ns/call (           0 ns,       0 calls, max         0, min      -1)
+00:19:56.768986 /PROF/CPU0/VM/Halt/R0HaltExec                      0 times
+00:19:56.768986 /PROF/CPU0/VM/Halt/R0HaltExec/FromBlock            0 times
+00:19:56.768986 /PROF/CPU0/VM/Halt/R0HaltExec/FromSpin             0 times
+00:19:56.768987 /PROF/CPU0/VM/Halt/R0HaltHistoryCounter            0 times
+00:19:56.768987 /PROF/CPU0/VM/Halt/R0HaltHistorySucceeded          0 times
+00:19:56.768987 /PROF/CPU0/VM/Halt/R0HaltHistoryToRing3            0 times
+00:19:56.768988 /PROF/CPU0/VM/Halt/R0HaltToR3                      0 times
+00:19:56.768988 /PROF/CPU0/VM/Halt/R0HaltToR3/FromSpin             0 times
+00:19:56.768988 /PROF/CPU0/VM/Halt/R0HaltToR3/Other                0 times
+00:19:56.768988 /PROF/CPU0/VM/Halt/R0HaltToR3/PendingFF            0 times
+00:19:56.768988 /PROF/CPU0/VM/Halt/R0HaltToR3/PostWaitNoInt         0 times
+00:19:56.768989 /PROF/CPU0/VM/Halt/R0HaltToR3/PostWaitPendingFF         0 times
+00:19:56.768989 /PROF/CPU0/VM/Halt/R0HaltToR3/SmallDelta           0 times
+00:19:56.768989 /PROF/CPU0/VM/Halt/Timers                       1338 ns/call (    75906517 ns,   56695 calls, max   2947243, min       2)
+00:19:56.768990 /PROF/CPU0/VM/Halt/Yield                        3860 ns/call (      108094 ns,      28 calls, max      8745, min    2278)
+00:19:56.768990 /Public/NetAdapter/0/BytesReceived                 0 bytes
+00:19:56.768990 /Public/NetAdapter/0/BytesTransmitted            590 bytes
+00:19:56.768991 /Public/NetAdapter/0/e1000                         0 
+00:19:56.768991 /Public/Storage/AHCI0/Port0/BytesRead         532992 bytes
+00:19:56.768991 /Public/Storage/AHCI0/Port0/QueryBufAttempts         0 count
+00:19:56.768992 /Public/Storage/AHCI0/Port0/QueryBufSuccess         0 count
+00:19:56.768992 /Public/Storage/AHCI0/Port0/ReqsRead            1026 count
+00:19:56.768992 /Public/Storage/AHCI0/Port0/ReqsSubmitted       1026 count
+00:19:56.768993 /Public/Storage/AHCI0/Port0/ReqsSucceeded       1026 count
+00:19:56.768993 /SELM/LoadHidSel/GstReadErrors                     0 times
+00:19:56.768993 /SELM/LoadHidSel/NoGoodGuest                       0 times
+00:19:56.768993 /TM/CPU/00/cNsExecuting                    1401522664 ns
+00:19:56.768994 /TM/CPU/00/cNsHalted                       2488416798 ns
+00:19:56.768994 /TM/CPU/00/cNsOther                        1371522279 ns
+00:19:56.768994 /TM/CPU/00/cNsTotal                        5261461741 ns
+00:19:56.768995 /TM/CPU/00/cPeriodsExecuting                   38954 count
+00:19:56.768995 /TM/CPU/00/cPeriodsHalted                        511 count
+00:19:56.768995 /TM/CPU/00/pctExecuting                           94 %
+00:19:56.768996 /TM/CPU/00/pctHalted                               0 %
+00:19:56.768996 /TM/CPU/00/pctOther                                5 %
+00:19:56.768996 /TM/CPU/pctExecuting                              94 %
+00:19:56.768997 /TM/CPU/pctHalted                                  0 %
+00:19:56.768997 /TM/CPU/pctOther                                   5 %
+00:19:56.768997 /TM/MaxHzHint                                      0 Hz
+00:19:56.768997 /TM/MaxHzHint/real                                 0 Hz
+00:19:56.768998 /TM/MaxHzHint/tsc                                  0 Hz
+00:19:56.768998 /TM/MaxHzHint/virtual                              0 Hz
+00:19:56.768998 /TM/MaxHzHint/virtual_sync                         0 Hz
+00:19:56.768999 /TM/PIT/Handler                                    0 ticks/call (           0 ticks,       0 calls, max         0, min      -1)
+00:19:56.768999 /TM/PIT/Irq                                        0 times
+00:19:56.768999 /TM/R3/1nsSteps                                 5104 times
+00:19:56.769000 /TM/TSC/offCPU0                                    0 ticks
+00:19:56.769000 /TM/VirtualSync/CurrentOffset              455739532 ns
+00:19:56.769001 /TRPM/ForwardRaw/IRQ/20                          463 times
+00:19:56.769006 /TRPM/ForwardRaw/TRAP/08                         159 times
+00:19:56.769006 /VMM/EmtHashCollisions/Emt00                       0 times
+00:19:56.769007 /VMM/LogFlush/00-Flushes                           0 times
+00:19:56.769007 /VMM/LogFlush/00-NoWakups                          0 times
+00:19:56.769007 /VMM/LogFlush/CPU0/Rel/cbBuf                    4096 bytes
+00:19:56.769008 ********************* End of statistics **********************
+00:19:56.769893 E1000#0: Interrupt attempts: 3
+00:19:56.769894 E1000#0: Interrupts raised : 1
+00:19:56.769894 E1000#0: Interrupts lowered: 0
+00:19:56.769894 E1000#0: ICR outside ISR   : 0
+00:19:56.769894 E1000#0: IMS raised ints   : 0
+00:19:56.769894 E1000#0: Interrupts skipped: 2
+00:19:56.769894 E1000#0: Masked interrupts : 0
+00:19:56.769895 E1000#0: Early interrupts  : 0
+00:19:56.769895 E1000#0: Late interrupts   : 0
+00:19:56.769895 E1000#0: Lost interrupts   : 0
+00:19:56.769895 E1000#0: Interrupts by RX  : 0
+00:19:56.769895 E1000#0: Interrupts by TX  : 1
+00:19:56.769895 E1000#0: Interrupts by ICS : 0
+00:19:56.769895 E1000#0: Interrupts by RDTR: 0
+00:19:56.769895 E1000#0: Interrupts by RDMT: 0
+00:19:56.769896 E1000#0: Interrupts by TXQE: 0
+00:19:56.769896 E1000#0: TX int delay asked: 0
+00:19:56.769897 E1000#0: TX delayed:         0
+00:19:56.769897 E1000#0: TX delay expired:   0
+00:19:56.769898 E1000#0: TX no report asked: 0
+00:19:56.769898 E1000#0: TX abs timer expd : 0
+00:19:56.769898 E1000#0: TX int timer expd : 0
+00:19:56.769898 E1000#0: RX abs timer expd : 0
+00:19:56.769898 E1000#0: RX int timer expd : 0
+00:19:56.769898 E1000#0: TX CTX descriptors: 0
+00:19:56.769898 E1000#0: TX DAT descriptors: 0
+00:19:56.769899 E1000#0: TX LEG descriptors: 1
+00:19:56.769899 E1000#0: Received frames   : 0
+00:19:56.769899 E1000#0: Transmitted frames: 1
+00:19:56.769899 E1000#0: TX frames up to 1514: 1
+00:19:56.769899 E1000#0: TX frames up to 2962: 0
+00:19:56.769899 E1000#0: TX frames up to 4410: 0
+00:19:56.769899 E1000#0: TX frames up to 5858: 0
+00:19:56.769899 E1000#0: TX frames up to 7306: 0
+00:19:56.769900 E1000#0: TX frames up to 8754: 0
+00:19:56.769900 E1000#0: TX frames up to 16384: 0
+00:19:56.769900 E1000#0: TX frames up to 32768: 0
+00:19:56.769900 E1000#0: Larger TX frames    : 0
+00:19:56.769900 E1000#0: Max TX Delay        : 0
+00:19:56.770475 NEM: Destroying partition 000001c3dd6fc590 with its 1 VCpus...
+00:19:56.774243 vmmR3LogFlusher: Terminating (VERR_OBJECT_DESTROYED)
+00:19:56.774275 Changing the VM state from 'DESTROYING' to 'TERMINATED'
+00:19:56.774279 Console: Machine state changed to 'PoweredOff'
+00:19:56.834377 GUI: Request for async QApp quit.
+00:19:56.836409 GUI: Cannot notify guest about VM window out-of-focus event
+00:19:56.864185 GUI: UICommon: Handling aboutToQuit request..
+00:19:58.342086 GUI: UICommon: aboutToQuit request handled!

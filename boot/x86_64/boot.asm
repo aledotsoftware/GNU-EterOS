@@ -25,12 +25,14 @@
 %ifndef STAGE2_SECTORS
 STAGE2_SECTORS      equ 16             ; Sectores de Stage 2 (8 KB default)
 %endif
+%define KERNEL_LOAD_ADDR TEMP_KERNEL_ADDR
 %ifndef KERNEL_SECTORS
 KERNEL_SECTORS      equ 512            ; Sectores del kernel (256 KB default)
 %endif
 STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
-KERNEL_LOAD_ADDR    equ 0x10000         ; Dirección donde se carga el kernel
-STACK_TOP           equ 0x7C00          ; El stack crece hacia abajo
+TEMP_KERNEL_ADDR    equ 0x56000         ; Buffer temporal bajo 1MB para BIOS
+FINAL_KERNEL_ADDR   equ 0x100000        ; Dirección final en 1MB (donde BSS tiene espacio)
+STACK_TOP           equ 0x8000000       ; Stack en 128MB (Lejos del heap de 96MB)
 
 ; =============================================================================
 ; Punto de entrada - Stage 1
@@ -72,7 +74,7 @@ stage1_start:
     mov ds, ax
     mov es, ax
     mov ss, ax
-    mov sp, STACK_TOP
+    mov sp, 0x7C00
     sti
 
     ; Guardar unidad de arranque (proporcionada por BIOS en DL)
@@ -94,7 +96,7 @@ stage1_start:
     mov cx, KERNEL_SECTORS * 128 ; 512 / 4 = 128 dwords por sector
     std
     mov esi, 0x9E00 + (KERNEL_SECTORS * 512) - 4
-    mov edi, 0x10000 + (KERNEL_SECTORS * 512) - 4
+    mov edi, TEMP_KERNEL_ADDR + (KERNEL_SECTORS * 512) - 4
     rep movsd
     cld
 
@@ -207,9 +209,6 @@ dw 0xAA55
 stage2_start:
     mov si, s2_msg_start
     call print_16
-
-    ; ---- Cargar Kernel ----
-    call load_kernel
 
     ; ---- Verificar soporte para Long Mode ----
     call check_long_mode
@@ -354,7 +353,7 @@ load_kernel:
 ; -----------------------------------------------------------------------------
 ; load_initrd: Carga el Initrd desde disco
 ; -----------------------------------------------------------------------------
-INITRD_LOAD_ADDR    equ 0x40000     ; ⚡ BOLT: Restored to safe sub-1MB zone
+INITRD_LOAD_ADDR    equ 0x15000     ; Mover Initrd a 0x15000 (después de tablas de paginación)
 %ifndef INITRD_SECTORS
 INITRD_SECTORS      equ 512         ; Keep the increased limit (default)
 %endif
@@ -456,9 +455,9 @@ read_retries: db 0
 ;   Usa 0xA000 para BootInfo struct
 ;   Usa 0xB000 para buffers temporales de VBE Mode Info Block
 ; -----------------------------------------------------------------------------
-BOOT_INFO_ADDR      equ 0xA000
-VBE_INFO_BLOCK_ADDR equ 0x9000
-VBE_MODE_INFO_ADDR  equ 0xB000
+BOOT_INFO_ADDR      equ 0x9E00          ; Justo después de Stage 2
+VBE_INFO_BLOCK_ADDR equ 0x0500          ; Memoria baja libre
+VBE_MODE_INFO_ADDR  equ 0x0700          ; Memoria baja libre
 VBE_DEFAULT_MODE    equ 0x118 | 0x4000  ; 1024x768x32 + LFB
 
 setup_vbe:
@@ -706,11 +705,19 @@ protected_mode_start:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x90000                    ; Stack alto para modo protegido
+    mov esp, 0x9F000                    ; Stack alto para modo protegido
 
     ; Indicador visual en VGA: "PM" (Protected Mode) en verde
     mov word [0xB8000], 0x2F50          ; 'P' verde
     mov word [0xB8002], 0x2F4D          ; 'M' verde
+    
+    ; ---- Relocalizar Kernel a su posición final (1MB+) ----
+    ; Esto lo hacemos en Modo Protegido para superar el límite de 1MB de la BIOS
+    ; y evitar colisiones de BSS con el stack/EBDA.
+    mov esi, TEMP_KERNEL_ADDR
+    mov edi, FINAL_KERNEL_ADDR
+    mov ecx, KERNEL_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores
+    rep movsd
 
     ; ---- Configurar tablas de paginación ----
     call setup_page_tables
@@ -740,48 +747,50 @@ protected_mode_start:
     jmp CODE64_SEG:long_mode_start
 
 ; -----------------------------------------------------------------------------
-; setup_page_tables: Configura paginación con identity mapping
-;   Usa páginas de 2 MB (huge pages) para mapear los primeros 8 MB
+; setup_page_tables: Configura paginación con identity mapping (4 GB)
+;   Usa páginas de 2 MB (huge pages) para mapear los primeros 4 GB
 ;
 ;   Estructura:
 ;     PML4[0] → PDPT (en PAGE_TABLE_ADDR + 0x1000)
-;     PDPT[0] → PD   (en PAGE_TABLE_ADDR + 0x2000)
-;     PD[0-3] → 4 páginas de 2 MB cada una = 8 MB
+;     PDPT[0] → PD0  (en PAGE_TABLE_ADDR + 0x2000)
+;     PDPT[1] → PD1  (en PAGE_TABLE_ADDR + 0x3000)
+;     PDPT[2] → PD2  (en PAGE_TABLE_ADDR + 0x4000)
+;     PDPT[3] → PD3  (en PAGE_TABLE_ADDR + 0x5000)
+;     Cada PD (0..3) tiene 512 entradas de 2 MB cada una = 1 GB por PD.
 ; -----------------------------------------------------------------------------
-PAGE_TABLE_ADDR equ 0x70000             ; ⚡ BOLT: Restored to safe sub-1MB zone
+PAGE_TABLE_ADDR equ 0x0A000             ; Después de Stage 2 y BootInfo
 
 setup_page_tables:
-    ; 1. Limpiar 6 páginas de 4 KB (PML4 + PDPT + 4*PD = 24 KB)
+    ; 1. Limpiar 6 páginas (PML4 + PDPT + 4*PD = 24 KB)
     mov edi, PAGE_TABLE_ADDR
     xor eax, eax
-    mov ecx, (4096 * 6) / 4            ; 24 KB / 4 bytes
+    mov ecx, (4096 * 6) / 4
     rep stosd
 
     ; 2. Configurar PML4[0] → PDPT
-    mov eax, PAGE_TABLE_ADDR + 0x1000   ; Dirección de PDPT
-    or eax, 0x07                        ; Present + Writable + USER
+    mov eax, PAGE_TABLE_ADDR + 0x1000
+    or eax, 0x03                        ; Present + Writable
     mov [PAGE_TABLE_ADDR], eax
 
-    ; 3. Configurar PDPT[0..3] → PD0..PD3 (Mapear 4GB)
-    mov edi, PAGE_TABLE_ADDR + 0x1000   ; PDPT Base
-    mov eax, PAGE_TABLE_ADDR + 0x2000   ; Base del primer PD
-    or eax, 0x07                        ; Present + RW + USER
-    mov ecx, 4                          ; 4 PDs para cubrir 4GB
+    ; 3. Configurar PDPT[0..3] → PD0..PD3 (4 entries = 4 GB)
+    mov edi, PAGE_TABLE_ADDR + 0x1000
+    mov eax, PAGE_TABLE_ADDR + 0x2000
+    mov ecx, 4
 .loop_pdpt:
     mov [edi], eax
-    add edi, 8                          ; Siguiente entrada en PDPT (8 bytes)
-    add eax, 0x1000                     ; Siguiente dirección de tabla PD
+    or dword [edi], 0x03                ; Present + RW
+    add edi, 8
+    add eax, 0x1000
     loop .loop_pdpt
 
-    ; 4. Llenar los 4 PDs con entradas de 2MB (Identity Mapping completo)
-    mov edi, PAGE_TABLE_ADDR + 0x2000   ; Inicio de PD0
-    mov eax, 0x00000083                 ; Phys 0 + Present + RW + Huge (2MB)
-    mov ecx, 512 * 4                    ; 2048 entradas (4GB / 2MB)
-    
+    ; 4. Llenar los 4 PDs (0..3) con entradas Huge (2 MB)
+    mov edi, PAGE_TABLE_ADDR + 0x2000
+    mov eax, 0x00000083                 ; Phys 0 + Huge + RW + Present
+    mov ecx, 512 * 4                    ; 2048 entradas de 2 MB = 4 GB
 .loop_pds:
-    mov [edi], eax                      ; Escribir entrada
-    add edi, 8                          ; Siguiente entrada en la tabla
-    add eax, 0x200000                   ; Siguiente dirección física (+2MB)
+    mov [edi], eax
+    add edi, 8
+    add eax, 0x200000
     loop .loop_pds
 
     ret
@@ -859,8 +868,8 @@ long_mode_start:
     mov gs, ax
     mov ss, ax
 
-    ; Configurar stack de 64 bits
-    mov rsp, 0x90000
+    ; Configurar stack de 64 bits (8MB Identity Mapped)
+    mov rsp, STACK_TOP
 
     ; ---- Habilitar SSE (Requerido por GCC en x86_64) ----
     mov rax, cr0
@@ -880,8 +889,8 @@ long_mode_start:
     mov word [abs 0xB800C], 0x2F4B          ; 'K'
 
     ; ---- Saltar al kernel de éterOS ----
-    ; El kernel fue cargado en 0x10000 por Stage 1
-    mov rax, KERNEL_LOAD_ADDR
+    ; El kernel fue reubicado a FINAL_KERNEL_ADDR (0x100000) por Stage 2
+    mov rax, FINAL_KERNEL_ADDR
     call rax
 
     ; Si el kernel retorna, detener la CPU

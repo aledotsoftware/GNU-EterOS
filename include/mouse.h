@@ -36,4 +36,14 @@ void mouse_set_callback(mouse_callback_t callback);
  */
 void mouse_process_byte(uint8_t byte);
 
+/**
+ * Establece la sensibilidad del mouse (multiplicador).
+ */
+void mouse_set_sensitivity(uint8_t sens);
+
+/**
+ * Establece si el mouse esta configurado para zurdos (intercambia botones).
+ */
+void mouse_set_handedness(bool left_handed);
+
 #endif /* ETEROS_MOUSE_H */

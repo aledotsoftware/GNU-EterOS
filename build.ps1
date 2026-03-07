@@ -220,11 +220,13 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\shell\cmd_task.c",
     "$KERNEL_DIR\shell\cmd_net.c",
     "$KERNEL_DIR\shell\cmd_misc.c",
+    "$KERNEL_DIR\shell\cmd_ota.c",
+    "$KERNEL_DIR\shell\cmd_devices.c",
+    "$KERNEL_DIR\shell\cmd_time.c",
+    "$KERNEL_DIR\shell\cmd_user.c",
     "$KERNEL_DIR\drivers\video\vga.c",
     "$KERNEL_DIR\drivers\video\framebuffer.c",
     "$KERNEL_DIR\drivers\video\font.c",
-
-
     "$KERNEL_DIR\drivers\serial\serial.c",
     "$KERNEL_DIR\drivers\input\keyboard.c",
     "$KERNEL_DIR\drivers\input\mouse.c",
@@ -265,7 +267,8 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\gfx\gfx.c",
     "$KERNEL_DIR\gfx\window.c",
     "$KERNEL_DIR\fs\elf.c",
-    "$KERNEL_DIR\crypto\sha256.c"
+    "$KERNEL_DIR\crypto\sha256.c",
+    "$KERNEL_DIR\crypto\ed25519.c"
 )
 
 # Archivos específicos de arquitectura
@@ -400,8 +403,11 @@ function Invoke-KernelBuild {
     }
 
     Write-Step "LD" "Enlazando kernel..."
-    & $LD @LDFLAGS_ARCH -T "$BOOT_DIR\linker.ld" -nostdlib -o $KERNEL_ELF $objFiles
-    if ($LASTEXITCODE -ne 0) {
+    $ErrorActionPreference = "Continue"
+    & $LD @LDFLAGS_ARCH -T "$BOOT_DIR\linker.ld" -nostdlib -o $KERNEL_ELF $objFiles 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) {
         Write-Step "ERR" "Fallo al enlazar el kernel"
         exit 1
     }
@@ -448,8 +454,11 @@ function Invoke-UserspaceBuild {
     if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test.c"; exit 1 }
 
     $testElf = "$initrdRoot\test.elf"
-    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testElf $testObj $libcObjs
-    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al enlazar test.elf"; exit 1 }
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testElf $testObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test.elf"; exit 1 }
 
     Write-Step "OK" "Userspace construido: $testElf"
 }

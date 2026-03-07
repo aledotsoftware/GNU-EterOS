@@ -65,7 +65,7 @@ void task_exit(int status) {
 
 void task_yield(void) {}
 void schedule(void) {}
-void context_switch(uint64_t* old, uint64_t new) {}
+void context_switch(uint64_t* old, uint64_t new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 
 void serial_write_string(const char* s) {
@@ -200,6 +200,27 @@ int eteros_snprintf(char* str, size_t size, const char* format, ...) {
 }
 
 /* Include source */
+int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir) {
+    if (!out_path || !path || size <= 0) return -1;
+    strlcpy(out_path, path, size);
+    return 0;
+}
+
+int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) {
+    (void)node; (void)index; (void)entry;
+    return -1;
+}
+
+fs_node_t *finddir_fs(fs_node_t *node, char *name) {
+    (void)node; (void)name;
+    return NULL;
+}
+
+fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) {
+    (void)root; (void)path; (void)follow_symlink;
+    return NULL;
+}
+
 #include "../kernel/arch/x86_64/syscall.c"
 
 int main() {
@@ -327,3 +348,4 @@ int main() {
 
     return 0;
 }
+int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) { return -1; }

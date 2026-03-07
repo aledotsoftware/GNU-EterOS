@@ -13,14 +13,10 @@
 #define dprintf eteros_dprintf
 #undef snprintf
 #define snprintf eteros_snprintf
-#undef sprintf
-#define sprintf eteros_sprintf
 #undef vprintf
 #define vprintf eteros_vprintf
 #undef vfprintf
 #define vfprintf eteros_vfprintf
-#undef vsprintf
-#define vsprintf eteros_vsprintf
 #undef vsnprintf
 #define vsnprintf eteros_vsnprintf
 
@@ -89,12 +85,12 @@ extern FILE *stderr;
 int eteros_printf(const char *format, ...);
 int eteros_dprintf(int fd, const char *format, ...);
 int eteros_snprintf(char *str, size_t size, const char *format, ...);
-int eteros_sprintf(char *str, const char *format, ...);
 int eteros_vprintf(const char *format, __builtin_va_list ap);
 int eteros_vfprintf(FILE *stream, const char *format, __builtin_va_list ap);
-int eteros_vsprintf(char *str, const char *format, __builtin_va_list ap);
 int eteros_vsnprintf(char *str, size_t size, const char *format, __builtin_va_list ap);
 
+#undef fprintf
+#define fprintf eteros_fprintf
 int eteros_fprintf(FILE *stream, const char *format, ...);
 
 /* File I/O */
@@ -125,10 +121,8 @@ int eteros_rename(const char *oldpath, const char *newpath);
 int printf(const char *format, ...);
 int dprintf(int fd, const char *format, ...);
 int snprintf(char *str, size_t size, const char *format, ...);
-int sprintf(char *str, const char *format, ...);
 int vprintf(const char *format, __builtin_va_list ap);
 int vfprintf(FILE *stream, const char *format, __builtin_va_list ap);
-int vsprintf(char *str, const char *format, __builtin_va_list ap);
 int vsnprintf(char *str, size_t size, const char *format, __builtin_va_list ap);
 
 int fprintf(FILE *stream, const char *format, ...);

@@ -21,8 +21,8 @@ gdt_flush:
     mov ds, ax
     mov es, ax
     mov fs, ax
-    mov gs, ax
     mov ss, ax
+    ; No recargamos GS porque GS se usa para MSR_GS_BASE en SMP y recargarlo lo pondría a cero.
 
     ; Recargar Code Segment (0x08) usando far return
     push 0x08                   ; Nuevo CS

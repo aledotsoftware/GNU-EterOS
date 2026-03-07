@@ -1,9 +1,11 @@
 #include <fs/vfs.h>
 #include <string.h>
 #include <mm.h>
+#include <serial.h>
 
 #ifndef __ETEROS_HOST_TEST__
 fs_node_t *fs_root = NULL;
+#include <task.h>
 #endif
 
 struct mount_point {
@@ -143,6 +145,10 @@ int vfs_mount(const char *path, fs_node_t *fs) {
 
 int vfs_mkdir(const char *path, uint16_t permission) {
     if (!path) return -1;
+    
+    serial_write_string("[VFS] mkdir: ");
+    serial_write_string(path);
+    serial_write_string("\n");
 
     char parent_path[128];
     char name[128];
@@ -175,27 +181,110 @@ int vfs_mkdir(const char *path, uint16_t permission) {
         strlcpy(name, path + last_slash + 1, sizeof(name));
     }
 
+    serial_write_string("      Parent: "); serial_write_string(parent_path);
+    serial_write_string(" Name: "); serial_write_string(name);
+    serial_write_string("\n");
+
     fs_node_t *parent = vfs_lookup(fs_root, parent_path);
-    if (!parent) return -1;
+    if (!parent) {
+        serial_write_string("      ERROR: Parent not found!\n");
+        return -1;
+    }
+
+    serial_write_string("      Parent Node Flags: ");
+    char buf[32]; utoa_hex_s(parent->flags, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("\n");
 
     int ret = mkdir_fs(parent, name, permission);
+    
+    serial_write_string("      mkdir_fs returned: ");
+    itoa_s(ret, buf, sizeof(buf), 10); serial_write_string(buf);
+    serial_write_string("\n");
+
     kfree(parent);
     return ret;
 }
 
 extern fs_node_t* tty_create_node(void);
 
-/**
- * Resolves a path to a filesystem node.
- *
- * @param root The root node to start the search from (usually fs_root).
- * @param path The path string to look up.
- * @return A pointer to the found fs_node_t, or NULL if not found.
- *
- * @note The returned node is allocated with kmalloc() and MUST be freed
- *       by the caller using kfree() when it is no longer needed to prevent memory leaks.
- */
+int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir) {
+    if (!out_path || !path || size <= 0) return -1;
+
+    char temp[512];
+    temp[0] = '\0';
+
+    if (path[0] != '/') {
+#ifndef __ETEROS_HOST_TEST__
+        if (base_dir) {
+            strlcpy(temp, base_dir, sizeof(temp));
+        } else {
+            task_t* current = task_get_current();
+            if (current) strlcpy(temp, current->cwd, sizeof(temp));
+            else strlcpy(temp, "/", sizeof(temp));
+        }
+#else
+        if (base_dir) {
+            strlcpy(temp, base_dir, sizeof(temp));
+        } else {
+            strlcpy(temp, "/", sizeof(temp));
+        }
+#endif
+        if (temp[strlen(temp) - 1] != '/') strlcat(temp, "/", sizeof(temp));
+        strlcat(temp, path, sizeof(temp));
+    } else {
+        strlcpy(temp, path, sizeof(temp));
+    }
+
+    char* segments[64];
+    int count = 0;
+
+    char* p = temp;
+    while (*p) {
+        while (*p == '/') p++;
+        if (!*p) break;
+
+        char* start = p;
+        while (*p && *p != '/') p++;
+
+        if (*p) {
+            *p = '\0';
+            p++;
+        }
+
+        if (strcmp(start, ".") == 0) {
+            continue;
+        } else if (strcmp(start, "..") == 0) {
+            if (count > 0) count--;
+        } else {
+            if (count < 64) {
+                segments[count++] = start;
+            } else {
+                return -1; // Too many segments
+            }
+        }
+    }
+
+    out_path[0] = '\0';
+    if (count == 0) {
+        strlcpy(out_path, "/", size);
+        return 0;
+    }
+
+    for (int i = 0; i < count; i++) {
+        strlcat(out_path, "/", size);
+        strlcat(out_path, segments[i], size);
+    }
+
+    return 0;
+}
+
+fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink);
+
 fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
+    return vfs_lookup_ext(root, path, 1);
+}
+
+fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) {
     if (!root || !path) return 0;
 
     /* Hack for /dev/tty */
@@ -267,6 +356,44 @@ fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
 
         if (!next) return 0;
         current = next;
+
+        /* Handle Symlinks */
+        int symlink_count = 0;
+        while ((current->flags & 0x7) == FS_SYMLINK) {
+            // Do not follow final component if follow_symlink is false and it is the end of the path
+            if (!follow_symlink && !*p) {
+                break;
+            }
+
+            if (symlink_count++ > 40) {
+                kfree(current);
+                return 0; // Too many levels of symbolic links
+            }
+
+            char target[256];
+            ssize_t read_bytes = 0;
+            if (current->read) {
+                read_bytes = current->read(current, 0, sizeof(target) - 1, (uint8_t*)target);
+            }
+
+            if (read_bytes <= 0) {
+                kfree(current);
+                return 0;
+            }
+            target[read_bytes] = '\0';
+
+            if (target[0] == '/') {
+                fs_node_t* target_node = vfs_lookup(root, target);
+                kfree(current);
+                current = target_node;
+            } else {
+                // Simplified relative lookup
+                fs_node_t* target_node = vfs_lookup(root, target);
+                kfree(current);
+                current = target_node;
+            }
+            if (!current) return 0;
+        }
 
         if ((current->flags & 0x7) != FS_DIRECTORY && *p) {
             kfree(current);

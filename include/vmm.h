@@ -23,16 +23,16 @@
 #define PAGE_ADDR_MASK  0x000FFFFFFFFFF000
 
 /* Índices en la dirección virtual */
-#define PML4_INDEX(addr) (((addr) >> 39) & 0x1FF)
-#define PDPT_INDEX(addr) (((addr) >> 30) & 0x1FF)
-#define PD_INDEX(addr)   (((addr) >> 21) & 0x1FF)
-#define PT_INDEX(addr)   (((addr) >> 12) & 0x1FF)
+#define PML4_INDEX(addr) (((addr) >> 39ULL) & 0x1FF)
+#define PDPT_INDEX(addr) (((addr) >> 30ULL) & 0x1FF)
+#define PD_INDEX(addr)   (((addr) >> 21ULL) & 0x1FF)
+#define PT_INDEX(addr)   (((addr) >> 12ULL) & 0x1FF)
 
 /* Dirección base del PML4 configurado por el bootloader */
-/* Nota: En boot.asm configuramos esto en 0x70000 */
-#define BOOT_PML4_ADDR  0x70000
-/* Tamaño de las tablas de paginación iniciales (24 KB = PML4 + PDPT + 4*PD) */
-#define BOOT_PAGE_TABLE_SIZE 0x6000
+/* Nota: En boot.asm configuramos esto en 0x0A000 */
+#define BOOT_PML4_ADDR  0x0A000
+/* Tamaño de las tablas de paginación iniciales (40 KB = PML4 + PDPT + 4*PD + 4*PT) */
+#define BOOT_PAGE_TABLE_SIZE 0xA000
 
 /* Límites del Espacio de Usuario (User Space) */
 #define USER_BASE       0x200000000UL        /* Inicio en 8 GB */

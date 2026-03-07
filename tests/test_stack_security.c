@@ -13,7 +13,14 @@ int tcp_input_called = 0;
 int tcp_input_len = 0;
 uint8_t* tcp_input_ptr = NULL;
 
+#include <sem.h>
 /* Mocks */
+void sem_init(sem_t* sem, int value) {
+}
+
+struct nic_driver;
+extern struct nic_driver* current_nic;
+
 int e1000_receive(void* buffer, uint16_t max_len) {
     if (mock_packet_data && mock_packet_len > 0) {
         int len = (mock_packet_len < (int)max_len) ? mock_packet_len : (int)max_len;
@@ -44,13 +51,41 @@ uint64_t timer_get_ticks(void) {
 
 void task_yield(void) {}
 
-/* Forward declarations */
-typedef int socket_t;
-
 /* Include headers via relative path since we are in tests/ */
 /* Note: We use -Iinclude during compilation */
 
-#include "kernel/net/stack.c"
+#include <net/nic.h>
+nic_driver_t mock_nic = {
+    .name = "e1000",
+    .init = NULL,
+    .send = e1000_send_packet,
+    .receive = e1000_receive,
+    .get_mac = e1000_get_mac
+};
+nic_driver_t* current_nic = &mock_nic;
+
+#include "kernel/net/core/stack.c"
+
+/* Mock string operations that kernel uses */
+void* eteros_memcpy(void* dest, const void* src, size_t n) {
+    if (!dest || !src || n == 0) return dest;
+    // Undefine the macro if it exists to avoid recursive call
+    #undef memcpy
+    return memcpy(dest, src, n);
+}
+
+void* eteros_memset(void* s, int c, size_t n) {
+    if (!s || n == 0) return s;
+    // Undefine the macro if it exists to avoid recursive call
+    #undef memset
+    return memset(s, c, n);
+}
+
+void itoa_s(int64_t value, char* str, size_t size, int base) {
+    if (str && size > 0) {
+        sprintf(str, "%ld", value);
+    }
+}
 
 /* Implement functions needed by stack.c but not in it */
 
@@ -102,6 +137,10 @@ int main() {
 
     /* Setup a socket */
     int sock_id = net_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock_id < 0 || sock_id >= MAX_SOCKETS) {
+        printf("Failed to create socket (id=%d)\n", sock_id);
+        exit(1);
+    }
     socket_entry_t* s = &socket_table[sock_id];
     s->local_port = 80; /* We will target port 80 */
     s->state = SOCKET_STATE_LISTEN; /* Listen state */

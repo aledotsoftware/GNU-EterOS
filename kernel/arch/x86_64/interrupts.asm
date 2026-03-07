@@ -135,3 +135,23 @@ isr_stub_lapic_timer:
     swapgs
 .lt2:
     iretq
+
+; -----------------------------------------------------------------------------
+; IPI TLB Shootdown (Vector 0xFD)
+; -----------------------------------------------------------------------------
+extern isr_tlb_shootdown_c
+global isr_stub_tlb_shootdown
+isr_stub_tlb_shootdown:
+    test qword [rsp + 8], 3
+    jz .ts1
+    swapgs
+.ts1:
+    PUSH_ALL
+    cld
+    call isr_tlb_shootdown_c
+    POP_ALL
+    test qword [rsp + 8], 3
+    jz .ts2
+    swapgs
+.ts2:
+    iretq
