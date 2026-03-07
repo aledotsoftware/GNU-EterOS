@@ -1,9 +1,7 @@
 #ifndef _SYS_SOCKET_H
 #define _SYS_SOCKET_H
 
-#include <stdint.h>
-#include <stddef.h>
-#include <sys/types.h>
+#include <types.h>
 
 /* Address Families */
 #define AF_INET     2
@@ -36,11 +34,17 @@ struct sockaddr_in {
     uint8_t  sin_zero[8];
 };
 
-/* Byte Order */
-uint16_t htons(uint16_t v);
-uint16_t ntohs(uint16_t v);
-uint32_t htonl(uint32_t v);
-uint32_t ntohl(uint32_t v);
+struct iovec { void *iov_base; size_t iov_len; };
+
+struct msghdr {
+    void         *msg_name;       /* optional address */
+    socklen_t     msg_namelen;    /* size of address */
+    struct iovec *msg_iov;        /* scatter/gather array */
+    size_t        msg_iovlen;     /* # elements in msg_iov */
+    void         *msg_control;    /* ancillary data, see below */
+    size_t        msg_controllen; /* ancillary data buffer len */
+    int           msg_flags;      /* flags on received message */
+};
 
 /* Prototypes */
 int socket(int domain, int type, int protocol);

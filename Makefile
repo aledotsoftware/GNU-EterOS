@@ -184,13 +184,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/net/e1000.c \
               $(KERNEL_DIR)/apps/wget.c
 
-NET_CORE_SRCS = $(KERNEL_DIR)/net/core/stack.c \
-                $(KERNEL_DIR)/net/core/tcp.c \
-                $(KERNEL_DIR)/net/core/dhcp.c \
-                $(KERNEL_DIR)/net/core/dhcp_parser.c \
-                $(KERNEL_DIR)/net/core/ip_utils.c \
-                $(KERNEL_DIR)/net/core/raw_tcp.c \
-                $(KERNEL_DIR)/net/core/nic.c
+NET_CORE_SRCS = $(KERNEL_DIR)/net/core/ip_utils.c
 
 NET_CORE_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(NET_CORE_SRCS))
 
