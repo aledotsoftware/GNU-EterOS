@@ -46,18 +46,13 @@ void shell_run(void) {
 
     for (;;) {
         char c = 0;
-        bool last_cursor_visible = false;
+
+        /* Add a visual text input affordance (Static Cursor) */
+        terminal_putchar('_');
+        terminal_putchar('\b');
 
         /* Esperar input de Teclado O Serial */
         while (1) {
-            /* Add a visual text input affordance (Blinking Cursor) */
-            bool cursor_visible = (timer_get_ticks() % 1000) < 500;
-            if (cursor_visible != last_cursor_visible) {
-                terminal_putchar(cursor_visible ? '_' : ' ');
-                terminal_putchar('\b');
-                last_cursor_visible = cursor_visible;
-            }
-
             if (keyboard_has_input()) {
                 c = keyboard_getchar();
                 break;
