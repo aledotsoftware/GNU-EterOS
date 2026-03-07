@@ -536,14 +536,25 @@ static int64_t sys_getpid(void) { return task_get_current()->id; }
 static int64_t sys_kill(int pid, int sig) {
     if (pid <= 0) return -EINVAL;
     if (sig < 0 || sig > 31) return -EINVAL;
-    if (sig == 0) return task_get_by_id((uint32_t)pid) ? 0 : -ESRCH;
+
+    task_t* current = task_get_current();
+    task_t* target = task_get_by_id((uint32_t)pid);
+
+    if (!target) return -ESRCH;
+    if (target->state == TASK_DEAD) return -ESRCH;
+
+    /* SECURITY FIX: Enforce permissions for sending signals */
+    if (current->uid != 0 && current->uid != target->uid) {
+        return -EPERM;
+    }
+
+    if (sig == 0) return 0;
+
     if (sig == SIGKILL || sig == SIGTERM) {
         if (task_kill((uint32_t)pid) == 0) return 0;
         return -ESRCH;
     }
-    task_t* target = task_get_by_id((uint32_t)pid);
-    if (!target) return -ESRCH;
-    if (target->state == TASK_DEAD) return -ESRCH;
+
     target->signal_pending |= (1u << sig);
     if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) task_wakeup(target);
     return 0;

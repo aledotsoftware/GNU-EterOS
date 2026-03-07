@@ -51,3 +51,8 @@
 **Vulnerability:** In `tcp_input`, an invalid TCP Data Offset (`doff`) value less than 5 (20 bytes) could result in an integer underflow when calculating `data_len` (`len - doff`). This could cause out-of-bounds reads and memory corruption when processing manipulated network packets.
 **Learning:** Network header parsers are a critical entry point and highly susceptible to mathematical errors. Malformed packets with syntactically impossible values (like a header size smaller than the protocol's minimum) can exploit trust in calculated lengths to bypass subsequent bounds checks.
 **Prevention:** Implement strict, defensive validation of all parsed header lengths (e.g., ensuring `doff >= 20` and `doff <= len`) at the very beginning of the packet processing function, before any pointer arithmetic or data length calculations occur.
+
+## 2026-11-09 - Missing Authorization Check in sys_kill
+**Vulnerability:** The `sys_kill` system call previously allowed any process to send arbitrary signals (including `SIGKILL` and `SIGTERM`) to any other process, regardless of user ownership (UID), because it lacked authorization checks. This allowed unprivileged processes to terminate root processes or processes belonging to other users.
+**Learning:** Signal sending operations are a form of inter-process communication that can alter or terminate execution. They must be protected by the same access control principles as file operations. System calls dealing with process manipulation must verify that the caller has sufficient privileges (e.g., matching UID or root).
+**Prevention:** Always verify `current->uid == 0 || current->uid == target->uid` before allowing process manipulation system calls like `kill`, `ptrace`, or `setpriority`.
