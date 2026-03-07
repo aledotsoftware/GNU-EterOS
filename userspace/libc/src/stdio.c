@@ -329,14 +329,6 @@ int snprintf(char *str, size_t size, const char *format, ...) {
     return ret;
 }
 
-int sprintf(char *str, const char *format, ...) {
-    va_list ap;
-    va_start(ap, format);
-    int ret = vsprintf(str, format, ap);
-    va_end(ap);
-    return ret;
-}
-
 #ifndef __ETEROS_HOST_TEST__
 int vprintf(const char *format, va_list ap) {
     return vfprintf(stdout, format, ap);
@@ -347,12 +339,6 @@ int vfprintf(FILE *stream, const char *format, va_list ap) {
     return vcbprintf(fd_putc, (void*)(long)stream->fd, format, ap);
 }
 #endif
-
-#define SPRINTF_MAX_LEN 65536
-
-int vsprintf(char *str, const char *format, va_list ap) {
-    return vsnprintf(str, SPRINTF_MAX_LEN, format, ap);
-}
 
 int vsnprintf(char *str, size_t size, const char *format, va_list ap) {
     struct buf_arg ba = {str, size, 0};

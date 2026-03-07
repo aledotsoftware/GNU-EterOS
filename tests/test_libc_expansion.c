@@ -169,8 +169,8 @@ void test_stdio() {
     char buf[100];
     int ret;
 
-    // sprintf
-    ret = sprintf(buf, "Hello %s %d", "World", 123);
+    // snprintf
+    ret = snprintf(buf, sizeof(buf), "Hello %s %d", "World", 123);
     TEST_ASSERT(ret == 15);
     TEST_ASSERT(strcmp(buf, "Hello World 123") == 0);
 
