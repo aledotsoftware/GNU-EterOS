@@ -28,6 +28,7 @@
 #include <ioctl.h>
 #include <termios.h>
 #include <linux_compat.h>
+#include <sched.h>
 
 #ifndef offsetof
 #define offsetof(type, member) ((size_t) &((type *)0)->member)
@@ -800,7 +801,7 @@ static int64_t sys_tgkill(int tgid, int tid, int sig) {
     return sys_kill(tid, sig);
 }
 
-static int64_t sys_getpid(void) { return task_get_current()->id; }
+static int64_t sys_getpid(void) { return task_get_current()->tgid; }
 
 static int64_t sys_kill(int pid, int sig) {
     if (pid <= 0) return -EINVAL;
@@ -1403,8 +1404,17 @@ static int64_t sys_getrandom(void* buf, size_t buflen, unsigned int flags) {
 
 static int64_t sys_getppid(void) { return 1; }
 static int64_t sys_gettid(void) { return task_get_current()->id; }
-static int64_t sys_set_tid_address(int* tidptr) { (void)tidptr; return task_get_current()->id; }
-static int64_t sys_exit_group(int status) { task_exit(status); __builtin_unreachable(); }
+static int64_t sys_set_tid_address(int* tidptr) {
+    task_t* current = task_get_current();
+    current->clear_child_tid = (uint32_t*)tidptr;
+    return current->id;
+}
+static int64_t sys_exit_group(int status) {
+    /* For now, just exit the current thread.
+       A true exit_group would kill all threads with the same tgid. */
+    task_exit(status);
+    __builtin_unreachable();
+}
 static int64_t sys_munmap(void* addr, size_t len) {
     if ((uint64_t)addr % PAGE_SIZE != 0) return -EINVAL;
     if (len == 0) return -EINVAL;
@@ -1907,7 +1917,11 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         sys_rt_sigreturn(regs);
         return;
     }
-    if (regs->rax == SYS_fork || regs->rax == SYS_vfork || regs->rax == SYS_clone) {
+    if (regs->rax == SYS_clone) {
+        regs->rax = (uint64_t)task_clone(regs->rdi, regs->rsi, (uint32_t*)regs->rdx, (uint32_t*)regs->r10, regs->r8, regs);
+        return;
+    }
+    if (regs->rax == SYS_fork || regs->rax == SYS_vfork) {
         regs->rax = (uint64_t)task_fork((void*)regs);
         return;
     }
@@ -1946,7 +1960,11 @@ static void syscall_linux_handler(struct syscall_regs* regs) {
         sys_rt_sigreturn(regs);
         return;
     }
-    if (regs->rax == SYS_fork || regs->rax == SYS_vfork || regs->rax == SYS_clone) {
+    if (regs->rax == SYS_clone) {
+        regs->rax = (uint64_t)task_clone(regs->rdi, regs->rsi, (uint32_t*)regs->rdx, (uint32_t*)regs->r10, regs->r8, regs);
+        return;
+    }
+    if (regs->rax == SYS_fork || regs->rax == SYS_vfork) {
         regs->rax = (uint64_t)task_fork((void*)regs);
         return;
     }
