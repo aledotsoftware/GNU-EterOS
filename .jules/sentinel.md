@@ -51,3 +51,8 @@
 **Vulnerability:** In `tcp_input`, an invalid TCP Data Offset (`doff`) value less than 5 (20 bytes) could result in an integer underflow when calculating `data_len` (`len - doff`). This could cause out-of-bounds reads and memory corruption when processing manipulated network packets.
 **Learning:** Network header parsers are a critical entry point and highly susceptible to mathematical errors. Malformed packets with syntactically impossible values (like a header size smaller than the protocol's minimum) can exploit trust in calculated lengths to bypass subsequent bounds checks.
 **Prevention:** Implement strict, defensive validation of all parsed header lengths (e.g., ensuring `doff >= 20` and `doff <= len`) at the very beginning of the packet processing function, before any pointer arithmetic or data length calculations occur.
+
+## 2026-06-02 - Missing User Pointer Validation in sys_wait4
+**Vulnerability:** The `sys_wait4` system call did not validate the user-provided `rusage` pointer before potentially passing it to underlying functions or ignoring it. If the kernel later used this pointer, a malicious user could pass a kernel address, leading to arbitrary kernel memory overwrite.
+**Learning:** Even if a system call argument is currently ignored or cast to `(void)`, it MUST be validated at the syscall boundary. Future implementations might utilize the argument, inheriting the vulnerability without noticing the missing check.
+**Prevention:** Always validate all user-provided pointers at the immediate entry point of the system call using `vmm_verify_user_access`, regardless of whether the pointer is actively used in the current stub implementation.

@@ -1379,8 +1379,9 @@ static int64_t sys_execve(const char* path, char* const argv[], char* const envp
     return task_exec(path, argv, envp, regs);
 }
 static int64_t sys_wait4(int pid, int* status, int options, void* rusage) {
-    (void)rusage;
     if (status && !vmm_verify_user_access(status, sizeof(int), 1)) return -EFAULT;
+    /* struct rusage is 144 bytes on x86_64 linux */
+    if (rusage && !vmm_verify_user_access(rusage, 144, 1)) return -EFAULT;
     return task_waitpid(pid, status, options);
 }
 
