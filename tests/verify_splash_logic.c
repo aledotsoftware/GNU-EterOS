@@ -129,17 +129,6 @@ static void show_splash(void) {
         }
     }
 
-    /* Wait ~2 seconds (busy wait on timer ticks to keep scheduler running) */
-    /* Simulate time passing */
-    printf("[MOCK] Waiting 2 seconds...\n");
-    uint64_t end_ticks = current_ticks + (2 * TIMER_HZ);
-    while (current_ticks < end_ticks) {
-        // Increment ticks manually to simulate ISR
-        current_ticks += 100; // Jump ahead for test speed
-    }
-
-    /* Clear screen to black and reset cursor for shell */
-    terminal_clear();
 }
 
 int main() {

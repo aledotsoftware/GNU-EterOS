@@ -42,6 +42,8 @@
 #include <framebuffer.h>
 #include <timer.h>
 
+extern void gui_demo_run(void);
+
 /* ========================================================================= */
 /* Constantes del Sistema                                                    */
 /* ========================================================================= */
@@ -160,6 +162,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
         /* Now that PMM, VMM, and heap are ready, switch console to framebuffer */
         if (boot_info && boot_info->fb_addr != 0) {
+            terminal_set_silent(true);
             terminal_switch_to_framebuffer(boot_info);
         }
     #endif
@@ -206,6 +209,9 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* Tier 1 (Microcontroller): Use simple static heap or similar if needed */
         /* For now, assume simple stack usage or static buffers */
     #endif
+
+    /* Show system splash screen */
+    show_splash();
 
     /* Network initialization moved after scheduler_init */
 
@@ -261,11 +267,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 8. Lanzar shell interactivo ---- */
     hal_interrupts_enable();
 
-    /* Show system splash screen */
-    show_splash();
+    terminal_set_silent(false);
+    terminal_clear();
 
-    /* Kernel shell (fallback until userspace shell is ready) */
-    shell_run();
+    /* Start GUI directly instead of kernel shell */
+    gui_demo_run();
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
     while(1) {
@@ -368,12 +374,4 @@ static void show_splash(void) {
         }
     }
 
-    /* Wait ~2 seconds (busy wait on timer ticks to keep scheduler running) */
-    uint64_t end_ticks = timer_get_ticks() + (2 * TIMER_HZ);
-    while (timer_get_ticks() < end_ticks) {
-        __asm__ volatile("hlt");
-    }
-
-    /* Clear screen to black and reset cursor for shell */
-    terminal_clear();
 }
