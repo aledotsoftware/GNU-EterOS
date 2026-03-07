@@ -325,6 +325,16 @@ void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t b
                 row_ptr[5] = bg;
                 row_ptr[6] = bg;
                 row_ptr[7] = bg;
+            } else if (bits == 0xFF) {
+                /* Fast path for solid rows */
+                row_ptr[0] = fg;
+                row_ptr[1] = fg;
+                row_ptr[2] = fg;
+                row_ptr[3] = fg;
+                row_ptr[4] = fg;
+                row_ptr[5] = fg;
+                row_ptr[6] = fg;
+                row_ptr[7] = fg;
             } else {
                 /* Unroll loop manually for 8 pixels - massive speedup over loops + checks + calls */
                 row_ptr[0] = (bits & 0x80) ? fg : bg;

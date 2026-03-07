@@ -380,9 +380,9 @@ static void irq_default(struct interrupt_frame *frame) {
 extern volatile uint64_t tlb_flush_addr;
 extern volatile uint64_t tlb_ack_count;
 
-__attribute__((interrupt))
-static void isr_tlb_shootdown(struct interrupt_frame *frame) {
-    (void)frame;
+extern void isr_stub_tlb_shootdown(void);
+
+void isr_tlb_shootdown_c(void) {
     vmm_flush_tlb_local(tlb_flush_addr);
     __sync_fetch_and_add(&tlb_ack_count, 1);
     lapic_eoi();
@@ -435,7 +435,7 @@ void idt_init(void) {
     }
 
     /* --- IPI Handlers --- */
-    idt_set_gate(IPI_TLB_SHOOTDOWN, (void*)isr_tlb_shootdown, IDT_GATE_INTERRUPT);
+    idt_set_gate(IPI_TLB_SHOOTDOWN, (void*)isr_stub_tlb_shootdown, IDT_GATE_INTERRUPT);
 
     /* --- LAPIC Timer --- */
     idt_set_gate(LAPIC_TIMER_VECTOR, (void*)isr_stub_lapic_timer, IDT_GATE_INTERRUPT);

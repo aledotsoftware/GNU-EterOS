@@ -41,3 +41,6 @@
 ## 2026-12-05 - [Framebuffer Image Rendering]
 **Learning:** In scenarios involving rendering fixed-size pixel images to the framebuffer, falling back to pixel-by-pixel assignments using a nested loop limits performance. When 32bpp framebuffers are in use, the entire image can be copied much faster row-by-row utilizing `memcpy` for block memory transfers when no pixel blending or scaling is involved.
 **Action:** When rendering solid pixel maps without alpha channel, use `memcpy` to copy rows directly if the destination BPP matches the source data, bypassing inner loops and significantly reducing CPU instructions.
+## 2026-12-05 - [Duplicate Formatting Logic]
+**Learning:** Re-implementing formatting functions (like `vsnprintf` and `itoa`) for specific modules (e.g., `klog`) can bypass highly optimized versions already present in the codebase. The custom implementation was significantly slower due to missing fast-paths (e.g., base 10/16 optimization) and backwards buffer filling techniques found in `kernel/stdio.c`.
+**Action:** When working on formatting or string processing, check for and reuse existing, highly optimized core library implementations (`vsnprintf`) rather than duplicating slower, simplistic versions.
