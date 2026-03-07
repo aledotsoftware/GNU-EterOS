@@ -100,6 +100,16 @@ static inline void load_cr3(uint64_t pml4_addr) {
 #endif
 }
 
+static inline pt_entry_t* get_active_pml4() {
+    uint64_t cr3_val;
+#ifndef __ETEROS_HOST_TEST__
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3_val));
+#else
+    cr3_val = (uint64_t)pml4;
+#endif
+    return (pt_entry_t*)(cr3_val & PAGE_ADDR_MASK);
+}
+
 /*
  * Obtiene o crea la siguiente tabla en la jerarquía.
  * Si la entrada no existe, asigna una nueva página física del PMM,
@@ -128,6 +138,12 @@ static pt_entry_t* get_next_table(pt_entry_t* table, uint64_t index, int alloc) 
         return NULL;
     }
 
+    char dbg_buf[64];
+    serial_write_string("[VMM] Allocating new page table at ");
+    utoa_hex_s((uintptr_t)new_table_phys, dbg_buf, sizeof(dbg_buf));
+    serial_write_string(dbg_buf);
+    serial_write_string("\n");
+
     /* Limpiar la nueva tabla (crítico para evitar entradas basura) */
     memset(new_table_phys, 0, PAGE_SIZE);
 
@@ -145,7 +161,11 @@ void vmm_init(void) {
     /* Por ahora, seguimos usando ese PML4. */
     /* En el futuro, aquí crearíamos un nuevo PML4 limpio y cambiaríamos a él. */
     
-    serial_write_string("[VMM] Usando PML4 del bootloader en 0x70000\n");
+    char pml4_addr_buf[32];
+    serial_write_string("[VMM] Usando PML4 del bootloader en 0x");
+    utoa_hex_s((uint64_t)pml4, pml4_addr_buf, sizeof(pml4_addr_buf));
+    serial_write_string(pml4_addr_buf);
+    serial_write_string("\n");
 }
 
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
@@ -156,7 +176,8 @@ int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 1);
+    pt_entry_t* active_pml4 = get_active_pml4();
+    pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 1);
     if (!pdpt) return -1;
 
     pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 1);
@@ -180,7 +201,8 @@ void vmm_unmap_page(uint64_t virt_addr) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
+    pt_entry_t* active_pml4 = get_active_pml4();
+    pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 0);
     if (!pdpt) return;
 
     pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
@@ -188,6 +210,9 @@ void vmm_unmap_page(uint64_t virt_addr) {
 
     pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
     if (!pt) return;
+
+    /* Verificar si la página está presente */
+    if (!(pt[pt_idx] & PAGE_PRESENT)) return;
 
     /* Marcar como no presente */
     pt[pt_idx] = 0;
@@ -201,16 +226,29 @@ uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
-    if (!pdpt) return 0;
+    pt_entry_t* active_pml4 = get_active_pml4();
 
-    pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
-    if (!pd) return 0;
+    /* 1. Walk PML4 */
+    if (!(active_pml4[pml4_idx] & PAGE_PRESENT)) return 0;
+    pt_entry_t* pdpt = (pt_entry_t*)(active_pml4[pml4_idx] & PAGE_ADDR_MASK);
 
-    pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
-    if (!pt) return 0;
-    
-    /* Verificar si la página está presente */
+    /* 2. Walk PDPT */
+    if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) return 0;
+    /* Check for 1GB Huge Page */
+    if (pdpt[pdpt_idx] & PAGE_HUGE) {
+        return (pdpt[pdpt_idx] & 0xFFFFFC0000000ULL) + (virt_addr & 0x3FFFFFFF);
+    }
+    pt_entry_t* pd = (pt_entry_t*)(pdpt[pdpt_idx] & PAGE_ADDR_MASK);
+
+    /* 3. Walk PD */
+    if (!(pd[pd_idx] & PAGE_PRESENT)) return 0;
+    /* Check for 2MB Huge Page */
+    if (pd[pd_idx] & PAGE_HUGE) {
+        return (pd[pd_idx] & 0xFFFFFFFFFE00000ULL) + (virt_addr & 0x1FFFFF);
+    }
+    pt_entry_t* pt = (pt_entry_t*)(pd[pd_idx] & PAGE_ADDR_MASK);
+
+    /* 4. Walk PT */
     if (!(pt[pt_idx] & PAGE_PRESENT)) return 0;
     
     return (pt[pt_idx] & PAGE_ADDR_MASK) + (virt_addr & 0xFFF);
@@ -340,8 +378,9 @@ uint64_t vmm_clone_pml4(int cow) {
     if (!new_pml4) return 0;
     memset(new_pml4, 0, PAGE_SIZE);
 
+    pt_entry_t* active_pml4 = get_active_pml4();
     /* Start recursion from Level 4 */
-    clone_pt_recursive(new_pml4, pml4, 4, cow);
+    clone_pt_recursive(new_pml4, active_pml4, 4, cow);
 
     /* If we modified current tables (CoW), we must flush TLB */
     if (cow) {
@@ -410,7 +449,8 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
         uint64_t pd_idx   = PD_INDEX(addr);
         uint64_t pt_idx   = PT_INDEX(addr);
 
-        pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
+        pt_entry_t* active_pml4 = get_active_pml4();
+        pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 0);
         if (!pdpt) return 0;
         pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
         if (!pd) return 0;
@@ -587,7 +627,7 @@ int vmm_validate_user_ptr(const void* addr, size_t size) {
     uint64_t end = start + size;
 
     /* Check for overflow (end < start) */
-    if (end < start) return 0;
+    if (end < start || size > (USER_LIMIT - start + 1)) return 0;
 
     /* Check bounds: [start, end) must be within [USER_BASE, USER_LIMIT] */
     if (start < USER_BASE) return 0;

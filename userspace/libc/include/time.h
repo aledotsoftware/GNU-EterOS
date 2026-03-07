@@ -60,7 +60,14 @@ struct tm {
 #endif
 
 #ifdef __ETEROS_HOST_TEST__
+/* Use host's struct tm and time_t for compatibility, but we might need to cast or ensure layout match if we access fields directly in our implementation.
+   Actually, userspace/libc/src/time.c uses struct tm fields.
+   When we define __ETEROS_HOST_TEST__, we include host's time.h which defines struct tm.
+   Our time.c implementation will then use host's struct tm.
+   But we need to make sure we don't redefine it.
+*/
 int eteros_nanosleep(const struct timespec *req, struct timespec *rem);
+/* Use clockid_t from host if available, or int */
 int eteros_clock_gettime(int clock_id, struct timespec *tp);
 time_t eteros_time(time_t *tloc);
 struct tm *eteros_gmtime(const time_t *timep);

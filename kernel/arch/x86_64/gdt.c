@@ -130,7 +130,7 @@ static void write_tss(int num, uint16_t ss0, uint64_t esp0) {
 
     /* Configurar Stack de Ring 0 */
     tss.rsp0 = esp0;
-    tss.ist[1] = esp0; /* Mapear también IST1 por seguridad */
+    tss.ist[1] = esp0;
     tss.iomap_base = sizeof(tss); /* Sin I/O map */
     
     (void)ss0; /* Unused */
@@ -188,9 +188,11 @@ void tss_set_rsp0(uint64_t rsp0) {
     cpu_info_t* cpu = get_current_cpu();
     if (cpu && cpu->tss) {
         ((struct tss_struct*)cpu->tss)->rsp0 = rsp0;
+        ((struct tss_struct*)cpu->tss)->ist[1] = rsp0;
     } else {
         /* Fallback for early boot (BSP only) */
         tss.rsp0 = rsp0;
+        tss.ist[1] = rsp0;
     }
 }
 

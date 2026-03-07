@@ -5,6 +5,7 @@
 #include <timer.h>
 #include <string.h>
 #include <task.h>
+#include <vmm.h>
 
 static uint64_t lapic_base = 0;
 
@@ -19,9 +20,12 @@ static void lapic_write(uint32_t reg, uint32_t data) {
 void lapic_init(void) {
     lapic_base = (uint64_t)acpi_get_lapic_addr();
     
+    /* Mapear Local APIC (Identity Map, desactivar cache) */
+    vmm_map_page(lapic_base, lapic_base, PAGE_PRESENT | PAGE_WRITE | PAGE_PCD | PAGE_PWT);
+    
     char buf[64];
     serial_write_string("[APIC] Initializing Local APIC at 0x");
-    itoa_s((int)lapic_base, buf, 64, 16);
+    utoa_hex_s(lapic_base, buf, 64);
     serial_write_string(buf);
     serial_write_string("\n");
 

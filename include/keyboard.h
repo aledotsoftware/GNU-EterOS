@@ -63,4 +63,13 @@ bool keyboard_has_input(void);
  */
 void keyboard_process_scancode(uint8_t scancode);
 
+/**
+ * Configura la velocidad de repeticion y el retraso del teclado (Typematic).
+ * @param delay Retraso antes de repetir (0-3).
+ * @param rate  Velocidad de repeticion (0-31).
+ */
+void keyboard_set_typematic(uint8_t delay, uint8_t rate);
+
+void keyboard_set_layout(int layout);
+
 #endif /* ETEROS_KEYBOARD_H */

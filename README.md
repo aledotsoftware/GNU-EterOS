@@ -40,96 +40,63 @@ El nombre **éter** evoca la sustancia que lo llena todo de forma invisible. Baj
 │       └── linker.ld           # Script de enlace para el kernel
 ├── kernel/                     # Ether-Core: El corazón del sistema
 │   ├── main.c                  # Punto de entrada (kmain)
-│   ├── string.c                # Utilidades de cadena y memoria
-│   ├── shell.c                 # Terminal interactiva (historial, teclas extendidas)
+│   ├── string.c/stdio.c        # Utilidades de cadena e I/O
+│   ├── shell/                  # Terminal interactiva (historial, comandos)
+│   │   ├── shell.c             # Lógica base de la shell
+│   │   ├── commands.c          # Registro e invocación de comandos
+│   │   └── cmd_*.c             # Implementaciones (sysinfo, net, task)
 │   ├── arch/                   # HAL — Una carpeta por arquitectura
 │   │   ├── x86_64/             # ✅ Implementado (PC / servidores)
 │   │   │   ├── idt.c           # IDT + ISRs (256 vectores)
 │   │   │   ├── gdt.c           # GDT + TSS (64-bit)
-│   │   │   ├── pic.c           # PIC 8259 remapeado
-│   │   │   ├── syscall.c       # Syscalls (MSRs, STAR, LSTAR) y Dispatcher Linux
-│   │   │   ├── interrupts.asm  # Stubs de interrupción ASM
-│   │   │   ├── user_mode.asm   # Context Switch Ring 0 <-> Ring 3
-│   │   │   ├── acpi.c          # Stack ACPI (RSDP, MADT parsing)
-│   │   │   ├── apic.c          # Driver Local/IO APIC
+│   │   │   ├── pic.c/apic.c    # APIC Local/IO y PIC 8259
+│   │   │   ├── syscall.c       # Syscalls (MSRs) y Dispatcher
 │   │   │   ├── smp.c           # Gestión Multicore y Per-CPU GS Base
-│   │   │   └── trampoline.asm  # Código de arranque para APs (16-bit)
-│   │   ├── aarch64/            # 🚧 En Desarrollo (Soporte RK3566 inicial)
-│   │   ├── arm-cortex-m/       # 🚧 En Desarrollo (STM32, Pico, IoT)
-│   │   ├── riscv64/            # ⚠️ Implementación Preliminar (HAL, UART, PLIC, SBI)
-│   │   └── xtensa/             # 🚧 En Desarrollo (ESP32)
+│   │   │   └── trampoline.asm  # Código de arranque para APs
+│   │   └── ...                 # Otras arquit. en desarrollo (ARM, RISC-V)
 │   ├── mm/                     # Gestión de Memoria
 │   │   ├── pmm.c               # Physical Memory Manager (bitmap, E820)
 │   │   ├── vmm.c               # Virtual Memory Manager (4-Level Paging)
 │   │   └── heap.c              # Heap dinámico (kmalloc/kfree/kcalloc)
-│   ├── task.c                  # Scheduler Round-Robin SMP-Aware (Multitarea)
+│   ├── task.c                  # Scheduler Round-Robin SMP-Aware
+│   ├── futex.c/sem.c           # Fast Userspace Mutexes y Semáforos
 │   ├── fs/                     # Sistema de Archivos Virtual (VFS)
 │   │   ├── vfs.c               # Capa de abstracción (read/write/open/close)
-│   │   ├── fat32.c             # Driver FAT32 (Lectura de archivos/dir)
-│   │   └── initrd.c            # Initial Ramdisk (Carga de assets en boot)
+│   │   ├── fat32.c             # Driver FAT32 (soporte A/B offset)
+│   │   ├── devfs.c/procfs.c    # Sistemas de archivo en memoria (/dev, /proc)
+│   │   ├── elf.c               # Parser y cargador de binarios ELF
+│   │   ├── jfs.c               # Sistema Journaling
+│   │   └── initrd.c            # Initial Ramdisk (Carga de assets)
 │   ├── drivers/                # El sistema sensorial
-│   │   ├── video/              # Drivers de Video
-│   │   │   ├── vga.c           # Modo Texto Legacy
-│   │   │   ├── framebuffer.c   # Linear Framebuffer (GOP/VBE)
-│   │   │   └── font.c          # Fuente Bitmap 8x16
-│   │   ├── serial/serial.c     # UART 16550 para depuración
-│   │   ├── input/              # Dispositivos de Entrada
-│   │   │   ├── keyboard.c      # Teclado PS/2 (Set 1 + Extended)
-│   │   │   └── mouse.c         # Mouse PS/2 (Packet parsing básico)
-│   │   ├── timer/pit.c         # PIT 8254 @ 100 Hz (uptime, delays)
-│   │   ├── rtc/rtc.c           # Real Time Clock (CMOS)
-│   │   ├── pci/pci.c           # Bus PCI (Escaneo y detección)
-│   │   ├── disk/               # Almacenamiento
-│   │   │   └── partition.c     # Gestor de particiones (MBR) y VFS A/B
-│   │   └── net/e1000.c         # Intel PRO/1000 NIC driver
+│   │   ├── video/              # VGA, Framebuffer GOP y rasterizado de fuentes
+│   │   ├── input/              # Teclado PS/2 (+ extended) y Mouse
+│   │   ├── net/                # NIC e1000 Intel Ethernet
+│   │   ├── disk/               # Gestores de particiones
+│   │   └── ...                 # PCI, RTC, Timer, Serial...
+│   ├── gfx/                    # Abstracción Gráfica (Motor Omni)
 │   ├── net/                    # Stack de Red
-│   │   ├── dhcp.c              # Cliente DHCP (Discover/Offer)
-│   │   ├── tcp.c               # Stack TCP minimalista
-│   │   ├── stack.c             # Logica de sockets y buffer
-│   │   └── lwip_port/          # Port del stack lwIP (TCP/IP) - lwIP 2.2.0 Estable
+│   │   ├── core/               # Stack nativo (dhcp.c, tcp.c, raw_tcp.c, stack.c)
+│   │   └── lwip_port/          # Port lwIP 2.2.0 Estable
 │   ├── crypto/                 # Criptografía
 │   │   ├── sha256.c            # Hashing SHA-256
-│   │   └── ed25519.c           # Firmas EdDSA (Seguridad)
+│   │   └── ed25519.c           # Firmas EdDSA (Seguridad OTA)
 │   └── apps/                   # Aplicaciones del kernel
-│       ├── santitravel.c       # Juego de texto (aventuras)
 │       ├── sysmon.c            # Monitor del sistema
+│       ├── gui_demo.c          # Demo gráfica de Batch Drawing
 │       ├── wget.c              # Downloader de archivos
-│       ├── doomgeneric/        # Port de DOOM (Motor de juego)
-│       └── user_loader.c       # Loader de ejecutables de usuario
-├── include/                    # API del sistema
-│   ├── hal.h                   # 🌍 HAL universal (interfaz multi-arch)
-│   ├── types.h                 # Tipos freestanding
-│   ├── idt.h / gdt.h / pic.h   # Interrupciones y segmentación (x86_64)
-│   ├── pmm.h / vmm.h / mm.h    # Memoria (física, virtual, heap)
-│   ├── keyboard.h / shell.h    # Input y terminal
-│   ├── timer.h                 # API del PIT timer
-│   ├── pci.h                   # Escaneo de bus PCI
-│   ├── vga.h / serial.h        # Video y debug
-│   └── io.h / string.h         # I/O y utilidades
-├── tools/                      # Herramientas de soporte
-│   ├── gen_logo.py             # Generador de bitmaps para boot
-│   ├── mkinitrd.py             # Creador de imágenes Initrd
-│   └── updater/                # Sistema de Actualización OTA
-│       └── build_update.ps1    # Script de empaquetado y firma
+│       ├── doomgeneric/        # Port de DOOM
+│       └── ...
+├── include/                    # API del sistema (headers multi-arch)
+├── tests/                      # Suite masiva de pruebas unitarias (>100)
 ├── userspace/                  # Espacio de usuario (Aplicaciones Ring 3)
-│   ├── libc/                   # Mini-LibC para éterOS
-│   └── test.c                 # Aplicación de prueba inicial
-├── initrd_root/                # Directorio raíz para el Initrd
-├── tests/                      # Suite de pruebas unitarias
-│   ├── test_fat32.c            # Test de lectura FAT32
-│   ├── test_heap.c             # Stress handling del Heap
-│   └── ...                     # Tests de syscalls, pci, dhcp...
-├── scripts/                    # Herramientas de despliegue
-│   ├── setup_wsl.sh            # Setup para WSL2
-│   ├── setup_windows.ps1       # Setup para Windows nativo
-│   ├── setup_toolchain.sh      # Setup para Linux/macOS
-│   └── create_iso.sh           # Generar ISO booteable
-├── .github/workflows/
-│   └── build.yml               # CI/CD: Compilación y Release automático
-├── build/                      # Artefactos generados
+│   ├── libc/                   # Mini-LibC POSIX para éterOS
+│   └── test*.c                 # Aplicaciones y tests en Ring 3
+├── initrd_root/                # Archivos empacados en el initrd al arranque
+├── tools/                      # Gestores de entorno, initrd y mkiso
+├── scripts/                    # Herramientas de despliegue para WSL, Windows
+├── .github/workflows/          # CI/CD: Compilación y Release automático
 ├── Makefile                    # Build system (Linux/WSL)
 ├── build.ps1                   # Build system (Windows nativo)
-├── JULES.md                    # Instrucciones para Jules Agent
 └── README.md                   # Este archivo
 ```
 
@@ -385,12 +352,12 @@ Situación actual: Si tu fork() actual duplica toda la RAM físicamente, el sist
 
 Lo que falta: Implementar Copy-on-Write en el VMM. Al hacer fork, marcas las páginas de memoria como "Solo Lectura" para ambos procesos. Solo cuando uno escribe, el kernel lanza un Page Fault, duplica la página y cambia los permisos. Sin esto, no podrás levantar procesos pesados.
 
-3. Implementación de Futexes (Fast Userspace Mutexes)
-Este es el "talón de Aquiles" de muchos kernels nuevos.
+3. Implementación de Futexes (Fast Userspace Mutexes) ✅
+Este es el "talón de Aquiles" de muchos kernels nuevos, pero ya está superado en éterOS.
 
 Por qué es vital: Casi toda app moderna de Linux usa la glibc o musl, y estas usan futex() para hilos (pthreads) y sincronización.
 
-Lo que falta: Una syscall sys_futex que pueda poner a dormir hilos y despertarlos basándose en una dirección de memoria virtual. Sin esto, los binarios se quedan "congelados" esperando un lock que nunca llega.
+Estado actual: Se ha implementado de forma madura (`futex.c`) con la syscall `sys_futex`. Adicionalmente, se tiene un sistema de semáforos (`sem.c`) y validaciones amplias en `userspace/`.
 
 4. Soporte para TLS (Thread Local Storage) y FS/GS Base
 Linux depende fuertemente de los registros de segmento FS y GS para manejar los datos locales de cada hilo (como la variable errno).

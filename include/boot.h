@@ -5,7 +5,7 @@
 
 /* Estructura de información pasada por el bootloader al kernel */
 /* Ubicación fija en memoria: 0xA000 */
-#define BOOT_INFO_ADDR 0xA000
+#define BOOT_INFO_ADDR 0x9E00
 
 typedef struct {
     uint32_t signature;       /* "KBOT" (0x544F424B) */

@@ -31,8 +31,11 @@ typedef struct {
 static futex_bucket_t buckets[FUTEX_BUCKETS];
 
 static int futex_hash(uint32_t *uaddr) {
+    task_t* current = task_get_current();
     uint64_t addr = (uint64_t)uaddr;
-    return (addr >> 2) % FUTEX_BUCKETS;
+    /* Mix CR3 into the hash to isolate processes, but threads sharing VM will match */
+    uint64_t cr3 = current ? current->cr3 : 0;
+    return ((addr >> 2) ^ (cr3 >> 12)) % FUTEX_BUCKETS;
 }
 
 void futex_init(void) {
@@ -167,9 +170,10 @@ int futex_wake(uint32_t *uaddr, int count) {
     futex_node_t **pp = &b->head;
     futex_node_t *curr = b->head;
     int woken = 0;
+    task_t* current = task_get_current();
 
     while (curr && woken < count) {
-        if (curr->uaddr == uaddr) {
+        if (curr->uaddr == uaddr && curr->task->cr3 == current->cr3) {
             /* Wake up this task */
             if (curr->task->state == TASK_BLOCKED) {
                 task_wakeup(curr->task);

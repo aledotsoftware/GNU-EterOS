@@ -43,6 +43,8 @@ int rmdir(const char *pathname);
 /* Process */
 int getpid(void);
 int getppid(void);
+int setuid(int uid);
+int setgid(int gid);
 int kill(int pid, int sig);
 int fork(void);
 int execve(const char *pathname, char *const argv[], char *const envp[]);
