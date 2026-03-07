@@ -23,10 +23,10 @@
 #define PAGE_ADDR_MASK  0x000FFFFFFFFFF000
 
 /* Índices en la dirección virtual */
-#define PML4_INDEX(addr) (((addr) >> 39) & 0x1FF)
-#define PDPT_INDEX(addr) (((addr) >> 30) & 0x1FF)
-#define PD_INDEX(addr)   (((addr) >> 21) & 0x1FF)
-#define PT_INDEX(addr)   (((addr) >> 12) & 0x1FF)
+#define PML4_INDEX(addr) (((addr) >> 39ULL) & 0x1FF)
+#define PDPT_INDEX(addr) (((addr) >> 30ULL) & 0x1FF)
+#define PD_INDEX(addr)   (((addr) >> 21ULL) & 0x1FF)
+#define PT_INDEX(addr)   (((addr) >> 12ULL) & 0x1FF)
 
 /* Dirección base del PML4 configurado por el bootloader */
 /* Nota: En boot.asm configuramos esto en 0x0A000 */

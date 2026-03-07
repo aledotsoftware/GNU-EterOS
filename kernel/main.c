@@ -161,13 +161,15 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* Now that PMM, VMM, and heap are ready, switch console to framebuffer */
         if (boot_info && boot_info->fb_addr != 0) {
             terminal_switch_to_framebuffer(boot_info);
-            terminal_set_silent(true);
+            // terminal_set_silent(true); /* Deshabilitado para depuración visual completa */
         }
     #endif
 
     #if defined(ARCH_X86_64)
-    /* ---- 2.7 Inicializar APIC y Despertar Cores ---- */
-    /* Must happen AFTER heap init so we can allocate per-CPU structures */
+    /* ---- 2.7 Inicializar Scheduler y APIC ---- */
+    /* Scheduler must be ready before APs boot because they create Idle tasks */
+    scheduler_init();
+
     lapic_init();   /* Inicializar Local APIC del core principal */
     smp_init();     /* Despertar los Application Processors (APs) */
     #endif
@@ -223,10 +225,6 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 6.5 Inicializar Mouse (PS/2) ---- */
     /* Nota: Se inicializa después de la IDT/PIC pero antes de la GUI */
     mouse_init();
-
-    /* ---- 7. Inicializar Scheduler ---- */
-    hal_console_write("  [INIT] Scheduler Round-Robin\n");
-    scheduler_init();
     
     /* ---- 7.1 Inicializar Red (Ahora podemos crear tareas) ---- */
     hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
@@ -255,19 +253,23 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     futex_init();
 
     /* ---- 7.5 Lanzar Test de Espacio de Usuario ---- */
-    hal_console_write("  [INIT] Lanzando User Mode Test...\n");
-    extern void user_loader_entry(void);
-    task_create("UserLoader", user_loader_entry);
-
+    // hal_console_write("  [INIT] Lanzando User Mode Test...\n");
+    // extern void user_loader_entry(void);
+    // task_create("UserLoader", user_loader_entry);
+ 
     /* ---- 8. Lanzar shell interactivo ---- */
     hal_interrupts_enable();
-
+ 
     /* Show system splash screen */
-    show_splash();
-
+    // show_splash();
+ 
     /* Kernel shell (fallback until userspace shell is ready) */
     terminal_set_silent(false);
     terminal_clear();
+ 
+    serial_write_string("[ETER] Entering shell_run()...\n");
+    hal_console_write("  [INIT] Sistema listo. Iniciando Shell...\n");
+ 
     shell_run();
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */

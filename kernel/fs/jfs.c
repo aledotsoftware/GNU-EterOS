@@ -5,6 +5,7 @@
 #include <hal.h>
 #include <klog.h>
 #include <stdio.h>
+#include <serial.h>
 
 /* Simulated Disk */
 static uint8_t *jfs_disk_buffer = NULL;
@@ -264,9 +265,26 @@ static int jfs_create(fs_node_t *parent, char *name, uint16_t permission) {
 
 /* Init */
 fs_node_t* jfs_init(void) {
+    char dbg_buf[64];
+    serial_write_string("[JFS] Initializing (Size: ");
+    itoa_s(jfs_disk_size, dbg_buf, sizeof(dbg_buf), 10);
+    serial_write_string(dbg_buf);
+    serial_write_string(")...\n");
+
     jfs_disk_buffer = (uint8_t*)kmalloc(jfs_disk_size);
-    if (!jfs_disk_buffer) return NULL;
+    if (!jfs_disk_buffer) {
+        serial_write_string("[JFS] ERROR: OOM allocating disk buffer!\n");
+        return NULL;
+    }
+
+    serial_write_string("[JFS] Buffer allocated at 0x");
+    utoa_hex_s((uint64_t)jfs_disk_buffer, dbg_buf, sizeof(dbg_buf));
+    serial_write_string(dbg_buf);
+    serial_write_string("\n");
+
+    serial_write_string("[JFS] Clearing buffer...\n");
     memset(jfs_disk_buffer, 0, jfs_disk_size);
+    serial_write_string("[JFS] Buffer cleared.\n");
 
     /* Format Disk */
     sb = (jfs_superblock_t*)jfs_disk_buffer;

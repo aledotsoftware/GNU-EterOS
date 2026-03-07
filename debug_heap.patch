@@ -1,0 +1,10 @@
+--- kernel/mm/heap.c
++++ kernel/mm/heap.c
+@@ -375,6 +375,7 @@
+            We just update prev's size.
+         */
+         block->prev->size += sizeof(block_header_t) + block->size;
++        // The prev block is already in SOME free list! Wait, did its size change its bucket?!
+         block->prev->next = block->next;
+         if (block->next) {
+             block->next->prev = block->prev;

@@ -257,8 +257,8 @@ void scheduler_init(void) {
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
     tasks[0].cr3 = cr3;
 
-    /* Configurar stack inicial para Task 0 (Boot Stack en 0x7FF000) */
-    kernel_stack_top = 0x7FF000;
+    /* Configurar stack inicial para Task 0 (Boot Stack en 128MB) */
+    kernel_stack_top = 0x8000000;
     tasks[0].kernel_stack = kernel_stack_top;
 
     strlcpy(tasks[0].name, "kernel", sizeof(tasks[0].name));
