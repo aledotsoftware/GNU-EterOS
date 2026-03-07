@@ -18,6 +18,7 @@
 static acpi_rsdp_t* rsdp = NULL;
 static acpi_rsdt_t* rsdt = NULL;
 static acpi_madt_t* madt = NULL;
+static acpi_fadt_t* fadt = NULL;
 
 /* Estado global de CPUs (Topología) */
 cpu_info_t cpus[MAX_CPUS];
@@ -131,7 +132,7 @@ void acpi_init(void) {
         return;
     }
     
-    /* Find MADT inside RSDT */
+    /* Find tables inside RSDT */
     int entries = (rsdt->header.length - sizeof(acpi_header_t)) / 4;
     
     for (int i = 0; i < entries; i++) {
@@ -139,7 +140,8 @@ void acpi_init(void) {
         
         if (memcmp(header->signature, ACPI_MADT_SIG, 4) == 0) {
             madt = (acpi_madt_t*)header;
-            break; /* Found MADT! */
+        } else if (memcmp(header->signature, "FACP", 4) == 0) {
+            fadt = (acpi_fadt_t*)header;
         }
     }
     
@@ -147,6 +149,12 @@ void acpi_init(void) {
         parse_madt();
     } else {
         serial_write_string("[ACPI] WARNING: MADT table not found in RSDT.\n");
+    }
+
+    if (fadt) {
+        serial_write_string("[ACPI] FACP (FADT) table found.\n");
+    } else {
+        serial_write_string("[ACPI] WARNING: FACP (FADT) table not found in RSDT.\n");
     }
 }
 
@@ -156,4 +164,25 @@ int acpi_get_cpu_count(void) {
 
 uint32_t acpi_get_lapic_addr(void) {
     return madt ? madt->lapic_addr : 0xFEE00000;
+}
+
+#include <io.h>
+void acpi_poweroff(void) {
+    if (!fadt) {
+        serial_write_string("[ACPI] Cannot poweroff, FADT not found.\n");
+        return;
+    }
+
+    /* Out to PM1a control block */
+    /* SLP_EN (bit 13) | SLP_TYPa = 5 (bits 10-12) */
+    outw(fadt->pm1a_control_block, 0x2000 | (5 << 10));
+
+    if (fadt->pm1b_control_block) {
+        outw(fadt->pm1b_control_block, 0x2000 | (5 << 10));
+    }
+
+    serial_write_string("[ACPI] Poweroff signal sent.\n");
+    while (1) {
+        __asm__ volatile("hlt");
+    }
 }

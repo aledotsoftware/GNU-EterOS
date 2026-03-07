@@ -1,39 +1,39 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2024-05-15
-**Commit:** 5715f15ae4c99ca17e6d3d5a6eb61faaddd05d6c
+**Commit:** HEAD
 **Estado de build:** ✅ COMPILA
-**Estado de boot:** ❌ NO ARRANCA (QEMU crashes immediately after `[eterOS] PIT configurado a ~100 Hz.`, possibly a triple fault)
+**Estado de boot:** ✅ ARRANCA (Boot a Ring 3 exitoso)
 
 ## Errores de Compilación
-| # | Tipo | Archivo | Línea | Error | Agente Responsable |
-|---|---|---|---|---|---|
-| 1 | E-MISSING | Makefile | 195 | `exceptions.asm` missing from `KERNEL_ASM_SRCS` | `orchestrator-meta-agent` |
-
-*(Note: Error #1 was fixed by `orchestrator-meta-agent` during this pass)*
+No hay errores de compilación actualmente.
 
 ## Estado por Módulo
 | Módulo | Estado | Notas |
 |---|---|---|
-| Boot | ❌ NO ARRANCA | Crash en QEMU (iothread assertion / triple fault) post `hal_init()` -> `PIT configurado`. |
-| PMM/VMM/Heap | ⚠️ UNKNOWN | Bloqueado por error de boot. |
-| Scheduler | ⚠️ UNKNOWN | Bloqueado por error de boot. |
-| VFS | ⚠️ UNKNOWN | Bloqueado por error de boot. |
-| Syscalls | ⚠️ UNKNOWN | Bloqueado por error de boot. |
-| Linux ABI | ⚠️ UNKNOWN | Bloqueado por error de boot. |
-| Red/Sockets | ⚠️ UNKNOWN | Bloqueado por error de boot. |
-| Userspace/LibC | ⚠️ UNKNOWN | Bloqueado por error de boot. |
-| Tests | ⚠️ UNKNOWN | Bloqueado por error de boot. |
+| Boot | ✅ FUNCIONAL | Kernel bootea correctamente. |
+| PMM/VMM/Heap | ✅ FUNCIONAL | Mapea memoria física y virtual, Heap inicializado dinámicamente (96MB). |
+| Scheduler | ✅ FUNCIONAL | Context switch corregido. Crash Exception 6 (#UD) solucionado (TSS RSP0 fixed). |
+| VFS | ✅ FUNCIONAL | Initrd montado correctamente con 8 archivos encontrados. |
+| Syscalls | ✅ FUNCIONAL | Test userland ejecuta fork() y execve() exitosamente. |
+| Linux ABI | ⚠️ PARCIAL | Carga ELF básicos (test.elf). Carga sh.elf fallida por no encontrarse en initrd. |
+| Red/Sockets | ⚠️ PARCIAL | Hardware de red E1000 detectado e inicializado. DHCP Discover enviado. |
+| Userspace/LibC | ⚠️ PARCIAL | test.elf en Ring 3 funcional. Faltan aplicaciones POSIX reales. |
+| Tests | ✅ FUNCIONAL | QEMU boot test end-to-end pasa correctamente (no kernel panic). |
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `kernel-stability-boot-bot` — Razón: Solucionar el triple fault/crash en QEMU que ocurre inmediatamente después de configurar el PIT en `hal_init()`.
+1. `userspace-libc-posix-bot` — Razón: Compilar e integrar correctamente `sh.elf` (busybox o shell nativo) dentro del Initrd para proveer una shell funcional en espacio de usuario.
+2. `aether-linux-subsystem-bot` — Razón: Extender syscalls y ABI para soportar `sh.elf` si falla algo durante la ejecución de los comandos shell.
 
 ## Correcciones de Integración Aplicadas
-- Añadido `$(KERNEL_DIR)/arch/x86_64/exceptions.asm` a `KERNEL_ASM_SRCS` en `Makefile` para resolver las referencias indefinidas a `exception_stub_0`, `exception_stub_1`, etc., desde `kernel/arch/x86_64/idt.c`.
+- **TSS RSP0 Context Switch Bug:** Corregido un bug crítico ("Triple Fault / Exception 6 (#UD) después de Timer Interrupt"). `TSS.RSP0` no se actualizaba correctamente al hacer context switch a tareas en Ring 0 (`kernel_stack == 0`), lo que causaba corrupción de pila y un RIP inválido apuntando a la sección `.bss`. Se inicializó el `kernel_stack` para la Tarea 0 (kernel) a `0x7FF000` y se eliminó la comprobación condicional en `schedule()` para que `tss_set_rsp0(next_task->kernel_stack)` se aplique de forma incondicional, solucionando el crash.
+- **Context Switch Offsets:** Corregido `[gs:56]` a `[gs:72]` (`user_stack_scratch`) en `kernel/arch/x86_64/context_switch.asm` basándose en el tamaño real de `cpu_info_t` (bug "ASM Struct Offset Mismatch").
+- **GDT Flush:** Removido la recarga del registro `gs` en `kernel/arch/x86_64/gdt_flush.asm` para evitar sobrescribir a 0 el MSR de GS Base seteado para SMP per-CPU data.
+- **memcpy undefined variable pattern:** Eliminado variable `pattern` que no estaba definida en el fallback de memcpy (`userspace/libc/src/string.c`).
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
 |-----------|----------|---------|
-| Kernel boota | ❌ | Crash/Triple fault después del PIT. |
-| sh.elf en Ring 3 | ❌ | Boot crash. |
-| busybox ash funciona | ❌ | Boot crash. |
-| Apache httpd sirve HTML | ❌ | Boot crash. |
+| Kernel boota | ✅ | Ninguno. |
+| sh.elf en Ring 3 | ❌ | Falla la búsqueda de `sh.elf` en initrd (no incluido o no compilado). |
+| busybox ash funciona | ❌ | Depende de `sh.elf` (o compilación estática de busybox). |
+| Apache httpd sirve HTML | ❌ | Falta red TCP funcional y soporte avanzado Linux ABI. |

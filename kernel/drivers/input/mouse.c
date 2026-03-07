@@ -47,6 +47,9 @@ static uint8_t mouse_bytes[3];      /* Buffer para los 3 bytes */
 static mouse_callback_t active_callback = (void*)0;
 static uint8_t prev_buttons = 0;
 
+static uint8_t mouse_sensitivity = 1;
+static bool mouse_handedness_left = false;
+
 /* Espera a que el buffer de entrada (0x60) esté vacío para poder escribir */
 static void mouse_wait(uint8_t type) {
     uint32_t timeout = 100000;
@@ -177,20 +180,44 @@ void mouse_process_byte(uint8_t byte) {
             dy = 0;
         }
 
+        /* Apply sensitivity */
+        int32_t final_dx = (int32_t)dx * mouse_sensitivity;
+        int32_t final_dy = (int32_t)dy * mouse_sensitivity;
+
         /* Report to Input System */
-        if (dx != 0) input_mouse_push(EV_REL, REL_X, dx);
-        if (dy != 0) input_mouse_push(EV_REL, REL_Y, -dy); /* Invert Y */
+        if (final_dx != 0) input_mouse_push(EV_REL, REL_X, final_dx);
+        if (final_dy != 0) input_mouse_push(EV_REL, REL_Y, -final_dy); /* Invert Y */
 
         uint8_t buttons = status & 0x07;
 
-        if ((buttons & 1) != (prev_buttons & 1))
-            input_mouse_push(EV_KEY, BTN_LEFT, (buttons & 1));
+        uint8_t left_btn = (buttons & 1) ? 1 : 0;
+        uint8_t right_btn = (buttons & 2) ? 1 : 0;
+        uint8_t middle_btn = (buttons & 4) ? 1 : 0;
 
-        if ((buttons & 2) != (prev_buttons & 2))
-            input_mouse_push(EV_KEY, BTN_RIGHT, (buttons & 2) ? 1 : 0);
+        if (mouse_handedness_left) {
+            uint8_t temp = left_btn;
+            left_btn = right_btn;
+            right_btn = temp;
+        }
 
-        if ((buttons & 4) != (prev_buttons & 4))
-            input_mouse_push(EV_KEY, BTN_MIDDLE, (buttons & 4) ? 1 : 0);
+        uint8_t prev_left = (prev_buttons & 1) ? 1 : 0;
+        uint8_t prev_right = (prev_buttons & 2) ? 1 : 0;
+        uint8_t prev_middle = (prev_buttons & 4) ? 1 : 0;
+
+        if (mouse_handedness_left) {
+            uint8_t temp = prev_left;
+            prev_left = prev_right;
+            prev_right = temp;
+        }
+
+        if (left_btn != prev_left)
+            input_mouse_push(EV_KEY, BTN_LEFT, left_btn);
+
+        if (right_btn != prev_right)
+            input_mouse_push(EV_KEY, BTN_RIGHT, right_btn);
+
+        if (middle_btn != prev_middle)
+            input_mouse_push(EV_KEY, BTN_MIDDLE, middle_btn);
 
         prev_buttons = buttons;
         input_mouse_push(EV_SYN, 0, 0);
@@ -199,7 +226,17 @@ void mouse_process_byte(uint8_t byte) {
         if (active_callback) {
             /* PS/2 Y axis is bottom-to-top usually, but screen is top-to-bottom */
             /* Invertimos DY para que coincida con coordenadas de pantalla */
-            active_callback(dx, -dy, status & 0x07);
+            active_callback(final_dx, -final_dy, status & 0x07);
         }
     }
+}
+
+void mouse_set_sensitivity(uint8_t sens) {
+    if (sens > 0) {
+        mouse_sensitivity = sens;
+    }
+}
+
+void mouse_set_handedness(bool left_handed) {
+    mouse_handedness_left = left_handed;
 }

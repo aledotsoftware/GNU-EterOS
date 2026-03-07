@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h> // Host string.h
+
+#undef assert
 #include <assert.h> // Host assert.h
 
 // Rename userspace functions to avoid conflicts
@@ -95,8 +97,46 @@ void test_memmove() {
     printf("memmove correctness tests passed!\n");
 }
 
+void test_strncpy();
 int main() {
     test_strlen();
     test_memmove();
+    test_strncpy();
     return 0;
+}
+
+void test_strncpy() {
+    char dest[20];
+    const char *src = "hello";
+
+    // Normal copy
+    memset(dest, 'A', sizeof(dest));
+    char *res = strncpy(dest, src, 5);
+    assert(res == dest);
+    assert(strncmp(dest, "hello", 5) == 0);
+    assert(dest[5] == 'A'); // No null padding because n=5
+
+    // Copy with null padding
+    memset(dest, 'A', sizeof(dest));
+    strncpy(dest, src, 10);
+    assert(strncmp(dest, "hello\0\0\0\0\0", 10) == 0);
+    assert(dest[10] == 'A'); // Unmodified
+
+    // Truncated copy
+    memset(dest, 'A', sizeof(dest));
+    strncpy(dest, src, 3);
+    assert(strncmp(dest, "hel", 3) == 0);
+    assert(dest[3] == 'A'); // Unmodified
+
+    // Zero length
+    memset(dest, 'A', sizeof(dest));
+    strncpy(dest, src, 0);
+    assert(dest[0] == 'A'); // Unmodified
+
+    printf("strncpy correctness tests passed!\n");
+}
+
+void eteros_assert_fail(const char *expr, const char *file, int line, const char *func) {
+    fprintf(stderr, "Assertion failed: %s at %s:%d in %s\n", expr, file, line, func);
+    exit(1);
 }

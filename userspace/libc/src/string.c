@@ -70,6 +70,28 @@ void *memset(void *s, int c, size_t n) {
     size_t qwords = n / 8;
     size_t remainder = n % 8;
 
+    /* ⚡ BOLT Optimization: Fast path for small blocks (< 64 bytes) to avoid
+       the setup overhead of the `rep` microcode on modern x86_64. */
+    if (n < 64) {
+        uint8_t *d = (uint8_t *)s;
+        while (n >= 8) {
+            *(uint64_t *)d = pattern;
+            d += 8; n -= 8;
+        }
+        if (n >= 4) {
+            *(uint32_t *)d = (uint32_t)pattern;
+            d += 4; n -= 4;
+        }
+        if (n >= 2) {
+            *(uint16_t *)d = (uint16_t)pattern;
+            d += 2; n -= 2;
+        }
+        if (n) {
+            *d = (uint8_t)pattern;
+        }
+        return original_dest;
+    }
+
     __asm__ volatile (
         "cld\n\t"
         "rep stosq\n\t"
@@ -190,9 +212,59 @@ size_t strlen(const char *s) {
 }
 
 size_t strnlen(const char *s, size_t maxlen) {
+#ifdef __x86_64__
+    const char *char_ptr = s;
+    const uint64_t *longword_ptr;
+    uint64_t longword, himagic, lomagic;
+
+    /* Handle unaligned bytes */
+    while (maxlen > 0 && ((uintptr_t)char_ptr & 7) != 0) {
+        if (*char_ptr == '\0')
+            return char_ptr - s;
+        char_ptr++;
+        maxlen--;
+    }
+
+    /* Process 8 bytes at a time */
+    longword_ptr = (const uint64_t*)char_ptr;
+    himagic = 0x8080808080808080ULL;
+    lomagic = 0x0101010101010101ULL;
+
+    /* ⚡ BOLT Optimization: SWAR (SIMD Within A Register) for strnlen.
+       Process 8 bytes at a time to drastically reduce loop iterations.
+       This significantly speeds up strncpy, strlcat, and strlcpy. */
+    while (maxlen >= 8) {
+        longword = *longword_ptr++;
+
+        if (((longword - lomagic) & ~longword & himagic) != 0) {
+            const char* cp = (const char*)(longword_ptr - 1);
+            if (cp[0] == 0) return cp - s;
+            if (cp[1] == 0) return cp - s + 1;
+            if (cp[2] == 0) return cp - s + 2;
+            if (cp[3] == 0) return cp - s + 3;
+            if (cp[4] == 0) return cp - s + 4;
+            if (cp[5] == 0) return cp - s + 5;
+            if (cp[6] == 0) return cp - s + 6;
+            if (cp[7] == 0) return cp - s + 7;
+        }
+        maxlen -= 8;
+    }
+
+    /* Handle remaining bytes */
+    char_ptr = (const char*)longword_ptr;
+    while (maxlen > 0) {
+        if (*char_ptr == '\0')
+            return char_ptr - s;
+        char_ptr++;
+        maxlen--;
+    }
+
+    return char_ptr - s;
+#else
     size_t i;
     for (i = 0; i < maxlen && s[i]; i++);
     return i;
+#endif
 }
 
 int strcmp(const char *s1, const char *s2) {
@@ -251,9 +323,13 @@ int strncmp(const char *s1, const char *s2, size_t n) {
 }
 
 char *strncpy(char *dest, const char *src, size_t n) {
-    char *d = dest;
-    while (n && (*d++ = *src++)) n--;
-    while (n--) *d++ = '\0';
+    /* ⚡ BOLT Optimization: Leverage strnlen and block memory operations (memcpy/memset)
+       instead of a slow byte-by-byte copy loop. */
+    size_t len = strnlen(src, n);
+    memcpy(dest, src, len);
+    if (len < n) {
+        memset(dest + len, 0, n - len);
+    }
     return dest;
 }
 

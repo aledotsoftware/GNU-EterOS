@@ -11,6 +11,7 @@
 #include "../../../include/serial.h"
 #include "../../../include/mm.h"
 #include "../../../include/string.h"
+#include "../../../include/vmm.h"
 #include "../../../include/pmm.h"
 #include "../../../include/io.h"
 #include "../../../include/timer.h"
@@ -177,6 +178,12 @@ int e1000_init(pci_device_t* pci_dev_ptr) {
     bar0 &= 0xFFFFFFF0;
     
     mmio_base = (uint8_t*)(uintptr_t)bar0;
+    
+    /* Map 128KB of MMIO Space (32 pages x 4KB) */
+    for (int i = 0; i < 32; i++) {
+        vmm_map_page(bar0 + i * 4096, bar0 + i * 4096, PAGE_PRESENT | PAGE_WRITE | PAGE_PCD | PAGE_PWT);
+    }
+    
     e1000_active = 1;
     
     serial_write_string("[E1000] MMIO Base: 0x");

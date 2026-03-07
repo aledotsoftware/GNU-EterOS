@@ -73,14 +73,50 @@ static const char scancode_to_ascii_shift[128] = {
     0,    ' ',  0,    0,    0,    0,    0,    0,        /* 0x38-0x3F */
 };
 
+/* Scancodes normales (sin Shift) - ES (Spanish) */
+static const char scancode_to_ascii_es[128] = {
+    0,    27,   '1',  '2',  '3',  '4',  '5',  '6',    /* 0x00-0x07 */
+    '7',  '8',  '9',  '0',  '\'', 173,  '\b', '\t',   /* 0x08-0x0F  (173 = ¡) */
+    'q',  'w',  'e',  'r',  't',  'y',  'u',  'i',    /* 0x10-0x17 */
+    'o',  'p',  '`',  '+',  '\n', 0,    'a',  's',    /* 0x18-0x1F */
+    'd',  'f',  'g',  'h',  'j',  'k',  'l',  164,    /* 0x20-0x27  (164 = ñ) */
+    '{',  '|',  0,    '}',  'z',  'x',  'c',  'v',    /* 0x28-0x2F */
+    'b',  'n',  'm',  ',',  '.',  '-',  0,    '*',    /* 0x30-0x37 */
+    0,    ' ',  0,    0,    0,    0,    0,    0,      /* 0x38-0x3F */
+    0,    0,    0,    0,    0,    0,    0,    0,      /* 0x40-0x47 */
+    0,    0,    '-',  0,    0,    0,    '+',  0,      /* 0x48-0x4F */
+    0,    0,    0,    0,    0,    0,    0,    0,      /* 0x50-0x57 */
+    0,    0,    0,    0,    0,    0,    0,    0,      /* 0x58-0x5F */
+};
+
+/* Scancodes con Shift presionado - ES (Spanish) */
+static const char scancode_to_ascii_shift_es[128] = {
+    0,    27,   '!',  '"',  '#',  '$',  '%',  '&',    /* 0x00-0x07 */
+    '/',  '(',  ')',  '=',  '?',  168,  '\b', '\t',   /* 0x08-0x0F  (168 = ¿) */
+    'Q',  'W',  'E',  'R',  'T',  'Y',  'U',  'I',    /* 0x10-0x17 */
+    'O',  'P',  '^',  '*',  '\n', 0,    'A',  'S',    /* 0x18-0x1F */
+    'D',  'F',  'G',  'H',  'J',  'K',  'L',  165,    /* 0x20-0x27  (165 = Ñ) */
+    '[',  ']',  0,    '\\', 'Z',  'X',  'C',  'V',    /* 0x28-0x2F */
+    'B',  'N',  'M',  ';',  ':',  '_',  0,    '*',    /* 0x30-0x37 */
+    0,    ' ',  0,    0,    0,    0,    0,    0,      /* 0x38-0x3F */
+};
+
+static const char* current_map = scancode_to_ascii;
+static const char* current_map_shift = scancode_to_ascii_shift;
+
 /* ========================================================================= */
 /* Procesamiento de Scancodes                                                */
 /* ========================================================================= */
+
+#include <gfx/window.h>
 
 /* Estado para scancodes extendidos (prefijo 0xE0) */
 static volatile bool extended_scancode = false;
 
 void keyboard_process_scancode(uint8_t scancode) {
+    /* Wake up the compositor on input */
+    compositor_wake();
+
     /* Detectar prefijo de scancode extendido */
     if (scancode == 0xE0) {
         extended_scancode = true;
@@ -175,9 +211,9 @@ void keyboard_process_scancode(uint8_t scancode) {
     /* Obtener el carácter ASCII */
     char c;
     if (shift_pressed) {
-        c = scancode_to_ascii_shift[scancode];
+        c = current_map_shift[scancode];
     } else {
-        c = scancode_to_ascii[scancode];
+        c = current_map[scancode];
     }
 
     /* Aplicar Caps Lock solo a letras */
@@ -206,6 +242,31 @@ void keyboard_process_scancode(uint8_t scancode) {
 /* API Pública                                                               */
 /* ========================================================================= */
 
+static void kb_wait(uint8_t type) {
+    uint32_t timeout = 100000;
+    if (type == 0) {
+        /* Wait for data (Bit 0 = 1) */
+        while (timeout--) {
+            if ((inb(KB_STATUS_PORT) & 1) == 1) return;
+        }
+    } else {
+        /* Wait for buffer empty (Bit 1 = 0) */
+        while (timeout--) {
+            if ((inb(KB_STATUS_PORT) & 2) == 0) return;
+        }
+    }
+}
+
+static void kb_write(uint8_t data) {
+    kb_wait(1);
+    outb(KB_DATA_PORT, data);
+}
+
+static uint8_t kb_read(void) {
+    kb_wait(0);
+    return inb(KB_DATA_PORT);
+}
+
 void keyboard_init(void) {
     kb_write_pos = 0;
     kb_read_pos  = 0;
@@ -231,4 +292,26 @@ char keyboard_getchar(void) {
     char c = kb_buffer[kb_read_pos];
     kb_read_pos = (kb_read_pos + 1) % KB_BUFFER_SIZE;
     return c;
+}
+
+void keyboard_set_layout(int layout) {
+    /* 0 = EN (US), 1 = ES */
+    if (layout == 1) {
+        current_map = scancode_to_ascii_es;
+        current_map_shift = scancode_to_ascii_shift_es;
+    } else {
+        current_map = scancode_to_ascii;
+        current_map_shift = scancode_to_ascii_shift;
+    }
+}
+
+void keyboard_set_typematic(uint8_t delay, uint8_t rate) {
+    /* delay: 0-3 (250ms - 1000ms), rate: 0-31 (30Hz - 2Hz) */
+    uint8_t byte = (delay << 5) | (rate & 0x1F);
+
+    kb_write(0xF3); // Set typematic rate and delay command
+    kb_read();      // Wait for ACK (0xFA)
+
+    kb_write(byte);
+    kb_read();      // Wait for ACK
 }

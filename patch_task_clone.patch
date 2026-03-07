@@ -1,0 +1,183 @@
+--- kernel/task.c
++++ kernel/task.c
+@@ -14,6 +14,7 @@
+ #include "../include/elf.h"
+ #include "../include/errno.h"
+ #include "../include/fcntl.h"
++#include "../include/sched.h"
+
+ extern void fork_return(void);
+
+@@ -242,6 +243,9 @@
+     tasks[0].id = next_id++;
+     tasks[0].parent_id = 0;
++    tasks[0].tgid = tasks[0].id;
++    tasks[0].group_leader = &tasks[0];
++    tasks[0].clear_child_tid = NULL;
+     tasks[0].state = TASK_RUNNING;
+     tasks[0].stack_base = NULL;  /* El kernel ya tiene su stack */
+     tasks[0].rsp = 0;            /* Se llenará en el primer context_switch */
+@@ -311,6 +315,9 @@
+     /* Inicializar tarea Idle para este CPU */
+     tasks[slot].id = next_id++;
+     tasks[slot].parent_id = 0;
++    tasks[slot].tgid = tasks[slot].id;
++    tasks[slot].group_leader = &tasks[slot];
++    tasks[slot].clear_child_tid = NULL;
+     tasks[slot].state = TASK_RUNNING; /* Ya está corriendo */
+     tasks[slot].stack_base = NULL;    /* Usa el stack del AP init */
+     tasks[slot].rsp = 0;
+@@ -390,6 +397,9 @@
+     tasks[slot].id = next_id++;
+     tasks[slot].parent_id = 0;
++    tasks[slot].tgid = tasks[slot].id;
++    tasks[slot].group_leader = &tasks[slot];
++    tasks[slot].clear_child_tid = NULL;
+     tasks[slot].state = TASK_READY;
+     tasks[slot].stack_base = stack;
+     tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
+@@ -836,6 +846,9 @@
+     /* 3. Setup Child Task */
+     tasks[slot].id = next_id++;
+     tasks[slot].parent_id = task_get_current()->id;
++    tasks[slot].tgid = tasks[slot].id;
++    tasks[slot].group_leader = &tasks[slot];
++    tasks[slot].clear_child_tid = NULL;
+     tasks[slot].state = TASK_READY;
+     tasks[slot].stack_base = stack;
+     tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
+@@ -922,6 +935,134 @@
+     return tasks[slot].id;
+ }
+
++int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs_ptr) {
++    struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;
++
++    __asm__ volatile("cli");
++    spin_lock(&sched_lock);
++
++    if (task_count >= MAX_TASKS) {
++        spin_unlock(&sched_lock);
++        __asm__ volatile("sti");
++        return -1;
++    }
++    int slot = find_free_slot();
++    if (slot == -1) {
++        spin_unlock(&sched_lock);
++        __asm__ volatile("sti");
++        return -1;
++    }
++
++    uint8_t* stack = (uint8_t*)alloc_kernel_stack(slot);
++    if (!stack) {
++        task_bitmap &= ~(1ULL << slot);
++        spin_unlock(&sched_lock);
++        __asm__ volatile("sti");
++        return -1;
++    }
++
++    task_t* parent = task_get_current();
++
++    tasks[slot].id = next_id++;
++    tasks[slot].parent_id = parent->id;
++
++    if (clone_flags & CLONE_THREAD) {
++        tasks[slot].tgid = parent->tgid;
++        tasks[slot].group_leader = parent->group_leader;
++    } else {
++        tasks[slot].tgid = tasks[slot].id;
++        tasks[slot].group_leader = &tasks[slot];
++    }
++
++    if (clone_flags & CLONE_CHILD_CLEARTID) {
++        tasks[slot].clear_child_tid = child_tid;
++    } else {
++        tasks[slot].clear_child_tid = NULL;
++    }
++
++    tasks[slot].state = TASK_READY;
++    tasks[slot].stack_base = stack;
++    tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
++
++    if (clone_flags & CLONE_VM) {
++        tasks[slot].cr3 = parent->cr3;
++    } else {
++        tasks[slot].cr3 = vmm_clone_pml4(1);
++    }
++
++    strlcpy(tasks[slot].name, parent->name, sizeof(tasks[slot].name));
++    strlcpy(tasks[slot].executable_path, parent->executable_path, sizeof(tasks[slot].executable_path));
++
++    if (clone_flags & CLONE_FILES) {
++        /* Warning: In a real system, CLONE_FILES shares the fd_table array.
++           Since our fd_table is inline in task_t, modifying it in one thread won't affect the other
++           if they are physically different arrays. But we copy it to start.
++           Proper sharing requires fd_table to be a pointer to a refcounted struct.
++           For now we just copy it but don't deeply share state mutations. */
++    }
++    memcpy(tasks[slot].fd_table, parent->fd_table, sizeof(parent->fd_table));
++    for (int i = 0; i < MAX_FD; i++) {
++        if (tasks[slot].fd_table[i].node) {
++            __atomic_fetch_add(&tasks[slot].fd_table[i].node->ref_count, 1, __ATOMIC_SEQ_CST);
++        }
++    }
++
++    if (clone_flags & CLONE_FS) {
++        /* Same caveat as CLONE_FILES */
++    }
++    strlcpy(tasks[slot].cwd, parent->cwd, sizeof(tasks[slot].cwd));
++    tasks[slot].cwd_node = parent->cwd_node;
++    if (tasks[slot].cwd_node) __atomic_fetch_add(&tasks[slot].cwd_node->ref_count, 1, __ATOMIC_SEQ_CST);
++
++    if (clone_flags & CLONE_SIGHAND) {
++        /* Same caveat as CLONE_FILES */
++    }
++    tasks[slot].signal_mask = parent->signal_mask;
++    memcpy(tasks[slot].signal_handlers, parent->signal_handlers, sizeof(parent->signal_handlers));
++    memcpy(tasks[slot].signal_restorers, parent->signal_restorers, sizeof(parent->signal_restorers));
++    memcpy(tasks[slot].signal_flags, parent->signal_flags, sizeof(parent->signal_flags));
++
++    tasks[slot].brk = parent->brk;
++
++    if (clone_flags & CLONE_SETTLS) {
++        tasks[slot].fs_base = tls;
++    } else {
++        tasks[slot].fs_base = parent->fs_base;
++    }
++
++    tasks[slot].gs_base = parent->gs_base;
++    tasks[slot].os_abi = parent->os_abi;
++    tasks[slot].uid = parent->uid;
++    tasks[slot].gid = parent->gid;
++    tasks[slot].euid = parent->euid;
++    tasks[slot].egid = parent->egid;
++    tasks[slot].user_rsp = stack_top ? stack_top : parent->user_rsp;
++    tasks[slot].mmap_base = parent->mmap_base;
++
++    if (clone_flags & CLONE_PARENT_SETTID) {
++        if (parent_tid) {
++            *parent_tid = tasks[slot].id;
++        }
++    }
++    if (clone_flags & CLONE_CHILD_SETTID) {
++        if (child_tid) {
++            *child_tid = tasks[slot].id;
++        }
++    }
++
++    uint64_t* sp = (uint64_t*)tasks[slot].kernel_stack;
++    sp = (uint64_t*)((uint8_t*)sp - sizeof(struct syscall_regs));
++    memcpy(sp, regs, sizeof(struct syscall_regs));
++    ((struct syscall_regs*)sp)->rax = 0; /* Child returns 0 */
++    *(--sp) = (uint64_t)fork_return;
++    for(int i=0; i<6; i++) *(--sp) = 0; /* callee-saved */
++    tasks[slot].rsp = (uint64_t)sp;
++
++    if (slot >= task_count) task_count = slot + 1;
++    enqueue_ready(&tasks[slot]);
++    spin_unlock(&sched_lock);
++    __asm__ volatile("sti");
++    return tasks[slot].id;
++}
++
+ int task_waitpid(int pid, int* status, int options) {

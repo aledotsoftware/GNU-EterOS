@@ -100,6 +100,16 @@ static inline void load_cr3(uint64_t pml4_addr) {
 #endif
 }
 
+static inline pt_entry_t* get_active_pml4() {
+    uint64_t cr3_val;
+#ifndef __ETEROS_HOST_TEST__
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3_val));
+#else
+    cr3_val = (uint64_t)pml4;
+#endif
+    return (pt_entry_t*)(cr3_val & PAGE_ADDR_MASK);
+}
+
 /*
  * Obtiene o crea la siguiente tabla en la jerarquía.
  * Si la entrada no existe, asigna una nueva página física del PMM,
@@ -166,7 +176,8 @@ int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 1);
+    pt_entry_t* active_pml4 = get_active_pml4();
+    pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 1);
     if (!pdpt) return -1;
 
     pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 1);
@@ -190,7 +201,8 @@ void vmm_unmap_page(uint64_t virt_addr) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
-    pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
+    pt_entry_t* active_pml4 = get_active_pml4();
+    pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 0);
     if (!pdpt) return;
 
     pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
@@ -198,6 +210,9 @@ void vmm_unmap_page(uint64_t virt_addr) {
 
     pt_entry_t* pt = get_next_table(pd, pd_idx, 0);
     if (!pt) return;
+
+    /* Verificar si la página está presente */
+    if (!(pt[pt_idx] & PAGE_PRESENT)) return;
 
     /* Marcar como no presente */
     pt[pt_idx] = 0;
@@ -211,9 +226,11 @@ uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
     uint64_t pd_idx   = PD_INDEX(virt_addr);
     uint64_t pt_idx   = PT_INDEX(virt_addr);
 
+    pt_entry_t* active_pml4 = get_active_pml4();
+
     /* 1. Walk PML4 */
-    if (!(pml4[pml4_idx] & PAGE_PRESENT)) return 0;
-    pt_entry_t* pdpt = (pt_entry_t*)(pml4[pml4_idx] & PAGE_ADDR_MASK);
+    if (!(active_pml4[pml4_idx] & PAGE_PRESENT)) return 0;
+    pt_entry_t* pdpt = (pt_entry_t*)(active_pml4[pml4_idx] & PAGE_ADDR_MASK);
 
     /* 2. Walk PDPT */
     if (!(pdpt[pdpt_idx] & PAGE_PRESENT)) return 0;
@@ -361,8 +378,9 @@ uint64_t vmm_clone_pml4(int cow) {
     if (!new_pml4) return 0;
     memset(new_pml4, 0, PAGE_SIZE);
 
+    pt_entry_t* active_pml4 = get_active_pml4();
     /* Start recursion from Level 4 */
-    clone_pt_recursive(new_pml4, pml4, 4, cow);
+    clone_pt_recursive(new_pml4, active_pml4, 4, cow);
 
     /* If we modified current tables (CoW), we must flush TLB */
     if (cow) {
@@ -431,7 +449,8 @@ int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
         uint64_t pd_idx   = PD_INDEX(addr);
         uint64_t pt_idx   = PT_INDEX(addr);
 
-        pt_entry_t* pdpt = get_next_table(pml4, pml4_idx, 0);
+        pt_entry_t* active_pml4 = get_active_pml4();
+        pt_entry_t* pdpt = get_next_table(active_pml4, pml4_idx, 0);
         if (!pdpt) return 0;
         pt_entry_t* pd = get_next_table(pdpt, pdpt_idx, 0);
         if (!pd) return 0;
