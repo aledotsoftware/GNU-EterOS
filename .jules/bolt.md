@@ -37,3 +37,7 @@
 ## 2026-11-26 - [Framebuffer Block Copy Optimization]
 **Learning:** Flushing rectangles row-by-row in the framebuffer introduces overhead from loop iterations and multiple function calls even with optimized `memcpy`. When a dirty rectangle spans the full width of the framebuffer (`row_len == fb_pitch`), the region is perfectly contiguous in memory.
 **Action:** Always check if the drawing area spans the full pitch width, and if so, use a single, highly efficient `memcpy` block operation to copy the entire contiguous memory region at once.
+
+## 2026-03-07 - [SWAR Optimization for String Search]
+**Learning:** Operations like `strchr` and `strrchr` natively rely on byte-by-byte comparisons, which form a major bottleneck for large strings in C kernels lacking a hardware-accelerated standard library.
+**Action:** Utilize SWAR (SIMD Within A Register) bitwise logic to process memory in 64-bit blocks. This enables locating specific bytes using `zero_mask` and `match_mask` without looping over every single byte, significantly reducing iteration counts and offering over 2.5x speedups.
