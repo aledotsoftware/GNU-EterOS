@@ -206,17 +206,25 @@ void pmm_init(void) {
 
     /* 4. Marcar regiones críticas como OCUPADAS de nuevo */
     
-    /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel) */
-    pmm_mark_region_used(0x0, 0x100000); 
+    /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel Loader) */
+    pmm_mark_region_used(0x0, 0x100000);
+    if(!pmm_bitmap) serial_write_string("[PMM] ASSERT FAILED: Bitmap is NULL\n");
 
-    /* b) Reservar explícitamente el espacio del Bitmap y RefCounts */
+    /* b) Kernel (ahora en 1MB+) */
+    extern uint8_t _kernel_start, _kernel_end;
+    uint64_t k_start = (uint64_t)&_kernel_start;
+    uint64_t k_end = (uint64_t)&_kernel_end;
+    pmm_mark_region_used(k_start, k_end - k_start);
+
+    /* c) Reservar explícitamente el espacio del Bitmap y RefCounts */
     uint64_t ref_counts_size = total_pages * sizeof(uint16_t);
-    uint64_t pmm_end = (uint64_t)pmm_ref_counts + ref_counts_size;
-    pmm_mark_region_used((uint64_t)pmm_bitmap, pmm_bitmap_size);
-    pmm_mark_region_used((uint64_t)pmm_ref_counts, ref_counts_size);
+    uint64_t p_bitmap = (uint64_t)pmm_bitmap;
+    uint64_t p_ref_counts = (uint64_t)pmm_ref_counts;
+    pmm_mark_region_used(p_bitmap, pmm_bitmap_size);
+    pmm_mark_region_used(p_ref_counts, ref_counts_size);
+    pmm_mark_region_used(0x4000000, 0x1000000); /* Reserve Initrd */
     
-    /* c) Tablas de paginación del bootloader (0x70000-0x76000, ya dentro del 1MB) */
-
+    uint64_t pmm_end = p_ref_counts + ref_counts_size;
     free_mem_start = PAGE_ALIGN_UP(pmm_end);
 
     /* Stats Report */
@@ -272,6 +280,7 @@ static void* pmm_alloc_page_impl(void) {
                      if (pmm_ref_counts) pmm_ref_counts[page] = 1;
                      used_ram += PAGE_SIZE;
                      last_free_idx = page + 1;
+                 if (last_free_idx >= total_pages) last_free_idx = 0;
                      return (void*)(page * PAGE_SIZE);
                  }
                  continue;
@@ -292,6 +301,7 @@ static void* pmm_alloc_page_impl(void) {
             if (pmm_ref_counts) pmm_ref_counts[page] = 1;
             used_ram += PAGE_SIZE;
             last_free_idx = page + 1;
+                 if (last_free_idx >= total_pages) last_free_idx = 0;
             return (void*)(page * PAGE_SIZE);
         }
     }
@@ -315,6 +325,7 @@ check_wrap:
                  if (pmm_ref_counts) pmm_ref_counts[page] = 1;
                  used_ram += PAGE_SIZE;
                  last_free_idx = page + 1;
+                 if (last_free_idx >= total_pages) last_free_idx = 0;
                  return (void*)(page * PAGE_SIZE);
             } else {
                  /* Partial scan (last word of the loop) */
@@ -327,6 +338,7 @@ check_wrap:
                          if (pmm_ref_counts) pmm_ref_counts[page] = 1;
                          used_ram += PAGE_SIZE;
                          last_free_idx = page + 1;
+                 if (last_free_idx >= total_pages) last_free_idx = 0;
                          return (void*)(page * PAGE_SIZE);
                      }
                  }
@@ -386,6 +398,12 @@ void pmm_free_page(void* addr) {
             /* Still referenced, do not free */
             spin_unlock(&pmm_lock);
             return;
+        } else if (pmm_ref_counts[page_idx] == 0) {
+            if (!bitmap_test(page_idx)) {
+                serial_write_string("[PMM] ERROR: Double free detected!\n");
+                spin_unlock(&pmm_lock);
+                return;
+            }
         }
     }
 

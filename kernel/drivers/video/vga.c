@@ -19,8 +19,8 @@ static size_t   terminal_col;
 static uint8_t  terminal_color;
 static volatile uint16_t* terminal_buffer;
 static bool     use_framebuffer = false;
-static uint32_t fb_fg = 0xFFFFFFFF; // Blanco por defecto
-static uint32_t fb_bg = 0xFF000000; // Negro por defecto
+static uint32_t fb_fg = 0xFF000000; // Negro por defecto
+static uint32_t fb_bg = 0xFFFFFFFF; // Blanco por defecto
 
 /*
  * Hardware Scrolling State
@@ -94,12 +94,6 @@ static void vga_scroll(void) {
     const size_t last_line_offset = (VGA_HEIGHT - 1) * VGA_WIDTH;
     memset16((uint16_t*)(terminal_buffer + last_line_offset), vga_entry(' ', terminal_color), VGA_WIDTH);
 }
-
-/* ========================================================================= */
-/* Funciones Framebuffer (Privadas - Scroll simple)                          */
-/* ========================================================================= */
-// TODO: Implementar scroll real en framebuffer. Por ahora, si llegamos al final, volvemos arriba (wrap).
-// Scroll de 3MB es pesado sin optimización.
 
 /* ========================================================================= */
 /* Implementación de la API pública                                          */
@@ -181,9 +175,6 @@ void terminal_scroll(void) {
 static void _terminal_putchar(char c) {
     if (active_hook) {
         active_hook(c);
-        /* Si hay hook activo, podríamos evitar escribir en pantalla VGA/FB para evitar "doble print" en la ventanita */
-        /* O podemos dejar que pinte en fondo */
-        // return;  <-- Si queremos silenciar el fondo
     }
 
     if (terminal_silent) return;

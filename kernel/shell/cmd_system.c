@@ -52,6 +52,19 @@ void cmd_sysinfo(const char* args) {
     itoa_s(secs % 60, buf, sizeof(buf), 10);
     terminal_write_string(buf);
     terminal_write_string("s\n");
+
+    #include "../../include/nvram.h"
+    uint8_t boot_part = nvram_get_boot_partition();
+    terminal_write_colored("  Boot Slot:    ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string(boot_part == 0 ? "A (Active) / B (Pending)\n" : "B (Active) / A (Pending)\n");
+    terminal_write_colored("  Build Date:   ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string(__DATE__);
+    terminal_write_string(" ");
+    terminal_write_string(__TIME__);
+    terminal_write_string("\n");
+    terminal_write_colored("  Commit Hash:  ", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("5715f15ae4c99ca17e6d3d5a6eb61faaddd05d6c\n");
+
     terminal_write_string("\n");
 }
 
@@ -201,9 +214,9 @@ void cmd_usermode(const char* args) {
     }
 
     /* 3. Map pages as USER (Ring 3 accessible) */
-    /* We assume Identity Mapping for simplicity in this test */
-    uint64_t code_virt = (uint64_t)code_page;
-    uint64_t stack_virt = (uint64_t)stack_page;
+    /* Use addresses above 4GB to avoid colliding with Bootloader's Kernel Huge Pages */
+    uint64_t code_virt = 0x200000000;
+    uint64_t stack_virt = 0x300000000;
 
     /* Ensure pages are mapped with USER flag */
     /* Code page: READ | WRITE | EXEC | USER */

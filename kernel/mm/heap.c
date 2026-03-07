@@ -46,7 +46,8 @@ typedef struct free_node {
 } free_node_t;
 
 static block_header_t* heap_start = NULL;
-static block_header_t* free_list_head = NULL; /* Head of the explicit free list */
+#define NUM_BUCKETS 10
+static block_header_t* free_buckets[NUM_BUCKETS] = {NULL}; /* Heads of the segregated free lists */
 static size_t memory_used = 0;
 static size_t memory_total = 0;
 
@@ -68,6 +69,19 @@ static size_t align(size_t n) {
     return aligned;
 }
 
+static inline int get_bucket_index(size_t size) {
+    if (size <= 32) return 0;
+    if (size <= 64) return 1;
+    if (size <= 128) return 2;
+    if (size <= 256) return 3;
+    if (size <= 512) return 4;
+    if (size <= 1024) return 5;
+    if (size <= 2048) return 6;
+    if (size <= 4096) return 7;
+    if (size <= 8192) return 8;
+    return 9;
+}
+
 static free_node_t* get_free_node(block_header_t* block) {
     return (free_node_t*)((uintptr_t)block + sizeof(block_header_t));
 }
@@ -75,29 +89,31 @@ static free_node_t* get_free_node(block_header_t* block) {
 static void add_to_free_list(block_header_t* block) {
     if (!block || !block->is_free) return;
 
+    int bucket = get_bucket_index(block->size);
     free_node_t* node = get_free_node(block);
 
-    node->next_free = free_list_head;
+    node->next_free = free_buckets[bucket];
     node->prev_free = NULL;
 
-    if (free_list_head) {
-        free_node_t* head_node = get_free_node(free_list_head);
+    if (free_buckets[bucket]) {
+        free_node_t* head_node = get_free_node(free_buckets[bucket]);
         head_node->prev_free = block;
     }
 
-    free_list_head = block;
+    free_buckets[bucket] = block;
 }
 
 static void remove_from_free_list(block_header_t* block) {
     if (!block || !block->is_free) return;
 
+    int bucket = get_bucket_index(block->size);
     free_node_t* node = get_free_node(block);
 
     if (node->prev_free) {
         free_node_t* prev_node = get_free_node(node->prev_free);
         prev_node->next_free = node->next_free;
     } else {
-        free_list_head = node->next_free;
+        free_buckets[bucket] = node->next_free;
     }
 
     if (node->next_free) {
@@ -187,7 +203,9 @@ void mm_init(boot_info_t* boot_info) {
 
     /* Inicializar variables globales */
     heap_start = (block_header_t*)best_start;
-    free_list_head = NULL;
+    for (int i = 0; i < NUM_BUCKETS; i++) {
+        free_buckets[i] = NULL;
+    }
     memory_total = best_size;
 
     /* Configurar bloque inicial */
@@ -233,56 +251,60 @@ static void* _kmalloc_impl(size_t size) {
 
     size_t aligned_size = align(size);
     
-    /* Free List Strategy: O(K) where K is number of free blocks */
-    block_header_t* curr = free_list_head;
+    /* Segregated Free List Strategy: O(1) mostly */
+    int start_bucket = get_bucket_index(aligned_size);
 
-    while (curr) {
-        /* Sanity check */
-        if (!curr->is_free) {
-             /* Should not happen if list maintenance is correct */
-             /* Skip or remove? Safest to just move on for now. */
-             curr = get_free_node(curr)->next_free;
-             continue;
-        }
+    for (int b = start_bucket; b < NUM_BUCKETS; b++) {
+        block_header_t* curr = free_buckets[b];
 
-        if (curr->size >= aligned_size) {
-            /* Found a fit! */
+        while (curr) {
+            /* Sanity check */
+            if (!curr->is_free) {
+                 /* Should not happen if list maintenance is correct */
+                 /* Skip or remove? Safest to just move on for now. */
+                 curr = get_free_node(curr)->next_free;
+                 continue;
+            }
 
-            /* Remove from free list first - we will re-add the remainder if split */
-            remove_from_free_list(curr);
+            if (curr->size >= aligned_size) {
+                /* Found a fit! */
 
-            /* Check if we can split */
-            /* We need enough space for header + data (aligned) + min free block size (sizeof(free_node_t)) */
-            /* align() already ensures minimum size for data is sizeof(free_node_t) */
-            /* So we need: size >= aligned_size + sizeof(block_header_t) + sizeof(free_node_t) */
+                /* Remove from free list first - we will re-add the remainder if split */
+                remove_from_free_list(curr);
 
-            if (curr->size >= aligned_size + sizeof(block_header_t) + sizeof(free_node_t)) {
-                block_header_t* new_block = (block_header_t*)((uintptr_t)curr + 
-                                            sizeof(block_header_t) + aligned_size);
+                /* Check if we can split */
+                /* We need enough space for header + data (aligned) + min free block size (sizeof(free_node_t)) */
+                /* align() already ensures minimum size for data is sizeof(free_node_t) */
+                /* So we need: size >= aligned_size + sizeof(block_header_t) + sizeof(free_node_t) */
 
-                new_block->size = curr->size - aligned_size - sizeof(block_header_t);
-                new_block->is_free = 1;
-                new_block->magic = HEAP_MAGIC;
-                new_block->next = curr->next;
-                new_block->prev = curr;
+                if (curr->size >= aligned_size + sizeof(block_header_t) + sizeof(free_node_t)) {
+                    block_header_t* new_block = (block_header_t*)((uintptr_t)curr +
+                                                sizeof(block_header_t) + aligned_size);
 
-                if (new_block->next) {
-                    new_block->next->prev = new_block;
+                    new_block->size = curr->size - aligned_size - sizeof(block_header_t);
+                    new_block->is_free = 1;
+                    new_block->magic = HEAP_MAGIC;
+                    new_block->next = curr->next;
+                    new_block->prev = curr;
+
+                    if (new_block->next) {
+                        new_block->next->prev = new_block;
+                    }
+
+                    curr->size = aligned_size;
+                    curr->next = new_block;
+
+                    /* Add the new remainder block to the free list */
+                    add_to_free_list(new_block);
                 }
 
-                curr->size = aligned_size;
-                curr->next = new_block;
-
-                /* Add the new remainder block to the free list */
-                add_to_free_list(new_block);
+                curr->is_free = 0;
+                memory_used += curr->size + sizeof(block_header_t);
+                return (void*)((uintptr_t)curr + sizeof(block_header_t));
             }
-            
-            curr->is_free = 0;
-            memory_used += curr->size + sizeof(block_header_t);
-            return (void*)((uintptr_t)curr + sizeof(block_header_t));
-        }
 
-        curr = get_free_node(curr)->next_free;
+            curr = get_free_node(curr)->next_free;
+        }
     }
     
     serial_write_string("[MM] CRITICAL: Out of Memory!\n");
@@ -348,15 +370,17 @@ static void _kfree_impl(void* ptr) {
     if (block->prev && block->prev->is_free) {
         /* Prev is already free, so it should be in the free list.
            We merge 'block' into 'prev'.
-           We do NOT need to add 'block' to free list, and we don't need to change prev's
-           position in the free list.
-           We just update prev's size.
+           Because the size changes, it might belong to a different bucket now.
+           We must remove it from its old bucket and add it back.
         */
+        remove_from_free_list(block->prev);
+
         block->prev->size += sizeof(block_header_t) + block->size;
         block->prev->next = block->next;
         if (block->next) {
             block->next->prev = block->prev;
         }
+        add_to_free_list(block->prev);
     } else {
         /* Only add to free list if we didn't merge into a previous block */
         add_to_free_list(block);

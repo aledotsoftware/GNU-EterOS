@@ -32,6 +32,12 @@ void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t b
 /* Backend para la terminal */
 void terminal_framebuffer_write(const char* data, size_t size);
 
+/* TODO: AetherGraphics Resolution Toggles.
+   Dynamic VBE/GOP resolution change is not currently supported by the
+   underlying driver APIs. Needs implementation in the future.
+   void framebuffer_set_resolution(uint32_t width, uint32_t height);
+*/
+
 /* Acceso directo al buffer (para optimizaciones Omni) */
 uint32_t* framebuffer_get_buffer(void);
 uint32_t framebuffer_get_pitch(void);

@@ -38,6 +38,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_rtc.c kernel/string.c -o tests/t
 ./tests/test_rtc
 rm tests/test_rtc
 
+# Test BCache
+echo "---------------------------------------------------"
+echo "Running test_bcache..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_bcache.c kernel/string.c -o tests/test_bcache
+./tests/test_bcache
+rm tests/test_bcache
+
 # Test FAT32
 echo "---------------------------------------------------"
 echo "Running test_fat32..."
@@ -80,6 +87,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_ip_aton.c kernel/net/core/ip_uti
 ./tests/test_ip_aton
 rm tests/test_ip_aton
 
+# Test Stack Security
+echo "---------------------------------------------------"
+echo "Running test_stack_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude -I. tests/test_stack_security.c -o tests/test_stack_security
+./tests/test_stack_security
+rm tests/test_stack_security
+
 # Test Initrd Overflow
 echo "---------------------------------------------------"
 echo "Running test_initrd_overflow..."
@@ -100,6 +114,25 @@ echo "Running test_mmap_fixed..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_mmap_fixed.c kernel/string.c -o tests/test_mmap_fixed
 ./tests/test_mmap_fixed
 rm tests/test_mmap_fixed
+
+# Test VMM Unmap Page
+echo "---------------------------------------------------"
+echo "Running test_vmm_unmap..."
+# Need to mock the inline assembly for ASAN/Host execution
+cp kernel/mm/vmm.c tests/vmm_mock.c
+sed -i 's/__asm__ volatile("invlpg (%0)" : : "r" (addr) : "memory");/flush_tlb_local_called = true; flush_tlb_addr = addr;/g' tests/vmm_mock.c
+sed -i 's/(void)addr;/flush_tlb_local_called = true; flush_tlb_addr = addr;/g' tests/vmm_mock.c
+sed -i 's/__asm__ volatile("pause");//g' tests/vmm_mock.c
+sed -i 's/__asm__ volatile("mov %0, %%cr3" : : "r" (pml4_addr) : "memory");//g' tests/vmm_mock.c
+sed -i 's/__asm__ volatile("mov %%cr3, %0" : "=r"(current_cr3));//g' tests/vmm_mock.c
+sed -i 's/__asm__ volatile("mov %0, %%cr3" : : "r"(current_cr3) : "memory");//g' tests/vmm_mock.c
+sed -i 's/__asm__ volatile("mov %%cr3, %0" : "=r"(cr3));//g' tests/vmm_mock.c
+sed -i 's/static pt_entry_t\* pml4 = (pt_entry_t\*)BOOT_PML4_ADDR;/pt_entry_t* pml4 = NULL;/g' tests/vmm_mock.c
+sed -i 's|../../include/|../include/|g' tests/vmm_mock.c
+gcc -g -O0 -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vmm_unmap.c -o tests/test_vmm_unmap
+./tests/test_vmm_unmap
+rm tests/test_vmm_unmap
+rm tests/vmm_mock.c
 
 # Test Reclaimer (Disabled - File Missing)
 # echo "---------------------------------------------------"
@@ -122,12 +155,26 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_procfs.c -o tests/test_procfs
 ./tests/test_procfs
 rm tests/test_procfs
 
+# Test DevFS
+echo "---------------------------------------------------"
+echo "Running test_devfs..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_devfs.c kernel/crypto/sha256.c -o tests/test_devfs
+./tests/test_devfs
+rm tests/test_devfs
+
 # Test Framebuffer Scroll
 echo "---------------------------------------------------"
 echo "Running test_framebuffer_scroll..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_framebuffer_scroll.c kernel/drivers/video/font.c -o tests/test_framebuffer_scroll
 ./tests/test_framebuffer_scroll
 rm tests/test_framebuffer_scroll
+
+# Test Sem Logic
+echo "---------------------------------------------------"
+echo "Running test_sem_logic..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sem_logic.c -o tests/test_sem_logic
+./tests/test_sem_logic
+rm tests/test_sem_logic
 
 # Test Sys Open (Security Fix)
 echo "---------------------------------------------------"
@@ -136,7 +183,94 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o te
 ./tests/test_sys_open
 rm tests/test_sys_open
 
+# Test Sys Read/Write Permissions
 echo "---------------------------------------------------"
+echo "Running test_sys_rw_perms..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_rw_perms.c kernel/string.c -o tests/test_sys_rw_perms
+./tests/test_sys_rw_perms
+rm tests/test_sys_rw_perms
+
+# Test Socket Security
+echo "---------------------------------------------------"
+echo "Running test_socket_security..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_socket_security.c kernel/string.c -o tests/test_socket_security
+./tests/test_socket_security
+rm tests/test_socket_security
+
+# Test VFS Readdir
+echo "---------------------------------------------------"
+echo "Running test_vfs_readdir..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_readdir.c -o tests/test_vfs_readdir
+./tests/test_vfs_readdir
+rm tests/test_vfs_readdir
+
+echo "---------------------------------------------------"
+# Test Syscall Dispatch
+
+echo "---------------------------------------------------"
+
+echo "Running test_syscall_dispatch..."
+
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_dispatch.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_dispatch
+
+./tests/test_syscall_dispatch
+
+rm tests/test_syscall_dispatch
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_openat..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_openat.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_openat
+./tests/test_syscall_openat
+rm tests/test_syscall_openat
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_getdents64..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_getdents64.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_getdents64
+./tests/test_syscall_getdents64
+rm tests/test_syscall_getdents64
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_epoll..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_epoll.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_epoll
+./tests/test_syscall_epoll
+rm tests/test_syscall_epoll
+
+echo "---------------------------------------------------"
+echo "---------------------------------------------------"
+
+echo "Running test_syscall_mmap_linux..."
+
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_mmap_linux.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_linux
+
+./tests/test_syscall_mmap_linux
+
+rm tests/test_syscall_mmap_linux
+
+
+echo "Running test_syscall_mmap_fixed..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_mmap_fixed.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_fixed
+./tests/test_syscall_mmap_fixed
+rm tests/test_syscall_mmap_fixed
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_clone..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_clone.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_clone
+./tests/test_syscall_clone
+rm tests/test_syscall_clone
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_pipe2..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_pipe2.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_pipe2
+./tests/test_syscall_pipe2
+rm tests/test_syscall_pipe2
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_rt_sigaction..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_rt_sigaction.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_rt_sigaction
+./tests/test_syscall_rt_sigaction
+rm tests/test_syscall_rt_sigaction
+
+
 echo "All tests passed!"
 
 # Test Omni Gradient Math
@@ -159,3 +293,30 @@ echo "Running test_xtensa_uart..."
 gcc -D__ETEROS_HOST_TEST__ tests/test_xtensa_uart.c -o tests/test_xtensa_uart
 ./tests/test_xtensa_uart
 rm tests/test_xtensa_uart
+
+# Test Sem
+echo "---------------------------------------------------"
+echo "Running test_sem..."
+gcc -D__ETEROS_HOST_TEST__ -Itests/mocks tests/test_sem.c -o tests/test_sem
+./tests/test_sem
+rm tests/test_sem
+
+# Test Bench Draw Window Fastpath
+echo "---------------------------------------------------"
+echo "Running bench_draw_window_fastpath..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_draw_window_fastpath.c -o tests/bench_draw_window_fastpath
+./tests/bench_draw_window_fastpath
+rm tests/bench_draw_window_fastpath
+
+# Test Bench GFX Draw Rect Fastpath
+echo "---------------------------------------------------"
+echo "Running bench_gfx_draw_rect..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_gfx_draw_rect.c -o tests/bench_gfx_draw_rect
+./tests/bench_gfx_draw_rect
+rm tests/bench_gfx_draw_rect
+# Test Bench Gfx Rect Fastpath
+echo "---------------------------------------------------"
+echo "Running bench_gfx_rect..."
+gcc -O3 -D__ETEROS_HOST_TEST__ -Iinclude tests/bench_gfx_rect.c kernel/string.c -o tests/bench_gfx_rect
+./tests/bench_gfx_rect
+rm tests/bench_gfx_rect
