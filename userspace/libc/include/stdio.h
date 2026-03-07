@@ -95,6 +95,8 @@ int eteros_vfprintf(FILE *stream, const char *format, __builtin_va_list ap);
 int eteros_vsprintf(char *str, const char *format, __builtin_va_list ap);
 int eteros_vsnprintf(char *str, size_t size, const char *format, __builtin_va_list ap);
 
+#undef fprintf
+#define fprintf eteros_fprintf
 int eteros_fprintf(FILE *stream, const char *format, ...);
 
 /* File I/O */
