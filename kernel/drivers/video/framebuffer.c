@@ -211,10 +211,14 @@ void framebuffer_clear(uint32_t color) {
             uint8_t g = (color >> 8) & 0xFF;
             uint8_t b = (color) & 0xFF;
             uint16_t c = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
-            for (uint32_t y = 0; y < fb_height; y++) {
-                uint16_t* row = (uint16_t*)((uint8_t*)active_buffer + (y * fb_pitch));
-                for (uint32_t x = 0; x < fb_width; x++) {
-                    row[x] = c;
+
+            /* ⚡ BOLT Optimization: Contiguous memory fast path and memset16 */
+            if (fb_pitch == fb_width * 2) {
+                memset16(active_buffer, c, fb_width * fb_height);
+            } else {
+                for (uint32_t y = 0; y < fb_height; y++) {
+                    uint16_t* row = (uint16_t*)((uint8_t*)active_buffer + (y * fb_pitch));
+                    memset16(row, c, fb_width);
                 }
             }
         } else {
@@ -266,10 +270,17 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
         uint8_t g = (color >> 8) & 0xFF;
         uint8_t b = (color) & 0xFF;
         uint16_t c = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
-        for (uint32_t i = 0; i < h; i++) {
-            uint16_t* row_ptr = (uint16_t*)((uint8_t*)active_buffer + ((y + i) * fb_pitch) + (x * 2));
-            for (uint32_t j = 0; j < w; j++) {
-                *row_ptr++ = c;
+
+        /* ⚡ BOLT Optimization: Hoist row pointer arithmetic out of the loop */
+        uint8_t* base_addr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * 2);
+
+        /* ⚡ BOLT Optimization: Contiguous memory fast path */
+        if (w * 2 == fb_pitch) {
+            memset16((uint16_t*)base_addr, c, w * h);
+        } else {
+            for (uint32_t i = 0; i < h; i++) {
+                memset16((uint16_t*)base_addr, c, w);
+                base_addr += fb_pitch;
             }
         }
     } else {
@@ -314,6 +325,16 @@ void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t b
                 row_ptr[5] = bg;
                 row_ptr[6] = bg;
                 row_ptr[7] = bg;
+            } else if (bits == 0xFF) {
+                /* Fast path for solid rows */
+                row_ptr[0] = fg;
+                row_ptr[1] = fg;
+                row_ptr[2] = fg;
+                row_ptr[3] = fg;
+                row_ptr[4] = fg;
+                row_ptr[5] = fg;
+                row_ptr[6] = fg;
+                row_ptr[7] = fg;
             } else {
                 /* Unroll loop manually for 8 pixels - massive speedup over loops + checks + calls */
                 row_ptr[0] = (bits & 0x80) ? fg : bg;

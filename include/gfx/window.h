@@ -27,6 +27,7 @@ extern uint64_t last_input_ticks;
 extern int dark_mode_enabled;
 
 /* API */
+void flux_set_theme(int is_dark);
 void compositor_wake(void);
 void compositor_init(void);
 window_t* window_create(int32_t x, int32_t y, int32_t width, int32_t height, uint32_t flags);

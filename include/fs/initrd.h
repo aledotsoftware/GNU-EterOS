@@ -27,5 +27,6 @@ typedef struct {
  */
 void* initrd_read_file(const char* name, uint32_t* size);
 void initrd_list_files(void);
+uint32_t initrd_get_size(void);
 
 #endif

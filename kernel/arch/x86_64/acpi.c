@@ -174,10 +174,11 @@ void acpi_poweroff(void) {
     }
 
     /* Out to PM1a control block */
-    outw(fadt->pm1a_control_block, 0x2000);
+    /* SLP_EN (bit 13) | SLP_TYPa = 5 (bits 10-12) */
+    outw(fadt->pm1a_control_block, 0x2000 | (5 << 10));
 
     if (fadt->pm1b_control_block) {
-        outw(fadt->pm1b_control_block, 0x2000);
+        outw(fadt->pm1b_control_block, 0x2000 | (5 << 10));
     }
 
     serial_write_string("[ACPI] Poweroff signal sent.\n");

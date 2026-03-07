@@ -72,36 +72,178 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
         return NULL;
     }
 
-    /* Provide a dummy image buffer filled with a recognizable pattern since we don't have zlib */
+    if (width > 4096 || height > 4096) {
+         serial_write_string("[PNG] Dimensions too large for native decoder.\n");
+         return NULL;
+    }
+
     png_image_t* img = (png_image_t*)kmalloc(sizeof(png_image_t));
     if (!img) return NULL;
 
     img->width = width;
     img->height = height;
-
-    /* Avoid allocating massive buffers if the dimensions are garbage/huge */
-    if (width > 4096 || height > 4096) {
-         serial_write_string("[PNG] Dimensions too large for native decoder.\n");
-         kfree(img);
-         return NULL;
-    }
-
     img->pixels = (uint32_t*)kmalloc(width * height * 4);
     if (!img->pixels) {
         kfree(img);
         return NULL;
     }
 
-    /* Fill with a simple fallback gradient/color so it "works" visually */
-    for (uint32_t y = 0; y < height; y++) {
-        for (uint32_t x = 0; x < width; x++) {
-            uint8_t r = (x * 255) / width;
-            uint8_t g = (y * 255) / height;
-            uint8_t b = 128;
-            img->pixels[y * width + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
+    /* We need to extract the IDAT payload and uncompress it */
+    /* Allocate a buffer for the entire IDAT payload */
+    uint32_t max_idat_size = size; /* Overshoot, max possible is size of file */
+    uint8_t* idat_payload = (uint8_t*)kmalloc(max_idat_size);
+    if (!idat_payload) {
+        kfree(img->pixels);
+        kfree(img);
+        return NULL;
+    }
+
+    uint32_t idat_len = 0;
+    offset = 8;
+    while (offset + 8 < size) {
+        uint32_t chunk_len = get_be32(data + offset);
+        const char* chunk_type = (const char*)(data + offset + 4);
+        if (offset + 12 + chunk_len > size) break;
+
+        if (memcmp(chunk_type, "IDAT", 4) == 0) {
+            if (idat_len + chunk_len > max_idat_size) {
+                 break; /* Buffer overflow protection */
+            }
+            memcpy(idat_payload + idat_len, data + offset + 8, chunk_len);
+            idat_len += chunk_len;
+        } else if (memcmp(chunk_type, "IEND", 4) == 0) {
+            break;
+        }
+        offset += chunk_len + 12;
+    }
+
+    if (idat_len == 0) {
+        serial_write_string("[PNG] No IDAT data found.\n");
+        kfree(idat_payload);
+        kfree(img->pixels);
+        kfree(img);
+        return NULL;
+    }
+
+    /* Expected uncompressed size: (width * bytes_per_pixel + 1) * height */
+    uint32_t bpp = (color_type == 6) ? 4 : ((color_type == 2) ? 3 : 0);
+    if (bpp == 0 || bit_depth != 8) {
+        serial_write_string("[PNG] Only 8-bit RGB/RGBA supported.\n");
+        kfree(idat_payload);
+        kfree(img->pixels);
+        kfree(img);
+        return NULL;
+    }
+
+    uint32_t expected_size = (width * bpp + 1) * height;
+    uint8_t* uncompressed = (uint8_t*)kmalloc(expected_size);
+    if (!uncompressed) {
+        kfree(idat_payload);
+        kfree(img->pixels);
+        kfree(img);
+        return NULL;
+    }
+
+    /* Parse zlib and deflate (only uncompressed blocks supported) */
+    uint32_t zlib_offset = 0;
+    if (idat_len >= 2) {
+        /* Skip zlib header (2 bytes) */
+        zlib_offset = 2;
+    }
+
+    uint32_t out_len = 0;
+    int bfinal = 0;
+    while (!bfinal && zlib_offset < idat_len) {
+        uint8_t header = idat_payload[zlib_offset++];
+        bfinal = header & 1;
+        uint8_t btype = (header >> 1) & 3;
+
+        if (btype == 0) {
+            /* Uncompressed block */
+            if (zlib_offset + 4 > idat_len) break;
+            uint16_t len = idat_payload[zlib_offset] | (idat_payload[zlib_offset+1] << 8);
+            uint16_t nlen = idat_payload[zlib_offset+2] | (idat_payload[zlib_offset+3] << 8);
+            zlib_offset += 4;
+
+            if (len != (uint16_t)~nlen) {
+                serial_write_string("[PNG] Invalid uncompressed block length.\n");
+                break;
+            }
+
+            if (zlib_offset + len > idat_len || out_len + len > expected_size) {
+                serial_write_string("[PNG] Uncompressed block exceeds bounds.\n");
+                break;
+            }
+
+            memcpy(uncompressed + out_len, idat_payload + zlib_offset, len);
+            out_len += len;
+            zlib_offset += len;
+        } else {
+            serial_write_string("[PNG] Unsupported DEFLATE compression type. Fallback to gradient.\n");
+            out_len = 0; /* Force failure to fallback */
+            break;
         }
     }
 
+    kfree(idat_payload);
+
+    if (out_len != expected_size) {
+        /* Fallback to gradient if not valid uncompressed PNG */
+        for (uint32_t y = 0; y < height; y++) {
+            for (uint32_t x = 0; x < width; x++) {
+                uint8_t r = (x * 255) / width;
+                uint8_t g = (y * 255) / height;
+                uint8_t b = 128;
+                img->pixels[y * width + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
+            }
+        }
+        kfree(uncompressed);
+        return img;
+    }
+
+    /* Apply PNG Filters and convert to ARGB */
+    uint32_t stride = width * bpp;
+    uint8_t* prev_row = NULL;
+
+    for (uint32_t y = 0; y < height; y++) {
+        uint8_t* row = uncompressed + y * (stride + 1);
+        uint8_t filter = row[0];
+        uint8_t* pixels = row + 1;
+
+        for (uint32_t x = 0; x < stride; x++) {
+            uint8_t a = (x >= bpp) ? pixels[x - bpp] : 0;
+            uint8_t b_val = (prev_row) ? prev_row[x] : 0;
+            uint8_t c = (prev_row && x >= bpp) ? prev_row[x - bpp] : 0;
+
+            if (filter == 1) { /* Sub */
+                pixels[x] += a;
+            } else if (filter == 2) { /* Up */
+                pixels[x] += b_val;
+            } else if (filter == 3) { /* Average */
+                pixels[x] += (a + b_val) / 2;
+            } else if (filter == 4) { /* Paeth */
+                int p = a + b_val - c;
+                int pa = p > a ? p - a : a - p;
+                int pb = p > b_val ? p - b_val : b_val - p;
+                int pc = p > c ? p - c : c - p;
+                uint8_t pr = (pa <= pb && pa <= pc) ? a : (pb <= pc ? b_val : c);
+                pixels[x] += pr;
+            }
+        }
+
+        /* Copy to ARGB buffer */
+        for (uint32_t x = 0; x < width; x++) {
+            uint8_t r = pixels[x * bpp];
+            uint8_t g = pixels[x * bpp + 1];
+            uint8_t b = pixels[x * bpp + 2];
+            uint8_t a = (bpp == 4) ? pixels[x * bpp + 3] : 255;
+            img->pixels[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+
+        prev_row = pixels;
+    }
+
+    kfree(uncompressed);
     return img;
 }
 

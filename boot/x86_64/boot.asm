@@ -32,7 +32,7 @@ KERNEL_SECTORS      equ 512            ; Sectores del kernel (256 KB default)
 STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
 TEMP_KERNEL_ADDR    equ 0x56000         ; Buffer temporal bajo 1MB para BIOS
 FINAL_KERNEL_ADDR   equ 0x100000        ; Dirección final en 1MB (donde BSS tiene espacio)
-STACK_TOP           equ 0x7FF000        ; Stack en 8MB (fin del identity mapping)
+STACK_TOP           equ 0x8000000       ; Stack en 128MB (Lejos del heap de 96MB)
 
 ; =============================================================================
 ; Punto de entrada - Stage 1
@@ -747,69 +747,51 @@ protected_mode_start:
     jmp CODE64_SEG:long_mode_start
 
 ; -----------------------------------------------------------------------------
-; setup_page_tables: Configura paginación con identity mapping
-;   Usa páginas de 2 MB (huge pages) para mapear los primeros 8 MB
+; setup_page_tables: Configura paginación con identity mapping (4 GB)
+;   Usa páginas de 2 MB (huge pages) para mapear los primeros 4 GB
 ;
 ;   Estructura:
 ;     PML4[0] → PDPT (en PAGE_TABLE_ADDR + 0x1000)
-;     PDPT[0] → PD   (en PAGE_TABLE_ADDR + 0x2000)
-;     PD[0-3] → 4 páginas de 2 MB cada una = 8 MB
+;     PDPT[0] → PD0  (en PAGE_TABLE_ADDR + 0x2000)
+;     PDPT[1] → PD1  (en PAGE_TABLE_ADDR + 0x3000)
+;     PDPT[2] → PD2  (en PAGE_TABLE_ADDR + 0x4000)
+;     PDPT[3] → PD3  (en PAGE_TABLE_ADDR + 0x5000)
+;     Cada PD (0..3) tiene 512 entradas de 2 MB cada una = 1 GB por PD.
 ; -----------------------------------------------------------------------------
 PAGE_TABLE_ADDR equ 0x0A000             ; Después de Stage 2 y BootInfo
 
 setup_page_tables:
-    ; 1. Limpiar 10 páginas de 4 KB (PML4 + PDPT + 4*PD + 4*PT = 40 KB)
+    ; 1. Limpiar 6 páginas (PML4 + PDPT + 4*PD = 24 KB)
     mov edi, PAGE_TABLE_ADDR
     xor eax, eax
-    mov ecx, (4096 * 10) / 4            ; 40 KB / 4 bytes
+    mov ecx, (4096 * 6) / 4
     rep stosd
 
     ; 2. Configurar PML4[0] → PDPT
-    mov eax, PAGE_TABLE_ADDR + 0x1000   ; Dirección de PDPT
-    or eax, 0x07                        ; Present + Writable + USER
+    mov eax, PAGE_TABLE_ADDR + 0x1000
+    or eax, 0x03                        ; Present + Writable
     mov [PAGE_TABLE_ADDR], eax
 
-    ; 3. Configurar PDPT[0..3] → PD0..PD3 (Mapear 4GB)
-    mov edi, PAGE_TABLE_ADDR + 0x1000   ; PDPT Base
-    mov eax, PAGE_TABLE_ADDR + 0x2000   ; Base del primer PD
-    or eax, 0x07                        ; Present + RW + USER
-    mov ecx, 4                          ; 4 PDs para cubrir 4GB
+    ; 3. Configurar PDPT[0..3] → PD0..PD3 (4 entries = 4 GB)
+    mov edi, PAGE_TABLE_ADDR + 0x1000
+    mov eax, PAGE_TABLE_ADDR + 0x2000
+    mov ecx, 4
 .loop_pdpt:
     mov [edi], eax
-    add edi, 8                          ; Siguiente entrada en PDPT (8 bytes)
-    add eax, 0x1000                     ; Siguiente dirección de tabla PD
-    loop .loop_pdpt
-
-    ; 4. Configurar PD0[0..3] → PT0..PT3 (Primeros 8MB con páginas de 4KB)
-    mov edi, PAGE_TABLE_ADDR + 0x2000   ; Inicio de PD0
-    mov eax, PAGE_TABLE_ADDR + 0x6000   ; Base del primer PT
-    or eax, 0x07                        ; Present + RW + USER
-    mov ecx, 4
-.loop_pd0_pts:
-    mov [edi], eax
+    or dword [edi], 0x03                ; Present + RW
     add edi, 8
     add eax, 0x1000
-    loop .loop_pd0_pts
+    loop .loop_pdpt
 
-    ; 5. Llenar los 4 PTs para mapear los primeros 8MB (4KB pages)
-    mov edi, PAGE_TABLE_ADDR + 0x6000   ; Inicio de PT0
-    mov eax, 0x00000007                 ; Phys 0 + Present + RW + USER (NO bit Huge)
-    mov ecx, 512 * 4                    ; 2048 entradas (8MB / 4KB)
-.loop_pts:
-    mov [edi], eax
-    add edi, 8
-    add eax, 0x1000                     ; Siguiente página fisica (+4KB)
-    loop .loop_pts
-
-    ; 6. Llenar PD0 con Huge Pages (0 a 1GB) - Identity Mapping
+    ; 4. Llenar los 4 PDs (0..3) con entradas Huge (2 MB)
     mov edi, PAGE_TABLE_ADDR + 0x2000
-    mov eax, 0x00000083                 ; Phys 0MB + Present + RW + Huge (2MB)
-    mov ecx, 512                        ; 512 * 2MB = 1GB
-.loop_pd0:
+    mov eax, 0x00000083                 ; Phys 0 + Huge + RW + Present
+    mov ecx, 512 * 4                    ; 2048 entradas de 2 MB = 4 GB
+.loop_pds:
     mov [edi], eax
     add edi, 8
     add eax, 0x200000
-    loop .loop_pd0
+    loop .loop_pds
 
     ret
 
@@ -907,8 +889,8 @@ long_mode_start:
     mov word [abs 0xB800C], 0x2F4B          ; 'K'
 
     ; ---- Saltar al kernel de éterOS ----
-    ; El kernel fue cargado en 0x10000 por Stage 1
-    mov rax, KERNEL_LOAD_ADDR
+    ; El kernel fue reubicado a FINAL_KERNEL_ADDR (0x100000) por Stage 2
+    mov rax, FINAL_KERNEL_ADDR
     call rax
 
     ; Si el kernel retorna, detener la CPU

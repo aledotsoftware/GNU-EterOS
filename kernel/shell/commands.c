@@ -46,6 +46,14 @@ static const shell_command_t commands[] = {
     { "halt",     "Detiene la CPU",                              cmd_halt    },
     { "test_compositor", "Test Basic Compositor",                cmd_test_compositor },
     { "gui_demo", "Test Batch Drawing",                          (cmd_handler_t)gui_demo_run },
+    { "keymap",   "Cambiar distribucion (uso: keymap <en|es>)",  cmd_keymap  },
+    { "typematic","Ajuste de teclado (uso: typematic <d> <r>)",  cmd_typematic },
+    { "mouse",    "Configurar mouse (sens / handed)",            cmd_mouse   },
+    { "storage",  "Estado de almacenamiento / A/B Slots",        cmd_storage },
+    { "time",     "Ver la hora actual del sistema",              cmd_time    },
+    { "timezone", "Configurar zona horaria (offset UTC)",        cmd_timezone},
+    { "ntp",      "Sincronizar RTC via red (NTP)",               cmd_ntp     },
+    { "user",     "Administrar usuarios y seguridad",            cmd_user    },
 };
 
 #define NUM_COMMANDS  (sizeof(commands) / sizeof(commands[0]))
@@ -68,6 +76,29 @@ const char* match_command(const char* input, const char* cmd) {
         return input;
     }
     return (void*)0;
+}
+
+const char* shell_autocomplete(const char* prefix) {
+    if (!prefix || !*prefix) return (void*)0;
+    size_t len = strlen(prefix);
+    const char* match = (void*)0;
+    int matches = 0;
+
+    for (size_t i = 0; i < NUM_COMMANDS; i++) {
+        if (strncmp(prefix, commands[i].name, len) == 0) {
+            match = commands[i].name;
+            matches++;
+        }
+    }
+
+    for (size_t i = 0; i < NUM_APPS; i++) {
+        if (strncmp(prefix, apps[i].name, len) == 0) {
+            match = apps[i].name;
+            matches++;
+        }
+    }
+
+    return (matches == 1) ? match : (void*)0;
 }
 
 void cmd_help(const char* args) {
@@ -108,6 +139,12 @@ void cmd_help(const char* args) {
         terminal_write_string("\n");
     }
 
+    terminal_write_string("\n");
+    terminal_write_colored("  Atajos de teclado:\n", VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    terminal_write_string("    [Tab]      Autocompletar comando\n");
+    terminal_write_string("    [Up/Down]  Navegar historial\n");
+    terminal_write_string("    [Ctrl+L]   Limpiar pantalla\n");
+    terminal_write_string("    [Ctrl+C]   Cancelar linea\n");
     terminal_write_string("\n");
 }
 

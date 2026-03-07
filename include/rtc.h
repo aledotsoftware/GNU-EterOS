@@ -26,9 +26,30 @@ void rtc_init(void);
 void rtc_get_time(rtc_time_t* time);
 
 /**
+ * Escribe una hora en el RTC (en UTC).
+ */
+void rtc_set_time(rtc_time_t* time);
+
+/**
  * Convierte una hora UTC a hora local de Argentina (UTC-3).
  * Maneja correctamente el cambio de día, mes y año.
  */
 void rtc_to_argentina(const rtc_time_t* utc, rtc_time_t* local);
+
+/**
+ * Convierte una hora UTC a la hora local configurada en el sistema.
+ */
+void rtc_get_local_time(const rtc_time_t* utc, rtc_time_t* local);
+
+/**
+ * Configura la zona horaria del sistema.
+ * @param offset Desplazamiento respecto a UTC (ej. -3 para Argentina).
+ */
+void rtc_set_timezone(int8_t offset);
+
+/**
+ * Obtiene la zona horaria actual.
+ */
+int8_t rtc_get_timezone(void);
 
 #endif /* ETEROS_RTC_H */

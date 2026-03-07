@@ -69,7 +69,7 @@ void task_exit(int status) {
 
 void task_yield(void) {}
 void schedule(void) {}
-void context_switch(uint64_t* old, uint64_t new) {}
+void context_switch(uint64_t* old, uint64_t new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 
 void serial_write_string(const char* s) {}
@@ -107,7 +107,6 @@ void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {}
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int unlink_fs(fs_node_t *parent, char *name) { return 0; }
 int ioctl_fs(fs_node_t *node, int request, void *arg) { return 0; }
-int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) { return -1; }
 
 /* Stub MSR functions */
 uint64_t rdmsr(uint32_t msr) { return 0; }
@@ -259,3 +258,4 @@ int main() {
     printf("All permissions logic tests passed!\n");
     return 0;
 }
+int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) { return -1; }

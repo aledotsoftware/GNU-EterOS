@@ -2,6 +2,7 @@
 #include "../../include/keyboard.h"
 #include "../../include/serial.h"
 #include "../../include/string.h"
+#include "../../include/timer.h"
 
 static void shell_print_prompt(void) {
     terminal_write_colored(SHELL_PROMPT, VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
@@ -35,7 +36,9 @@ void shell_run(void) {
                           VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     terminal_write_string("Escribe ");
     terminal_write_colored("help", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    terminal_write_string(" para ver comandos.\n\n");
+    terminal_write_string(" para ver comandos, o usa ");
+    terminal_write_colored("[Tab]", VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    terminal_write_string(" para autocompletar.\n\n");
 
     shell_print_prompt();
 
@@ -44,8 +47,7 @@ void shell_run(void) {
     for (;;) {
         char c = 0;
 
-        /* Add a visual text input affordance (Cursor) */
-        /* Print cursor and immediately move back */
+        /* Add a visual text input affordance (Static Cursor) */
         terminal_putchar('_');
         terminal_putchar('\b');
 
@@ -89,6 +91,20 @@ void shell_run(void) {
             shell_print_prompt();
             history_nav_idx = shell_history_count();
 
+        } else if (c == '\t') {
+            /* ---- Tab: Autocompletar comando ---- */
+            if (pos > 0) {
+                input[pos] = '\0';
+                const char* match = shell_autocomplete(input);
+                if (match) {
+                    shell_replace_line(input, &pos, match);
+                    if (pos < SHELL_MAX_INPUT - 1) {
+                        input[pos++] = ' ';
+                        terminal_putchar(' ');
+                    }
+                }
+            }
+
         } else if (c == '\b') {
             /* ---- Backspace ---- */
             if (pos > 0) {
@@ -126,7 +142,7 @@ void shell_run(void) {
 
         } else if (c == 12) {
             /* ---- Ctrl+L: clear screen ---- */
-            terminal_initialize(NULL);
+            terminal_clear();
             pos = 0;
             shell_print_prompt();
 

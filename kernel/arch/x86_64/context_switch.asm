@@ -17,11 +17,19 @@ global context_switch
 section .text
 
 ; -----------------------------------------------------------------------------
-; context_switch(uint64_t* old_rsp, uint64_t new_rsp)
+; context_switch(uint64_t* old_rsp, uint64_t new_rsp, void* old_fpu, void* new_fpu)
 ;   RDI = puntero donde guardar el RSP actual (de la tarea saliente)
 ;   RSI = RSP de la tarea entrante (a restaurar)
+;   RDX = puntero al buffer FPU (fpu_state) de la tarea saliente
+;   RCX = puntero al buffer FPU (fpu_state) de la tarea entrante
 ; -----------------------------------------------------------------------------
 context_switch:
+    ; Guardar FPU state si old_fpu no es NULL
+    test rdx, rdx
+    jz .skip_fpu_save
+    fxsave [rdx]
+.skip_fpu_save:
+
     ; Guardar registros callee-saved en el stack actual
     push rbp
     push rbx
@@ -43,6 +51,12 @@ context_switch:
     pop r12
     pop rbx
     pop rbp
+
+    ; Restaurar FPU state si new_fpu no es NULL
+    test rcx, rcx
+    jz .skip_fpu_restore
+    fxrstor [rcx]
+.skip_fpu_restore:
 
     ; RET salta a la dirección de retorno que está en el stack de la nueva tarea.
     ; Si la tarea ya corría antes, vuelve a schedule() -> timer ISR -> iretq.
@@ -73,9 +87,9 @@ fork_return:
     pop rbx
     pop rax
 
-    ; Restaurar User Stack Pointer desde Per-CPU Data (offset 56)
-    ; schedule() se aseguró de que gs:56 tenga el user_rsp del hijo.
-    mov rsp, [gs:56]
+    ; Restaurar User Stack Pointer desde Per-CPU Data (offset 72 - user_stack_scratch)
+    ; schedule() se aseguró de que gs:72 tenga el user_rsp del hijo.
+    mov rsp, [gs:72]
 
     ; Restaurar User GS Base
     swapgs

@@ -1,6 +1,7 @@
 #include <fs/vfs.h>
 #include <string.h>
 #include <mm.h>
+#include <serial.h>
 
 #ifndef __ETEROS_HOST_TEST__
 fs_node_t *fs_root = NULL;
@@ -144,6 +145,10 @@ int vfs_mount(const char *path, fs_node_t *fs) {
 
 int vfs_mkdir(const char *path, uint16_t permission) {
     if (!path) return -1;
+    
+    serial_write_string("[VFS] mkdir: ");
+    serial_write_string(path);
+    serial_write_string("\n");
 
     char parent_path[128];
     char name[128];
@@ -176,10 +181,26 @@ int vfs_mkdir(const char *path, uint16_t permission) {
         strlcpy(name, path + last_slash + 1, sizeof(name));
     }
 
+    serial_write_string("      Parent: "); serial_write_string(parent_path);
+    serial_write_string(" Name: "); serial_write_string(name);
+    serial_write_string("\n");
+
     fs_node_t *parent = vfs_lookup(fs_root, parent_path);
-    if (!parent) return -1;
+    if (!parent) {
+        serial_write_string("      ERROR: Parent not found!\n");
+        return -1;
+    }
+
+    serial_write_string("      Parent Node Flags: ");
+    char buf[32]; utoa_hex_s(parent->flags, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("\n");
 
     int ret = mkdir_fs(parent, name, permission);
+    
+    serial_write_string("      mkdir_fs returned: ");
+    itoa_s(ret, buf, sizeof(buf), 10); serial_write_string(buf);
+    serial_write_string("\n");
+
     kfree(parent);
     return ret;
 }

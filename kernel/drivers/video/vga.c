@@ -9,6 +9,7 @@
 #include <vga.h>
 #include <io.h>
 #include <string.h>
+#include <lock.h>
 #include <framebuffer.h>
 
 /* ========================================================================= */
@@ -19,8 +20,8 @@ static size_t   terminal_col;
 static uint8_t  terminal_color;
 static volatile uint16_t* terminal_buffer;
 static bool     use_framebuffer = false;
-static uint32_t fb_fg = 0xFFFFFFFF; // Blanco por defecto
-static uint32_t fb_bg = 0xFF000000; // Negro por defecto
+static uint32_t fb_fg = 0xFFEBEEF0; // Blanco suave (Premium)
+static uint32_t fb_bg = 0xFF0A0E14; // Azul marino profundo (Dark Mode)
 
 /*
  * Hardware Scrolling State
@@ -134,8 +135,10 @@ void terminal_switch_to_framebuffer(boot_info_t* info) {
     if (info->signature != 0x544F424B || info->fb_addr == 0) return;
 
     framebuffer_init(info);
+    framebuffer_enable_double_buffer();
     use_framebuffer = true;
     framebuffer_clear(fb_bg);
+    framebuffer_flush();
 
     /* Re-position cursor to top */
     terminal_row = 0;
@@ -175,9 +178,6 @@ void terminal_scroll(void) {
 static void _terminal_putchar(char c) {
     if (active_hook) {
         active_hook(c);
-        /* Si hay hook activo, podríamos evitar escribir en pantalla VGA/FB para evitar "doble print" en la ventanita */
-        /* O podemos dejar que pinte en fondo */
-        // return;  <-- Si queremos silenciar el fondo
     }
 
     if (terminal_silent) return;
@@ -209,6 +209,16 @@ static void _terminal_putchar(char c) {
                     size_t index = terminal_row * VGA_WIDTH + terminal_col;
                     terminal_buffer[index] = vga_entry(' ', terminal_color);
                 }
+            } else if (terminal_row > 0) {
+                /* Wrap back to previous line */
+                terminal_row--;
+                terminal_col = width - 1;
+                if (use_framebuffer) {
+                     framebuffer_putchar(' ', terminal_col * 8, terminal_row * 16, fb_fg, fb_bg);
+                } else {
+                    size_t index = terminal_row * VGA_WIDTH + terminal_col;
+                    terminal_buffer[index] = vga_entry(' ', terminal_color);
+                }
             }
             break;
         default:
@@ -231,16 +241,32 @@ static void _terminal_putchar(char c) {
     }
 }
 
+static spinlock_t terminal_lock = 0;
+
 void terminal_putchar(char c) {
+    uint64_t flags = irq_save();
+    spin_lock(&terminal_lock);
+    
     _terminal_putchar(c);
-    if (!use_framebuffer) vga_update_cursor();
+    if (!use_framebuffer) {
+        vga_update_cursor();
+    } else {
+        framebuffer_flush();
+    }
+    
+    spin_unlock(&terminal_lock);
+    irq_restore(flags);
 }
 
 void terminal_write_string(const char* str) {
     while (*str) {
         _terminal_putchar(*str++);
     }
-    if (!use_framebuffer) vga_update_cursor();
+    if (!use_framebuffer) {
+        vga_update_cursor();
+    } else {
+        framebuffer_flush();
+    }
 }
 
 void terminal_write_colored(const char* str, vga_color_t fg, vga_color_t bg) {
@@ -253,6 +279,7 @@ void terminal_write_colored(const char* str, vga_color_t fg, vga_color_t bg) {
 void terminal_clear(void) {
     if (use_framebuffer) {
         framebuffer_clear(fb_bg);
+        framebuffer_flush();
     } else {
         vga_buffer_offset = 0;
         vga_set_start_address(0);
@@ -273,5 +300,6 @@ void terminal_set_cursor(size_t x, size_t y) {
         terminal_col = x;
         terminal_row = y;
         if (!use_framebuffer) vga_update_cursor();
+        else framebuffer_flush();
     }
 }

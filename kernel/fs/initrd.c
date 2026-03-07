@@ -291,3 +291,4 @@ void initrd_list_files(void) {
         hal_console_write(" bytes)\n");
     }
 }
+uint32_t initrd_get_size(void) { return initrd_image_size; }

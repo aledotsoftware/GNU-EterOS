@@ -3,10 +3,10 @@ LD = ld
 CFLAGS = -m64 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -Ilibc/include
 LDFLAGS = -T linker.ld -nostdlib -m elf_x86_64
 
-LIBC_SRC = libc/src/start.c libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/stdlib.c libc/src/signal.c
+LIBC_SRC = libc/src/start.c libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/stdlib.c libc/src/signal.c libc/src/sha256.c libc/src/strtok.c
 LIBC_OBJ = $(LIBC_SRC:.c=.o)
 
-all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf
+all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf test_stdio.elf test_malloc.elf test_pthread.elf login.elf passwd.elf useradd.elf userdel.elf sh.elf test_security.elf
 
 libc/src/%.o: libc/src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -47,5 +47,65 @@ test_futex_security.o: test_futex_security.c
 test_futex_security.elf: $(LIBC_OBJ) test_futex_security.o
 	$(LD) $(LDFLAGS) -o test_futex_security.elf $(LIBC_OBJ) test_futex_security.o
 
+test_stdio.o: test_stdio.c
+	$(CC) $(CFLAGS) -c test_stdio.c -o test_stdio.o
+
+test_stdio.elf: $(LIBC_OBJ) test_stdio.o
+	$(LD) $(LDFLAGS) -o test_stdio.elf $(LIBC_OBJ) test_stdio.o
+
+test_malloc.o: test_malloc.c
+	$(CC) $(CFLAGS) -c test_malloc.c -o test_malloc.o
+
+test_malloc.elf: $(LIBC_OBJ) test_malloc.o
+	$(LD) $(LDFLAGS) -o test_malloc.elf $(LIBC_OBJ) test_malloc.o
+
+test_pthread.o: test_pthread.c
+	$(CC) $(CFLAGS) -c test_pthread.c -o test_pthread.o
+
+test_pthread.elf: $(LIBC_OBJ) test_pthread.o
+	$(LD) $(LDFLAGS) -o test_pthread.elf $(LIBC_OBJ) test_pthread.o
+
+login.o: login.c
+	$(CC) $(CFLAGS) -c login.c -o login.o
+
+login.elf: $(LIBC_OBJ) login.o
+	$(LD) $(LDFLAGS) -o login.elf $(LIBC_OBJ) login.o
+
+passwd.o: passwd.c
+	$(CC) $(CFLAGS) -c passwd.c -o passwd.o
+
+passwd.elf: $(LIBC_OBJ) passwd.o
+	$(LD) $(LDFLAGS) -o passwd.elf $(LIBC_OBJ) passwd.o
+
+useradd.o: useradd.c
+	$(CC) $(CFLAGS) -c useradd.c -o useradd.o
+
+useradd.elf: $(LIBC_OBJ) useradd.o
+	$(LD) $(LDFLAGS) -o useradd.elf $(LIBC_OBJ) useradd.o
+
+userdel.o: userdel.c
+	$(CC) $(CFLAGS) -c userdel.c -o userdel.o
+
+userdel.elf: $(LIBC_OBJ) userdel.o
+	$(LD) $(LDFLAGS) -o userdel.elf $(LIBC_OBJ) userdel.o
+
+test_security.o: test_security.c
+	$(CC) $(CFLAGS) -c test_security.c -o test_security.o
+
+test_security.elf: $(LIBC_OBJ) test_security.o
+	$(LD) $(LDFLAGS) -o test_security.elf $(LIBC_OBJ) test_security.o
+
+sh.o: sh.c
+	$(CC) $(CFLAGS) -c sh.c -o sh.o
+
+sh.elf: $(LIBC_OBJ) sh.o
+	$(LD) $(LDFLAGS) -o sh.elf $(LIBC_OBJ) sh.o
+
 clean:
 	rm -f *.o *.elf libc/src/*.o
+
+test_net_echo.o: test_net_echo.c
+	$(CC) $(CFLAGS) -c test_net_echo.c -o test_net_echo.o
+
+test_net_echo.elf: $(LIBC_OBJ) test_net_echo.o
+	$(LD) $(LDFLAGS) -o test_net_echo.elf $(LIBC_OBJ) test_net_echo.o

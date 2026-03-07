@@ -211,19 +211,41 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     itoa_s(vector, buf, sizeof(buf), 10);
     serial_write_string(buf);
     serial_write_string("\n");
-    serial_write_string("RIP: "); utoa_hex_s(frame->rip, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string(" CS: "); utoa_hex_s(frame->cs, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string("\nRFLAGS: "); utoa_hex_s(frame->rflags, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string(" Error: "); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("RIP: 0x"); utoa_hex_s(frame->rip, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" CS: 0x"); utoa_hex_s(frame->cs, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("\nRFLAGS: 0x"); utoa_hex_s(frame->rflags, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" RSP: 0x"); utoa_hex_s(frame->rsp, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" SS: 0x"); utoa_hex_s(frame->ss, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string("\nError Code: 0x"); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
+    if (vector == 14) {
+        uint64_t cr2;
+        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        serial_write_string(" CR2: 0x"); utoa_hex_s(cr2, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" [");
+        serial_write_string((error_code & 1) ? "Present" : "Not Present");
+        serial_write_string((error_code & 2) ? ", Write" : ", Read");
+        serial_write_string((error_code & 4) ? ", User]" : ", Supervisor]");
+    }
     serial_write_string("\nTask: ");
     extern task_t* task_get_current(void);
     task_t* panic_task = task_get_current();
     if (panic_task) {
         serial_write_string(panic_task->name);
-        serial_write_string(" (state=");
-        itoa_s(panic_task->state, buf, sizeof(buf), 10);
+        serial_write_string(" (PID=");
+        itoa_s(panic_task->id, buf, sizeof(buf), 10);
         serial_write_string(buf);
         serial_write_string(")");
+    }
+    serial_write_string("\nStack Trace (RBP chain):\n");
+    uint64_t* rbp;
+    __asm__ volatile("mov %%rbp, %0" : "=r"(rbp));
+    for (int i=0; i<10 && rbp != NULL; i++) {
+        if (!vmm_verify_user_access(rbp, 16, 0)) break; /* Basic check to avoid #PF in walk */
+        uint64_t rip_caller = rbp[1];
+        serial_write_string("  ["); itoa_s(i, buf, sizeof(buf), 10); serial_write_string(buf);
+        serial_write_string("] 0x"); utoa_hex_s(rip_caller, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string("\n");
+        rbp = (uint64_t*)rbp[0];
     }
     serial_write_string("\n");
 
@@ -239,7 +261,14 @@ struct int_regs {
     uint64_t rip, cs, rflags, rsp, ss;
 };
 
+extern void syscall_int80_handler(struct syscall_regs* regs);
+
 void exception_handler_c(struct int_regs *regs) {
+    if (regs->int_no == 128) {
+        syscall_int80_handler((struct syscall_regs*)regs);
+        return;
+    }
+
     struct interrupt_frame frame = {
         .rip = regs->rip,
         .cs = regs->cs,
@@ -273,6 +302,7 @@ extern void exception_stub_18(void);
 extern void exception_stub_19(void);
 extern void exception_stub_20(void);
 extern void exception_stub_21(void);
+extern void exception_stub_128(void);
 
 /* ========================================================================= */
 /* ========================================================================= */
@@ -350,9 +380,9 @@ static void irq_default(struct interrupt_frame *frame) {
 extern volatile uint64_t tlb_flush_addr;
 extern volatile uint64_t tlb_ack_count;
 
-__attribute__((interrupt))
-static void isr_tlb_shootdown(struct interrupt_frame *frame) {
-    (void)frame;
+extern void isr_stub_tlb_shootdown(void);
+
+void isr_tlb_shootdown_c(void) {
     vmm_flush_tlb_local(tlb_flush_addr);
     __sync_fetch_and_add(&tlb_ack_count, 1);
     lapic_eoi();
@@ -386,6 +416,9 @@ void idt_init(void) {
     idt_set_gate(20, (void*)exception_stub_20, IDT_GATE_INTERRUPT);
     idt_set_gate(21, (void*)exception_stub_21, IDT_GATE_INTERRUPT);
 
+    /* Syscall int 0x80 (128) - with DPL=3 to allow userspace calls */
+    idt_set_gate(128, (void*)exception_stub_128, 0xEE);
+
     /* --- Instalar handlers de IRQs (32-47) --- */
     /* Usamos isr_stub_timer (assembly) -> irq_timer_handler (C) */
     idt_set_gate(IRQ_BASE + 0,  (void*)isr_stub_timer,    IDT_GATE_INTERRUPT);
@@ -402,7 +435,7 @@ void idt_init(void) {
     }
 
     /* --- IPI Handlers --- */
-    idt_set_gate(IPI_TLB_SHOOTDOWN, (void*)isr_tlb_shootdown, IDT_GATE_INTERRUPT);
+    idt_set_gate(IPI_TLB_SHOOTDOWN, (void*)isr_stub_tlb_shootdown, IDT_GATE_INTERRUPT);
 
     /* --- LAPIC Timer --- */
     idt_set_gate(LAPIC_TIMER_VECTOR, (void*)isr_stub_lapic_timer, IDT_GATE_INTERRUPT);

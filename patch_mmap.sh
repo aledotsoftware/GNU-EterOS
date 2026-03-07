@@ -1,1 +1,0 @@
-sed -i 's/if (!(flags & 0x20)) return -ENODEV;/fs_node_t* file_node = NULL;\n    if (!(flags \& 0x20)) {\n        if (fd < 0 || fd >= MAX_FD || !current->fd_table[fd].node) return -EBADF;\n        file_node = current->fd_table[fd].node;\n    }/g' kernel/arch/x86_64/syscall.c

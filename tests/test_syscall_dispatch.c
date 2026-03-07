@@ -85,7 +85,6 @@ __attribute__((weak)) int mkdir_fs(fs_node_t *parent, char *name, uint16_t permi
 __attribute__((weak)) int unlink_fs(fs_node_t *parent, char *name) { return -1; }
 __attribute__((weak)) fs_node_t *vfs_lookup(fs_node_t *root, const char *path) { return NULL; }
 __attribute__((weak)) int ioctl_fs(fs_node_t *node, int request, void *arg) { return -1; }
-__attribute__((weak)) int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) { return -1; }
 
 __attribute__((weak)) task_t* task_get_by_id(uint32_t id) { return NULL; }
 __attribute__((weak)) int task_kill(uint32_t pid) { return -1; }
@@ -177,3 +176,4 @@ int main() {
     printf("All tests passed.\n");
     return 0;
 }
+int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) { return -1; }

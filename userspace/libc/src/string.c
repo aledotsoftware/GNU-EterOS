@@ -70,6 +70,28 @@ void *memset(void *s, int c, size_t n) {
     size_t qwords = n / 8;
     size_t remainder = n % 8;
 
+    /* ⚡ BOLT Optimization: Fast path for small blocks (< 64 bytes) to avoid
+       the setup overhead of the `rep` microcode on modern x86_64. */
+    if (n < 64) {
+        uint8_t *d = (uint8_t *)s;
+        while (n >= 8) {
+            *(uint64_t *)d = pattern;
+            d += 8; n -= 8;
+        }
+        if (n >= 4) {
+            *(uint32_t *)d = (uint32_t)pattern;
+            d += 4; n -= 4;
+        }
+        if (n >= 2) {
+            *(uint16_t *)d = (uint16_t)pattern;
+            d += 2; n -= 2;
+        }
+        if (n) {
+            *d = (uint8_t)pattern;
+        }
+        return original_dest;
+    }
+
     __asm__ volatile (
         "cld\n\t"
         "rep stosq\n\t"
@@ -190,9 +212,59 @@ size_t strlen(const char *s) {
 }
 
 size_t strnlen(const char *s, size_t maxlen) {
+#ifdef __x86_64__
+    const char *char_ptr = s;
+    const uint64_t *longword_ptr;
+    uint64_t longword, himagic, lomagic;
+
+    /* Handle unaligned bytes */
+    while (maxlen > 0 && ((uintptr_t)char_ptr & 7) != 0) {
+        if (*char_ptr == '\0')
+            return char_ptr - s;
+        char_ptr++;
+        maxlen--;
+    }
+
+    /* Process 8 bytes at a time */
+    longword_ptr = (const uint64_t*)char_ptr;
+    himagic = 0x8080808080808080ULL;
+    lomagic = 0x0101010101010101ULL;
+
+    /* ⚡ BOLT Optimization: SWAR (SIMD Within A Register) for strnlen.
+       Process 8 bytes at a time to drastically reduce loop iterations.
+       This significantly speeds up strncpy, strlcat, and strlcpy. */
+    while (maxlen >= 8) {
+        longword = *longword_ptr++;
+
+        if (((longword - lomagic) & ~longword & himagic) != 0) {
+            const char* cp = (const char*)(longword_ptr - 1);
+            if (cp[0] == 0) return cp - s;
+            if (cp[1] == 0) return cp - s + 1;
+            if (cp[2] == 0) return cp - s + 2;
+            if (cp[3] == 0) return cp - s + 3;
+            if (cp[4] == 0) return cp - s + 4;
+            if (cp[5] == 0) return cp - s + 5;
+            if (cp[6] == 0) return cp - s + 6;
+            if (cp[7] == 0) return cp - s + 7;
+        }
+        maxlen -= 8;
+    }
+
+    /* Handle remaining bytes */
+    char_ptr = (const char*)longword_ptr;
+    while (maxlen > 0) {
+        if (*char_ptr == '\0')
+            return char_ptr - s;
+        char_ptr++;
+        maxlen--;
+    }
+
+    return char_ptr - s;
+#else
     size_t i;
     for (i = 0; i < maxlen && s[i]; i++);
     return i;
+#endif
 }
 
 int strcmp(const char *s1, const char *s2) {
@@ -245,15 +317,71 @@ int strcmp(const char *s1, const char *s2) {
 }
 
 int strncmp(const char *s1, const char *s2, size_t n) {
-    while (n && *s1 && *s1 == *s2) { s1++; s2++; n--; }
     if (n == 0) return 0;
-    return (int)(unsigned char)*s1 - (int)(unsigned char)*s2;
+
+#ifdef __x86_64__
+    /* ⚡ BOLT Optimization: Compare 8 bytes at a time if pointers are aligned */
+    typedef uint64_t __attribute__((__may_alias__)) u64_alias;
+
+    /* Align s1 to 8 bytes */
+    while (n > 0 && ((uintptr_t)s1 & 7) != 0) {
+        if (*s1 != *s2) {
+            return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+        }
+        if (*s1 == '\0') {
+            return 0;
+        }
+        s1++;
+        s2++;
+        n--;
+    }
+
+    /* If s2 is also aligned, we can do 64-bit comparison */
+    if (n >= 8 && ((uintptr_t)s2 & 7) == 0) {
+        const u64_alias* ls1 = (const u64_alias*)s1;
+        const u64_alias* ls2 = (const u64_alias*)s2;
+        uint64_t v1, v2;
+
+        while (n >= 8) {
+            v1 = *ls1;
+            v2 = *ls2;
+
+            /* Check for null terminator in v1 using standard bit trick:
+             * (v1 - 0x01...) & ~v1 & 0x80... detects zero byte.
+             * Also check if words differ.
+             */
+            if (((v1 - 0x0101010101010101ULL) & ~v1 & 0x8080808080808080ULL) || (v1 != v2)) {
+                /* Mismatch or null terminator found.
+                 * Break to byte loop to find exact location. */
+                break;
+            }
+
+            ls1++;
+            ls2++;
+            n -= 8;
+        }
+        s1 = (const char*)ls1;
+        s2 = (const char*)ls2;
+    }
+#endif
+
+    while (n > 0 && *s1 && (*s1 == *s2)) {
+        s1++;
+        s2++;
+        n--;
+    }
+    if (n == 0) return 0;
+    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
 }
 
 char *strncpy(char *dest, const char *src, size_t n) {
-    char *d = dest;
-    while (n && (*d++ = *src++)) n--;
-    while (n--) *d++ = '\0';
+    /* ⚡ BOLT Optimization: Leverage strnlen and block memory operations (memcpy/memset)
+       instead of a slow byte-by-byte copy loop. */
+    size_t len = strnlen(src, n);
+    memcpy(dest, src, len);
+    if (len < n) {
+        memset(dest + len, 0, n - len);
+    }
     return dest;
 }
 
