@@ -41,15 +41,12 @@ void shell_run(void) {
     terminal_write_string(" para autocompletar.\n\n");
 
     shell_print_prompt();
+    terminal_flush();
 
     history_nav_idx = shell_history_count();
 
     for (;;) {
         char c = 0;
-
-        /* Add a visual text input affordance (Static Cursor) */
-        terminal_putchar('_');
-        terminal_putchar('\b');
 
         /* Esperar input de Teclado O Serial */
         while (1) {
@@ -70,10 +67,6 @@ void shell_run(void) {
             __asm__ volatile("hlt");
         }
 
-        /* Clear the cursor before processing the new character */
-        terminal_putchar(' ');
-        terminal_putchar('\b');
-
         if (c == '\n') {
             /* ---- Enter: procesar comando ---- */
             terminal_write_string("\n");
@@ -89,6 +82,7 @@ void shell_run(void) {
 
             pos = 0;
             shell_print_prompt();
+            terminal_flush();
             history_nav_idx = shell_history_count();
 
         } else if (c == '\t') {
@@ -110,6 +104,7 @@ void shell_run(void) {
             if (pos > 0) {
                 pos--;
                 terminal_putchar('\b');
+                terminal_flush();
             }
 
         } else if ((unsigned char)c == KB_KEY_UP) {
@@ -151,6 +146,7 @@ void shell_run(void) {
             if (pos < SHELL_MAX_INPUT - 1) {
                 input[pos++] = c;
                 terminal_putchar(c);
+                terminal_flush();
             }
         }
         /* Otras teclas especiales (LEFT, RIGHT, etc.) se ignoran por ahora */

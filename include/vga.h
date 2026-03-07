@@ -106,6 +106,11 @@ void terminal_write_colored(const char* str, vga_color_t fg, vga_color_t bg);
 void terminal_clear(void);
 
 /**
+ * Fuerza el volcado del buffer de terminal a la pantalla (Framebuffer flush).
+ */
+void terminal_flush(void);
+
+/**
  * Mueve el cursor a una posición específica.
  */
 void terminal_set_cursor(size_t x, size_t y);

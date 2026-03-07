@@ -243,14 +243,24 @@ static void _terminal_putchar(char c) {
 
 static spinlock_t terminal_lock = 0;
 
+void terminal_flush(void) {
+    if (use_framebuffer) {
+        framebuffer_flush();
+    } else {
+        vga_update_cursor();
+    }
+}
+
 void terminal_putchar(char c) {
     uint64_t flags = irq_save();
     spin_lock(&terminal_lock);
     
     _terminal_putchar(c);
+    
+    /* Auto-flush on newline to keep logs readable, or if using VGA text mode */
     if (!use_framebuffer) {
         vga_update_cursor();
-    } else {
+    } else if (c == '\n') {
         framebuffer_flush();
     }
     

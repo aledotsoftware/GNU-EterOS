@@ -298,8 +298,8 @@ extern const uint8_t font8x16[];
 void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t bg) {
     if (!active_buffer) return;
 
-    /* Clip basic check */
-    if (x >= fb_width || y >= fb_height - 16) return;
+    /* Clip basic check: allow drawing if the character fits within bounds */
+    if (x + 8 > fb_width || y + 16 > fb_height) return;
 
     unsigned char uc = (unsigned char)c;
     const uint8_t* glyph = &font8x16[uc * 16];
