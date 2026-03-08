@@ -337,6 +337,7 @@ userspace:
 	cp userspace/sh.elf $(INITRD_DIR)/
 	cp userspace/test_security.elf $(INITRD_DIR)/
 	cp userspace/test_shm.elf $(INITRD_DIR)/
+	cp userspace/marea_shell.elf $(INITRD_DIR)/
 
 # ---- Initrd ----
 initrd: userspace $(INITRD_IMG)
