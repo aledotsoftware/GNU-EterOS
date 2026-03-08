@@ -11,6 +11,12 @@
 /* Include string implementation (provides eteros_strlen, eteros_strlcpy, eteros_strcmp, etc) */
 #include "../kernel/string.c"
 
+/* Mock framebuffer */
+uint32_t framebuffer_get_width(void) { return 1024; }
+uint32_t framebuffer_get_height(void) { return 768; }
+uint32_t framebuffer_get_bpp(void) { return 32; }
+uint32_t framebuffer_get_pitch(void) { return 1024 * 4; }
+
 /* Mock memory allocation */
 void* kmalloc(size_t size) {
     return malloc(size);

@@ -23,6 +23,18 @@ uint64_t rdmsr(uint32_t msr) { printf("rdmsr(0x%x)\n", msr); return 0; }
 void syscall_entry(void) { printf("syscall_entry referenced\n"); }
 
 /* Mocks for cpu */
+int shmfs_truncate(fs_node_t* node, uint32_t length) { return -1; }
+void pmm_ref_page(void* p) {}
+uint32_t* framebuffer_get_buffer(void) { return NULL; }
+uint32_t framebuffer_get_width(void) { return 0; }
+uint32_t framebuffer_get_height(void) { return 0; }
+uint32_t framebuffer_get_pitch(void) { return 0; }
+uint32_t framebuffer_get_bpp(void) { return 0; }
+void framebuffer_putpixel(uint32_t x, uint32_t y, uint32_t color) {}
+void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color) {}
+void gfx_add_dirty_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {}
+void gfx_present(void) {}
+
 #include "../include/cpu.h"
 #undef get_current_cpu
 cpu_info_t cpu_mock_struct;

@@ -147,6 +147,18 @@ void pmm_free_page(void* p) { free(p); }
 uint64_t hal_mem_get_phys(uint64_t virt) { return virt; }
 int hal_mem_map(uint64_t phys, uint64_t virt, uint32_t flags) { return 0; }
 
+int shmfs_truncate(fs_node_t* node, uint32_t length) { return -1; }
+void pmm_ref_page(void* p) {}
+uint32_t* framebuffer_get_buffer(void) { return NULL; }
+uint32_t framebuffer_get_width(void) { return 0; }
+uint32_t framebuffer_get_height(void) { return 0; }
+uint32_t framebuffer_get_pitch(void) { return 0; }
+uint32_t framebuffer_get_bpp(void) { return 0; }
+void framebuffer_putpixel(uint32_t x, uint32_t y, uint32_t color) {}
+void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color) {}
+void gfx_add_dirty_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {}
+void gfx_present(void) {}
+
 /* Stub APIC */
 void lapic_send_ipi(int id, int vector) {}
 

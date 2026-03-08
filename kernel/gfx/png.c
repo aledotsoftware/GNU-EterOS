@@ -210,24 +210,50 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
         uint8_t filter = row[0];
         uint8_t* pixels = row + 1;
 
-        for (uint32_t x = 0; x < stride; x++) {
-            uint8_t a = (x >= bpp) ? pixels[x - bpp] : 0;
-            uint8_t b_val = (prev_row) ? prev_row[x] : 0;
-            uint8_t c = (prev_row && x >= bpp) ? prev_row[x - bpp] : 0;
-
-            if (filter == 1) { /* Sub */
-                pixels[x] += a;
-            } else if (filter == 2) { /* Up */
-                pixels[x] += b_val;
-            } else if (filter == 3) { /* Average */
-                pixels[x] += (a + b_val) / 2;
-            } else if (filter == 4) { /* Paeth */
-                int p = a + b_val - c;
-                int pa = p > a ? p - a : a - p;
-                int pb = p > b_val ? p - b_val : b_val - p;
-                int pc = p > c ? p - c : c - p;
-                uint8_t pr = (pa <= pb && pa <= pc) ? a : (pb <= pc ? b_val : c);
-                pixels[x] += pr;
+        /* ⚡ BOLT Optimization: Lift invariant branches (filter, prev_row) and bound checks (x >= bpp) out of the inner pixel loop */
+        if (filter == 1) { /* Sub */
+            for (uint32_t x = bpp; x < stride; x++) {
+                pixels[x] += pixels[x - bpp];
+            }
+        } else if (filter == 2) { /* Up */
+            if (prev_row) {
+                for (uint32_t x = 0; x < stride; x++) {
+                    pixels[x] += prev_row[x];
+                }
+            }
+        } else if (filter == 3) { /* Average */
+            if (prev_row) {
+                for (uint32_t x = 0; x < bpp; x++) {
+                    pixels[x] += prev_row[x] / 2;
+                }
+                for (uint32_t x = bpp; x < stride; x++) {
+                    pixels[x] += (pixels[x - bpp] + prev_row[x]) / 2;
+                }
+            } else {
+                for (uint32_t x = bpp; x < stride; x++) {
+                    pixels[x] += pixels[x - bpp] / 2;
+                }
+            }
+        } else if (filter == 4) { /* Paeth */
+            if (prev_row) {
+                for (uint32_t x = 0; x < bpp; x++) {
+                    pixels[x] += prev_row[x]; /* a=0, c=0 => Paeth(0, b, 0) returns b */
+                }
+                for (uint32_t x = bpp; x < stride; x++) {
+                    uint8_t a = pixels[x - bpp];
+                    uint8_t b_val = prev_row[x];
+                    uint8_t c = prev_row[x - bpp];
+                    int p = a + b_val - c;
+                    int pa = p > a ? p - a : a - p;
+                    int pb = p > b_val ? p - b_val : b_val - p;
+                    int pc = p > c ? p - c : c - p;
+                    uint8_t pr = (pa <= pb && pa <= pc) ? a : (pb <= pc ? b_val : c);
+                    pixels[x] += pr;
+                }
+            } else {
+                for (uint32_t x = bpp; x < stride; x++) {
+                    pixels[x] += pixels[x - bpp]; /* b=0, c=0 => Paeth(a, 0, 0) returns a */
+                }
             }
         }
 

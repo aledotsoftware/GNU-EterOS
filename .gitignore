@@ -32,3 +32,7 @@ __pycache__/
 # Node
 web_ui/node_modules/
 tests/bench_gfx_draw_rect
+qemu_test.log
+/qemu_test.log
+/qemu_serial.log
+/qemu_debug.log
