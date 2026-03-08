@@ -24,6 +24,7 @@
 #include <fs/initrd.h>
 #include <fs/vfs.h>
 #include <fs/devfs.h>
+#include <fs/shmfs.h>
 #include <fs/procfs.h>
 #include <fs/jfs.h>
 #include <vga.h>
@@ -185,6 +186,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
                 /* Dynamic Mounts */
                 vfs_mkdir("/dev", 0);
                 vfs_mount("/dev", devfs_init());
+                vfs_mkdir("/dev/shm", 0);
+                vfs_mount("/dev/shm", shmfs_init());
                 vfs_mkdir("/proc", 0);
                 vfs_mount("/proc", procfs_init());
                 vfs_mkdir("/data", 0);
@@ -253,9 +256,9 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     futex_init();
 
     /* ---- 7.5 Lanzar Test de Espacio de Usuario ---- */
-    // hal_console_write("  [INIT] Lanzando User Mode Test...\n");
-    // extern void user_loader_entry(void);
-    // task_create("UserLoader", user_loader_entry);
+    hal_console_write("  [INIT] Lanzando User Mode Test...\n");
+    extern void user_loader_entry(void);
+    task_create("UserLoader", user_loader_entry);
  
     /* ---- 8. Lanzar shell interactivo ---- */
     hal_interrupts_enable();

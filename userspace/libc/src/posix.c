@@ -174,3 +174,78 @@ char *getcwd(char *buf, size_t size) {
     if (ret < 0) { errno = (int)(-ret); return (void*)0; }
     return buf;
 }
+
+/* shm_open() */
+int shm_open(const char *name, int oflag, mode_t mode) {
+    char path[256];
+    if (!name) {
+        errno = EINVAL;
+        return -1;
+    }
+    
+    int i = 0;
+    while (path[i] && i < 255) { path[i] = 0; i++; }
+    
+    char* prefix = "/dev/shm/";
+    int p_idx = 0;
+    while (prefix[p_idx] && p_idx < 255) {
+        path[p_idx] = prefix[p_idx];
+        p_idx++;
+    }
+    
+    /* Skip leading slash on name if present */
+    const char* n_ptr = name;
+    if (n_ptr[0] == '/') n_ptr++;
+    
+    int n_idx = 0;
+    while (n_ptr[n_idx] && (p_idx + n_idx) < 255) {
+        path[p_idx + n_idx] = n_ptr[n_idx];
+        n_idx++;
+    }
+    path[p_idx + n_idx] = '\0';
+    
+    long ret = _syscall3(SYS_open, (long)path, oflag, mode);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return (int)ret;
+}
+
+/* ftruncate() */
+int ftruncate(int fd, int64_t length) {
+    long ret = _syscall2(SYS_ftruncate, fd, length);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return 0;
+}
+
+/* shm_unlink() */
+int shm_unlink(const char *name) {
+    char path[256];
+    if (!name) {
+        errno = EINVAL;
+        return -1;
+    }
+    
+    int i = 0;
+    while (path[i] && i < 255) { path[i] = 0; i++; }
+    
+    char* prefix = "/dev/shm/";
+    int p_idx = 0;
+    while (prefix[p_idx] && p_idx < 255) {
+        path[p_idx] = prefix[p_idx];
+        p_idx++;
+    }
+    
+    /* Skip leading slash on name if present */
+    const char* n_ptr = name;
+    if (n_ptr[0] == '/') n_ptr++;
+    
+    int n_idx = 0;
+    while (n_ptr[n_idx] && (p_idx + n_idx) < 255) {
+        path[p_idx + n_idx] = n_ptr[n_idx];
+        n_idx++;
+    }
+    path[p_idx + n_idx] = '\0';
+    
+    long ret = _syscall1(SYS_unlink, (long)path);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return 0;
+}

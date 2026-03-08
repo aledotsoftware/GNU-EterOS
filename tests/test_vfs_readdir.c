@@ -24,6 +24,7 @@
 typedef int spinlock_t;
 void spin_lock(spinlock_t *lock) { (void)lock; }
 void spin_unlock(spinlock_t *lock) { (void)lock; }
+void serial_write_string(const char* s) { (void)s; }
 
 struct fs_node;
 struct dirent {

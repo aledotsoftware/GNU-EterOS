@@ -864,12 +864,15 @@ int task_fork(void* regs_ptr) {
     tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
 
     /* 4. Clone Address Space (CoW) */
-    /* Use current task's CR3, not necessarily kernel's CR3 */
-    /*
-     * NOTE: Enabling CoW (1) to reduce memory usage.
-     * Ensure vmm_handle_page_fault properly handles CoW faults.
-     */
-    tasks[slot].cr3 = vmm_clone_pml4(1);
+    /* Release lock to avoid deadlock during TLB shootdowns or heavy VM activity */
+    spin_unlock(&sched_lock);
+    __asm__ volatile("sti");
+
+    uint64_t child_cr3 = vmm_clone_pml4(1);
+
+    __asm__ volatile("cli");
+    spin_lock(&sched_lock);
+    tasks[slot].cr3 = child_cr3;
 
     /* 5. Copy Task Struct Fields */
     task_t* parent = task_get_current();
@@ -997,7 +1000,15 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     if (clone_flags & CLONE_VM) {
         tasks[slot].cr3 = parent->cr3;
     } else {
-        tasks[slot].cr3 = vmm_clone_pml4(1);
+        /* Release lock to avoid deadlock during TLB shootdowns or heavy VM activity */
+        spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
+
+        uint64_t child_cr3 = vmm_clone_pml4(1);
+
+        __asm__ volatile("cli");
+        spin_lock(&sched_lock);
+        tasks[slot].cr3 = child_cr3;
     }
 
     strlcpy(tasks[slot].name, parent->name, sizeof(tasks[slot].name));

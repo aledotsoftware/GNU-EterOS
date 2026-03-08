@@ -71,7 +71,7 @@ void vmm_flush_tlb_smp(uint64_t addr) {
     /* Wait for ACKs (Strict Consistency) */
     /* We wait for other cores to acknowledge invalidation. */
     if (expected_acks > 0) {
-        uint64_t timeout = 10000000; /* Increased to 10M cycles for stability on slow VMs */
+        uint64_t timeout = 50000000; /* Increased to 50M cycles for stability on slow VMs */
         while (tlb_ack_count < expected_acks) {
 #ifndef __ETEROS_HOST_TEST__
             __asm__ volatile("pause");
@@ -179,6 +179,10 @@ void vmm_init(void) {
     /* El bootloader ya configuró un Identity Mapping básico (0-4MB o 0-8MB con Huge Pages) */
     /* Por ahora, seguimos usando ese PML4. */
     /* En el futuro, aquí crearíamos un nuevo PML4 limpio y cambiaríamos a él. */
+    
+    /* FIX: El Bootloader no configuró el flag de Usuario en la jerarquía inicial. */
+    /* Necesitamos PAGE_USER en PML4[0] para permitir acceso a las aplicaciones Ring 3 */
+    pml4[0] |= PAGE_USER;
     
     char pml4_addr_buf[32];
     serial_write_string("[VMM] Usando PML4 del bootloader en 0x");

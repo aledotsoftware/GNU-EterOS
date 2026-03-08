@@ -261,6 +261,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\fs\procfs.c",
     "$KERNEL_DIR\fs\bcache.c",
     "$KERNEL_DIR\fs\jfs.c",
+    "$KERNEL_DIR\fs\shmfs.c",
     "$KERNEL_DIR\drivers\disk\partition.c",
     "$KERNEL_DIR\drivers\input\input.c",
     "$KERNEL_DIR\drivers\tty.c",
@@ -460,7 +461,20 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test.elf"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf"
+    # eterland.elf
+    $eterlandSrc = "$userDir\eterland.c"
+    $eterlandObj = "$BUILD_DIR\userspace\eterland.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $eterlandSrc -o $eterlandObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar eterland.c"; exit 1 }
+
+    $eterlandElf = "$initrdRoot\eterland.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $eterlandElf $eterlandObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar eterland.elf"; exit 1 }
+
+    Write-Step "OK" "Userspace construido: $testElf, $eterlandElf"
 }
 
 function Invoke-InitrdBuild {

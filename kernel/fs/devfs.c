@@ -8,6 +8,7 @@
 #include <input/event.h>
 #include <lock.h>
 #include <crypto/sha256.h>
+#include <framebuffer.h>
 
 /* Global root node for DevFS */
 static fs_node_t* devfs_root = NULL;
@@ -196,6 +197,23 @@ static uint32_t dev_random_write(fs_node_t *node, uint32_t offset, uint32_t size
 }
 
 /* ========================================================================= */
+/* /dev/fb0 Implementation                                                   */
+/* ========================================================================= */
+static int dev_fb0_ioctl(fs_node_t *node, int request, void *arg) {
+    (void)node;
+    if (request == 0x4600) { /* FBIOGET_VSCREENINFO */
+        uint32_t* info = (uint32_t*)arg;
+        if (!info) return -1;
+        info[0] = framebuffer_get_width();
+        info[1] = framebuffer_get_height();
+        info[2] = framebuffer_get_bpp();
+        info[3] = framebuffer_get_pitch();
+        return 0;
+    }
+    return -1;
+}
+
+/* ========================================================================= */
 /* DevFS Directory Operations                                                */
 /* ========================================================================= */
 
@@ -230,6 +248,16 @@ static int devfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) 
     if (index == 5) {
         strlcpy(entry->name, "input", sizeof(entry->name));
         entry->inode = 5;
+        return 0;
+    }
+    if (index == 6) {
+        strlcpy(entry->name, "fb0", sizeof(entry->name));
+        entry->inode = 6;
+        return 0;
+    }
+    if (index == 7) {
+        strlcpy(entry->name, "shm", sizeof(entry->name));
+        entry->inode = 7;
         return 0;
     }
     return 1; /* EOF */
@@ -278,6 +306,15 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->finddir = devfs_input_finddir;
         fnode->read = NULL;
         fnode->inode = 5;
+    } else if (strcmp(name, "fb0") == 0) {
+        strlcpy(fnode->name, "fb0", sizeof(fnode->name));
+        fnode->flags = FS_CHARDEVICE;
+        fnode->ioctl = dev_fb0_ioctl;
+        fnode->inode = 6;
+    } else if (strcmp(name, "shm") == 0) {
+        strlcpy(fnode->name, "shm", sizeof(fnode->name));
+        fnode->flags = FS_DIRECTORY;
+        fnode->inode = 7;
     } else {
         kfree(fnode);
         return 0;
