@@ -391,7 +391,9 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
             if (!phys) return -ENOMEM;
             
             hal_mem_map((uint64_t)phys, v, map_flags);
+#ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
+#endif
 
             if (file_node) {
                 uint64_t current_offset = offset + (v - start);

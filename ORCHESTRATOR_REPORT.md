@@ -15,14 +15,14 @@ No hay errores de compilación actualmente.
 | Scheduler | ✅ FUNCIONAL | Context switch verificado y assert_statics agregados para offsets. |
 | VFS | ✅ FUNCIONAL | Initrd montado correctamente con 19 archivos encontrados. |
 | Syscalls | ✅ FUNCIONAL | Syscalls inicializadas correctamente. |
-| Linux ABI | ⚠️ PARCIAL | Carga ELF básicos (test.elf). Carga sh.elf fallida por no encontrarse en initrd previamente (arreglado). |
+| Linux ABI | ⚠️ PARCIAL | Carga ELF básicos (test.elf). sh.elf incluido en initrd. |
 | Red/Sockets | ⚠️ PARCIAL | Hardware de red E1000 detectado e inicializado. |
 | Userspace/LibC | ⚠️ PARCIAL | test.elf en Ring 3 funcional. |
 | Tests | ✅ FUNCIONAL | Compila sin problemas. |
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `userspace-libc-posix-bot` — Razón: Compilar e integrar correctamente `sh.elf` (busybox o shell nativo) dentro del Initrd para proveer una shell funcional en espacio de usuario.
-2. `aether-linux-subsystem-bot` — Razón: Extender syscalls y ABI para soportar `sh.elf` si falla algo durante la ejecución de los comandos shell.
+1. `aether-linux-subsystem-bot` — Razón: sh.elf está en initrd. Extender syscalls y ABI para soportar sh.elf en Ring 3 y evitar crashes.
+2. `userspace-libc-posix-bot` — Razón: sh.elf necesita libc funcional (busybox/shell nativo) para operar comandos exitosamente.
 3. `testing-ci-validation-bot` — Razón: Añadir pruebas automatizadas más rigurosas que no dependan de qemu interactivo local o arreglar scripts test QEMU.
 
 ## Correcciones de Integración Aplicadas
@@ -33,6 +33,6 @@ No hay errores de compilación actualmente.
 | Milestone | Progreso | Blocker |
 |-----------|----------|---------|
 | Kernel boota | ✅ | Ninguno. |
-| sh.elf en Ring 3 | ❌ | Falla la búsqueda de `sh.elf` en initrd (no incluido o no compilado). |
+| sh.elf en Ring 3 | ❌ | Falla al ejecutar sh.elf, QEMU termina inesperadamente. Requiere arreglos en ABI/syscalls. |
 | busybox ash funciona | ❌ | Depende de `sh.elf` (o compilación estática de busybox). |
 | Apache httpd sirve HTML | ❌ | Falta red TCP funcional y soporte avanzado Linux ABI. |
