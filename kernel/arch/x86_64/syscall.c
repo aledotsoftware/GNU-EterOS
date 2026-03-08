@@ -1678,6 +1678,7 @@ static int64_t sys_setuid(uint32_t uid) {
         return -1; /* -EPERM */
     }
     current->uid = uid;
+    current->euid = uid; /* SECURITY FIX: Sync effective UID */
     return 0;
 }
 
@@ -1687,6 +1688,7 @@ static int64_t sys_setgid(uint32_t gid) {
         return -1; /* -EPERM */
     }
     current->gid = gid;
+    current->egid = gid; /* SECURITY FIX: Sync effective GID */
     return 0;
 }
 #ifndef F_OK
