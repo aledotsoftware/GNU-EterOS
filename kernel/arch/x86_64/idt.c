@@ -153,6 +153,15 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
         serial_write_string(buf);
         serial_write_string("\n");
 
+        if (vector == 14) { /* Page Fault */
+            uint64_t cr2;
+            __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+            serial_write_string("    CR2: 0x");
+            utoa_hex_s(cr2, buf, sizeof(buf));
+            serial_write_string(buf);
+            serial_write_string("\n");
+        }
+
         /* Kill current task */
         task_t* current = task_get_current();
         if (current) {

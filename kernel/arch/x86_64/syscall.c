@@ -972,6 +972,8 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
         if (!vmm_verify_user_access(arg, sizeof(struct winsize), 0)) return -EFAULT;
     } else if (request == FIONBIO) {
         if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
+    } else if (request == 0x4600) { /* FBIOGET_VSCREENINFO */
+        if (!vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
     }
 
     task_t* current = task_get_current();

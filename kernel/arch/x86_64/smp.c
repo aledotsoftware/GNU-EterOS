@@ -23,6 +23,8 @@ extern char trampoline_end[];
 #define TRAMPOLINE_BASE 0x8000
 #define TRAMPOLINE_OFFSET(x) ((uint64_t)(x) - (uint64_t)trampoline_start)
 
+extern void syscall_init(void);
+
 void cpu_init_bsp(void) {
     if (total_cpus == 0) {
         total_cpus = 1;
@@ -166,6 +168,9 @@ void cpu_init_ap(int index) {
     /* Configurar GS Base */
     wrmsr(MSR_GS_BASE, (uint64_t)cpu);
     wrmsr(MSR_KERNEL_GS_BASE, (uint64_t)cpu);
+
+    /* Habilitar Syscalls en este AP (EFER.SCE, LSTAR, etc.) */
+    syscall_init();
 
     /* Habilitar interrupciones locales del APIC */
     lapic_init();

@@ -255,6 +255,11 @@ static int devfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) 
         entry->inode = 6;
         return 0;
     }
+    if (index == 7) {
+        strlcpy(entry->name, "shm", sizeof(entry->name));
+        entry->inode = 7;
+        return 0;
+    }
     return 1; /* EOF */
 }
 
@@ -306,6 +311,10 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->flags = FS_CHARDEVICE;
         fnode->ioctl = dev_fb0_ioctl;
         fnode->inode = 6;
+    } else if (strcmp(name, "shm") == 0) {
+        strlcpy(fnode->name, "shm", sizeof(fnode->name));
+        fnode->flags = FS_DIRECTORY;
+        fnode->inode = 7;
     } else {
         kfree(fnode);
         return 0;

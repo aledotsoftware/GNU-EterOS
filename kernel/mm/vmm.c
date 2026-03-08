@@ -180,6 +180,10 @@ void vmm_init(void) {
     /* Por ahora, seguimos usando ese PML4. */
     /* En el futuro, aquí crearíamos un nuevo PML4 limpio y cambiaríamos a él. */
     
+    /* FIX: El Bootloader no configuró el flag de Usuario en la jerarquía inicial. */
+    /* Necesitamos PAGE_USER en PML4[0] para permitir acceso a las aplicaciones Ring 3 */
+    pml4[0] |= PAGE_USER;
+    
     char pml4_addr_buf[32];
     serial_write_string("[VMM] Usando PML4 del bootloader en 0x");
     utoa_hex_s((uint64_t)pml4, pml4_addr_buf, sizeof(pml4_addr_buf));
