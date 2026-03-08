@@ -115,7 +115,7 @@ static volatile bool extended_scancode = false;
 
 void keyboard_process_scancode(uint8_t scancode) {
     /* Wake up the compositor on input */
-    compositor_wake();
+    /* compositor_wake(); // Disabled so it doesn't fight with Marea Shell over fb0 */
 
     /* Detectar prefijo de scancode extendido */
     if (scancode == 0xE0) {

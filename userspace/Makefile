@@ -6,7 +6,7 @@ LDFLAGS = -T linker.ld -nostdlib -m elf_x86_64
 LIBC_SRC = libc/src/start.c libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/stdlib.c libc/src/signal.c libc/src/sha256.c libc/src/strtok.c
 LIBC_OBJ = $(LIBC_SRC:.c=.o)
 
-all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf test_stdio.elf test_malloc.elf test_pthread.elf login.elf passwd.elf useradd.elf userdel.elf sh.elf test_security.elf test_shm.elf
+all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf test_stdio.elf test_malloc.elf test_pthread.elf login.elf passwd.elf useradd.elf userdel.elf sh.elf test_security.elf test_shm.elf marea_shell.elf
 
 libc/src/%.o: libc/src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -115,3 +115,9 @@ test_net_echo.o: test_net_echo.c
 
 test_net_echo.elf: $(LIBC_OBJ) test_net_echo.o
 	$(LD) $(LDFLAGS) -o test_net_echo.elf $(LIBC_OBJ) test_net_echo.o
+
+marea_shell.o: marea_shell.c
+	$(CC) $(CFLAGS) -c marea_shell.c -o marea_shell.o
+
+marea_shell.elf: $(LIBC_OBJ) marea_shell.o
+	$(LD) $(LDFLAGS) -o marea_shell.elf $(LIBC_OBJ) marea_shell.o

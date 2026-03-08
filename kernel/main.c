@@ -269,13 +269,13 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     // show_splash();
  
     /* Kernel shell (fallback until userspace shell is ready) */
-    terminal_set_silent(false);
+    terminal_set_silent(true); /* Silence kernel terminal for Marea */
     terminal_clear();
  
-    serial_write_string("[ETER] Entering shell_run()...\n");
-    hal_console_write("  [INIT] Sistema listo. Iniciando Shell...\n");
+    serial_write_string("[ETER] System ready, entering idle loop (Shell disabled for Userspace Marea)...\n");
+    serial_write_string("  [INIT] Sistema listo. Cediendo control a Marea Shell...\n");
  
-    shell_run();
+    /* shell_run(); // Disabled so it doesn't fight with Marea Shell over fb0 */
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
     while(1) {

@@ -474,7 +474,20 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar eterland.elf"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $eterlandElf"
+    # marea_shell.elf
+    $mareaShellSrc = "$userDir\marea_shell.c"
+    $mareaShellObj = "$BUILD_DIR\userspace\marea_shell.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $mareaShellSrc -o $mareaShellObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar marea_shell.c"; exit 1 }
+
+    $mareaShellElf = "$initrdRoot\marea_shell.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $mareaShellElf $mareaShellObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar marea_shell.elf"; exit 1 }
+
+    Write-Step "OK" "Userspace construido: $testElf, $eterlandElf, $mareaShellElf"
 }
 
 function Invoke-InitrdBuild {

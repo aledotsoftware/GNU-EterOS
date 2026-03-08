@@ -44,8 +44,17 @@ void user_loader_entry(void) {
     uint64_t entry_point = 0;
 
     /* Try to load ELF from Initrd */
-    /* Load eterland.elf */
-    entry_point = elf_load_file("eterland.elf", 0x200000000);
+    /* Load Marea Shell (Wayland-like Desktop Environment) */
+    entry_point = elf_load_file("marea_shell.elf", 0x200000000);
+
+    if (entry_point == 0) {
+        entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
+    }
+
+    /* Fallback: Load eterland.elf (legacy GUI) */
+    if (entry_point == 0) {
+        entry_point = elf_load_file("eterland.elf", 0x200000000);
+    }
 
     if (entry_point == 0) {
         entry_point = elf_load_file("/eterland.elf", 0x200000000);
@@ -128,7 +137,7 @@ void user_loader_entry(void) {
     char* sp = (char*)user_stack_top;
 
     /* 1. Push strings */
-    const char* argv0_str = "eterland";
+    const char* argv0_str = "marea_shell";
     size_t len = strlen(argv0_str) + 1;
     sp -= len;
     memcpy(sp, argv0_str, len);

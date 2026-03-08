@@ -344,12 +344,28 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         }
 
         if (is_fb0) {
-            extern uint32_t* framebuffer_get_buffer(void);
-            uint64_t fb_virt = (uint64_t)framebuffer_get_buffer();
+            extern uint32_t* framebuffer_get_hw_buffer(void);
+            uint64_t fb_virt = (uint64_t)framebuffer_get_hw_buffer();
             uint64_t v_offset = offset + (v - start);
             uint64_t phys = hal_mem_get_phys(fb_virt + v_offset);
             if (phys) {
                 hal_mem_map(phys, v, map_flags | HAL_MEM_WRITE_COMBINING);
+            } else {
+                /* Back buffer may be kmalloc'd — resolve via identity map fallback.
+                   For heap-allocated back buffers, the virtual address IS the physical
+                   address under the kernel's identity mapping (<4GB). */
+                uint64_t heap_addr = fb_virt + v_offset;
+                if (heap_addr < 0x100000000ULL) {
+                    /* Under 4GB: identity mapped, use virtual address as physical */
+                    hal_mem_map(heap_addr, v, map_flags | HAL_MEM_WRITE_COMBINING);
+                } else {
+                    /* Fallback: allocate a new page and copy the framebuffer content */
+                    void* new_phys = pmm_alloc_page();
+                    if (new_phys) {
+                        hal_mem_map((uint64_t)new_phys, v, map_flags);
+                        memcpy((void*)v, (void*)(fb_virt + v_offset), PAGE_SIZE);
+                    }
+                }
             }
         } else if (is_shmfs && shm_obj) {
             /* Map shared physical pages */

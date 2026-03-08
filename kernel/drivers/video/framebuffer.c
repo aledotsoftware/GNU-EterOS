@@ -415,3 +415,7 @@ void framebuffer_putchar(char c, uint32_t x, uint32_t y, uint32_t fg, uint32_t b
         }
     }
 }
+
+uint32_t* framebuffer_get_hw_buffer(void) {
+    return fb_buffer;
+}
