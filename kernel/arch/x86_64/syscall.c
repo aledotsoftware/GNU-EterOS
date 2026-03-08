@@ -1001,7 +1001,7 @@ static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
         int64_t r = sys_write(fd, kiov[i].iov_base, kiov[i].iov_len);
         if (r < 0) {
             kfree(kiov);
-            return r;
+            return total > 0 ? total : r;
         }
         total += r;
     }
@@ -1028,7 +1028,7 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
         int64_t r = sys_read(fd, kiov[i].iov_base, kiov[i].iov_len);
         if (r < 0) {
             kfree(kiov);
-            return r;
+            return total > 0 ? total : r;
         }
         total += r;
     }
