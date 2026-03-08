@@ -568,6 +568,22 @@ static int64_t sys_read(int fd, void* buf, size_t count) {
     return read;
 }
 
+
+/* SECURITY FIX: Unified permission helper to prevent authorization bypass */
+static int check_node_permission(fs_node_t* node, uint32_t req_mask) {
+    if (!node) return 0;
+    task_t* current = task_get_current();
+    if (current->euid == 0) {
+        if ((req_mask & 1) && !(node->mask & 0111) && ((node->flags & 0x7) != FS_DIRECTORY)) return 0;
+        return 1;
+    }
+    uint32_t granted = 0;
+    if (current->euid == node->uid) granted = (node->mask >> 6) & 7;
+    else if (current->egid == node->gid) granted = (node->mask >> 3) & 7;
+    else granted = node->mask & 7;
+    return (granted & req_mask) == req_mask;
+}
+
 static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     char* kpath = (char*)kmalloc(256);
     if (!kpath) return -ENOMEM;
@@ -591,6 +607,21 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     }
 
     fs_node_t* node = vfs_lookup(base_node, kpath);
+
+    int req_mask = 0;
+    if ((flags & O_ACCMODE) == O_RDONLY) req_mask = 4;
+    else if ((flags & O_ACCMODE) == O_WRONLY) req_mask = 2;
+    else if ((flags & O_ACCMODE) == O_RDWR) req_mask = 6;
+
+    /* SECURITY FIX: Enforce read/write permissions on existing nodes */
+    if (node) {
+        if (!check_node_permission(node, req_mask)) {
+            kfree(node);
+            kfree(kpath);
+            return -EACCES;
+        }
+    }
+
     if (!node) {
         if (flags & O_CREAT) {
             char* parent_path = (char*)kmalloc(128);
@@ -603,6 +634,11 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
             fs_node_t* parent = vfs_lookup(base_node, parent_path);
             if (!parent) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
             
+            /* SECURITY FIX: Require Write & Execute permission on parent dir for node creation */
+            if (!check_node_permission(parent, 2 | 1)) {
+                kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -EACCES;
+            }
+
             if (create_fs(parent, filename, (uint16_t)mode) != 0) {
                 kfree(parent);
                 kfree(filename);
@@ -671,6 +707,8 @@ static int64_t sys_mkdirat(int dirfd, const char* path, int mode) {
     if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
     if (!parent) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
+    /* SECURITY FIX: Require Write & Execute permission on parent dir for mkdir */
+    if (!check_node_permission(parent, 2 | 1)) { kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -EACCES; }
     int res2 = mkdir_fs(parent, filename, (uint16_t)mode);
     kfree(parent);
     kfree(filename);
@@ -697,6 +735,8 @@ static int64_t sys_unlinkat(int dirfd, const char* path, int flags) {
     if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
     if (!parent) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
+    /* SECURITY FIX: Require Write & Execute permission on parent dir for unlink */
+    if (!check_node_permission(parent, 2 | 1)) { kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -EACCES; }
     int res2 = unlink_fs(parent, filename);
     kfree(parent);
     kfree(filename);
@@ -1652,27 +1692,11 @@ static int64_t sys_faccessat(int dirfd, const char* path, int mode, int flags) {
 
     int allowed = 1;
     if (mode != F_OK) {
-        uint32_t req_read = (mode & R_OK) ? 4 : 0;
-        uint32_t req_write = (mode & W_OK) ? 2 : 0;
-        uint32_t req_exec = (mode & X_OK) ? 1 : 0;
-        uint32_t req_mask = req_read | req_write | req_exec;
-
-        uint32_t task_euid = task_get_current()->euid;
-        uint32_t task_egid = task_get_current()->egid;
-
-        if (task_euid == 0) {
-            /* Root has full access except for execute without any execute bits */
-            if (req_exec && !(node->mask & 0111) && !((node->flags & 0x7) == FS_DIRECTORY)) {
-                allowed = 0;
-            }
-        } else {
-            uint32_t granted = 0;
-            if (task_euid == node->uid) granted = (node->mask >> 6) & 7;
-            else if (task_egid == node->gid) granted = (node->mask >> 3) & 7;
-            else granted = node->mask & 7;
-
-            if ((granted & req_mask) != req_mask) allowed = 0;
-        }
+        uint32_t req_mask = 0;
+        if (mode & R_OK) req_mask |= 4;
+        if (mode & W_OK) req_mask |= 2;
+        if (mode & X_OK) req_mask |= 1;
+        allowed = check_node_permission(node, req_mask);
     }
 
     kfree(node);
