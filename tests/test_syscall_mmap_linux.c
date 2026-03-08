@@ -1,3 +1,4 @@
+
 #define __ETEROS_HOST_TEST__ 1
 
 #include <stdio.h>
@@ -56,6 +57,7 @@ int kfree_count = 0;
 socket_entry_t socket_table[MAX_SOCKETS];
 sem_t net_sem;
 fs_node_t* fs_root = NULL;
+
 int total_cpus = 1;
 cpu_info_t cpus[MAX_CPUS];
 
@@ -215,7 +217,11 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
 
 #include "../kernel/arch/x86_64/syscall.c"
 
+
+
+void* mock_addr = NULL;
 int main() {
+    posix_memalign(&mock_addr, 4096, 4096);
     printf("Running test_syscall_mmap_linux...\n");
 
     // Setup task
@@ -226,7 +232,7 @@ int main() {
     memset(current_task_mock.fd_table[3].node, 0, sizeof(fs_node_t));
 
     // Call sys_mmap with MAP_PRIVATE and valid FD
-    void* addr = (void*)0x200000;
+    void* addr = mock_addr;
     int64_t mmap_res = sys_mmap(addr, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, 3, 0);
 
     if (mmap_res == (int64_t)addr) {
@@ -239,3 +245,4 @@ int main() {
     return 0;
 }
 int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) { return -1; }
+uint32_t* framebuffer_get_hw_buffer(void) { return NULL; }

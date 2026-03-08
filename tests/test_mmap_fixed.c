@@ -1,3 +1,4 @@
+
 #define __ETEROS_HOST_TEST__ 1
 
 #include <stdio.h>
@@ -12,10 +13,10 @@
 #define timespec eteros_timespec
 
 /* Stub eteros_ string funcs to use libc ones */
-#define strlen eteros_strlen
-#define memset eteros_memset
-#define memcpy eteros_memcpy
-#define strncpy eteros_strncpy
+
+
+
+
 #define strlcpy eteros_strlcpy
 #define strlcat eteros_strlcat
 
@@ -63,6 +64,7 @@ uint64_t pmm_unref_addr = 0;
 socket_entry_t socket_table[MAX_SOCKETS];
 sem_t net_sem;
 fs_node_t* fs_root = NULL;
+
 int total_cpus = 1;
 cpu_info_t cpus[MAX_CPUS];
 
@@ -106,7 +108,7 @@ int vmm_strncpy_from_user(char *dst, const char *src, size_t count) {
 
 uint64_t vmm_virt_to_phys(uint64_t virt) {
     // Mock mapping for 0x10000000 -> 0x999000
-    if (virt >= 0x10000000 && virt < 0x10001000) {
+    if (virt >= 0x10000000 && virt < 0x10000000 + 4096) {
         return 0x999000;
     }
     return 0;
@@ -235,7 +237,11 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
 #define PROT_READ 1
 #define PROT_WRITE 2
 
+
+
+void* mock_addr = NULL;
 int main() {
+    posix_memalign(&mock_addr, 4096, 4096);
     printf("Running test_mmap_fixed...\n");
 
     // Setup task
@@ -250,7 +256,7 @@ int main() {
 
     // Call sys_mmap with MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS
     // Addr = 0x10000000, Len = 4096
-    int64_t res = sys_mmap((void*)0x10000000, 4096, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    int64_t res = sys_mmap(mock_addr, 4096, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 
     if (res != 0x10000000) {
         printf("FAILED: sys_mmap failed (res=%lx)\n", res);
@@ -271,3 +277,4 @@ int main() {
     return 1;
 }
 int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) { return -1; }
+uint32_t* framebuffer_get_hw_buffer(void) { return NULL; }
