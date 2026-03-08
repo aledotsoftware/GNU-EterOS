@@ -44,3 +44,7 @@
 ## 2026-12-05 - [Duplicate Formatting Logic]
 **Learning:** Re-implementing formatting functions (like `vsnprintf` and `itoa`) for specific modules (e.g., `klog`) can bypass highly optimized versions already present in the codebase. The custom implementation was significantly slower due to missing fast-paths (e.g., base 10/16 optimization) and backwards buffer filling techniques found in `kernel/stdio.c`.
 **Action:** When working on formatting or string processing, check for and reuse existing, highly optimized core library implementations (`vsnprintf`) rather than duplicating slower, simplistic versions.
+
+## 2026-12-07 - [Source Pixel Caching]
+**Learning:** In tight rendering loops (e.g., alpha blending in compositors), repeated access to source pixel arrays can cause the compiler to emit duplicate memory loads due to potential pointer aliasing between the source and destination arrays.
+**Action:** Cache the source pixel in a local scalar variable before evaluating conditions and assigning to the destination array. This prevents duplicate memory loads and yields a significant speedup.

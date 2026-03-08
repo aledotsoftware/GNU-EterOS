@@ -11,12 +11,14 @@
 /* Defines to handle conflicts with syscall.c */
 #define timespec eteros_timespec
 
+/* Stub eteros_ string funcs to use libc ones */
 #define strlen eteros_strlen
 #define memset eteros_memset
 #define memcpy eteros_memcpy
 #define strncpy eteros_strncpy
 #define strlcpy eteros_strlcpy
 #define strlcat eteros_strlcat
+
 
 /* Include kernel headers */
 #include "../include/types.h"
@@ -171,6 +173,17 @@ void lapic_send_ipi(int id, int vector) {}
 
 /* Stub task functions */
 int task_fork(void* regs) { return 0; }
+
+/* Stub framebuffer functions needed by window.c which might be linked or included */
+uint32_t* framebuffer_get_buffer(void) { return NULL; }
+uint32_t framebuffer_get_width(void) { return 0; }
+uint32_t framebuffer_get_height(void) { return 0; }
+uint32_t framebuffer_get_pitch(void) { return 0; }
+uint32_t framebuffer_get_bpp(void) { return 0; }
+void framebuffer_putpixel(uint32_t x, uint32_t y, uint32_t color) {}
+void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color) {}
+void gfx_add_dirty_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) {}
+void gfx_present(void) {}
 int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) { return 0; }
 int task_waitpid(int pid, int* status, int options) { return 0; }
 task_t* task_get_by_id(uint32_t id) { return NULL; }
