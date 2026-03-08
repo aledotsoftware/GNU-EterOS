@@ -158,10 +158,9 @@ static void draw_window(window_t* win) {
 
                 int32_t j = 0;
                 /* ⚡ BOLT Optimization: Unrolled loop (4x) with local scalar caching.
-                   Reading the source pixel into a local variable (`c0`, `c1`, etc.) guarantees a single
-                   memory load per pixel, preventing the compiler from emitting duplicate loads when evaluating
-                   the non-zero transparency condition (due to potential pointer aliasing between src and dest).
-                   This provides a ~15-20% speedup in the composition loop. */
+                   Caching the source pixel prevents the compiler from emitting duplicate
+                   memory loads due to potential pointer aliasing between src and dest,
+                   yielding significant speedup. */
                 for (; j <= width - 4; j += 4) {
                     uint32_t c0 = src[j];
                     uint32_t c1 = src[j+1];
@@ -176,9 +175,6 @@ static void draw_window(window_t* win) {
 
                 /* Remainder */
                 for (; j < width; j++) {
-                    /* ⚡ BOLT Optimization: Local scalar caching for the remainder loop as well.
-                       Also fixes a bug where `dest++` was incorrectly intermixed with `dest[j]` indexing,
-                       causing memory corruption by double-advancing the destination pointer. */
                     uint32_t c = src[j];
                     if (c) {
                         dest[j] = c;

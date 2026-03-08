@@ -18,7 +18,7 @@ function openWindow(appName) {
     if (appName === 'calculator') {
         content = '<h3>Calculator</h3><p>Simple Calculator App</p>';
     } else if (appName === 'notepad') {
-        content = '<h3>Notepad</h3><textarea style="width:100%; height:80%;"></textarea>';
+        content = '<h3>Notepad</h3><textarea aria-label="Notepad" placeholder="Type your notes here..." style="width:100%; height:80%;"></textarea>';
     }
 
     win.innerHTML = `
