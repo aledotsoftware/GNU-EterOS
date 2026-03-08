@@ -44,3 +44,11 @@
 ## 2026-12-05 - [Duplicate Formatting Logic]
 **Learning:** Re-implementing formatting functions (like `vsnprintf` and `itoa`) for specific modules (e.g., `klog`) can bypass highly optimized versions already present in the codebase. The custom implementation was significantly slower due to missing fast-paths (e.g., base 10/16 optimization) and backwards buffer filling techniques found in `kernel/stdio.c`.
 **Action:** When working on formatting or string processing, check for and reuse existing, highly optimized core library implementations (`vsnprintf`) rather than duplicating slower, simplistic versions.
+
+## 2026-03-08 - Optimize unrolled alpha-blend pixel loop & index bug
+**Learning:** In unrolled rendering loops (e.g., `draw_window`), blindly using multiple memory array accesses `if (src[j]) dest[j] = src[j]` causes duplicate memory loads due to potential compiler pointer aliasing constraints. Furthermore, mixing loop-indexed writes (`dest[j]`) with manual pointer increments (`dest++`) inside a remainder loop causes out-of-bounds corruption and visual tearing since the target steps twice per iteration.
+**Action:** Always cache array values into local scalar variables (`uint32_t c = src[j]; if (c) dest[j] = c;`) in highly iterated render passes. Never mix indexed addressing (`[j]`) with pointer arithmetic (`++`) on the same array in the same loop logic.
+
+## 2026-03-08 - Pre-existing test failures
+**Learning:** `tests/test_readv_security.c` fails to compile because it's missing a mock for `framebuffer_get_buffer`. This is a pre-existing test infrastructure issue unrelated to our window drawing optimizations.
+**Action:** Ignored since it is unrelated to current modifications.
