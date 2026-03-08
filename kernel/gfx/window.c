@@ -157,15 +157,16 @@ static void draw_window(window_t* win) {
                 uint32_t* src = src_row;
 
                 int32_t j = 0;
-                /* Unrolled loop (4x) */
-                /* ⚡ BOLT Optimization: Hoist source reads before writes to improve instruction
-                   pipelining and eliminate redundant memory loads caused by potential
-                   pointer aliasing between the src and dest arrays. */
+                /* ⚡ BOLT Optimization: Unrolled loop (4x) with local scalar caching.
+                   Caching the source pixel prevents the compiler from emitting duplicate
+                   memory loads due to potential pointer aliasing between src and dest,
+                   yielding significant speedup. */
                 for (; j <= width - 4; j += 4) {
                     uint32_t c0 = src[j];
                     uint32_t c1 = src[j+1];
                     uint32_t c2 = src[j+2];
                     uint32_t c3 = src[j+3];
+
                     if (c0) dest[j] = c0;
                     if (c1) dest[j+1] = c1;
                     if (c2) dest[j+2] = c2;
@@ -175,8 +176,9 @@ static void draw_window(window_t* win) {
                 /* Remainder */
                 for (; j < width; j++) {
                     uint32_t c = src[j];
-                    if (c) dest[j] = c;
-                    dest++;
+                    if (c) {
+                        dest[j] = c;
+                    }
                 }
 
                 /* Advance pointers by one row */
