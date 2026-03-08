@@ -12,6 +12,7 @@
 #include <pic.h>
 #include <vga.h> /* Para debug si es necesario */
 #include <input/event.h>
+#include <string.h>
 
 /* Comandos del Mouse (enviados al puerto de datos 0x60) */
 #define MOUSE_RESET         0xFF
@@ -50,88 +51,138 @@ static uint8_t prev_buttons = 0;
 static uint8_t mouse_sensitivity = 1;
 static bool mouse_handedness_left = false;
 
-/* Espera a que el buffer de entrada (0x60) esté vacío para poder escribir */
-static void mouse_wait(uint8_t type) {
-    uint32_t timeout = 100000;
+static bool mouse_wait(uint8_t type) {
+    uint32_t timeout = 100000000; /* Much longer timeout */
     if (type == 0) {
-        /* Esperar a que llegue data (Bit 0 de Status == 1) para LEER */
+        /* Wait for data to be available (Read) */
         while (timeout--) {
-            if ((inb(PORT_STATUS) & 1) == 1) {
-                return;
-            }
+            if ((inb(PORT_STATUS) & 1) == 1) return true;
+            __asm__ volatile("pause");
         }
-        /* Timeout, pero intentamos leer igual */
+        serial_write_string("[MOUSE] Timeout waiting to READ\n");
+        return false;
     } else {
-        /* Esperar a que el buffer de entrada esté vacío (Bit 1 de Status == 0) para ESCRIBIR */
+        /* Wait for buffer to be empty (Write) */
         while (timeout--) {
-            if ((inb(PORT_STATUS) & 2) == 0) {
-                return;
-            }
+            if ((inb(PORT_STATUS) & 2) == 0) return true;
+            __asm__ volatile("pause");
         }
+        serial_write_string("[MOUSE] Timeout waiting to WRITE\n");
+        return false;
     }
 }
 
 /* Escribe un byte al mouse (a través del puerto auxiliar del PS/2) */
-static void mouse_write(uint8_t command) {
-    /* Avisar al controlador que el siguiente byte es para el dispositivo auxiliar */
-    mouse_wait(1);
+static bool mouse_write(uint8_t command) {
+    if (!mouse_wait(1)) return false;
     outb(PORT_STATUS, PS2_CMD_WRITE_AUX);
     
-    /* Enviar comando */
-    mouse_wait(1);
+    if (!mouse_wait(1)) return false;
     outb(PORT_DATA, command);
+    return true;
 }
 
-/* Lee un byte del mouse (esperando respuesta) */
 static uint8_t mouse_read(void) {
-    mouse_wait(0); /* Esperar a que haya dato */
+    if (!mouse_wait(0)) return 0;
     return inb(PORT_DATA);
 }
 
+static void serial_write_hex8(uint8_t val) {
+    char h[] = "0123456789ABCDEF";
+    char buf[4];
+    buf[0] = h[(val >> 4) & 0xF];
+    buf[1] = h[val & 0xF];
+    buf[2] = ' ';
+    buf[3] = '\0';
+    serial_write_string(buf);
+}
+
 void mouse_init(void) {
-    uint8_t status;
+    uint8_t ack;
+    char buf[32]; /* Increased size */
 
-    serial_write_string("[MOUSE] Inicializando PS/2 Mouse...\n");
+    serial_write_string("[MOUSE] Inicializando PS/2 Mouse (Standard)...\n");
 
-    /* 1. Habilitar puerto auxiliar */
-    mouse_wait(1);
+    /* 1. Flush read buffer */
+    while ((inb(PORT_STATUS) & 1) == 1) {
+        inb(PORT_DATA);
+    }
+
+    /* 2. Controller Self Test? (Optional but good) */
+    /* serial_write_string("[MOUSE] Controller Self Test...\n");
+    if (!mouse_wait(1)) return;
+    outb(PORT_STATUS, 0xAA);
+    ack = mouse_read();
+    if (ack != 0x55) {
+        serial_write_string("[MOUSE] Controller self-test failed\n");
+    } */
+
+    /* 3. Disable Keyboard and Mouse ports during intense config */
+    if (!mouse_wait(1)) return;
+    outb(PORT_STATUS, 0xAD); /* Disable Keyboard */
+    if (!mouse_wait(1)) return;
+    outb(PORT_STATUS, 0xA7); /* Disable Mouse */
+
+    /* 3. Get config byte */
+    if (!mouse_wait(1)) return;
+    outb(PORT_STATUS, PS2_CMD_GET_CONFIG);
+    if (!mouse_wait(0)) return;
+    uint8_t status = inb(PORT_DATA);
+    serial_write_string("[MOUSE] Original Config Byte: "); serial_write_hex8(status); serial_write_string("\n");
+
+    /* 4. Modify config byte */
+    status |= 2; /* Bit 1: Enable IRQ 12 */
+    status &= ~0x20; /* Clear bit 5 (disable mouse clock -> enable it) */
+    
+    if (!mouse_wait(1)) return;
+    outb(PORT_STATUS, PS2_CMD_SET_CONFIG);
+    if (!mouse_wait(1)) return;
+    outb(PORT_DATA, status);
+    serial_write_string("[MOUSE] Configured Config Byte: "); serial_write_hex8(status); serial_write_string("\n");
+
+    /* 5. Enable Mouse port on controller */
+    if (!mouse_wait(1)) return;
     outb(PORT_STATUS, PS2_CMD_ENABLE_AUX);
 
-    /* 2. Habilitar interrupciones para IRQ 12 (Auxiliary Device) */
-    mouse_wait(1);
-    outb(PORT_STATUS, PS2_CMD_GET_CONFIG);
-    mouse_wait(0);
-    status = inb(PORT_DATA);
-    status |= 2; /* Bit 1: Enable IRQ 12 */
-    status &= ~0x20; /* Clear bit 5 (disable mouse clock -> enable it) Wait no, bit 5 is disable mouse usually? In config byte: bit 5 is disable mouse port. 0 = enable. */
-    /* Config byte:
-       Bit 0: Enable IRQ 1 (Keyboard)
-       Bit 1: Enable IRQ 12 (Mouse)
-       Bit 4: Disable Keyboard (1=disable)
-       Bit 5: Disable Mouse (1=disable)
-    */
-    /* Queremos Bit 1 (IRQ12) activado y Bit 5 (Disable Mouse) desactivado */
-    
-    mouse_wait(1);
-    outb(PORT_STATUS, PS2_CMD_SET_CONFIG);
-    mouse_wait(1);
-    outb(PORT_DATA, status);
+    /* 6. Enviar comando de Reset al mouse */
+    serial_write_string("[MOUSE] Reset (0xFF)... ");
+    if (!mouse_write(MOUSE_RESET)) return;
+    ack = mouse_read();
+    serial_write_hex8(ack);
+    if (ack == 0xFA) {
+        /* OK, now wait for self-test results */
+        serial_write_string("BAT: ");
+        ack = mouse_read(); 
+        serial_write_hex8(ack);
+        serial_write_string("ID: ");
+        ack = mouse_read(); 
+        serial_write_hex8(ack);
+    }
+    serial_write_string("\n");
 
-    /* 3. Resetear defaults del mouse */
-    mouse_write(MOUSE_SET_DEFAULTS);
-    mouse_read(); /* Acknowledge (0xFA) */
-
-    /* 4. Habilitar reporte de datos */
-    mouse_write(MOUSE_ENABLE_DATA);
-    mouse_read(); /* Acknowledge (0xFA) */
+    /* 7. Sample Rate / Resolution settings to be safe */
+    mouse_write(MOUSE_SET_SAMPLE); mouse_read(); /* ACK */
+    mouse_write(100); mouse_read(); /* ACK */
     
-    /* Desenmascarar IRQ12 en el PIC también */
+    /* 8. Resetear defaults del mouse */
+    serial_write_string("[MOUSE] Defaults (0xF6)... ");
+    if (!mouse_write(MOUSE_SET_DEFAULTS)) return;
+    ack = mouse_read(); 
+    serial_write_hex8(ack);
+    serial_write_string("\n");
+
+    /* 9. Habilitar reporte de datos */
+    serial_write_string("[MOUSE] Enable (0xF4)... ");
+    if (!mouse_write(MOUSE_ENABLE_DATA)) return;
+    ack = mouse_read(); 
+    serial_write_hex8(ack);
+    serial_write_string("\n");
+    
+    /* Desenmascarar IRQ12 en el PIC */
     pic_unmask_irq(12);
-
-    /* Habilitar IRQ2 (Cascade) just in case (Master PIC IRQ2 connected to Slave) */
     pic_unmask_irq(2);
 
-    serial_write_string("[MOUSE] Driver inicializado y IRQ12 desenmascarada.\n");
+    serial_write_string("[MOUSE] Driver inicializado y IRQ12 unmasked.\n");
 }
 
 /* Registra un callback para recibir eventos */

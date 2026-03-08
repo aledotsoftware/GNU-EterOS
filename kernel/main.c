@@ -227,9 +227,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 6. Información del sistema ---- */
     kernel_print_sysinfo();
 
-    /* ---- 6.5 Inicializar Mouse (PS/2) ---- */
-    /* Nota: Se inicializa después de la IDT/PIC pero antes de la GUI */
-    mouse_init();
+    /* Mouse se inicializa ahora en el HAL (hal_input_init) */
+
     
     /* ---- 7.1 Inicializar Red (Ahora podemos crear tareas) ---- */
     hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");

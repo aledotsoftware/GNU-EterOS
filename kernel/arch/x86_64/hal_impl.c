@@ -14,6 +14,7 @@
 #include <idt.h>
 #include <pic.h>
 #include <keyboard.h>
+#include <mouse.h>
 #include <timer.h>
 #include <io.h>
 #include <vmm.h>
@@ -127,6 +128,7 @@ void hal_console_clear(void) {
 
 void hal_input_init(void) {
     keyboard_init();
+    mouse_init();
     pic_unmask_irq(1); /* Enable Keyboard IRQ */
 }
 

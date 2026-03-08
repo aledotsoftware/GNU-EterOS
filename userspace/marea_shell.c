@@ -983,10 +983,16 @@ int main(int argc, char* argv[]) {
         sleep(1); /* Let parent render first */
 
         int mfd = open("/dev/input/mouse0", O_RDONLY);
-        if (mfd < 0) exit(1);
+        if (mfd < 0) {
+            printf("[Marea] Critical Error: Cannot open /dev/input/mouse0\n");
+            exit(1);
+        }
 
         input_event_t ev;
         while (read(mfd, &ev, sizeof(ev)) > 0) {
+            /* Visual debug: flick red square in top left when mouse events arrive */
+            fill_rect(0, 0, 8, 8, 0xFF0000); 
+
             if (ev.type == EV_REL) {
                 /* Erase old cursor */
                 cursor_restore_bg(mouse_x, mouse_y);

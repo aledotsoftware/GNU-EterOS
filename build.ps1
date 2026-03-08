@@ -766,8 +766,8 @@ function Invoke-VBoxRun {
         # Desmontar disco anterior
         & $VBOXMANAGE storageattach $vmName --storagectl "SATA" --port 0 --device 0 --medium none 2>&1 | Out-Null
 
-        # Asegurar tipo de red E1000
-        & $VBOXMANAGE modifyvm $vmName --nic1 nat --nictype1 82540EM 2>&1 | Out-Null
+        # Asegurar tipo de red E1000 y el uso del mouse PS/2
+        & $VBOXMANAGE modifyvm $vmName --nic1 nat --nictype1 82540EM --mouse ps2 2>&1 | Out-Null
 
         # Cerrar medio anterior si existe  
         & $VBOXMANAGE closemedium disk $vdiPath 2>&1 | Out-Null
@@ -811,6 +811,8 @@ function Invoke-VBoxRun {
             --nic1 nat `
             --nictype1 82540EM `
             --audio-driver none `
+            --mouse ps2 `
+            --keyboard ps2 `
             --uart1 0x3F8 4 `
             --uartmode1 file "$((Get-Location).Path)\build\$Arch\serial.log" 2>&1 | Out-Null
 

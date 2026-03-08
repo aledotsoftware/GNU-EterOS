@@ -370,6 +370,7 @@ void irq_serial_handler(void) {
  */
 void irq_mouse_handler(void) {
     uint8_t byte = inb(0x60);
+    serial_write_string("[IRQ12]\n");
     mouse_process_byte(byte);
     pic_send_eoi(12);
 }
