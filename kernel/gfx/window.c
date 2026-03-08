@@ -158,18 +158,24 @@ static void draw_window(window_t* win) {
 
                 int32_t j = 0;
                 /* Unrolled loop (4x) */
+                /* ⚡ BOLT Optimization: Hoist source reads before writes to improve instruction
+                   pipelining and eliminate redundant memory loads caused by potential
+                   pointer aliasing between the src and dest arrays. */
                 for (; j <= width - 4; j += 4) {
-                    if (src[j] != 0) dest[j] = src[j];
-                    if (src[j+1] != 0) dest[j+1] = src[j+1];
-                    if (src[j+2] != 0) dest[j+2] = src[j+2];
-                    if (src[j+3] != 0) dest[j+3] = src[j+3];
+                    uint32_t c0 = src[j];
+                    uint32_t c1 = src[j+1];
+                    uint32_t c2 = src[j+2];
+                    uint32_t c3 = src[j+3];
+                    if (c0) dest[j] = c0;
+                    if (c1) dest[j+1] = c1;
+                    if (c2) dest[j+2] = c2;
+                    if (c3) dest[j+3] = c3;
                 }
 
                 /* Remainder */
                 for (; j < width; j++) {
-                    if (src[j] != 0) {
-                        dest[j] = src[j];
-                    }
+                    uint32_t c = src[j];
+                    if (c) dest[j] = c;
                     dest++;
                 }
 
