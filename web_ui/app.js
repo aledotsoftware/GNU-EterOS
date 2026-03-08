@@ -25,7 +25,7 @@ function openWindow(appName) {
         <div class="title-bar">
             <span>${appName.charAt(0).toUpperCase() + appName.slice(1)}</span>
             <div class="window-controls">
-                <button aria-label="Close window" onclick="this.closest('.window').remove()">X</button>
+                <button aria-label="Close window" data-tooltip="Close" onclick="this.closest('.window').remove()">X</button>
             </div>
         </div>
         <div class="window-content">

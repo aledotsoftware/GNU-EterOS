@@ -1,0 +1,3 @@
+## 2024-03-08 - Keyboard accessibility and focus indicators for OS UI elements
+**Learning:** Window close controls and start buttons lacking `:focus-visible` styles prevent effective keyboard navigation since the user cannot tell when these elements are focused using the Tab key. In OS UIs where contrast is low, `outline: 2px solid white` provides highly visible feedback. Additionally, icon-only window buttons lack screen reader / tooltip explanations of their functionality.
+**Action:** Always ensure that dynamically created UI elements like window controls and custom buttons have both ARIA labels and `:focus-visible` styles, and utilize CSS-only tooltips for visual feedback.

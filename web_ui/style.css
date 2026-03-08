@@ -72,6 +72,11 @@ body {
     background-color: #c0392b;
 }
 
+#start-btn:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
 #clock {
     font-size: 14px;
 }
@@ -119,6 +124,12 @@ body {
 
 .window-controls button:hover {
     color: #e74c3c;
+}
+
+.window-controls button:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+    border-radius: 2px;
 }
 
 /* Tooltip implementation */
