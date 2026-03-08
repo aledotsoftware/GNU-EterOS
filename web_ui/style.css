@@ -31,11 +31,16 @@ body {
     margin: 5px;
 }
 
-.icon:hover,
-.icon:focus {
+.icon:hover {
     background-color: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
-    outline: none;
+}
+
+.icon:focus-visible {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    outline: 2px solid white;
+    outline-offset: 2px;
 }
 
 .icon img {
