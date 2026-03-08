@@ -45,10 +45,10 @@
 **Learning:** Re-implementing formatting functions (like `vsnprintf` and `itoa`) for specific modules (e.g., `klog`) can bypass highly optimized versions already present in the codebase. The custom implementation was significantly slower due to missing fast-paths (e.g., base 10/16 optimization) and backwards buffer filling techniques found in `kernel/stdio.c`.
 **Action:** When working on formatting or string processing, check for and reuse existing, highly optimized core library implementations (`vsnprintf`) rather than duplicating slower, simplistic versions.
 
-## 2026-12-06 - [Pointer Aliasing in Unrolled Render Loops]
-**Learning:** In tight rendering loops, checking a condition directly from an array element and then assigning from that same array element (`if (src[j] != 0) dest[j] = src[j];`) can cause the compiler to emit duplicate memory load instructions. The compiler assumes the write to `dest` might overlap with `src` (pointer aliasing), preventing it from keeping the loaded value in a register.
-**Action:** Always load the source value into a local scalar variable first (`uint32_t c = src[j]; if (c) dest[j] = c;`) in critical data-processing loops to enforce optimal register utilization and prevent redundant memory access.
+## 2026-03-08 - Optimize unrolled alpha-blend pixel loop & index bug
+**Learning:** In unrolled rendering loops (e.g., `draw_window`), blindly using multiple memory array accesses `if (src[j]) dest[j] = src[j]` causes duplicate memory loads due to potential compiler pointer aliasing constraints. Furthermore, mixing loop-indexed writes (`dest[j]`) with manual pointer increments (`dest++`) inside a remainder loop causes out-of-bounds corruption and visual tearing since the target steps twice per iteration.
+**Action:** Always cache array values into local scalar variables (`uint32_t c = src[j]; if (c) dest[j] = c;`) in highly iterated render passes. Never mix indexed addressing (`[j]`) with pointer arithmetic (`++`) on the same array in the same loop logic.
 
-## 2026-12-06 - [Loop Invariant Branch Hoisting in Image Decoders]
-**Learning:** In tight nested loops such as per-pixel image decoding (like PNG filters), evaluating conditions that remain constant for the entire row (`if (filter == X)`, `if (prev_row)`) inside the innermost loop imposes a massive performance penalty due to continuous branch prediction overhead and instruction bloat.
-**Action:** Always hoist invariant branches out of the inner loop, even if it requires duplicating the inner loop structure for each branch case. Additionally, unroll or split loops to eliminate pixel-bound checks (like `if (x >= bpp)` vs `x < bpp`) by handling the edge cases explicitly before running the main loop body.
+## 2026-03-08 - Pre-existing test failures
+**Learning:** `tests/test_readv_security.c` fails to compile because it's missing a mock for `framebuffer_get_buffer`. This is a pre-existing test infrastructure issue unrelated to our window drawing optimizations.
+**Action:** Ignored since it is unrelated to current modifications.

@@ -114,6 +114,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
     /* ---- 0.5. Inicializar SMP (BSP Topology) ---- */
     #if defined(ARCH_X86_64)
+    _Static_assert(__builtin_offsetof(cpu_info_t, kernel_stack_top) == 64, "ASM offset mismatch!");
+    _Static_assert(__builtin_offsetof(cpu_info_t, user_stack_scratch) == 72, "ASM offset mismatch!");
     cpu_init_bsp();
     #endif
 
