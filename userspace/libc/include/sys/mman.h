@@ -23,4 +23,7 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, int64_t offse
 int   munmap(void *addr, size_t length);
 int   mprotect(void *addr, size_t len, int prot);
 
+int   shm_open(const char *name, int oflag, mode_t mode);
+int   shm_unlink(const char *name);
+
 #endif /* _SYS_MMAN_H */

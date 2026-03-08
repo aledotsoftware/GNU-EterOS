@@ -11,6 +11,13 @@
 /* Defines to handle conflicts with syscall.c */
 #define timespec eteros_timespec
 
+#define strlen eteros_strlen
+#define memset eteros_memset
+#define memcpy eteros_memcpy
+#define strncpy eteros_strncpy
+#define strlcpy eteros_strlcpy
+#define strlcat eteros_strlcat
+
 /* Include kernel headers */
 #include "../include/types.h"
 #include "../include/task.h"
@@ -19,11 +26,14 @@
 #include "../include/pmm.h"
 
 /* Hack to mock inline functions in cpu.h */
+void pmm_ref_page(void* p) { (void)p; }
+int shmfs_truncate(fs_node_t* node, uint32_t length) { (void)node; (void)length; return -1; }
 #define get_current_cpu real_get_current_cpu
 #define get_cpu_id real_get_cpu_id
 #include "../include/cpu.h"
 #undef get_current_cpu
 #undef get_cpu_id
+
 #include "../include/lock.h"
 
 /* Define missing error codes if needed */
@@ -208,6 +218,7 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
 
 #define MAP_FIXED 0x10
 #define MAP_ANONYMOUS 0x20
+#define MAP_PRIVATE 0x02
 #define PROT_READ 1
 #define PROT_WRITE 2
 
@@ -224,9 +235,9 @@ int main() {
     vmm_unmap_called = false;
     pmm_unref_called = false;
 
-    // Call sys_mmap with MAP_FIXED | MAP_ANONYMOUS
+    // Call sys_mmap with MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS
     // Addr = 0x10000000, Len = 4096
-    int64_t res = sys_mmap((void*)0x10000000, 4096, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_ANONYMOUS, -1, 0);
+    int64_t res = sys_mmap((void*)0x10000000, 4096, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
 
     if (res != 0x10000000) {
         printf("FAILED: sys_mmap failed (res=%lx)\n", res);

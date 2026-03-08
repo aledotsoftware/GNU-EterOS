@@ -26,6 +26,7 @@
 #include <net/defs.h>
 #include <fcntl.h>
 #include <ioctl.h>
+#include <fs/shmfs.h>
 #include <termios.h>
 #include <linux_compat.h>
 #include <sched.h>
@@ -279,12 +280,12 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     if (len == 0) return -EINVAL;
     task_t* current = task_get_current();
 
-    /* flags & 0x22 (MAP_PRIVATE or MAP_ANONYMOUS) or 0x01 (MAP_SHARED) */
-    if (!(flags & 0x23)) {
+    /* If neither MAP_PRIVATE (0x02) nor MAP_SHARED (0x01) are set */
+    if (!(flags & 0x03)) {
         if (current && current->os_abi == ELFOSABI_LINUX && fd != -1) {
             /* Allow file-backed mmap without MAP_ANONYMOUS in Linux */
         } else {
-            return -ENODEV; // MAP_PRIVATE (0x02), MAP_SHARED (0x01) or MAP_ANONYMOUS (0x20)
+            return -ENODEV;
         }
     }
 
@@ -310,27 +311,69 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     if (end < start || (virt + len) < virt) return -ENOMEM; /* Overflow check */
 
     fs_node_t* file_node = NULL;
+    int is_shmfs = 0;
+    int is_fb0 = 0;
+    shm_object_t* shm_obj = NULL;
+
     if (fd != -1) {
         if (fd < 0 || fd >= MAX_FD) return -EBADF;
         if (!current->fd_table[fd].node) return -EBADF;
         file_node = current->fd_table[fd].node;
         __atomic_fetch_add(&file_node->ref_count, 1, __ATOMIC_SEQ_CST);
+
+        /* Check if this is a shared memory object (from /dev/shm) */
+        extern int shmfs_truncate(fs_node_t*, uint32_t); /* Hack to identify shmfs nodes */
+        if (file_node && file_node->truncate && file_node->truncate == shmfs_truncate && (flags & 0x01)) { /* MAP_SHARED */
+            is_shmfs = 1;
+            shm_obj = (shm_object_t*)(uintptr_t)file_node->impl;
+        } else if (file_node && strcmp(file_node->name, "fb0") == 0) {
+            is_fb0 = 1;
+        }
     }
 
+    uint32_t map_flags = HAL_MEM_USER | HAL_MEM_READ;
+    if (prot & 2) map_flags |= HAL_MEM_WRITE;
+    if (prot & 4) map_flags |= HAL_MEM_EXEC;
+
     for (uint64_t v = start; v < end; v += PAGE_SIZE) {
-        /* SECURITY FIX: Check if page is already mapped. If so, unmap it to prevent data leaks or reuse. */
+        /* Unmap existing pages */
         uint64_t existing_phys = hal_mem_get_phys(v);
         if (existing_phys != 0) {
             pmm_unref_page((void*)existing_phys);
             vmm_unmap_page(v);
         }
 
-        if (hal_mem_get_phys(v) == 0) {
+        if (is_fb0) {
+            extern uint32_t* framebuffer_get_buffer(void);
+            uint64_t fb_virt = (uint64_t)framebuffer_get_buffer();
+            uint64_t v_offset = offset + (v - start);
+            uint64_t phys = hal_mem_get_phys(fb_virt + v_offset);
+            if (phys) {
+                hal_mem_map(phys, v, map_flags | HAL_MEM_WRITE_COMBINING);
+            }
+        } else if (is_shmfs && shm_obj) {
+            /* Map shared physical pages */
+            uint32_t page_idx = (offset + (v - start)) / PAGE_SIZE;
+            
+            spin_lock(&shm_obj->lock);
+            if (page_idx < shm_obj->page_count && shm_obj->pages[page_idx]) {
+                uint64_t phys = shm_obj->pages[page_idx];
+                pmm_ref_page((void*)phys);
+                hal_mem_map(phys, v, map_flags);
+            } else {
+                /* Out of bounds mapping for SHM, allocate anonymous page as fallback */
+                void* phys = pmm_alloc_page();
+                if (phys) {
+                    hal_mem_map((uint64_t)phys, v, map_flags);
+                    memset((void*)v, 0, PAGE_SIZE);
+                }
+            }
+            spin_unlock(&shm_obj->lock);
+        } else {
+            /* Anonymous or regular file-backed mapping */
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
-            uint32_t map_flags = HAL_MEM_USER | HAL_MEM_READ;
-            if (prot & 2) map_flags |= HAL_MEM_WRITE;
-            if (prot & 4) map_flags |= HAL_MEM_EXEC;
+            
             hal_mem_map((uint64_t)phys, v, map_flags);
             memset((void*)v, 0, PAGE_SIZE);
 

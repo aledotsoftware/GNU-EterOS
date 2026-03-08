@@ -160,6 +160,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/fs/vfs.c               \
               $(KERNEL_DIR)/fs/bcache.c            \
               $(KERNEL_DIR)/fs/devfs.c             \
+              $(KERNEL_DIR)/fs/shmfs.c             \
               $(KERNEL_DIR)/fs/procfs.c            \
               $(KERNEL_DIR)/fs/jfs.c               \
               $(KERNEL_DIR)/crypto/sha256.c        \
@@ -182,10 +183,10 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/disk/partition.c \
               $(KERNEL_DIR)/fs/elf.c \
               $(KERNEL_DIR)/drivers/net/e1000.c \
-              $(KERNEL_DIR)/apps/wget.c \
-              $(KERNEL_DIR)/crypto/sha256.c
+              $(KERNEL_DIR)/apps/wget.c
 
-NET_CORE_SRCS = $(KERNEL_DIR)/net/core/ip_utils.c
+NET_CORE_SRCS = $(KERNEL_DIR)/net/core/ip_utils.c \
+                $(KERNEL_DIR)/net/mock.c
 
 NET_CORE_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(NET_CORE_SRCS))
 
@@ -335,6 +336,7 @@ userspace:
 	cp userspace/userdel.elf $(INITRD_DIR)/
 	cp userspace/sh.elf $(INITRD_DIR)/
 	cp userspace/test_security.elf $(INITRD_DIR)/
+	cp userspace/test_shm.elf $(INITRD_DIR)/
 
 # ---- Initrd ----
 initrd: userspace $(INITRD_IMG)

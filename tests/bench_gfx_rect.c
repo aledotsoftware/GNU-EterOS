@@ -19,6 +19,7 @@ void* kmalloc(size_t s) { return malloc(s); }
 
 const uint8_t font8x16[4096] = {0};
 
+
 int main() {
     printf("Starting benchmark for gfx_draw_rect...\n");
 

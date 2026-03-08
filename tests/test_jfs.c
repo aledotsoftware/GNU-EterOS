@@ -19,6 +19,9 @@
 void hal_console_write(const char* str) {
     // printf("[MOCK HAL] %s", str); // Uncomment for debug
 }
+void serial_write_string(const char* str) {
+    (void)str;
+}
 
 /* Mock Memory Management */
 static uint8_t heap[8 * 1024 * 1024]; // 8MB Heap

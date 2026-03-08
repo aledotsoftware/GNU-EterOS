@@ -24,6 +24,8 @@ int eteros_snprintf(char* str, size_t size, const char* format, ...) {
 }
 
 /* Mock I/O functions */
+int irq_save(void) { return 0; }
+void irq_restore(int flags) { (void)flags; }
 void outb(uint16_t port, uint8_t value) { (void)port; (void)value; }
 void outw(uint16_t port, uint16_t value) { (void)port; (void)value; }
 void outl(uint16_t port, uint32_t value) { (void)port; (void)value; }

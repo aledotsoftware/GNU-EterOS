@@ -170,6 +170,8 @@ int vmm_strncpy_from_user(char* dst, const char* src, size_t max) {
 
 /* Stub pmm_unref_page */
 void pmm_unref_page(void* p) {}
+void pmm_ref_page(void* p) {}
+int shmfs_truncate(fs_node_t* node, uint32_t length) { return -1; }
 
 /* Stub vmm_unmap_page */
 void vmm_unmap_page(uint64_t virt) {}

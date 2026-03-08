@@ -13,8 +13,11 @@ typedef struct {
 #define FD_CLR(fd, set) do { ((fd_set *)(set))->fds_bits[(fd) / 64] &= ~(1ULL << ((fd) % 64)); } while(0)
 #define FD_ISSET(fd, set) (((fd_set *)(set))->fds_bits[(fd) / 64] & (1ULL << ((fd) % 64)))
 
+#ifndef _SYS_TIME_H
 struct timeval {
     int64_t tv_sec;
     int64_t tv_usec;
 };
+#endif
+
 #endif
