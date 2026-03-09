@@ -1,6 +1,7 @@
 #ifndef __ETEROS_HOST_TEST__
 #define __ETEROS_HOST_TEST__
 #endif
+#include <assert.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -40,7 +41,7 @@ void kfree(void* ptr) {
 }
 
 /* Include source under test */
-#include <assert.h>
+
 #include "../kernel/fs/jfs.c"
 
 /* Tests */
