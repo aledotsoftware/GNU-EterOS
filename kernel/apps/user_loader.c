@@ -44,20 +44,20 @@ void user_loader_entry(void) {
     uint64_t entry_point = 0;
 
     /* Try to load ELF from Initrd */
-    /* Load Marea Shell (Wayland-like Desktop Environment) */
-    entry_point = elf_load_file("marea_shell.elf", 0x200000000);
-
-    if (entry_point == 0) {
-        entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
-    }
-
-    /* Fallback: Load eterland.elf (legacy GUI) */
-    if (entry_point == 0) {
-        entry_point = elf_load_file("eterland.elf", 0x200000000);
-    }
+    /* Load Eterland (User requested to work on eterland UI) */
+    entry_point = elf_load_file("eterland.elf", 0x200000000);
 
     if (entry_point == 0) {
         entry_point = elf_load_file("/eterland.elf", 0x200000000);
+    }
+
+    /* Fallback: Load Marea Shell (Wayland-like Desktop Environment) */
+    if (entry_point == 0) {
+        entry_point = elf_load_file("marea_shell.elf", 0x200000000);
+    }
+
+    if (entry_point == 0) {
+        entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
     }
 
     if (entry_point == 0) {
