@@ -119,8 +119,8 @@ test_net_echo.elf: $(LIBC_OBJ) test_net_echo.o
 marea_shell.o: marea_shell.c
 	$(CC) $(CFLAGS) -c marea_shell.c -o marea_shell.o
 
-marea_shell.elf eterland.elf: $(LIBC_OBJ) marea_shell.o
-	$(LD) $(LDFLAGS) -o marea_shell.elf eterland.elf $(LIBC_OBJ) marea_shell.o
+marea_shell.elf: $(LIBC_OBJ) marea_shell.o
+	$(LD) $(LDFLAGS) -o marea_shell.elf $(LIBC_OBJ) marea_shell.o
 
 eterland.o: eterland.c
 	$(CC) $(CFLAGS) -c eterland.c -o eterland.o
