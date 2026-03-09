@@ -251,7 +251,7 @@ void test_double_free() {
     kfree(p);
 
     // Double free - should warning but not crash or corrupt
-    // kfree(p); // ASSERT is catching this double-free now, which we stubbed to exit(1) in the test
+    kfree(p);
 
     block_header_t* h = (block_header_t*)((uintptr_t)p - sizeof(block_header_t));
     assert(h->is_free == 1);
