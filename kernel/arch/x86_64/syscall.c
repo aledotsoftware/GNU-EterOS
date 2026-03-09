@@ -2131,6 +2131,13 @@ static int64_t sys_chdir(const char* path) {
         kfree(node);
         return -ENOTDIR;
     }
+
+    /* SECURITY FIX: Enforce execute/search permission for directory traversal */
+    if (!check_node_permission(node, 1)) {
+        kfree(node);
+        return -EACCES;
+    }
+
     kfree(node);
 
     task_t* current = task_get_current();

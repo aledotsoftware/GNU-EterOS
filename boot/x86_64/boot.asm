@@ -103,7 +103,7 @@ stage1_start:
     ; Relocalizar Initrd: 0x29E00 -> 0x40000 (32 KB fijo o dinámico)
     mov cx, (64 * 512) / 4 ; 64 sectores
     mov esi, 0x29E00
-    mov edi, 0x40000
+    mov edi, 0x4000000
     rep movsd
 %else
     ; ---- Cargar Stage 2 desde disco ----
@@ -353,7 +353,7 @@ load_kernel:
 ; -----------------------------------------------------------------------------
 ; load_initrd: Carga el Initrd desde disco
 ; -----------------------------------------------------------------------------
-INITRD_LOAD_ADDR    equ 0x40000     ; Mover Initrd a 0x40000 (256 KB)
+INITRD_LOAD_ADDR    equ 0x4000000     ; Mover Initrd a 0x4000000 (64 MB)
 %ifndef INITRD_SECTORS
 INITRD_SECTORS      equ 512         ; Keep the increased limit (default)
 %endif
