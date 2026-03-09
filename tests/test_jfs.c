@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <assert.h>
+
 #include <stdint.h>
 
 /* Mock types */
@@ -40,6 +40,7 @@ void kfree(void* ptr) {
 }
 
 /* Include source under test */
+#include <assert.h>
 #include "../kernel/fs/jfs.c"
 
 /* Tests */
