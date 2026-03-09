@@ -203,13 +203,14 @@ static void draw_window(window_t* win, rect_t* clip) {
         }
     } else {
         /* Fallback for other depths */
+        int32_t start_win_y = draw_y_start - win->y;
+        int32_t start_win_x = draw_x_start - win->x;
+
         if (win->flags & WIN_GLASS) {
             for (int32_t y = draw_y_start; y < draw_y_end; y++) {
+                uint32_t* src_row = win->buffer + ((start_win_y + (y - draw_y_start)) * win->width) + start_win_x;
                 for (int32_t x = draw_x_start; x < draw_x_end; x++) {
-                    int32_t win_x = x - win->x;
-                    int32_t win_y = y - win->y;
-
-                    uint32_t sc = win->buffer[win_y * win->width + win_x];
+                    uint32_t sc = *src_row++;
                     if (sc != 0) {
                         uint32_t a = (sc >> 24) & 0xFF;
                         if (a == 255) {
@@ -229,13 +230,11 @@ static void draw_window(window_t* win, rect_t* clip) {
                 }
             }
         } else {
+            /* ⚡ BOLT Optimization: Hoist multiplication out of the inner loop */
             for (int32_t y = draw_y_start; y < draw_y_end; y++) {
+                uint32_t* src_row = win->buffer + ((start_win_y + (y - draw_y_start)) * win->width) + start_win_x;
                 for (int32_t x = draw_x_start; x < draw_x_end; x++) {
-                    /* Map screen (x,y) to window (win_x, win_y) */
-                    int32_t win_x = x - win->x;
-                    int32_t win_y = y - win->y;
-
-                    uint32_t color = win->buffer[win_y * win->width + win_x];
+                    uint32_t color = *src_row++;
 
                     /* Simple Alpha: If 0, transparent */
                     if (color != 0) {

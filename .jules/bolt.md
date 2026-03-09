@@ -56,3 +56,7 @@
 ## 2024-11-20 - [Alpha Rendering Loop Optimization]
 **Learning:** In tight 32bpp unrolled drawing loops (like the `draw_window` alpha path), using a combined bitwise OR on multiple pixels (e.g., `c0 | c1 | c2 ...`) to skip evaluating non-zero branches for entirely transparent chunks yields measurable performance wins, especially when dealing with rounded or sparse elements where long spans of zero-alpha exist. This relies on the property that any non-zero color value will result in a non-zero OR sum.
 **Action:** When writing fast-paths for rasterizing sprites or windows with alpha channels, consider grouping pixels into unrolled chunks (e.g. 4x or 8x) and gating the memory write block with a single boolean check on their bitwise OR to avoid excessive branching.
+
+## 2026-03-09 - [Render Fallback Loop Pointer Math]
+**Learning:** In fallback rendering paths (e.g., legacy BPP support for windows or images), per-pixel math like `buffer[y * width + x]` adds massive overhead inside nested `y`/`x` loops.
+**Action:** When a fallback path cannot utilize block memory operations (`memcpy`), hoist coordinate calculations out of the inner loop and use simple linear pointer increments (`*src++`) whenever drawing contiguous pixel regions.

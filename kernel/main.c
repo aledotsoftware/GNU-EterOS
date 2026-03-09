@@ -391,9 +391,11 @@ static void show_splash(void) {
         }
     } else {
         /* Fallback for other depths */
+        /* ⚡ BOLT Optimization: Use linear pointer advancement to avoid multiplication */
+        uint32_t* src_pixel = pixel_data;
         for (int y = 0; y < 200; y++) {
             for (int x = 0; x < 200; x++) {
-                 uint32_t color = pixel_data[y * 200 + x];
+                 uint32_t color = *src_pixel++;
                  framebuffer_putpixel(start_x + x, start_y + y, color);
             }
         }
