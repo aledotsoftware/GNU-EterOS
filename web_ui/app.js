@@ -58,17 +58,19 @@ function makeDraggable(element) {
         header.onmousedown = dragMouseDown;
     }
 
+    // Bring to front when any part of the window is clicked
+    element.addEventListener('mousedown', () => {
+        const windows = document.querySelectorAll('.window');
+        windows.forEach(w => w.style.zIndex = 1);
+        element.style.zIndex = 10;
+    });
+
     function dragMouseDown(e) {
         e.preventDefault();
         pos3 = e.clientX;
         pos4 = e.clientY;
         document.onmouseup = closeDragElement;
         document.onmousemove = elementDrag;
-
-        // Bring to front
-        const windows = document.querySelectorAll('.window');
-        windows.forEach(w => w.style.zIndex = 1);
-        element.style.zIndex = 10;
     }
 
     function elementDrag(e) {
