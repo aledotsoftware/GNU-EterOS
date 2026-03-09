@@ -143,6 +143,8 @@ void mouse_init(void) {
     /* 5. Enable Mouse port on controller */
     if (!mouse_wait(1)) return;
     outb(PORT_STATUS, PS2_CMD_ENABLE_AUX);
+    if (!mouse_wait(1)) return;
+    outb(PORT_STATUS, 0xAE); /* Enable Keyboard */
 
     /* 6. Enviar comando de Reset al mouse */
     serial_write_string("[MOUSE] Reset (0xFF)... ");
@@ -160,16 +162,16 @@ void mouse_init(void) {
     }
     serial_write_string("\n");
 
-    /* 7. Sample Rate / Resolution settings to be safe */
-    mouse_write(MOUSE_SET_SAMPLE); mouse_read(); /* ACK */
-    mouse_write(100); mouse_read(); /* ACK */
-    
-    /* 8. Resetear defaults del mouse */
+    /* 7. Resetear defaults del mouse */
     serial_write_string("[MOUSE] Defaults (0xF6)... ");
     if (!mouse_write(MOUSE_SET_DEFAULTS)) return;
     ack = mouse_read(); 
     serial_write_hex8(ack);
     serial_write_string("\n");
+
+    /* 8. Sample Rate / Resolution settings to be safe */
+    mouse_write(MOUSE_SET_SAMPLE); mouse_read(); /* ACK */
+    mouse_write(100); mouse_read(); /* ACK */
 
     /* 9. Habilitar reporte de datos */
     serial_write_string("[MOUSE] Enable (0xF4)... ");
