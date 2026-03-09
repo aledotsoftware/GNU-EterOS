@@ -19,6 +19,21 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         return 0;
     }
 
+    /* SECURITY FIX: Enforce execute permissions */
+    task_t* _sec_current = task_get_current();
+    if (_sec_current && _sec_current->euid != 0) {
+        uint32_t granted = 0;
+        if (_sec_current->euid == node->uid) granted = (node->mask >> 6) & 7;
+        else if (_sec_current->egid == node->gid) granted = (node->mask >> 3) & 7;
+        else granted = node->mask & 7;
+
+        if (!(granted & 1)) { /* 1 = Execute */
+            serial_write_string("[ELF] Permission denied. Missing execute permission.\n");
+            kfree(node);
+            return 0;
+        }
+    }
+
     Elf64_Ehdr header;
     if (read_fs(node, 0, sizeof(Elf64_Ehdr), (uint8_t*)&header) != sizeof(Elf64_Ehdr)) {
         serial_write_string("[ELF] Failed to read ELF header.\n");

@@ -68,3 +68,8 @@
 **Vulnerability:** The system calls `sys_setuid` and `sys_setgid` modified only the real `uid` and `gid` in `task_t`, completely ignoring `euid` and `egid`. Since VFS permission checks (`check_node_permission`) evaluate `euid` and `egid`, this omission meant that processes intending to drop privileges (e.g., setuid root programs stepping down to unprivileged users) remained with elevated privileges for file access, leading to critical authorization bypass vulnerabilities.
 **Learning:** Security state transitions must encompass all aspects of process identity. Modifying just the real user/group ID without synchronizing the effective ID breaks the security boundaries assumed by applications when managing least privilege.
 **Prevention:** Always ensure that effective identities (`euid`/`egid`) are securely synced with real identities during credential manipulation system calls unless specifically building mechanisms that maintain independent values (like `setreuid`).
+
+## 2026-06-03 - sys_execve Permission Bypass
+**Vulnerability:** The `sys_execve` system call (handled via `task_exec` and `elf_load_file`) did not check if the calling task had execute permissions (`X_OK`) for the requested file. A user could execute any file they had read access to, bypassing standard POSIX execution controls.
+**Learning:** Core process execution paths must validate authorization independently, just like read/write operations. A successful path resolution (`vfs_lookup`) does not imply execution rights.
+**Prevention:** In any function loading an executable (like `elf_load_file`), explicitly calculate and verify the granted permissions (using `euid`, `egid`, and the file's `mask`) against the execute bit before processing the file.
