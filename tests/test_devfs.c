@@ -56,7 +56,7 @@ void test_devfs_finddir() {
     printf("Testing devfs_finddir...\n");
 
     fs_node_t *root = devfs_init();
-    assert(root != NULL);
+    ASSERT(root != NULL);
 
     // Test existing nodes
     const char *existing_nodes[] = {
@@ -76,7 +76,7 @@ void test_devfs_finddir() {
         }
 
         // Ensure name was set properly
-        assert(eteros_strcmp(node->name, existing_nodes[i]) == 0);
+        ASSERT(eteros_strcmp(node->name, existing_nodes[i]) == 0);
 
         kfree(node);
     }
@@ -103,3 +103,4 @@ int main() {
     test_devfs_finddir();
     return 0;
 }
+void serial_write_string(const char* s) {}

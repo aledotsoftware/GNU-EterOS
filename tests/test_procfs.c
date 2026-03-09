@@ -69,18 +69,18 @@ void test_proc_version() {
     printf("Running test_proc_version...\n");
 
     fs_node_t* root = procfs_init();
-    assert(root != NULL);
+    ASSERT(root != NULL);
 
     fs_node_t* version_node = root->finddir(root, "version");
-    assert(version_node != NULL);
-    assert(eteros_strcmp(version_node->name, "version") == 0);
+    ASSERT(version_node != NULL);
+    ASSERT(eteros_strcmp(version_node->name, "version") == 0);
 
     char buffer[256];
     eteros_memset(buffer, 0, sizeof(buffer));
 
     uint32_t read_bytes = version_node->read(version_node, 0, sizeof(buffer), (uint8_t*)buffer);
-    assert(read_bytes > 0);
-    assert(eteros_strncmp(buffer, "eterOS version", 14) == 0);
+    ASSERT(read_bytes > 0);
+    ASSERT(eteros_strncmp(buffer, "eterOS version", 14) == 0);
 
     printf("  Content: %s", buffer);
 
@@ -88,8 +88,8 @@ void test_proc_version() {
     char partial[10];
     read_bytes = version_node->read(version_node, 0, 6, (uint8_t*)partial);
     partial[6] = '\0';
-    assert(read_bytes == 6);
-    assert(eteros_strcmp(partial, "eterOS") == 0);
+    ASSERT(read_bytes == 6);
+    ASSERT(eteros_strcmp(partial, "eterOS") == 0);
 
     kfree(version_node);
     kfree(root);
@@ -103,7 +103,7 @@ void test_proc_uptime() {
 
     fs_node_t* root = procfs_init();
     fs_node_t* uptime_node = root->finddir(root, "uptime");
-    assert(uptime_node != NULL);
+    ASSERT(uptime_node != NULL);
 
     char buffer[256];
     eteros_memset(buffer, 0, sizeof(buffer));
@@ -113,7 +113,7 @@ void test_proc_uptime() {
 
     /* Expected: "12345.00 0.00\n" */
     printf("  Uptime string: %s", buffer);
-    assert(eteros_strncmp(buffer, "12345.00 0.00", 13) == 0);
+    ASSERT(eteros_strncmp(buffer, "12345.00 0.00", 13) == 0);
 
     kfree(uptime_node);
     kfree(root);
@@ -130,7 +130,7 @@ void test_proc_meminfo() {
 
     fs_node_t* root = procfs_init();
     fs_node_t* meminfo_node = root->finddir(root, "meminfo");
-    assert(meminfo_node != NULL);
+    ASSERT(meminfo_node != NULL);
 
     char buffer[512];
     eteros_memset(buffer, 0, sizeof(buffer));
@@ -145,9 +145,9 @@ void test_proc_meminfo() {
     /* 64MB = 65536 kB */
     /* 32MB = 32768 kB */
 
-    assert(strstr(buffer, "MemTotal:       65536 kB"));
-    assert(strstr(buffer, "MemFree:        32768 kB"));
-    assert(strstr(buffer, "MemUsed:        32768 kB"));
+    ASSERT(strstr(buffer, "MemTotal:       65536 kB"));
+    ASSERT(strstr(buffer, "MemFree:        32768 kB"));
+    ASSERT(strstr(buffer, "MemUsed:        32768 kB"));
 
     kfree(meminfo_node);
     kfree(root);
@@ -158,32 +158,32 @@ void test_proc_directory() {
     printf("Running test_proc_directory...\n");
 
     fs_node_t* root = procfs_init();
-    assert(root->flags == FS_DIRECTORY);
+    ASSERT(root->flags == FS_DIRECTORY);
 
     struct dirent entry;
 
     /* Index 0: version */
-    assert(root->readdir(root, 0, &entry) == 0);
-    assert(eteros_strcmp(entry.name, "version") == 0);
+    ASSERT(root->readdir(root, 0, &entry) == 0);
+    ASSERT(eteros_strcmp(entry.name, "version") == 0);
 
     /* Index 1: uptime */
-    assert(root->readdir(root, 1, &entry) == 0);
-    assert(eteros_strcmp(entry.name, "uptime") == 0);
+    ASSERT(root->readdir(root, 1, &entry) == 0);
+    ASSERT(eteros_strcmp(entry.name, "uptime") == 0);
 
     /* Index 2: meminfo */
-    assert(root->readdir(root, 2, &entry) == 0);
-    assert(eteros_strcmp(entry.name, "meminfo") == 0);
+    ASSERT(root->readdir(root, 2, &entry) == 0);
+    ASSERT(eteros_strcmp(entry.name, "meminfo") == 0);
 
     /* Index 3: self */
-    assert(root->readdir(root, 3, &entry) == 0);
-    assert(eteros_strcmp(entry.name, "self") == 0);
+    ASSERT(root->readdir(root, 3, &entry) == 0);
+    ASSERT(eteros_strcmp(entry.name, "self") == 0);
 
     /* Index 4: EOF */
-    assert(root->readdir(root, 4, &entry) != 0);
+    ASSERT(root->readdir(root, 4, &entry) != 0);
 
     /* Find invalid */
     fs_node_t* invalid = root->finddir(root, "invalid");
-    assert(invalid == NULL);
+    ASSERT(invalid == NULL);
 
     kfree(root);
     printf("  Passed.\n");
@@ -198,3 +198,4 @@ int main() {
     printf("All ProcFS tests passed!\n");
     return 0;
 }
+void serial_write_string(const char* s) {}

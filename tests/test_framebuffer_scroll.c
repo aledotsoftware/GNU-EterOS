@@ -1,3 +1,4 @@
+#include <assert.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -137,8 +138,8 @@ int main() {
     terminal_switch_to_framebuffer(&info);
 
     /* Verify Framebuffer Mode */
-    assert(use_framebuffer == true);
-    assert(fb_buffer != NULL);
+    ASSERT(use_framebuffer == true);
+    ASSERT(fb_buffer != NULL);
 
     /* Fill screen with a pattern */
     /* We write enough lines to fill the screen */

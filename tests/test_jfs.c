@@ -1,3 +1,4 @@
+#include <assert.h>
 #ifndef __ETEROS_HOST_TEST__
 #define __ETEROS_HOST_TEST__
 #endif
@@ -60,14 +61,14 @@ void test_jfs_init() {
     reset_jfs_state(); // Reset heap and static vars
 
     fs_node_t* fs = jfs_init();
-    assert(fs != NULL);
-    assert(strcmp(fs->name, "jfs_root") == 0);
-    assert(fs->flags == FS_DIRECTORY);
+    ASSERT(fs != NULL);
+    ASSERT(strcmp(fs->name, "jfs_root") == 0);
+    ASSERT(fs->flags == FS_DIRECTORY);
 
     // Verify Superblock
-    assert(sb != NULL);
-    assert(sb->magic == JFS_MAGIC);
-    assert(sb->block_size == 512);
+    ASSERT(sb != NULL);
+    ASSERT(sb->magic == JFS_MAGIC);
+    ASSERT(sb->block_size == 512);
 
     printf("PASSED\n");
 }
@@ -79,12 +80,12 @@ void test_jfs_create_file() {
 
     // Create file
     int res = root->create(root, "test.txt", 0);
-    assert(res == 0);
+    ASSERT(res == 0);
 
     // Find file
     fs_node_t* file = root->finddir(root, "test.txt");
-    assert(file != NULL);
-    assert(strcmp(file->name, "test.txt") == 0);
+    ASSERT(file != NULL);
+    ASSERT(strcmp(file->name, "test.txt") == 0);
 
     // Verify Journal for creation (directory update)
     uint32_t j_start = sb->journal_start;
@@ -98,20 +99,20 @@ void test_jfs_create_file() {
 
     // Check TX_COMMIT
     jfs_journal_header_t* commit_hdr = (jfs_journal_header_t*)(jfs_disk_buffer + ((j_start + 3) * 512));
-    assert(commit_hdr->type == JFS_TX_COMMIT);
+    ASSERT(commit_hdr->type == JFS_TX_COMMIT);
 
     // Check TX_BEGIN
     jfs_journal_header_t* begin_hdr = (jfs_journal_header_t*)(jfs_disk_buffer + (j_start * 512));
-    assert(begin_hdr->type == JFS_TX_BEGIN);
-    assert(begin_hdr->tx_id == commit_hdr->tx_id);
+    ASSERT(begin_hdr->type == JFS_TX_BEGIN);
+    ASSERT(begin_hdr->tx_id == commit_hdr->tx_id);
 
     // Check TX_DATA
     jfs_journal_header_t* data_hdr = (jfs_journal_header_t*)(jfs_disk_buffer + ((j_start + 1) * 512));
-    assert(data_hdr->type == JFS_TX_DATA);
+    ASSERT(data_hdr->type == JFS_TX_DATA);
 
     // Verify target block matches root dir block
     // Root dir block is sb->data_start (100)
-    assert(data_hdr->target_block == sb->data_start);
+    ASSERT(data_hdr->target_block == sb->data_start);
 
     printf("PASSED\n");
 }
@@ -124,39 +125,39 @@ void test_jfs_write_read() {
     // Create file
     root->create(root, "data.txt", 0);
     fs_node_t* file = root->finddir(root, "data.txt");
-    assert(file != NULL);
+    ASSERT(file != NULL);
 
     const char* data = "Hello, Journaling Filesystem!";
     uint32_t len = strlen(data);
 
     // Write
     uint32_t written = file->write(file, 0, len, (uint8_t*)data);
-    assert(written == len);
+    ASSERT(written == len);
 
     // Read
     char buffer[100];
     memset(buffer, 0, sizeof(buffer));
     uint32_t read = file->read(file, 0, sizeof(buffer), (uint8_t*)buffer);
-    assert(read == len);
-    assert(strcmp(buffer, data) == 0);
+    ASSERT(read == len);
+    ASSERT(strcmp(buffer, data) == 0);
 
     // Verify Journal for write
     uint32_t j_start = sb->journal_start;
 
     // Inspect the journal area.
     jfs_journal_header_t* commit_hdr = (jfs_journal_header_t*)(jfs_disk_buffer + ((j_start + 3) * 512));
-    assert(commit_hdr->type == JFS_TX_COMMIT);
+    ASSERT(commit_hdr->type == JFS_TX_COMMIT);
 
     // Verify data in journal
     uint8_t* journal_data = jfs_disk_buffer + ((j_start + 2) * 512);
-    assert(memcmp(journal_data, data, len) == 0);
+    ASSERT(memcmp(journal_data, data, len) == 0);
 
     // Verify file still exists in directory (check for corruption)
     // If jfs_write overwrote the root directory block (100), this will fail.
     fs_node_t* file2 = root->finddir(root, "data.txt");
     if (file2 == NULL) {
         printf("CRITICAL: Root directory corrupted by file write!\n");
-        assert(file2 != NULL);
+        ASSERT(file2 != NULL);
     }
 
     printf("PASSED\n");
@@ -174,17 +175,17 @@ void test_jfs_directory() {
 
     // Readdir index 0
     int res = root->readdir(root, 0, &entry);
-    assert(res == 0);
-    assert(strcmp(entry.name, "file1.txt") == 0);
+    ASSERT(res == 0);
+    ASSERT(strcmp(entry.name, "file1.txt") == 0);
 
     // Readdir index 1
     res = root->readdir(root, 1, &entry);
-    assert(res == 0);
-    assert(strcmp(entry.name, "file2.txt") == 0);
+    ASSERT(res == 0);
+    ASSERT(strcmp(entry.name, "file2.txt") == 0);
 
     // Readdir index 2 (EOF)
     res = root->readdir(root, 2, &entry);
-    assert(res != 0);
+    ASSERT(res != 0);
 
     printf("PASSED\n");
 }

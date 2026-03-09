@@ -31,6 +31,7 @@ KERNEL_SECTORS      equ 512            ; Sectores del kernel (256 KB default)
 %endif
 STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
 TEMP_KERNEL_ADDR    equ 0x10000         ; Buffer temporal bajo 1MB para BIOS (movido a 64KB)
+TEMP_INITRD_ADDR    equ 0x50000         ; Buffer temporal para initrd (después de 256KB de kernel)
 FINAL_KERNEL_ADDR   equ 0x100000        ; Dirección final en 1MB (donde BSS tiene espacio)
 STACK_TOP           equ 0x8000000       ; Stack en 128MB (Lejos del heap de 96MB)
 
@@ -366,7 +367,7 @@ load_initrd:
     ; Leer sectores del Initrd
     mov eax, INITRD_START_LBA       ; LBA Inicio
     mov ecx, INITRD_SECTORS         ; Cantidad de sectores
-    mov edi, INITRD_LOAD_ADDR       ; Destino (Linear Addr)
+    mov edi, TEMP_INITRD_ADDR       ; Destino temporal (bajo 1MB)
 
     call read_sectors_lba
     ret
@@ -717,6 +718,12 @@ protected_mode_start:
     mov esi, TEMP_KERNEL_ADDR
     mov edi, FINAL_KERNEL_ADDR
     mov ecx, KERNEL_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores
+    rep movsd
+
+    ; ---- Relocalizar Initrd a su posición final (64MB) ----
+    mov esi, TEMP_INITRD_ADDR
+    mov edi, INITRD_LOAD_ADDR
+    mov ecx, INITRD_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores
     rep movsd
 
     ; ---- Configurar tablas de paginación ----
