@@ -198,13 +198,19 @@ void framebuffer_clear(uint32_t color) {
             uint8_t r = (color >> 16) & 0xFF;
             uint8_t g = (color >> 8) & 0xFF;
             uint8_t b = (color) & 0xFF;
-            for (uint32_t y = 0; y < fb_height; y++) {
-                uint8_t* row = (uint8_t*)active_buffer + (y * fb_pitch);
-                for (uint32_t x = 0; x < fb_width; x++) {
-                    row[x*3] = b;
-                    row[x*3+1] = g;
-                    row[x*3+2] = r;
-                }
+            /* ⚡ BOLT Optimization: Build the first row once, then copy it with memcpy
+               to subsequent rows instead of per-pixel assignments. */
+            uint8_t* first_row = (uint8_t*)active_buffer;
+            for (uint32_t x = 0; x < fb_width; x++) {
+                first_row[x*3] = b;
+                first_row[x*3+1] = g;
+                first_row[x*3+2] = r;
+            }
+            uint8_t* dest_row = first_row + fb_pitch;
+            size_t row_bytes = fb_width * 3;
+            for (uint32_t y = 1; y < fb_height; y++) {
+                memcpy(dest_row, first_row, row_bytes);
+                dest_row += fb_pitch;
             }
         } else if (fb_bpp == 16) {
             uint8_t r = (color >> 16) & 0xFF;
@@ -257,13 +263,22 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
         uint8_t r = (color >> 16) & 0xFF;
         uint8_t g = (color >> 8) & 0xFF;
         uint8_t b = (color) & 0xFF;
-        for (uint32_t i = 0; i < h; i++) {
-            uint8_t* row_ptr = (uint8_t*)active_buffer + ((y + i) * fb_pitch) + (x * 3);
-            for (uint32_t j = 0; j < w; j++) {
-                *row_ptr++ = b;
-                *row_ptr++ = g;
-                *row_ptr++ = r;
-            }
+
+        /* ⚡ BOLT Optimization: Build the first row segment once, then use memcpy
+           to blast it to the remaining rows, drastically reducing inner loop overhead. */
+        uint8_t* first_row_ptr = (uint8_t*)active_buffer + (y * fb_pitch) + (x * 3);
+        uint8_t* p = first_row_ptr;
+        for (uint32_t j = 0; j < w; j++) {
+            *p++ = b;
+            *p++ = g;
+            *p++ = r;
+        }
+
+        size_t row_bytes = w * 3;
+        uint8_t* dest_row_ptr = first_row_ptr + fb_pitch;
+        for (uint32_t i = 1; i < h; i++) {
+            memcpy(dest_row_ptr, first_row_ptr, row_bytes);
+            dest_row_ptr += fb_pitch;
         }
     } else if (fb_bpp == 16) {
         uint8_t r = (color >> 16) & 0xFF;
