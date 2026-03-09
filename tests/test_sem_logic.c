@@ -1,3 +1,4 @@
+#include <assert.h>
 #define __ETEROS_HOST_TEST__ 1
 
 #include <stdio.h>
@@ -66,7 +67,7 @@ void test_sem_signal_null(void) {
     printf("Test: sem_signal with NULL semaphore...\n");
     task_wakeup_called = 0;
     sem_signal(NULL);
-    assert(task_wakeup_called == 0);
+    ASSERT(task_wakeup_called == 0);
     printf("PASS\n");
 }
 
@@ -85,8 +86,8 @@ void test_sem_signal_no_waiters(void) {
 
     sem_signal(&sem);
 
-    assert(sem.count == 1);
-    assert(task_wakeup_called == 0);
+    ASSERT(sem.count == 1);
+    ASSERT(task_wakeup_called == 0);
     printf("PASS\n");
 }
 
@@ -111,30 +112,30 @@ void test_sem_signal_with_waiters(void) {
     sem_signal(&sem);
 
     /* Should increment count */
-    assert(sem.count == 1);
+    ASSERT(sem.count == 1);
 
     /* Should wake up exactly ONE task */
-    assert(task_wakeup_called == 1);
-    assert(last_woken_task != NULL);
-    assert(last_woken_task->id == 1 || last_woken_task->id == 2);
+    ASSERT(task_wakeup_called == 1);
+    ASSERT(last_woken_task != NULL);
+    ASSERT(last_woken_task->id == 1 || last_woken_task->id == 2);
 
     /* The woken task should no longer be waiting on 'sem' */
-    assert(last_woken_task->waiting_sem == NULL);
-    assert(last_woken_task->state == TASK_READY);
+    ASSERT(last_woken_task->waiting_sem == NULL);
+    ASSERT(last_woken_task->state == TASK_READY);
 
     /* The other task should still be waiting */
     task_t* other_task = (last_woken_task->id == 1) ? &tasks[2] : &tasks[1];
-    assert(other_task->waiting_sem == (struct semaphore*)&sem);
-    assert(other_task->state == TASK_BLOCKED);
+    ASSERT(other_task->waiting_sem == (struct semaphore*)&sem);
+    ASSERT(other_task->state == TASK_BLOCKED);
 
     /* Second signal */
     sem_signal(&sem);
 
-    assert(sem.count == 2);
-    assert(task_wakeup_called == 2);
-    assert(last_woken_task == other_task);
-    assert(last_woken_task->waiting_sem == NULL);
-    assert(last_woken_task->state == TASK_READY);
+    ASSERT(sem.count == 2);
+    ASSERT(task_wakeup_called == 2);
+    ASSERT(last_woken_task == other_task);
+    ASSERT(last_woken_task->waiting_sem == NULL);
+    ASSERT(last_woken_task->state == TASK_READY);
 
     printf("PASS\n");
 }
@@ -147,3 +148,4 @@ int main(void) {
     printf("All sem_logic tests passed!\n");
     return 0;
 }
+void serial_write_string(const char* s) {}

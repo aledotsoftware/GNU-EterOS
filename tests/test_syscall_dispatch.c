@@ -1,3 +1,4 @@
+#include <assert.h>
 #define _STRUCT_TIMESPEC
 #define __ETEROS_HOST_TEST__ 1
 
@@ -138,14 +139,14 @@ int main() {
     printf("Output: ");
     syscall_handler(&regs);
     printf("\n");
-    // // assert(regs.rax == 5);
+    // // ASSERT(regs.rax == 5);
     printf("SYS_write passed\n");
 
     /* Test ENOSYS */
     regs.rax = 999;
     syscall_handler(&regs);
     printf("Unknown syscall returned: %lld (expected %lld)\n", (long long)regs.rax, (long long)-38);
-    assert(regs.rax == (uint64_t)-38);
+    ASSERT(regs.rax == (uint64_t)-38);
     printf("ENOSYS passed\n");
 
     /* Test sys_uname */
@@ -162,13 +163,13 @@ int main() {
 
     printf("sys_uname returned: %lld\n", (long long)regs.rax);
 
-    assert(regs.rax == 0);
+    ASSERT(regs.rax == 0);
 
-    assert(eteros_strcmp(uts.sysname, "Linux") == 0);
+    ASSERT(eteros_strcmp(uts.sysname, "Linux") == 0);
 
-    assert(eteros_strcmp(uts.nodename, "eterOS") == 0);
+    ASSERT(eteros_strcmp(uts.nodename, "eterOS") == 0);
 
-    assert(eteros_strcmp(uts.machine, "x86_64") == 0);
+    ASSERT(eteros_strcmp(uts.machine, "x86_64") == 0);
 
     printf("sys_uname valid pointer passed\n");
 
@@ -180,7 +181,7 @@ int main() {
 
     syscall_handler(&regs);
 
-    assert(regs.rax == (uint64_t)-EFAULT);
+    ASSERT(regs.rax == (uint64_t)-EFAULT);
 
     printf("sys_uname NULL pointer passed\n");
 

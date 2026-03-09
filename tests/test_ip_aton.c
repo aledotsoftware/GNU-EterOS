@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
@@ -19,42 +20,42 @@ void test_valid_ips() {
 
     /* 1.2.3.4 -> 0x04030201 (Little Endian) */
     uint32_t val = ip_aton("1.2.3.4");
-    assert(val == 0x04030201);
+    ASSERT(val == 0x04030201);
 
     /* 0.0.0.0 -> 0x00000000 */
     /* Note: ip_aton returns 0 on failure, so 0.0.0.0 is technically valid but ambiguous return */
     /* Implementation logic: digits=1 ('0'), part=0. Loop runs 4 times. Returns 0. Correct. */
     val = ip_aton("0.0.0.0");
-    assert(val == 0);
+    ASSERT(val == 0);
 
     /* 255.255.255.255 -> 0xFFFFFFFF */
     val = ip_aton("255.255.255.255");
-    assert(val == 0xFFFFFFFF);
+    ASSERT(val == 0xFFFFFFFF);
 }
 
 void test_invalid_ips() {
     printf("Testing Invalid IPs...\n");
 
     /* Overflow per octet */
-    assert(ip_aton("256.0.0.0") == 0);
-    assert(ip_aton("300.2.3.4") == 0);
-    assert(ip_aton("1.2.3.256") == 0);
+    ASSERT(ip_aton("256.0.0.0") == 0);
+    ASSERT(ip_aton("300.2.3.4") == 0);
+    ASSERT(ip_aton("1.2.3.256") == 0);
 
     /* Missing octets */
-    assert(ip_aton("1.2.3") == 0);
-    assert(ip_aton("1.2") == 0);
-    assert(ip_aton("1") == 0);
+    ASSERT(ip_aton("1.2.3") == 0);
+    ASSERT(ip_aton("1.2") == 0);
+    ASSERT(ip_aton("1") == 0);
 
     /* Extra octets / garbage */
-    assert(ip_aton("1.2.3.4.5") == 0);
-    assert(ip_aton("1.2.3.4a") == 0);
-    assert(ip_aton("1.2.3.4 ") == 0); // Trailing space
+    ASSERT(ip_aton("1.2.3.4.5") == 0);
+    ASSERT(ip_aton("1.2.3.4a") == 0);
+    ASSERT(ip_aton("1.2.3.4 ") == 0); // Trailing space
 
     /* Format errors */
-    assert(ip_aton("1.2.3.") == 0);   // Trailing dot
-    assert(ip_aton(".2.3.4") == 0);   // Leading dot
-    assert(ip_aton("1..3.4") == 0);   // Double dot
-    assert(ip_aton("1.2.3.4.") == 0); // Trailing dot after valid IP
+    ASSERT(ip_aton("1.2.3.") == 0);   // Trailing dot
+    ASSERT(ip_aton(".2.3.4") == 0);   // Leading dot
+    ASSERT(ip_aton("1..3.4") == 0);   // Double dot
+    ASSERT(ip_aton("1.2.3.4.") == 0); // Trailing dot after valid IP
 }
 
 int main() {
@@ -64,3 +65,4 @@ int main() {
     printf("All ip_aton tests passed!\n");
     return 0;
 }
+void serial_write_string(const char* s) {}

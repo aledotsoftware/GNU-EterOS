@@ -32,90 +32,90 @@ void test_snprintf() {
 
     /* Basic integer */
     ret = snprintf(buf, sizeof(buf), "%d", 123);
-    assert(strcmp(buf, "123") == 0);
-    assert(ret == 3);
+    ASSERT(strcmp(buf, "123") == 0);
+    ASSERT(ret == 3);
 
     /* Negative integer */
     ret = snprintf(buf, sizeof(buf), "%d", -123);
-    assert(strcmp(buf, "-123") == 0);
-    assert(ret == 4);
+    ASSERT(strcmp(buf, "-123") == 0);
+    ASSERT(ret == 4);
 
     /* Hex (unsigned) */
     ret = snprintf(buf, sizeof(buf), "%x", 0xABC);
-    assert(strcmp(buf, "abc") == 0); /* Lowercase default */
-    assert(ret == 3);
+    ASSERT(strcmp(buf, "abc") == 0); /* Lowercase default */
+    ASSERT(ret == 3);
 
     /* Hex (uppercase) */
     ret = snprintf(buf, sizeof(buf), "%X", 0xABC);
-    assert(strcmp(buf, "ABC") == 0);
-    assert(ret == 3);
+    ASSERT(strcmp(buf, "ABC") == 0);
+    ASSERT(ret == 3);
 
     /* String */
     ret = snprintf(buf, sizeof(buf), "%s", "Hello");
-    assert(strcmp(buf, "Hello") == 0);
-    assert(ret == 5);
+    ASSERT(strcmp(buf, "Hello") == 0);
+    ASSERT(ret == 5);
 
     /* Char */
     ret = snprintf(buf, sizeof(buf), "%c", 'A');
-    assert(strcmp(buf, "A") == 0);
-    assert(ret == 1);
+    ASSERT(strcmp(buf, "A") == 0);
+    ASSERT(ret == 1);
 
     /* Pointer */
     void* ptr = (void*)(uintptr_t)0x1234;
     ret = snprintf(buf, sizeof(buf), "%p", ptr);
     /* Should be 0x1234 */
-    assert(strcmp(buf, "0x1234") == 0);
+    ASSERT(strcmp(buf, "0x1234") == 0);
 
     /* Percent */
     ret = snprintf(buf, sizeof(buf), "%%");
-    assert(strcmp(buf, "%") == 0);
-    assert(ret == 1);
+    ASSERT(strcmp(buf, "%") == 0);
+    ASSERT(ret == 1);
 
     /* Mixed */
     ret = snprintf(buf, sizeof(buf), "Val: %d, Hex: %x", 10, 255);
-    assert(strcmp(buf, "Val: 10, Hex: ff") == 0);
+    ASSERT(strcmp(buf, "Val: 10, Hex: ff") == 0);
 
     /* Truncation */
     char small[5]; /* 4 + null */
     ret = snprintf(small, sizeof(small), "%s", "Hello World");
-    assert(ret == 11); /* Should return length needed */
-    assert(strcmp(small, "Hell") == 0); /* Should be truncated to fit */
+    ASSERT(ret == 11); /* Should return length needed */
+    ASSERT(strcmp(small, "Hell") == 0); /* Should be truncated to fit */
 
     /* Zero padding */
     ret = snprintf(buf, sizeof(buf), "%05d", 123);
-    assert(strcmp(buf, "00123") == 0);
+    ASSERT(strcmp(buf, "00123") == 0);
 
     /* Width padding (space) */
     ret = snprintf(buf, sizeof(buf), "%5d", 123);
-    assert(strcmp(buf, "  123") == 0);
+    ASSERT(strcmp(buf, "  123") == 0);
 
     /* Left justification */
     ret = snprintf(buf, sizeof(buf), "%-5d", 123);
-    assert(strcmp(buf, "123  ") == 0);
+    ASSERT(strcmp(buf, "123  ") == 0);
 
     /* Left justification with zero flag (should ignore zero) */
     ret = snprintf(buf, sizeof(buf), "%-05d", 123);
-    assert(strcmp(buf, "123  ") == 0);
+    ASSERT(strcmp(buf, "123  ") == 0);
 
     /* String width padding */
     ret = snprintf(buf, sizeof(buf), "%10s", "Hello");
-    assert(strcmp(buf, "     Hello") == 0);
+    ASSERT(strcmp(buf, "     Hello") == 0);
 
     /* String left justification */
     ret = snprintf(buf, sizeof(buf), "%-10s", "Hello");
-    assert(strcmp(buf, "Hello     ") == 0);
+    ASSERT(strcmp(buf, "Hello     ") == 0);
 
     /* String precision */
     ret = snprintf(buf, sizeof(buf), "%.3s", "Hello");
-    assert(strcmp(buf, "Hel") == 0);
+    ASSERT(strcmp(buf, "Hel") == 0);
 
     /* String width + precision */
     ret = snprintf(buf, sizeof(buf), "%10.3s", "Hello");
-    assert(strcmp(buf, "       Hel") == 0);
+    ASSERT(strcmp(buf, "       Hel") == 0);
 
     /* String width + precision + left justification */
     ret = snprintf(buf, sizeof(buf), "%-10.3s", "Hello");
-    assert(strcmp(buf, "Hel       ") == 0);
+    ASSERT(strcmp(buf, "Hel       ") == 0);
 
     /* INT64_MIN */
     ret = snprintf(buf, sizeof(buf), "%ld", INT64_MIN);
@@ -123,7 +123,7 @@ void test_snprintf() {
     if (strcmp(buf, "-9223372036854775808") != 0) {
         printf("FAIL: INT64_MIN expected '-9223372036854775808', got '%s'\n", buf);
     }
-    assert(strcmp(buf, "-9223372036854775808") == 0);
+    ASSERT(strcmp(buf, "-9223372036854775808") == 0);
 
     printf("snprintf tests passed\n");
 }
@@ -131,11 +131,11 @@ void test_snprintf() {
 void test_kprintf() {
     mock_console_buffer[0] = '\0';
     kprintf("Hello %s", "World");
-    assert(strcmp(mock_console_buffer, "Hello World") == 0);
+    ASSERT(strcmp(mock_console_buffer, "Hello World") == 0);
 
     mock_console_buffer[0] = '\0';
     kprintf("Value: %d", 42);
-    assert(strcmp(mock_console_buffer, "Value: 42") == 0);
+    ASSERT(strcmp(mock_console_buffer, "Value: 42") == 0);
 
     printf("kprintf tests passed\n");
 }
@@ -145,3 +145,4 @@ int main() {
     test_kprintf();
     return 0;
 }
+void serial_write_string(const char* s) {}
