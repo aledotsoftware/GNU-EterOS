@@ -36,3 +36,5 @@ qemu_test.log
 /qemu_test.log
 /qemu_serial.log
 /qemu_debug.log
+qemu.log
+qemu.out

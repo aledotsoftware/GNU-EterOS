@@ -33,6 +33,9 @@ def create_initrd(input_dir, output_file):
             print(f"Warning: Filename '{rel_path}' truncated to 63 chars.")
             rel_path = rel_path[:63]
 
+        # Ignore non-executable or very large specific files if necessary
+        # We will not skip .elfs but in original code there was no skip, wait, was it failing in boot.asm sector limit?
+
         with open(filepath, 'rb') as f:
             content = f.read()
             size = len(content)

@@ -104,7 +104,8 @@ int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
 
     /* Check conflicts with real files */
     for (uint32_t i = 0; i < file_count; i++) {
-        if (strncmp(file_headers[i].name, name, sizeof(file_headers[i].name)) == 0) return -1;
+        size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
+        if (strncmp(name, file_headers[i].name, name_len) == 0 && name[name_len] == '\0') return -1;
     }
 
     initrd_dir_t *new_dir = (initrd_dir_t*)kmalloc(sizeof(initrd_dir_t));
@@ -139,15 +140,14 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
     }
 
     for (uint32_t i = 0; i < file_count; i++) {
-        /* Use strncmp to prevent buffer over-read if header name is not null-terminated */
-        if (strncmp(name, file_headers[i].name, sizeof(file_headers[i].name)) == 0) {
+        size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
+        if (strncmp(name, file_headers[i].name, name_len) == 0 && name[name_len] == '\0') {
              fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
              if (!fnode) return 0;
              memset(fnode, 0, sizeof(fs_node_t));
              fnode->ref_count = 1;
 
              /* Securely copy name */
-             size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
              if (name_len >= sizeof(fnode->name)) name_len = sizeof(fnode->name) - 1;
              memcpy(fnode->name, file_headers[i].name, name_len);
              fnode->name[name_len] = '\0';
@@ -256,7 +256,8 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
 void* initrd_read_file(const char* name, uint32_t* size) {
     if (!initrd_start) return NULL;
     for (uint32_t i = 0; i < file_count; i++) {
-        if (strncmp(file_headers[i].name, name, sizeof(file_headers[i].name)) == 0) {
+        size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
+        if (strncmp(name, file_headers[i].name, name_len) == 0 && name[name_len] == '\0') {
             /* Security Check */
             if (file_headers[i].offset >= initrd_image_size) return NULL;
 

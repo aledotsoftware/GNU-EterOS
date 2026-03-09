@@ -323,20 +323,11 @@ userspace:
 	@echo "[USER] Compilando userspace..."
 	$(MAKE) -C userspace
 	@mkdir -p $(INITRD_DIR)
-	cp userspace/test.elf $(INITRD_DIR)/
-	cp userspace/exec_test.elf $(INITRD_DIR)/
-	cp userspace/test_libc_advanced.elf $(INITRD_DIR)/
-	cp userspace/test_signal.elf $(INITRD_DIR)/
-	cp userspace/test_stdio.elf $(INITRD_DIR)/
-	cp userspace/test_malloc.elf $(INITRD_DIR)/
-	cp userspace/test_pthread.elf $(INITRD_DIR)/
 	cp userspace/login.elf $(INITRD_DIR)/
 	cp userspace/passwd.elf $(INITRD_DIR)/
 	cp userspace/useradd.elf $(INITRD_DIR)/
 	cp userspace/userdel.elf $(INITRD_DIR)/
 	cp userspace/sh.elf $(INITRD_DIR)/
-	cp userspace/test_security.elf $(INITRD_DIR)/
-	cp userspace/test_shm.elf $(INITRD_DIR)/
 	cp userspace/marea_shell.elf $(INITRD_DIR)/
 	cp userspace/eterland.elf $(INITRD_DIR)/
 
