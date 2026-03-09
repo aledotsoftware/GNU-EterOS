@@ -72,6 +72,14 @@ void window_invalidate(window_t* win) {
     gfx_add_dirty_rect(win->x, win->y, win->width, win->height);
 }
 
+/* ⚡ BOLT Optimization: SWAR (SIMD Within A Register) Alpha Blending helper. */
+static inline uint32_t blend_swar(uint32_t sc, uint32_t dc, uint32_t a) {
+    uint32_t inv_a = 255 - a;
+    uint32_t rb = (((sc & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
+    uint32_t g = (((sc & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
+    return 0xFF000000 | rb | g;
+}
+
 static void draw_window(window_t* win) {
     if (!(win->flags & WIN_VISIBLE)) return;
 
@@ -124,26 +132,47 @@ static void draw_window(window_t* win) {
             for (int32_t i = 0; i < height; i++) {
                 uint32_t* dest = (uint32_t*)dest_row;
                 uint32_t* src = src_row;
+                int32_t j = 0;
 
-                for (int32_t j = 0; j < width; j++) {
-                    uint32_t sc = src[j];
-                    if (sc != 0) {
-                        uint32_t a = (sc >> 24) & 0xFF;
-                        if (a == 255) {
-                            dest[j] = sc;
-                        } else if (a > 0) {
-                            uint32_t dc = dest[j];
+                /* ⚡ BOLT Optimization: Unrolled loop (4x) with combined transparent chunk skip
+                   and SWAR (SIMD Within A Register) Alpha Blending helper. */
+                for (; j <= width - 4; j += 4) {
+                    uint32_t c0 = src[j];
+                    uint32_t c1 = src[j+1];
+                    uint32_t c2 = src[j+2];
+                    uint32_t c3 = src[j+3];
 
-                            /* ⚡ BOLT Optimization: SWAR (SIMD Within A Register) Alpha Blending.
-                               Process Red and Blue channels together in a single 32-bit operation,
-                               reducing multiplications from 6 to 4 per pixel and eliminating
-                               costly bitwise shifts for individual component extraction. */
-                            uint32_t inv_a = 255 - a;
-                            uint32_t rb = (((sc & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
-                            uint32_t g = (((sc & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
+                    if ((c0 | c1 | c2 | c3) == 0) continue;
 
-                            dest[j] = 0xFF000000 | rb | g;
-                        }
+                    if (c0) {
+                        uint32_t a = c0 >> 24;
+                        if (a == 255) dest[j] = c0;
+                        else if (a > 0) dest[j] = blend_swar(c0, dest[j], a);
+                    }
+                    if (c1) {
+                        uint32_t a = c1 >> 24;
+                        if (a == 255) dest[j+1] = c1;
+                        else if (a > 0) dest[j+1] = blend_swar(c1, dest[j+1], a);
+                    }
+                    if (c2) {
+                        uint32_t a = c2 >> 24;
+                        if (a == 255) dest[j+2] = c2;
+                        else if (a > 0) dest[j+2] = blend_swar(c2, dest[j+2], a);
+                    }
+                    if (c3) {
+                        uint32_t a = c3 >> 24;
+                        if (a == 255) dest[j+3] = c3;
+                        else if (a > 0) dest[j+3] = blend_swar(c3, dest[j+3], a);
+                    }
+                }
+
+                /* Remainder */
+                for (; j < width; j++) {
+                    uint32_t c = src[j];
+                    if (c != 0) {
+                        uint32_t a = c >> 24;
+                        if (a == 255) dest[j] = c;
+                        else if (a > 0) dest[j] = blend_swar(c, dest[j], a);
                     }
                 }
 
@@ -157,15 +186,17 @@ static void draw_window(window_t* win) {
                 uint32_t* src = src_row;
 
                 int32_t j = 0;
-                /* ⚡ BOLT Optimization: Unrolled loop (4x) with local scalar caching.
+                /* ⚡ BOLT Optimization: Unrolled loop (4x) with local scalar caching and early skip.
                    Caching the source pixel prevents the compiler from emitting duplicate
-                   memory loads due to potential pointer aliasing between src and dest,
-                   yielding significant speedup. */
+                   memory loads due to potential pointer aliasing between src and dest.
+                   The combined bitwise OR zero-check skips completely transparent chunks. */
                 for (; j <= width - 4; j += 4) {
                     uint32_t c0 = src[j];
                     uint32_t c1 = src[j+1];
                     uint32_t c2 = src[j+2];
                     uint32_t c3 = src[j+3];
+
+                    if ((c0 | c1 | c2 | c3) == 0) continue;
 
                     if (c0) dest[j] = c0;
                     if (c1) dest[j+1] = c1;

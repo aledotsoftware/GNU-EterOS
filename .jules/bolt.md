@@ -52,3 +52,7 @@
 ## 2026-03-08 - Pre-existing test failures
 **Learning:** `tests/test_readv_security.c` fails to compile because it's missing a mock for `framebuffer_get_buffer`. This is a pre-existing test infrastructure issue unrelated to our window drawing optimizations.
 **Action:** Ignored since it is unrelated to current modifications.
+
+## $(date +%Y-%m-%d) - Window Compositing Optimization: Branchless Transparent Chunk Skipping
+**Learning:** In graphical blending loops (`kernel/gfx/window.c`), evaluating transparency per-pixel incurs heavy branching overhead, especially for mostly-transparent elements (like menus or terminal backgrounds). We discovered that unrolling loops by 8x and checking `((c0 | c1 | ... | c7) == 0)` skips completely empty chunks efficiently using branchless bitwise ORs instead of nested conditionals.
+**Action:** When writing rendering or blending loops in C, unroll 4x or 8x and use combined bitwise OR operations to detect entire blocks of 'empty' data, avoiding per-pixel branching completely.
