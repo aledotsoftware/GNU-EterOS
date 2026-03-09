@@ -63,6 +63,9 @@ void pmm_mark_region_used(uint64_t base, size_t size) {
 }
 
 /* Include the file under test directly to access static variables */
+/* Stub ASSERT for the mock environment since heap.c uses it now */
+#define ASSERT(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+
 #include "../kernel/mm/heap.c"
 
 /* Helper to reset heap state */
