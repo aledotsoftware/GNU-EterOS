@@ -84,6 +84,7 @@ void reset_heap() {
     }
     memory_total = HEAP_SIZE;
     memory_used = 0;
+    mm_initialized = true;
 
     // Initialize first block
     heap_start->size = memory_total - sizeof(block_header_t);
