@@ -69,6 +69,16 @@ void gfx_add_dirty_rect(int32_t x, int32_t y, int32_t w, int32_t h) {
     }
 }
 
+int gfx_get_dirty_rect(rect_t* out_rect) {
+    if (!dirty_rect_valid || !out_rect) return 0;
+    out_rect->x = dirty_rect.x;
+    out_rect->y = dirty_rect.y;
+    out_rect->w = dirty_rect.w;
+    out_rect->h = dirty_rect.h;
+    return 1;
+}
+
+
 void gfx_present(void) {
     if (!dirty_rect_valid) return;
 

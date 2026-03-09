@@ -52,3 +52,7 @@
 ## 2026-03-08 - Pre-existing test failures
 **Learning:** `tests/test_readv_security.c` fails to compile because it's missing a mock for `framebuffer_get_buffer`. This is a pre-existing test infrastructure issue unrelated to our window drawing optimizations.
 **Action:** Ignored since it is unrelated to current modifications.
+
+## 2026-03-09 - [Compositor Dirty Rect Only Rendering]
+**Learning:** Forcing a full-screen clear (`framebuffer_rect(0,0,width,height)`) inside the 60Hz compositor render loop (`compositor_render`) completely negates the benefit of damage tracking (dirty rectangles), generating massive unnecessary memory bandwidth usage and redundant VRAM flushes even when the UI is idle.
+**Action:** Before issuing clear or draw commands, verify if a dirty rectangle actually exists. If it does, strictly restrict background clears to the coordinates of the dirty bounding box, rather than clearing the full screen.
