@@ -32,5 +32,6 @@ void gfx_draw_pixels(const gfx_point_t* pixels, size_t count);
 /* Damage Tracking (Dirty Rectangles) */
 void gfx_add_dirty_rect(int32_t x, int32_t y, int32_t w, int32_t h);
 void gfx_present(void);
+int gfx_get_dirty_rect(rect_t* out_rect);
 
 #endif /* GFX_H */

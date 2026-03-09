@@ -56,6 +56,8 @@ typedef struct {
     char name[32];
     uint64_t os_abi;
     uint64_t brk;
+    uint32_t euid;
+    uint32_t egid;
 } task_t;
 
 /* Types from fs/vfs.h */
@@ -64,6 +66,9 @@ typedef struct fs_node {
     uint32_t flags;
     uint32_t length;
     uint32_t impl;
+    uint32_t uid;
+    uint32_t gid;
+    uint32_t mask;
 } fs_node_t;
 
 fs_node_t* fs_root = NULL;

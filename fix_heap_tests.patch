@@ -1,0 +1,18 @@
+--- tests/test_heap.c
++++ tests/test_heap.c
+@@ -2,7 +2,6 @@
+ #define __ETEROS_HOST_TEST__
+ #endif
+
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdlib.h>
+@@ -43,6 +42,9 @@
+ /* Test tracking */
+ static int N = 1000;
+ static void* ptrs[1000];
++
++/* Stub ASSERT for the mock environment since heap.c uses it now */
++#define ASSERT(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+
+ #include "../kernel/mm/heap.c"

@@ -72,24 +72,29 @@ void window_invalidate(window_t* win) {
     gfx_add_dirty_rect(win->x, win->y, win->width, win->height);
 }
 
-static void draw_window(window_t* win) {
+static void draw_window(window_t* win, rect_t* clip) {
     if (!(win->flags & WIN_VISIBLE)) return;
 
     uint32_t fb_w = framebuffer_get_width();
     uint32_t fb_h = framebuffer_get_height();
 
-    /* Clip window to screen */
+    /* Clip window to given dirty rect/screen */
+    int32_t clip_x = clip ? clip->x : 0;
+    int32_t clip_y = clip ? clip->y : 0;
+    int32_t clip_w = clip ? clip->w : (int32_t)fb_w;
+    int32_t clip_h = clip ? clip->h : (int32_t)fb_h;
+
     int32_t x_start = win->x;
     int32_t y_start = win->y;
     int32_t x_end = win->x + win->width;
     int32_t y_end = win->y + win->height;
 
-    if (x_start >= (int32_t)fb_w || y_start >= (int32_t)fb_h || x_end <= 0 || y_end <= 0) return;
+    if (x_start >= clip_x + clip_w || y_start >= clip_y + clip_h || x_end <= clip_x || y_end <= clip_y) return;
 
-    int32_t draw_x_start = x_start < 0 ? 0 : x_start;
-    int32_t draw_y_start = y_start < 0 ? 0 : y_start;
-    int32_t draw_x_end = x_end > (int32_t)fb_w ? (int32_t)fb_w : x_end;
-    int32_t draw_y_end = y_end > (int32_t)fb_h ? (int32_t)fb_h : y_end;
+    int32_t draw_x_start = x_start < clip_x ? clip_x : x_start;
+    int32_t draw_y_start = y_start < clip_y ? clip_y : y_start;
+    int32_t draw_x_end = x_end > clip_x + clip_w ? clip_x + clip_w : x_end;
+    int32_t draw_y_end = y_end > clip_y + clip_h ? clip_y + clip_h : y_end;
 
     /* Optimized 32-bit path */
     if (framebuffer_get_bpp() == 32) {
@@ -198,13 +203,14 @@ static void draw_window(window_t* win) {
         }
     } else {
         /* Fallback for other depths */
+        int32_t start_win_y = draw_y_start - win->y;
+        int32_t start_win_x = draw_x_start - win->x;
+
         if (win->flags & WIN_GLASS) {
             for (int32_t y = draw_y_start; y < draw_y_end; y++) {
+                uint32_t* src_row = win->buffer + ((start_win_y + (y - draw_y_start)) * win->width) + start_win_x;
                 for (int32_t x = draw_x_start; x < draw_x_end; x++) {
-                    int32_t win_x = x - win->x;
-                    int32_t win_y = y - win->y;
-
-                    uint32_t sc = win->buffer[win_y * win->width + win_x];
+                    uint32_t sc = *src_row++;
                     if (sc != 0) {
                         uint32_t a = (sc >> 24) & 0xFF;
                         if (a == 255) {
@@ -224,13 +230,11 @@ static void draw_window(window_t* win) {
                 }
             }
         } else {
+            /* ⚡ BOLT Optimization: Hoist multiplication out of the inner loop */
             for (int32_t y = draw_y_start; y < draw_y_end; y++) {
+                uint32_t* src_row = win->buffer + ((start_win_y + (y - draw_y_start)) * win->width) + start_win_x;
                 for (int32_t x = draw_x_start; x < draw_x_end; x++) {
-                    /* Map screen (x,y) to window (win_x, win_y) */
-                    int32_t win_x = x - win->x;
-                    int32_t win_y = y - win->y;
-
-                    uint32_t color = win->buffer[win_y * win->width + win_x];
+                    uint32_t color = *src_row++;
 
                     /* Simple Alpha: If 0, transparent */
                     if (color != 0) {
@@ -242,10 +246,10 @@ static void draw_window(window_t* win) {
     }
 }
 
-static void draw_windows_recursive(window_t* w) {
+static void draw_windows_recursive(window_t* w, rect_t* clip) {
     if (!w) return;
-    draw_windows_recursive(w->next);
-    draw_window(w);
+    draw_windows_recursive(w->next, clip);
+    draw_window(w, clip);
 }
 
 int display_sleep_mode = 0;
@@ -282,14 +286,17 @@ void compositor_render(void) {
         return;
     }
 
+    rect_t dirty;
+    if (!gfx_get_dirty_rect(&dirty)) {
+        return; // Nothing to draw
+    }
+
     /* Clear screen to dark gray or light gray depending on dark mode */
     uint32_t bg_color = dark_mode_enabled ? 0xFF202020 : 0xFFE0E0E0;
-    framebuffer_rect(0, 0, framebuffer_get_width(), framebuffer_get_height(), bg_color);
+    framebuffer_rect(dirty.x, dirty.y, dirty.w, dirty.h, bg_color);
 
     /* Draw windows back to front */
-    draw_windows_recursive(window_list);
+    draw_windows_recursive(window_list, &dirty);
 
-    /* Mark whole screen dirty for present */
-    gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());
     gfx_present();
 }
