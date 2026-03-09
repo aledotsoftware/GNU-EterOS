@@ -68,3 +68,7 @@
 **Vulnerability:** The system calls `sys_setuid` and `sys_setgid` modified only the real `uid` and `gid` in `task_t`, completely ignoring `euid` and `egid`. Since VFS permission checks (`check_node_permission`) evaluate `euid` and `egid`, this omission meant that processes intending to drop privileges (e.g., setuid root programs stepping down to unprivileged users) remained with elevated privileges for file access, leading to critical authorization bypass vulnerabilities.
 **Learning:** Security state transitions must encompass all aspects of process identity. Modifying just the real user/group ID without synchronizing the effective ID breaks the security boundaries assumed by applications when managing least privilege.
 **Prevention:** Always ensure that effective identities (`euid`/`egid`) are securely synced with real identities during credential manipulation system calls unless specifically building mechanisms that maintain independent values (like `setreuid`).
+## 2024-05-30 - Missing Authorization on Directory Traversal
+**Vulnerability:** The `sys_chdir` system call failed to enforce execute/search permission (`+x`) on the target directory, allowing users to enter restricted directories.
+**Learning:** Checking that a target is a directory `((node->flags & 0x7) == FS_DIRECTORY)` is not sufficient for traversal; explicit authorization via `check_node_permission(node, 1)` must be performed before updating `current->cwd`.
+**Prevention:** Always evaluate execute permissions on directory nodes before allowing traversal, open, or chdir operations.

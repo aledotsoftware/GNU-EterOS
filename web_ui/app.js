@@ -35,6 +35,11 @@ function openWindow(appName) {
 
     makeDraggable(win);
     windowsContainer.appendChild(win);
+
+    // Bring to front and set focus for accessibility
+    win.dispatchEvent(new MouseEvent('mousedown'));
+    const closeBtn = win.querySelector('button[aria-label="Close window"]');
+    if (closeBtn) closeBtn.focus();
 }
 
 // Keyboard accessibility for icons
@@ -47,6 +52,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon.click();
             }
         });
+    });
+
+    // Global keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const windows = Array.from(document.querySelectorAll('.window'));
+            if (windows.length > 0) {
+                // Find active window (zIndex 10) or default to the last one
+                const activeWindow = windows.find(w => w.style.zIndex === '10') || windows[windows.length - 1];
+                activeWindow.remove();
+            }
+        }
     });
 });
 

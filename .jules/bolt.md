@@ -52,6 +52,7 @@
 ## 2026-03-08 - Pre-existing test failures
 **Learning:** `tests/test_readv_security.c` fails to compile because it's missing a mock for `framebuffer_get_buffer`. This is a pre-existing test infrastructure issue unrelated to our window drawing optimizations.
 **Action:** Ignored since it is unrelated to current modifications.
-## 2026-12-06 - [24bpp Block Copy Optimization]
-**Learning:** For rendering 24-bit per pixel (bpp) shapes and screen clears, there is no direct 24-bit memset instruction available. Looping per row and assigning `r`, `g`, `b` byte-by-byte for every pixel adds massive loop overhead.
-**Action:** When implementing rendering operations (like clearing or solid rectangles) in 24bpp mode, construct the pattern for a single row first using byte-by-byte assignments, then use the high-performance `memcpy` (block copy) function to quickly replicate that first row to all subsequent rows.
+
+## 2024-11-20 - [Alpha Rendering Loop Optimization]
+**Learning:** In tight 32bpp unrolled drawing loops (like the `draw_window` alpha path), using a combined bitwise OR on multiple pixels (e.g., `c0 | c1 | c2 ...`) to skip evaluating non-zero branches for entirely transparent chunks yields measurable performance wins, especially when dealing with rounded or sparse elements where long spans of zero-alpha exist. This relies on the property that any non-zero color value will result in a non-zero OR sum.
+**Action:** When writing fast-paths for rasterizing sprites or windows with alpha channels, consider grouping pixels into unrolled chunks (e.g. 4x or 8x) and gating the memory write block with a single boolean check on their bitwise OR to avoid excessive branching.

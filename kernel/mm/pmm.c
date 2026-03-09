@@ -12,6 +12,7 @@
 #include "../../include/vga.h"
 #include "../../include/fs/bcache.h"
 #include "../../include/lock.h"
+#include <assert.h>
 
 /* ========================================================================= */
 /* Variables Globales                                                        */
@@ -222,7 +223,8 @@ void pmm_init(void) {
     uint64_t p_ref_counts = (uint64_t)pmm_ref_counts;
     pmm_mark_region_used(p_bitmap, pmm_bitmap_size);
     pmm_mark_region_used(p_ref_counts, ref_counts_size);
-    /* Initrd is loaded at 0x15000 (below 1MB), already covered by 0-1MB reservation. */
+
+    /* d) PMM will reserve initrd and fb via kernel/main.c */
     
     uint64_t pmm_end = p_ref_counts + ref_counts_size;
     free_mem_start = PAGE_ALIGN_UP(pmm_end);
@@ -248,6 +250,10 @@ static void* pmm_alloc_page_impl(void) {
      * and start from the last allocated position.
      * Complexity: O(1) Amortized, O(N/64) Worst Case.
      */
+
+    if (last_free_idx >= total_pages) {
+        last_free_idx = 0; /* Overflow check on rover */
+    }
 
     uint64_t word_idx = last_free_idx / 64;
     uint64_t bit_idx = last_free_idx % 64;
@@ -401,6 +407,7 @@ void pmm_free_page(void* addr) {
         } else if (pmm_ref_counts[page_idx] == 0) {
             if (!bitmap_test(page_idx)) {
                 serial_write_string("[PMM] ERROR: Double free detected!\n");
+                ASSERT(0 && "PMM Double free detected!");
                 spin_unlock(&pmm_lock);
                 return;
             }

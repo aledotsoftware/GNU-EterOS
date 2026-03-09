@@ -12,6 +12,7 @@
 #include <types.h>
 #include <hal.h>
 #include <klog.h>
+#include <assert.h>
 #include <string.h>
 #include <stdio.h>
 #include <io.h>
@@ -124,6 +125,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_init();
     
     serial_write_string("[DEBUG] HAL Initialized returned to main.\n");
+    ASSERT(1); /* Basic sanity check for assert macro */
 
     /* ---- 2. Obtener Info del Bootloader (si aplica) ---- */
     /* En x86, esto está en 0xA000. En ARM, puede ser NULL o DTB. */
@@ -149,14 +151,28 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         #if defined(ARCH_X86_64)
             /* x86 specific PMM init (uses E820) */
             pmm_init();
+            ASSERT(pmm_get_total_ram() > 0);
+
+            if (boot_info && boot_info->initrd_addr) {
+                pmm_mark_region_used(boot_info->initrd_addr, boot_info->initrd_size);
+            }
+            if (boot_info && boot_info->fb_addr) {
+                /* We don't have the exact FB size here, but typically it's less than 16MB */
+                pmm_mark_region_used(boot_info->fb_addr, 16 * 1024 * 1024);
+            }
+
+            serial_write_string("[DEBUG] PMM Initialized.\n");
         #endif
 
         #if ETEROS_HAS_MMU
             hal_mmu_init(); /* Configura paginación virtual */
+            serial_write_string("[DEBUG] VMM Initialized.\n");
         #endif
 
         /* Heap Manager (Generic) */
         mm_init(boot_info);
+        ASSERT(mm_get_total_memory() > 0);
+        serial_write_string("[DEBUG] Heap Initialized.\n");
 
         /* Block Cache (requires heap/kmalloc) */
         bcache_init();

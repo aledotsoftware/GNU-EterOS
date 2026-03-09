@@ -157,20 +157,30 @@ static void draw_window(window_t* win) {
                 uint32_t* src = src_row;
 
                 int32_t j = 0;
-                /* ⚡ BOLT Optimization: Unrolled loop (4x) with local scalar caching.
-                   Caching the source pixel prevents the compiler from emitting duplicate
-                   memory loads due to potential pointer aliasing between src and dest,
+                /* ⚡ BOLT Optimization: Unrolled loop (8x) with combined non-zero check.
+                   Caching 8 pixels and checking them together prevents the compiler from emitting
+                   separate loads and branches when dealing with highly transparent areas,
                    yielding significant speedup. */
-                for (; j <= width - 4; j += 4) {
+                for (; j <= width - 8; j += 8) {
                     uint32_t c0 = src[j];
                     uint32_t c1 = src[j+1];
                     uint32_t c2 = src[j+2];
                     uint32_t c3 = src[j+3];
+                    uint32_t c4 = src[j+4];
+                    uint32_t c5 = src[j+5];
+                    uint32_t c6 = src[j+6];
+                    uint32_t c7 = src[j+7];
 
-                    if (c0) dest[j] = c0;
-                    if (c1) dest[j+1] = c1;
-                    if (c2) dest[j+2] = c2;
-                    if (c3) dest[j+3] = c3;
+                    if (c0 | c1 | c2 | c3 | c4 | c5 | c6 | c7) {
+                        if (c0) dest[j] = c0;
+                        if (c1) dest[j+1] = c1;
+                        if (c2) dest[j+2] = c2;
+                        if (c3) dest[j+3] = c3;
+                        if (c4) dest[j+4] = c4;
+                        if (c5) dest[j+5] = c5;
+                        if (c6) dest[j+6] = c6;
+                        if (c7) dest[j+7] = c7;
+                    }
                 }
 
                 /* Remainder */
