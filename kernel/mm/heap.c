@@ -11,6 +11,7 @@
 #include "../../include/mm.h"
 #include "../../include/serial.h"
 #include "../../include/pmm.h" /* Para PAGE_ALIGN_UP y PAGE_SIZE */
+#include <assert.h>
 #include "../../include/lock.h"
 #include "../../include/io.h"
 
@@ -29,6 +30,7 @@ extern uint8_t _kernel_end;
 
 /* Magic Number para validación de heap */
 #define HEAP_MAGIC 0x48454150 /* "HEAP" */
+#define HEAP_FOOTER_MAGIC 0x464F4F54 /* "FOOT" */
 
 /* Estructura de cabecera de bloque */
 typedef struct block_header {
@@ -249,7 +251,7 @@ static void* _kmalloc_impl(size_t size) {
         return NULL;
     }
 
-    size_t aligned_size = align(size);
+    size_t aligned_size = align(size + sizeof(uint32_t)); /* Add space for footer */
     
     /* Segregated Free List Strategy: O(1) mostly */
     int start_bucket = get_bucket_index(aligned_size);
@@ -300,6 +302,11 @@ static void* _kmalloc_impl(size_t size) {
 
                 curr->is_free = 0;
                 memory_used += curr->size + sizeof(block_header_t);
+
+                /* Set footer magic */
+                uint32_t* footer = (uint32_t*)((uintptr_t)curr + sizeof(block_header_t) + curr->size - sizeof(uint32_t));
+                *footer = HEAP_FOOTER_MAGIC;
+
                 return (void*)((uintptr_t)curr + sizeof(block_header_t));
             }
 
@@ -336,11 +343,21 @@ static void _kfree_impl(void* ptr) {
     /* Verificar Magic Number */
     if (block->magic != HEAP_MAGIC) {
         serial_write_string("[MM] Error: kfree of invalid address (bad magic)\n");
+        ASSERT(0 && "Heap corruption detected: Invalid magic number");
         return;
     }
 
     if (block->is_free) {
         serial_write_string("[MM] Warning: Double free detected\n");
+        ASSERT(0 && "Double free detected");
+        return;
+    }
+
+    /* Check footer magic */
+    uint32_t* footer = (uint32_t*)((uintptr_t)block + sizeof(block_header_t) + block->size - sizeof(uint32_t));
+    if (*footer != HEAP_FOOTER_MAGIC) {
+        serial_write_string("[MM] Error: kfree of invalid address (bad footer magic)\n");
+        ASSERT(0 && "Heap corruption detected: Invalid footer magic number");
         return;
     }
     
@@ -424,6 +441,7 @@ void* krealloc(void* ptr, size_t size) {
     /* Sanity check */
     if (block->magic != HEAP_MAGIC) {
         serial_write_string("[MM] Error: krealloc of invalid address\n");
+        ASSERT(0 && "Heap corruption detected during krealloc");
         spin_unlock(&heap_lock);
         irq_restore(flags);
         return NULL;

@@ -103,10 +103,17 @@ static const char* exception_names[] = {
 
 #define NUM_EXCEPTION_NAMES  21
 
+struct int_regs {
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
+    uint64_t int_no, err_code;
+    uint64_t rip, cs, rflags, rsp, ss;
+};
+
 /**
  * Handler genérico de excepción: muestra el error y detiene la CPU.
  */
-static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint64_t error_code) {
+static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint64_t error_code, struct int_regs* regs) {
     /* Check if Page Fault (14) */
     if (vector == 14) {
         uint64_t cr2;
@@ -225,7 +232,32 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     serial_write_string("\nRFLAGS: 0x"); utoa_hex_s(frame->rflags, buf, sizeof(buf)); serial_write_string(buf);
     serial_write_string(" RSP: 0x"); utoa_hex_s(frame->rsp, buf, sizeof(buf)); serial_write_string(buf);
     serial_write_string(" SS: 0x"); utoa_hex_s(frame->ss, buf, sizeof(buf)); serial_write_string(buf);
-    serial_write_string("\nError Code: 0x"); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
+
+    uint64_t cr3;
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
+    serial_write_string("\nCR3: 0x"); utoa_hex_s(cr3, buf, sizeof(buf)); serial_write_string(buf);
+    serial_write_string(" Error Code: 0x"); utoa_hex_s(error_code, buf, sizeof(buf)); serial_write_string(buf);
+
+    if (regs) {
+        serial_write_string("\nRegisters:\n");
+        serial_write_string(" RAX: 0x"); utoa_hex_s(regs->rax, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" RBX: 0x"); utoa_hex_s(regs->rbx, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" RCX: 0x"); utoa_hex_s(regs->rcx, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" RDX: 0x"); utoa_hex_s(regs->rdx, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string("\n RSI: 0x"); utoa_hex_s(regs->rsi, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" RDI: 0x"); utoa_hex_s(regs->rdi, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" RBP: 0x"); utoa_hex_s(regs->rbp, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string("\n  R8: 0x"); utoa_hex_s(regs->r8, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string("  R9: 0x"); utoa_hex_s(regs->r9, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" R10: 0x"); utoa_hex_s(regs->r10, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" R11: 0x"); utoa_hex_s(regs->r11, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string("\n R12: 0x"); utoa_hex_s(regs->r12, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" R13: 0x"); utoa_hex_s(regs->r13, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" R14: 0x"); utoa_hex_s(regs->r14, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string(" R15: 0x"); utoa_hex_s(regs->r15, buf, sizeof(buf)); serial_write_string(buf);
+        serial_write_string("\n");
+    }
+
     if (vector == 14) {
         uint64_t cr2;
         __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
@@ -234,6 +266,10 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
         serial_write_string((error_code & 1) ? "Present" : "Not Present");
         serial_write_string((error_code & 2) ? ", Write" : ", Read");
         serial_write_string((error_code & 4) ? ", User]" : ", Supervisor]");
+    } else if (vector == 8) {
+        serial_write_string("\nDouble Fault detected. Stack or GDT may be corrupted.\n");
+    } else if (vector == 2) {
+        serial_write_string("\nNMI detected. Hardware error or manual interrupt.\n");
     }
     serial_write_string("\nTask: ");
     extern task_t* task_get_current(void);
@@ -263,13 +299,6 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     for (;;) { __asm__ volatile ("hlt"); }
 }
 
-struct int_regs {
-    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
-    uint64_t rbp, rdi, rsi, rdx, rcx, rbx, rax;
-    uint64_t int_no, err_code;
-    uint64_t rip, cs, rflags, rsp, ss;
-};
-
 extern void syscall_int80_handler(struct syscall_regs* regs);
 
 void exception_handler_c(struct int_regs *regs) {
@@ -285,7 +314,7 @@ void exception_handler_c(struct int_regs *regs) {
         .rsp = regs->rsp,
         .ss = regs->ss
     };
-    handle_exception(regs->int_no, &frame, regs->err_code);
+    handle_exception(regs->int_no, &frame, regs->err_code, regs);
 }
 
 /* Stubs definidos en exceptions.asm */
