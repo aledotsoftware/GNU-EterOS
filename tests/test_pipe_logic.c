@@ -66,7 +66,7 @@ int get_cpu_id(void) { return 0; }
 void task_exit(int status) { printf("task_exit called with status %d\n", status); exit(status); }
 void task_yield(void) {}
 void schedule(void) {}
-void context_switch(uint64_t* old, uint64_t new, void* fpu1, void* fpu2) {}
+void context_switch(uint64_t* old, uint64_t* new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 void serial_write_string(const char* s) {}
 

@@ -55,6 +55,7 @@ static size_t memory_total = 0;
 
 /* Spinlock para proteger el heap en entornos SMP */
 static spinlock_t heap_lock = 0;
+bool mm_initialized = false;
 
 /* ========================================================================= */
 /* Helpers                                                                   */
@@ -240,6 +241,7 @@ void mm_init(boot_info_t* boot_info) {
 static void* _kmalloc_impl(size_t size) {
     if (size == 0) return NULL;
     if (!heap_start) return NULL; /* Heap no inicializado */
+    if (!mm_initialized) return NULL;
 
     /* Overflow check: prevent align() wrap-around and excessive size */
     if (size > SIZE_MAX - HEAP_ALIGNMENT - sizeof(block_header_t)) {

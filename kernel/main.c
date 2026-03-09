@@ -174,6 +174,9 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         ASSERT(mm_get_total_memory() > 0);
         serial_write_string("[DEBUG] Heap Initialized.\n");
 
+        extern bool mm_initialized;
+        mm_initialized = true;
+
         /* Block Cache (requires heap/kmalloc) */
         bcache_init();
 

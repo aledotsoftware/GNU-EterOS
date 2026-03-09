@@ -209,6 +209,7 @@ void pmm_init(void) {
     
     /* a) Primer 1MB (BIOS, VGA, Stack, Bootloader, Kernel Loader) */
     pmm_mark_region_used(0x0, 0x100000);
+    pmm_mark_region_used(0xB8000, 32000); /* Reserva explícita adicional por si acaso del VGA text mode */
     if(!pmm_bitmap) serial_write_string("[PMM] ASSERT FAILED: Bitmap is NULL\n");
 
     /* b) Kernel (ahora en 1MB+) */
@@ -221,6 +222,7 @@ void pmm_init(void) {
     uint64_t ref_counts_size = total_pages * sizeof(uint16_t);
     uint64_t p_bitmap = (uint64_t)pmm_bitmap;
     uint64_t p_ref_counts = (uint64_t)pmm_ref_counts;
+    ASSERT(pmm_bitmap != NULL);
     pmm_mark_region_used(p_bitmap, pmm_bitmap_size);
     pmm_mark_region_used(p_ref_counts, ref_counts_size);
 

@@ -1,47 +1,33 @@
-# Plan
+1. **Auditar el Layout de Memoria:**
+   - La disposición está mayormente definida en `boot/x86_64/boot.asm` y `kernel/mm/pmm.c`. Ya confirmamos que se movió a `FINAL_KERNEL_ADDR` (`0x100000`).
+   - El PMM Bitmap está en `0x400000`. Initrd se carga en `0x4000000`. Todo bien aquí.
 
-1. **Implement `syscall()` wrapper generic**
-   - Create `userspace/libc/src/syscall_wrap.c` with a generic `long syscall(long nr, ...)` function.
-   - The wrapper should call the standard Linux x86_64 syscall interface, checking for return values `-1..-4095` to set `errno` and return `-1`.
-   - Update `userspace/libc/include/unistd.h` (or a suitable header) to declare `syscall`.
+2. **Orden de Inicialización y `kmalloc` Seguro (`kernel/main.c`):**
+   - Asegurar el orden `hal_init` -> `pmm_init` -> `hal_mmu_init` -> `mm_init` con `ASSERT`.
+   - Modificar `kernel/main.c` para incluir `ASSERT(1)` entre llamadas si no están, o verificar que no haya llamadas a heap (como en `bcache_init`) antes de `mm_init()`.
 
-2. **Enhance `stdio.h` and `stdio.c` for Buffered I/O**
-   - Redefine `struct _eteros_IO_FILE` in `userspace/libc/src/stdio.c` (or a private header) to include an 8KB buffer, a read/write buffer position, mode flags (read, write, append), and the `fd`.
-   - Implement buffered I/O functions: `fopen`, `fclose`, `fflush`, `fread`, `fwrite`, `fgets`, `fputs`, `fseek`, `ftell`, `feof`, `ferror`, `fileno`, `getc`, `putc`, `ungetc`, `perror`. Use the existing syscall wrappers (`open`, `read`, `write`, `close`, `lseek`).
-   - Implement `fprintf`.
+3. **PMM Hardening (`kernel/mm/pmm.c`):**
+   - Verificar `pmm_init()` y asegurar que reserva (marcar ocupado) las regiones de kernel, initrd, PMM y framebuffer. `boot_info` debería pasarse si se puede o se debe acceder.
+   - RefCounts se deben usar correctamente para double-free. Modificar `pmm_free_page()` o `pmm_alloc_page()` si se necesita double-free checks en el bitmap.
 
-3. **Enhance `stdlib.h` and `stdlib.c`**
-   - Implement `atoi` (already present, need to check), `strtol`, `strtoul`, `abs`, `qsort`, `bsearch`.
-   - Implement environment functions: `getenv`, `setenv`, `atexit`, `exit` (needs to run atexit handlers), `abort` (already present), `system` (stub or execve wrapper).
+4. **VMM Hardening (`kernel/mm/vmm.c`):**
+   - Asegurarnos de que `PAGE_USER` se aplica apropiadamente en el nivel `PML4`.
 
-4. **Enhance `string.h` and `string.c`**
-   - Implement `strdup`, `strtok`, `strtok_r`, `strsep`, `strpbrk`, `strerror`, `strncasecmp`, `memrchr`.
+5. **Excepciones y Panics (`kernel/arch/x86_64/idt.c`):**
+   - Añadir volcado de stack trace, registros RAX-R15, CR2, CR3, etc. Esto ya se hace parcialmente pero verificar si necesita el walk de `RBP chain`. En `handle_exception` ya vimos el walk, vamos a asegurar que imprima la tarea y PID si no lo hace, y si fue read/write.
 
-5. **Implement pthreads over `clone` and `futex`**
-   - Add `userspace/libc/src/pthread.c`.
-   - Implement `pthread_create` using `clone`.
-   - Implement `pthread_join`, `pthread_exit`, `pthread_self`, `pthread_detach`.
-   - Implement `pthread_mutex_init`, `pthread_mutex_lock`, `pthread_mutex_unlock`, `pthread_mutex_destroy` using `futex`.
-   - Implement `pthread_cond_init`, `pthread_cond_wait`, `pthread_cond_signal`, `pthread_cond_broadcast` using `futex`.
+6. **TSS y RSP0 (`kernel/task.c` / `kernel/arch/x86_64/gdt.c`):**
+   - En `tss_init()` o `gdt_init()` asegurar `tss.rsp0 = kernel_stack_top`.
+   - En `schedule()`, antes de `context_switch`, poner `tss_set_rsp0(next_task->kernel_stack)`. Ya está en el código.
 
-6. **Enhance `signal.h` and `signal.c`**
-   - Add implementations for `sigemptyset`, `sigfillset`, `sigaddset`.
-   - Check `signal`, `sigaction`, `sigprocmask`, `raise`, `kill` which are mostly present but might need verification against requirements.
+7. **Context Switch Mismatch (`kernel/task.c` y `kernel/arch/x86_64/context_switch.asm`):**
+   - Verificar convención de punteros.
+   - C manda `&current->rsp` y `next_task->rsp`. (Opción B: puntero + valor).
+   - ASM hace `mov [rdi], rsp` y `mov rsp, rsi`.
+   - En `context_switch.asm`: `mov [rdi], rsp` y `mov rsp, rsi`. Esto parece estar correcto según la Opción B.
 
-7. **Enhance `time.h` and `time.c`**
-   - Implement `localtime`, `strftime`.
-   - Verify `time`, `clock_gettime`, `gettimeofday`, `nanosleep`, `sleep`, `gmtime`.
+8. **Script de Test:**
+   - Crear el script `tests/test_boot.sh` para correr QEMU `-serial stdio -no-reboot -no-shutdown` y verificar.
 
-8. **Fix `crt0.asm`**
-   - We already created `crt0.asm` parsing `argc`, `argv`, `envp`.
-   - Need to parse `auxv` (Auxiliary Vector) and call `_init` array if any, though the instructions mention "Parse argc/argv/envp/auxv from stack. Call constructors -> main() -> exit()". Add constructors call.
-
-9. **Headers (Stubs)**
-   - Created `<dirent.h>`, `<sys/socket.h>`, `<poll.h>`, `<dlfcn.h>`, `<locale.h>`.
-   - Need `<netinet/in.h>`, `<arpa/inet.h>`.
-   - Implement `<dirent.h>` functions (`opendir`, `readdir`, `closedir`) using `getdents64`.
-
-10. **Pre-commit and Verifications**
-    - Compile with `make` and test in sandbox. Check if it compiles cleanly.
-    - Follow `pre_commit_instructions` tool to complete pre commit steps ensuring proper testing, verifications, reviews and reflections are done.
-    - Submit PR.
+9. **Pre-commit:**
+   - "Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done."

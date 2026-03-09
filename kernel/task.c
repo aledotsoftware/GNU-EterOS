@@ -49,6 +49,9 @@ static void* alloc_kernel_stack(int slot) {
         return (void*)stack_start;
     }
 
+    /* Guard page unmapped */
+    vmm_unmap_page(base);
+
     /* Allocate and Map */
     for (uint64_t addr = stack_start; addr < stack_end; addr += PAGE_SIZE) {
         void* phys = pmm_alloc_page();
@@ -258,7 +261,7 @@ void scheduler_init(void) {
     tasks[0].cr3 = cr3;
 
     /* Configurar stack inicial para Task 0 (Boot Stack en 128MB) */
-    kernel_stack_top = 0x8000000;
+    kernel_stack_top = 0x7FF000;
     tasks[0].kernel_stack = kernel_stack_top;
 
     strlcpy(tasks[0].name, "kernel", sizeof(tasks[0].name));
@@ -608,7 +611,7 @@ void schedule(void) {
 
     /* Context Switch holding the lock! */
     /* The next task will release it in schedule() return or task_entry_wrapper */
-    context_switch(&current->rsp, next_task->rsp, current->fpu_state, next_task->fpu_state);
+    context_switch(&current->rsp, &next_task->rsp, current->fpu_state, next_task->fpu_state);
 
     /* We are back in the old task (now current) */
     spin_unlock(&sched_lock);

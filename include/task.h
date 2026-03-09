@@ -253,6 +253,6 @@ task_t* task_get_by_id(uint32_t id);
  * @param old_fpu Puntero al buffer FPU (fpu_state) de la tarea saliente.
  * @param new_fpu Puntero al buffer FPU (fpu_state) de la tarea entrante a restaurar.
  */
-extern void context_switch(uint64_t* old_rsp, uint64_t new_rsp, void* old_fpu, void* new_fpu);
+extern void context_switch(uint64_t* old_rsp, uint64_t* new_rsp, void* old_fpu, void* new_fpu);
 
 #endif /* ETEROS_TASK_H */
