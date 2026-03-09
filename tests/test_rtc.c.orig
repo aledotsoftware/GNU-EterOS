@@ -35,11 +35,6 @@ void irq_restore(uint64_t flags) { (void)flags; }
 // Include source file to test
 #include "../kernel/drivers/rtc/rtc.c"
 
-/* Assert might be undefined in strict environments if stdlib isn't fully linked or if standard asserts conflict */
-#ifndef assert
-#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
-#endif
-
 void test_rtc_bcd_24h() {
     printf("Testing RTC BCD 24h...\n");
     memset(cmos_registers, 0, sizeof(cmos_registers));
