@@ -1,8 +1,17 @@
+#include <stdlib.h>
+#include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
 #include <net/defs.h>
+#include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); return; } } while(0)
+#endif
 
 /* Helper to convert uint32_t to human readable string (for debugging) */
 void print_ip(uint32_t ip) {

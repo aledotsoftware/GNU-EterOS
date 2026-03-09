@@ -1,6 +1,12 @@
+#include <stdlib.h>
+#include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include <assert.h>
 
 // Mock IO functions

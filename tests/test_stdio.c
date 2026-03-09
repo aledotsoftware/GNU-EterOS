@@ -1,3 +1,8 @@
+#include <stdlib.h>
+#include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+#endif
 #include <stdio.h> /* This includes ../include/stdio.h due to -Iinclude, which pulls system stdio via include_next */
 #include <string.h> /* This includes ../include/string.h due to -Iinclude */
 #include <hal.h> /* For hal_console_write prototype */
@@ -5,6 +10,9 @@
 /* We need to define asserts manually or include <assert.h> */
 /* <assert.h> is system header, likely not in include/, so it picks system one. */
 #include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+#endif
 #include <stdint.h> /* For INT64_MIN */
 
 /* Mock hal_console_write */

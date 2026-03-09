@@ -1,3 +1,8 @@
+#include <stdlib.h>
+#include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+#endif
 #define _STRUCT_TIMESPEC
 #define __ETEROS_HOST_TEST__ 1
 

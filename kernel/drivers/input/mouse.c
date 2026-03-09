@@ -99,7 +99,6 @@ static void serial_write_hex8(uint8_t val) {
 
 void mouse_init(void) {
     uint8_t ack;
-    char buf[32]; /* Increased size */
 
     serial_write_string("[MOUSE] Inicializando PS/2 Mouse (Standard)...\n");
 

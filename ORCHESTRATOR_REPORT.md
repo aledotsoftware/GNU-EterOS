@@ -7,7 +7,8 @@
 ## Errores de Compilación Resueltos
 | # | Tipo | Archivo | Línea | Error | Agente Responsable |
 |---|------|---------|-------|-------|--------------------|
-| 1 | N/A | N/A | N/A | No compilation errors found during current build check. | `orchestrator-meta-agent` |
+| 1 | E-MISSING | tests/test_jfs.c | N/A | Missing `assert.h` | `orchestrator-meta-agent` |
+| 2 | E-MISSING | tests/test_rtc.c | N/A | Missing `stdlib.h` | `orchestrator-meta-agent` |
 
 ## Estado por Módulo
 | Módulo | Estado | Notas |
@@ -26,7 +27,11 @@
 3. `aether-linux-subsystem-bot` — Razón: Asegurar el multiplexado completo de syscalls Linux para los próximos bots/test apps que usen musl.
 
 ## Correcciones de Integración Aplicadas
-- Sin correcciones necesarias en el ciclo actual, el sistema es estable.
+- Fixed missing `<assert.h>` in `tests/test_jfs.c` causing build failures.
+- Fixed missing `<stdlib.h>` in `tests/test_rtc.c` causing build failures.
+- Added `__attribute__((unused))` to `show_splash` inside `kernel/main.c`.
+- Removed an unused `char buf[32];` from `kernel/drivers/input/mouse.c`.
+- Appended `section .note.GNU-stack noalloc noexec nowrite progbits` to all kernel assembly files to resolve linker warnings.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |

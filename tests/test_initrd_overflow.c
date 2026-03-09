@@ -1,3 +1,8 @@
+#include <stdlib.h>
+#include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+#endif
 #ifndef __ETEROS_HOST_TEST__
 #define __ETEROS_HOST_TEST__
 #endif
@@ -9,6 +14,9 @@ typedef __builtin_va_list __gnuc_va_list;
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+#endif
 
 /* Mock types */
 #include "../include/types.h"

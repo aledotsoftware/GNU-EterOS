@@ -1,3 +1,8 @@
+#include <stdlib.h>
+#include <assert.h>
+#ifndef assert
+#define assert(x) do { if (!(x)) { printf("ASSERT FAILED: %s\n", #x); exit(1); } } while(0)
+#endif
 /* Define Host Test Mode at the very top */
 #define __ETEROS_HOST_TEST__
 
