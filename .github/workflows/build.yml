@@ -71,15 +71,16 @@ jobs:
           chmod +x tests/run_integration.sh
           bash tests/run_integration.sh
 
-      - name: "Subir artefactos de build"
-        uses: actions/upload-artifact@v4
-        with:
-          name: eteros-build
-          path: |
-            build/eteros.img
-            build/eteros.iso
-            build/serial_output.log
-          retention-days: 30
+      # Comentado para evitar el error de "Artifact storage quota has been hit"
+      # - name: "Subir artefactos de build"
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: eteros-build
+      #     path: |
+      #       build/eteros.img
+      #       build/eteros.iso
+      #       build/serial_output.log
+      #     retention-days: 30
 
   # ---- Release automático cuando se pushea un tag v* ----
   release:
