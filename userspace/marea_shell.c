@@ -525,6 +525,14 @@ static void draw_menu(void) {
 /* Window Drawing                                                            */
 /* ========================================================================= */
 
+/* Check if click is on a window's close button */
+static int hit_close_button(marea_window_t* win, int mx, int my) {
+    int btn_cx = win->x + 14;
+    int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
+    int dx = mx - btn_cx, dy = my - btn_cy;
+    return (dx * dx + dy * dy <= 8 * 8);
+}
+
 static void draw_window_chrome(marea_window_t* win) {
     int x = win->x, y = win->y, w = win->w, h = win->h;
     int is_focused = win->focused;
@@ -553,12 +561,26 @@ static void draw_window_chrome(marea_window_t* win) {
     int btn_base_x = x + 14;
     int btn_base_y = y + TITLEBAR_HEIGHT / 2;
 
+    /* Check hover states */
+    int hover_close = hit_close_button(win, mouse_x, mouse_y);
+    int hover_min = (mouse_x >= btn_base_x + btn_spacing - btn_r && mouse_x <= btn_base_x + btn_spacing + btn_r &&
+                     mouse_y >= btn_base_y - btn_r && mouse_y <= btn_base_y + btn_r);
+    int hover_max = (mouse_x >= btn_base_x + btn_spacing * 2 - btn_r && mouse_x <= btn_base_x + btn_spacing * 2 + btn_r &&
+                     mouse_y >= btn_base_y - btn_r && mouse_y <= btn_base_y + btn_r);
+
     /* Close (red) */
     for (int dy = -btn_r; dy <= btn_r; dy++) {
         for (int dx = -btn_r; dx <= btn_r; dx++) {
             if (dx*dx + dy*dy <= btn_r*btn_r) {
                 put_pixel(btn_base_x + dx, btn_base_y + dy, COL_DANGER);
             }
+        }
+    }
+    if (hover_close) {
+        /* Draw 'x' inside close button */
+        for (int i = -2; i <= 2; i++) {
+            put_pixel(btn_base_x + i, btn_base_y + i, 0xFF4C0000);
+            put_pixel(btn_base_x + i, btn_base_y - i, 0xFF4C0000);
         }
     }
 
@@ -570,6 +592,12 @@ static void draw_window_chrome(marea_window_t* win) {
             }
         }
     }
+    if (hover_min) {
+        /* Draw '-' inside minimize button */
+        for (int i = -2; i <= 2; i++) {
+            put_pixel(btn_base_x + btn_spacing + i, btn_base_y, 0xFF4C4C00);
+        }
+    }
 
     /* Maximize (green) */
     for (int dy = -btn_r; dy <= btn_r; dy++) {
@@ -577,6 +605,13 @@ static void draw_window_chrome(marea_window_t* win) {
             if (dx*dx + dy*dy <= btn_r*btn_r) {
                 put_pixel(btn_base_x + btn_spacing * 2 + dx, btn_base_y + dy, COL_SUCCESS);
             }
+        }
+    }
+    if (hover_max) {
+        /* Draw '+' inside maximize button */
+        for (int i = -2; i <= 2; i++) {
+            put_pixel(btn_base_x + btn_spacing * 2 + i, btn_base_y, 0xFF004C00);
+            put_pixel(btn_base_x + btn_spacing * 2, btn_base_y + i, 0xFF004C00);
         }
     }
 
@@ -836,24 +871,10 @@ static int hit_start_button(int mx, int my) {
     return (mx >= btn_x && mx < btn_x + 40 && my >= btn_y && my < btn_y + 32);
 }
 
-/* Check if click is on a window's close button */
-static int hit_close_button(marea_window_t* win, int mx, int my) {
-    int btn_cx = win->x + 14;
-    int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
-    int dx = mx - btn_cx, dy = my - btn_cy;
-    return (dx * dx + dy * dy <= 8 * 8);
-}
-
 /* Check if click is on titlebar (for drag) */
 static int hit_titlebar(marea_window_t* win, int mx, int my) {
     return (mx >= win->x && mx < win->x + win->w &&
             my >= win->y && my < win->y + TITLEBAR_HEIGHT);
-}
-
-/* Check if click is inside window body */
-static int hit_window_body(marea_window_t* win, int mx, int my) {
-    return (mx >= win->x && mx < win->x + win->w &&
-            my >= win->y + TITLEBAR_HEIGHT && my < win->y + win->h);
 }
 
 /* Find topmost window under point */
@@ -1018,6 +1039,20 @@ int main(int argc, char* argv[]) {
 
                     /* Redraw everything (simple approach for now) */
                     redraw_all();
+                } else {
+                    /* Not dragging, check if we need to redraw window chrome for hover states */
+                    static int last_hovered_win = -1;
+                    int hovered_win = find_window_at(mouse_x, mouse_y);
+                    if (hovered_win >= 0) {
+                        marea_window_t* win = &windows[hovered_win];
+                        if (mouse_y >= win->y && mouse_y <= win->y + TITLEBAR_HEIGHT) {
+                            draw_window_chrome(win);
+                        }
+                    }
+                    if (last_hovered_win >= 0 && last_hovered_win != hovered_win && windows[last_hovered_win].visible) {
+                        draw_window_chrome(&windows[last_hovered_win]);
+                    }
+                    last_hovered_win = hovered_win;
                 }
 
                 /* Draw new cursor */
