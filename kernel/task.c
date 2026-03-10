@@ -611,7 +611,7 @@ void schedule(void) {
 
     /* Context Switch holding the lock! */
     /* The next task will release it in schedule() return or task_entry_wrapper */
-    context_switch(&current->rsp, &next_task->rsp, current->fpu_state, next_task->fpu_state);
+    context_switch(&current->rsp, next_task->rsp, current->fpu_state, next_task->fpu_state);
 
     /* We are back in the old task (now current) */
     spin_unlock(&sched_lock);

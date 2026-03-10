@@ -41,8 +41,8 @@ context_switch:
     ; Guardar el RSP actual en *old_rsp
     mov [rdi], rsp
 
-    ; Cargar el RSP de la nueva tarea (*new_rsp)
-    mov rsp, [rsi]
+    ; Cargar el RSP de la nueva tarea (new_rsp)
+    mov rsp, rsi
 
     ; Restaurar registros callee-saved del stack de la nueva tarea
     pop r15

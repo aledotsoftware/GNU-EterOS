@@ -61,6 +61,6 @@
 **Learning:** In fallback rendering paths (e.g., legacy BPP support for windows or images), per-pixel math like `buffer[y * width + x]` adds massive overhead inside nested `y`/`x` loops.
 **Action:** When a fallback path cannot utilize block memory operations (`memcpy`), hoist coordinate calculations out of the inner loop and use simple linear pointer increments (`*src++`) whenever drawing contiguous pixel regions.
 
-## 2026-12-06 - [Marea Shell fill_rect Block Optimization]
-**Learning:** In userspace rendering loops like `marea_shell.c`, iterating per-pixel in `fill_rect` introduces significant overhead. When the row matches contiguous memory or when drawing rectangles row by row, building the first row once and using `memcpy` to copy that row to subsequent rows provides a massive performance boost over per-pixel loops. Additionally, alpha blending routines (`fill_rect_alpha`) were bypassing direct buffer manipulation by making expensive `get_pixel` and `put_pixel` function calls.
-**Action:** Optimize userspace `fill_rect` and `fill_rect_alpha` by hoisting pointer arithmetic, using direct memory access (`row[j]`) instead of function calls, and using `memcpy` to blast pre-calculated rows when copying solid colors.
+## 2026-03-10 - [Glassmorphism Rendering Optimization]
+**Learning:** Calculating glassmorphism (per-pixel SWAR alpha blending reading the current background) is extremely slow when evaluated pixel by pixel, especially when the window is mostly transparent.
+**Action:** Unroll glassmorphism alpha blending loops (e.g., by 4x) and utilize a combined bitwise OR zero-check `(c0 | c1 | c2 | c3) == 0` to skip evaluating branches or executing math for entirely transparent multi-pixel chunks. This significantly reduces instruction count and branch misses.

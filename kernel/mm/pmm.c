@@ -174,7 +174,16 @@ void pmm_init(void) {
     pmm_bitmap = mock_pmm_bitmap;
     pmm_ref_counts = mock_pmm_ref_counts;
 #else
-    pmm_bitmap = (uint8_t*)0x400000;
+    /* Ubicar el Bitmap justo después del kernel para evitar colisiones */
+    extern uint8_t _kernel_end;
+    uint64_t kernel_end_addr = PAGE_ALIGN_UP((uint64_t)&_kernel_end);
+
+    /* Enforzar mínimo de seguridad en 4MB por si acaso */
+    if (kernel_end_addr < 0x400000) {
+        kernel_end_addr = 0x400000;
+    }
+
+    pmm_bitmap = (uint8_t*)kernel_end_addr;
     
     /* Calcular tamaño del bitmap (1 bit por página) */
     pmm_bitmap_size = total_pages / 8;
@@ -185,6 +194,11 @@ void pmm_init(void) {
     pmm_ref_counts = (uint16_t*)PAGE_ALIGN_UP((uint64_t)pmm_bitmap + pmm_bitmap_size);
 #endif
     
+    /* Validar Layout de Memoria (Assertions) */
+    extern uint8_t _kernel_start;
+    ASSERT((uint64_t)&_kernel_start >= 0x100000 && "Kernel no esta cargado en 1MB!");
+    ASSERT((uint64_t)pmm_bitmap >= (uint64_t)&_kernel_end && "PMM Bitmap colisiona con el Kernel!");
+
     /* Inicializar bitmap: MARCAR TODO COMO USADO (1) por defecto */
     /* Luego liberaremos solo las regiones USABLE del mapa E820 */
     memset(pmm_bitmap, 0xFF, pmm_bitmap_size);
@@ -413,6 +427,13 @@ void pmm_free_page(void* addr) {
                 spin_unlock(&pmm_lock);
                 return;
             }
+        }
+    } else {
+        if (!bitmap_test(page_idx)) {
+            serial_write_string("[PMM] ERROR: Double free detected!\n");
+            ASSERT(0 && "PMM Double free detected!");
+            spin_unlock(&pmm_lock);
+            return;
         }
     }
 
