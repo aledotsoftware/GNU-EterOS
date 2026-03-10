@@ -60,3 +60,7 @@
 ## 2026-03-09 - [Render Fallback Loop Pointer Math]
 **Learning:** In fallback rendering paths (e.g., legacy BPP support for windows or images), per-pixel math like `buffer[y * width + x]` adds massive overhead inside nested `y`/`x` loops.
 **Action:** When a fallback path cannot utilize block memory operations (`memcpy`), hoist coordinate calculations out of the inner loop and use simple linear pointer increments (`*src++`) whenever drawing contiguous pixel regions.
+
+## 2026-12-06 - [Marea Shell fill_rect Block Optimization]
+**Learning:** In userspace rendering loops like `marea_shell.c`, iterating per-pixel in `fill_rect` introduces significant overhead. When the row matches contiguous memory or when drawing rectangles row by row, building the first row once and using `memcpy` to copy that row to subsequent rows provides a massive performance boost over per-pixel loops. Additionally, alpha blending routines (`fill_rect_alpha`) were bypassing direct buffer manipulation by making expensive `get_pixel` and `put_pixel` function calls.
+**Action:** Optimize userspace `fill_rect` and `fill_rect_alpha` by hoisting pointer arithmetic, using direct memory access (`row[j]`) instead of function calls, and using `memcpy` to blast pre-calculated rows when copying solid colors.
