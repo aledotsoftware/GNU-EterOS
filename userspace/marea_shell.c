@@ -194,23 +194,35 @@ static void fill_rect(int x, int y, int w, int h, uint32_t color) {
     if (w <= 0 || h <= 0) return;
 
     if (fb_info.bpp == 32) {
-        for (int i = 0; i < h; i++) {
-            uint32_t* row = (uint32_t*)(fb_ptr + (y + i) * fb_info.pitch + x * 4);
-            for (int j = 0; j < w; j++) {
-                row[j] = color;
-            }
+        /* ⚡ BOLT Optimization: Build the first row segment once, then use memcpy
+           to blast it to the remaining rows, drastically reducing inner loop overhead. */
+        uint32_t* first_row = (uint32_t*)(fb_ptr + y * fb_info.pitch + x * 4);
+        for (int j = 0; j < w; j++) {
+            first_row[j] = color;
+        }
+        size_t row_bytes = w * 4;
+        uint8_t* dest_row = (uint8_t*)first_row + fb_info.pitch;
+        for (int i = 1; i < h; i++) {
+            memcpy(dest_row, first_row, row_bytes);
+            dest_row += fb_info.pitch;
         }
     } else if (fb_info.bpp == 24) {
         uint8_t b = color & 0xFF;
         uint8_t g = (color >> 8) & 0xFF;
         uint8_t r = (color >> 16) & 0xFF;
-        for (int i = 0; i < h; i++) {
-            uint8_t* row = fb_ptr + (y + i) * fb_info.pitch + x * 3;
-            for (int j = 0; j < w; j++) {
-                row[j * 3]     = b;
-                row[j * 3 + 1] = g;
-                row[j * 3 + 2] = r;
-            }
+        /* ⚡ BOLT Optimization: Build the first row segment once, then use memcpy
+           to blast it to the remaining rows, drastically reducing inner loop overhead. */
+        uint8_t* first_row = fb_ptr + y * fb_info.pitch + x * 3;
+        for (int j = 0; j < w; j++) {
+            first_row[j * 3]     = b;
+            first_row[j * 3 + 1] = g;
+            first_row[j * 3 + 2] = r;
+        }
+        size_t row_bytes = w * 3;
+        uint8_t* dest_row = first_row + fb_info.pitch;
+        for (int i = 1; i < h; i++) {
+            memcpy(dest_row, first_row, row_bytes);
+            dest_row += fb_info.pitch;
         }
     }
 }
@@ -228,11 +240,14 @@ static void fill_rect_alpha(int x, int y, int w, int h, uint32_t color) {
     if (w <= 0 || h <= 0) return;
 
     uint32_t inv_a = 255 - a;
+    uint32_t color_rb = (color & 0xFF00FF) * a;
+    uint32_t color_g = (color & 0x00FF00) * a;
+
     for (int i = 0; i < h; i++) {
         for (int j = 0; j < w; j++) {
             uint32_t dc = get_pixel(x + j, y + i);
-            uint32_t rb = (((color & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
-            uint32_t g  = (((color & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
+            uint32_t rb = ((color_rb + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
+            uint32_t g  = ((color_g + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
             put_pixel(x + j, y + i, 0xFF000000 | rb | g);
         }
     }
@@ -257,9 +272,9 @@ static void stroke_rect(int x, int y, int w, int h, uint32_t color) {
 /* Rounded rect (simple corner masking) */
 static void fill_rounded_rect(int x, int y, int w, int h, int r, uint32_t color) {
     /* Body minus corners */
-    fill_rect(x + r, y, w - 2 * r, h, color);
-    fill_rect(x, y + r, r, h - 2 * r, color);
-    fill_rect(x + w - r, y + r, r, h - 2 * r, color);
+    fill_rect(x + r, y, w - 2 * r, h, color);         /* Center */
+    fill_rect(x, y + r, r, h - 2 * r, color);         /* Left */
+    fill_rect(x + w - r, y + r, r, h - 2 * r, color); /* Right */
 
     /* Simple round corners via filled circles (quarter arcs) */
     for (int cy = 0; cy < r; cy++) {
@@ -289,6 +304,9 @@ static void fill_rounded_rect_alpha(int x, int y, int w, int h, int r, uint32_t 
 
     /* Corner pixels with alpha */
     uint32_t inv_a = 255 - a;
+    uint32_t color_rb = (color & 0xFF00FF) * a;
+    uint32_t color_g = (color & 0x00FF00) * a;
+
     for (int cy = 0; cy < r; cy++) {
         for (int cx = 0; cx < r; cx++) {
             if (cx * cx + cy * cy <= r * r) {
@@ -302,8 +320,8 @@ static void fill_rounded_rect_alpha(int x, int y, int w, int h, int r, uint32_t 
                     int px = pts[p][0], py = pts[p][1];
                     if (px < 0 || px >= (int)fb_info.width || py < 0 || py >= (int)fb_info.height) continue;
                     uint32_t dc = get_pixel(px, py);
-                    uint32_t rb = (((color & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
-                    uint32_t g  = (((color & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
+                    uint32_t rb = ((color_rb + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
+                    uint32_t g  = ((color_g + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
                     put_pixel(px, py, 0xFF000000 | rb | g);
                 }
             }
