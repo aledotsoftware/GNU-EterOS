@@ -8,6 +8,20 @@
 static window_t* window_list = NULL;
 static int32_t next_window_id = 1;
 
+/* ⚡ BOLT Optimization: Extract SWAR blending logic to an inline helper */
+static inline void blend_pixel(uint32_t* dest, uint32_t sc) {
+    uint32_t a = sc >> 24;
+    if (a == 255) {
+        *dest = sc;
+    } else if (a > 0) {
+        uint32_t dc = *dest;
+        uint32_t inv_a = 255 - a;
+        uint32_t rb = (((sc & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
+        uint32_t g = (((sc & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
+        *dest = 0xFF000000 | rb | g;
+    }
+}
+
 void compositor_init(void) {
     window_list = NULL;
 }
@@ -130,25 +144,27 @@ static void draw_window(window_t* win, rect_t* clip) {
                 uint32_t* dest = (uint32_t*)dest_row;
                 uint32_t* src = src_row;
 
-                for (int32_t j = 0; j < width; j++) {
+                int32_t j = 0;
+                /* ⚡ BOLT Optimization: Unroll glass blending loop 4x and use combined bitwise OR check
+                   to skip transparent chunks entirely without evaluating branches. SWAR logic extracted. */
+                for (; j <= width - 4; j += 4) {
+                    uint32_t c0 = src[j];
+                    uint32_t c1 = src[j+1];
+                    uint32_t c2 = src[j+2];
+                    uint32_t c3 = src[j+3];
+
+                    if (c0 | c1 | c2 | c3) {
+                        if (c0) blend_pixel(&dest[j], c0);
+                        if (c1) blend_pixel(&dest[j+1], c1);
+                        if (c2) blend_pixel(&dest[j+2], c2);
+                        if (c3) blend_pixel(&dest[j+3], c3);
+                    }
+                }
+
+                for (; j < width; j++) {
                     uint32_t sc = src[j];
                     if (sc != 0) {
-                        uint32_t a = (sc >> 24) & 0xFF;
-                        if (a == 255) {
-                            dest[j] = sc;
-                        } else if (a > 0) {
-                            uint32_t dc = dest[j];
-
-                            /* ⚡ BOLT Optimization: SWAR (SIMD Within A Register) Alpha Blending.
-                               Process Red and Blue channels together in a single 32-bit operation,
-                               reducing multiplications from 6 to 4 per pixel and eliminating
-                               costly bitwise shifts for individual component extraction. */
-                            uint32_t inv_a = 255 - a;
-                            uint32_t rb = (((sc & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
-                            uint32_t g = (((sc & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
-
-                            dest[j] = 0xFF000000 | rb | g;
-                        }
+                        blend_pixel(&dest[j], sc);
                     }
                 }
 

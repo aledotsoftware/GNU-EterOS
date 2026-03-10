@@ -61,6 +61,6 @@
 **Learning:** In fallback rendering paths (e.g., legacy BPP support for windows or images), per-pixel math like `buffer[y * width + x]` adds massive overhead inside nested `y`/`x` loops.
 **Action:** When a fallback path cannot utilize block memory operations (`memcpy`), hoist coordinate calculations out of the inner loop and use simple linear pointer increments (`*src++`) whenever drawing contiguous pixel regions.
 
-## 2026-12-06 - [Userspace Framebuffer Blitting]
-**Learning:** In userspace software compositing loops (`marea_shell`), filling solid and semi-transparent rectangles pixel-by-pixel using nested loops incurs extreme performance penalties. Calculating pointer offsets on every iteration limits rendering speed to 2.2s for 10k passes.
-**Action:** When working on framebuffer drawing functions, always hoist invariant operations (such as color channel multiplications and base row pointer address math) out of inner rendering loops. For solid color drawing, construct a single row and copy it line-by-line with `memcpy` to yield a ~55% speed increase.
+## 2026-03-10 - [Glassmorphism Rendering Optimization]
+**Learning:** Calculating glassmorphism (per-pixel SWAR alpha blending reading the current background) is extremely slow when evaluated pixel by pixel, especially when the window is mostly transparent.
+**Action:** Unroll glassmorphism alpha blending loops (e.g., by 4x) and utilize a combined bitwise OR zero-check `(c0 | c1 | c2 | c3) == 0` to skip evaluating branches or executing math for entirely transparent multi-pixel chunks. This significantly reduces instruction count and branch misses.

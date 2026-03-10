@@ -194,12 +194,13 @@ static void fill_rect(int x, int y, int w, int h, uint32_t color) {
     if (w <= 0 || h <= 0) return;
 
     if (fb_info.bpp == 32) {
-        /* ⚡ BOLT Optimization: Build the first row segment once, then use memcpy
-           to blast it to the remaining rows, drastically reducing inner loop overhead. */
+        /* ⚡ BOLT Optimization: Build the first row once, then copy it with memcpy
+           to subsequent rows instead of per-pixel assignments. */
         uint32_t* first_row = (uint32_t*)(fb_ptr + y * fb_info.pitch + x * 4);
         for (int j = 0; j < w; j++) {
             first_row[j] = color;
         }
+
         size_t row_bytes = w * 4;
         uint8_t* dest_row = (uint8_t*)first_row + fb_info.pitch;
         for (int i = 1; i < h; i++) {
@@ -210,14 +211,16 @@ static void fill_rect(int x, int y, int w, int h, uint32_t color) {
         uint8_t b = color & 0xFF;
         uint8_t g = (color >> 8) & 0xFF;
         uint8_t r = (color >> 16) & 0xFF;
-        /* ⚡ BOLT Optimization: Build the first row segment once, then use memcpy
-           to blast it to the remaining rows, drastically reducing inner loop overhead. */
+
+        /* ⚡ BOLT Optimization: Build the first row segment once, then use memcpy */
         uint8_t* first_row = fb_ptr + y * fb_info.pitch + x * 3;
+        uint8_t* p = first_row;
         for (int j = 0; j < w; j++) {
-            first_row[j * 3]     = b;
-            first_row[j * 3 + 1] = g;
-            first_row[j * 3 + 2] = r;
+            *p++ = b;
+            *p++ = g;
+            *p++ = r;
         }
+
         size_t row_bytes = w * 3;
         uint8_t* dest_row = first_row + fb_info.pitch;
         for (int i = 1; i < h; i++) {
@@ -227,7 +230,6 @@ static void fill_rect(int x, int y, int w, int h, uint32_t color) {
     }
 }
 
-/* Alpha-blended rectangle (ARGB) */
 static void fill_rect_alpha(int x, int y, int w, int h, uint32_t color) {
     uint32_t a = (color >> 24) & 0xFF;
     if (a == 0xFF) { fill_rect(x, y, w, h, color); return; }
@@ -240,15 +242,25 @@ static void fill_rect_alpha(int x, int y, int w, int h, uint32_t color) {
     if (w <= 0 || h <= 0) return;
 
     uint32_t inv_a = 255 - a;
-    uint32_t color_rb = (color & 0xFF00FF) * a;
-    uint32_t color_g = (color & 0x00FF00) * a;
-
-    for (int i = 0; i < h; i++) {
-        for (int j = 0; j < w; j++) {
-            uint32_t dc = get_pixel(x + j, y + i);
-            uint32_t rb = ((color_rb + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
-            uint32_t g  = ((color_g + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
-            put_pixel(x + j, y + i, 0xFF000000 | rb | g);
+    if (fb_info.bpp == 32) {
+        for (int i = 0; i < h; i++) {
+            uint32_t* row = (uint32_t*)(fb_ptr + (y + i) * fb_info.pitch + x * 4);
+            for (int j = 0; j < w; j++) {
+                uint32_t dc = row[j];
+                uint32_t rb = (((color & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
+                uint32_t g  = (((color & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
+                row[j] = 0xFF000000 | rb | g;
+            }
+        }
+    } else {
+        /* Fallback for other depths using get_pixel/put_pixel */
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w; j++) {
+                uint32_t dc = get_pixel(x + j, y + i);
+                uint32_t rb = (((color & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
+                uint32_t g  = (((color & 0x00FF00) * a + (dc & 0x00FF00) * inv_a) >> 8) & 0x00FF00;
+                put_pixel(x + j, y + i, 0xFF000000 | rb | g);
+            }
         }
     }
 }
