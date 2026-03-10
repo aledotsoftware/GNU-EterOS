@@ -1,39 +1,61 @@
 # 🌌 éterOS: El Sistema Operativo Universal (v0.2.0 "Genesis SMP")
 
-éterOS es un sistema operativo de **Nueva Era**, desarrollado desde el **"cero absoluto" (Bare-Metal)**. Su arquitectura de **Kernel Híbrido** y su **HAL (Hardware Abstraction Layer)** universal le permiten ejecutarse en cualquier dispositivo: desde un microcontrolador en un sensor IoT hasta un cluster de servidores x86_64 o tablets ARM64.
+éterOS es un sistema operativo de **Nueva Era**, desarrollado desde el **"cero absoluto" (Bare-Metal)** en C y ensamblador. Diseñado con una arquitectura de **Kernel Híbrido** y una **HAL (Hardware Abstraction Layer)** universal, su objetivo es ser el tejido conectivo entre microcontroladores IoT, dispositivos móviles ARM64 y potentes servidores x86_64.
 
-> *"El éter lo llena todo, invisible e infinito. éterOS: Un sistema operativo que no conoce límites."*
-
----
-
-## ✨ Filosofía y Visión: El Poder del Éter
-
-éterOS no es solo un clon de UNIX; es una reinvención de cómo el software interactúa con el silicio. Se construye sobre tres pilares fundamentales:
-
-1.  **Ether-Core (Arquitectura Híbrida):** Combina la estabilidad de un microkernel (aislando drivers en espacio de usuario) con el rendimiento de un núcleo monolítico para operaciones críticas.
-2.  **Fluidez Nativa:** Diseñado para hardware moderno. Optimizamos para **UEFI/GOP**, **NVMe**, **Multicore (SMP)** y renderizado acelerado.
-3.  **Aero-Minimalismo:** Una experiencia visual basada en vectores, transparencias (**Glassmorphism**) y una interfaz fluida denominada **Flux UI**, impulsada por el motor **Omni v2.0**.
+Este documento es el manifiesto técnico y la única fuente de verdad sobre la arquitectura, funcionamiento y visión de éterOS.
 
 ---
 
-## 🏛️ Arquitectura del Sistema (Radiografía Técnica)
+## 📖 Tabla de Contenidos
+1. [Filosofía y Visión](#1-filosofía-y-visión)
+2. [Arquitectura General (Ether-Core)](#2-arquitectura-general-ether-core)
+3. [Secuencia de Arranque y Hardware](#3-secuencia-de-arranque-y-hardware)
+4. [Gestión de Memoria (MMU)](#4-gestión-de-memoria-mmu)
+5. [Planificador, SMP y Sincronización](#5-planificador-smp-y-sincronización)
+6. [Sistema de Archivos Virtual (VFS)](#6-sistema-de-archivos-virtual-vfs)
+7. [Networking y Stack TCP/IP](#7-networking-y-stack-tcpip)
+8. [Eterland: Servidor Gráfico y Motor Omni](#8-eterland-servidor-gráfico-y-motor-omni)
+9. [Espacio de Usuario y Compatibilidad (ACS)](#9-espacio-de-usuario-y-compatibilidad-acs)
+10. [EterStore: Gestión de Paquetes](#10-eterstore-gestión-de-paquetes)
+11. [Guía de Soporte ARM64 (Rockchip RK3566)](#11-guía-de-soporte-arm64-rockchip-rk3566)
+12. [Compilación y Toolchain](#12-compilación-y-toolchain)
+13. [Hoja de Ruta y Faltantes Críticos](#13-hoja-de-ruta-y-faltantes-críticos)
 
-### 1. Diagrama de Capas
-```
+---
+
+## 1. Filosofía y Visión
+
+éterOS no es un clon de UNIX; es una reinvención. Se construye sobre tres pilares:
+*   **Ether-Core (Arquitectura Híbrida):** Combina la estabilidad de un microkernel (aislando drivers en espacio de usuario) con el rendimiento de un núcleo monolítico para operaciones críticas.
+*   **Fluidez Nativa:** Ignoramos el lastre de los 90. Diseñado para hardware moderno: **UEFI/GOP**, **NVMe**, **Multicore (SMP)** y renderizado acelerado.
+*   **Aero-Minimalismo:** Una experiencia visual basada en vectores, transparencias (**Glassmorphism**) y una interfaz fluida denominada **Flux UI**.
+
+### Sistema de Tiers (Portabilidad)
+La HAL permite que éterOS escale según el hardware:
+*   **Tier 1 (Micro):** IoT, Sensores (ARM Cortex-M, RISC-V32). Sin MMU.
+*   **Tier 2 (Core):** Tablets, RPi (AArch64). MMU + Paging.
+*   **Tier 3 (Full):** PCs, Servidores (x86_64). MMU + Ring 0-3 + SMP.
+
+---
+
+## 2. Arquitectura General (Ether-Core)
+
+El sistema está dividido en capas estrictas para garantizar la seguridad y la abstracción:
+
+```text
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║                        ESPACIO DE USUARIO (Ring 3)                         ║
 ║   ┌──────────┐  ┌──────────┐  ┌──────────────┐  ┌────────────────────┐     ║
 ║   │  sh.elf  │  │ test.elf │  │ exec_test.elf│  │  Aplicaciones ELF  │     ║
 ║   └────┬─────┘  └────┬─────┘  └──────┬───────┘  └──────────┬─────────┘     ║
-║        │             │               │                     │               ║
 ║   ┌────┴─────────────┴───────────────┴─────────────────────┴──────────┐    ║
-║   │                    libc (Userspace Library)                       │    ║
+║   │                    libc (Mini-LibC POSIX)                         │    ║
 ║   └───────────────────────────┬───────────────────────────────────────┘    ║
 ║                        syscall (INT/SYSCALL)                               ║
 ╠═══════════════════════════════╪════════════════════════════════════════════╣
 ║                     ESPACIO DEL KERNEL (Ring 0)                            ║
 ║ ┌────────────────────────────────────────────────────────────────────────┐ ║
-║ │  INTERFAZ DE SYSCALLS (Linux-Compatible ABI)                           │ ║
+║ │  INTERFAZ DE SYSCALLS (~70 Syscalls Linux-Compatible ABI)              │ ║
 ║ └──────────────────────────────┬─────────────────────────────────────────┘ ║
 ║ ┌──────────┐  ┌─────────┐  ┌───────────┐  ┌──────────────────┐             ║
 ║ │SCHEDULER │  │  SHELL  │  │  NETWORK  │  │  APLICACIONES    │             ║
@@ -43,146 +65,212 @@
 ║ │  MEMORY MGR (mm/)  │  FILESYSTEM (VFS) (fs/)  │   CRYPTO (crypto/)     │ ║
 ║ └─────────┬────────────────────┬─────────────────────────────────────────┘ ║
 ║ ┌─────────┴────────────────────┴─────────────────────────────────────────┐ ║
-║ │            HARDWARE ABSTRACTION LAYER (HAL)                            │ ║
+║ │            HARDWARE ABSTRACTION LAYER (HAL) (include/hal.h)            │ ║
 ║ └──────────────────────────────┬─────────────────────────────────────────┘ ║
 ║ ┌──────────────────────────────┼─────────────────────────────────────────┐ ║
 ║ │  DRIVERS (Video, Serial, Input, Net, Disk, Timer, PCI, RTC, ACPI)      │ ║
 ║ └──────────────────────────────┬─────────────────────────────────────────┘ ║
 ║ ┌──────────────────────────────┼─────────────────────────────────────────┐ ║
 ║ │              CÓDIGO ESPECÍFICO DE ARQUITECTURA                         │ ║
-║ │                   (x86_64 / AArch64 / RISC-V)                          │ ║
+║ │          (x86_64: gdt, idt, pic, apic, smp, context_switch)            │ ║
 ║ └────────────────────────────────────────────────────────────────────────┘ ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 ```
 
-### 2. Gestión de Memoria (MMU)
-*   **PMM (Physical Memory Manager):** Basado en mapa de bits (4KB por página). Utiliza estrategia **Next-Fit** con rover para asignación O(1) amortizada.
-*   **VMM (Virtual Memory Manager):** Paginación de 4 niveles (PML4->PDPT->PD->PT). Soporta **Copy-on-Write (CoW)** para `fork()` y **TLB Shootdown** vía IPIs en entornos SMP.
-*   **Heap:** Implementación dinámica (`kmalloc`/`kfree`) con coalescencia de bloques y protección de canarios.
+---
 
-#### Mapa de Memoria Virtual (x86_64):
-| Rango de Dirección | Descripción |
-|:--- |:--- |
-| `0x0000000000000000` | Espacio de Usuario (Identidad primeros 4GB) |
-| `0x0000000200000000` | Código de Usuario (ELF Load Address) |
-| `0x0000000300000000` | Stack de Usuario (Ring 3) |
-| `0xFFFF800000000000` | Kernel High-Half (Reservado para futura implementación) |
+## 3. Secuencia de Arranque y Hardware
 
-### 3. Scheduler y Multitarea (SMP-Aware)
-éterOS utiliza un planificador **Round-Robin Preemptivo** diseñado para escalar:
-*   **Preempción:** IRQ0 (PIT a 100Hz) activa el cambio de contexto.
-*   **Context Switch:** Implementado en ASM para máxima velocidad, guarda/restaura registros de propósito general y FPU.
-*   **SMP Support:** Despierta núcleos AP vía ACPI/MADT usando un trampolín de 16 bits. Cada CPU tiene su propio stack de kernel y bloque de datos `GS_BASE`.
+### El Salto al Modo Largo (x86_64)
+éterOS despierta en un entorno de **64 bits puro**:
+1.  **BIOS POST → MBR (boot.asm):** El bootloader de 2 etapas carga el kernel (128 sectores) y el Initrd.
+2.  **Detección:** Se consulta la memoria vía E820, se activa la puerta A20 y se detecta el framebuffer VBE.
+3.  **Transición:** Se configuran las tablas de paginación iniciales (Identity Mapping de 4GB), GDT de 64 bits y se activa PAE + EFER.LME.
+4.  **kmain():** El núcleo toma el control en `0x10000`.
 
-### 4. VFS (Virtual File System)
-Estructura de archivos unificada con múltiples backends:
-*   `/` (Root): **Initrd** (Read-Only, cargado en boot).
-*   `/dev/`: **DevFS** (null, zero, tty, random, input).
-*   `/proc/`: **ProcFS** (uptime, version, meminfo).
-*   `/data/`: **JFS** (Journaling File System) o **FAT32** (Storage).
+### Inicialización de Hardware (`hal_init`)
+1.  **Interrupts (IDT/PIC):** Se remapean las IRQs (0x20-0x2F). Se configuran 256 vectores para excepciones, IRQs e IPIs (Inter-Processor Interrupts).
+2.  **GDT & TSS:** Configuración per-CPU para el manejo de stacks durante interrupciones desde Ring 3.
+3.  **Timer:** PIT (Programmable Interval Timer) a 100Hz para preempción.
+4.  **ACPI & APIC:** Parseo de tablas RSDP/MADT para descubrir la topología de la CPU (Cores).
 
 ---
 
-## 🎨 Eterland y Flux UI
+## 4. Gestión de Memoria (MMU)
 
-**Eterland** es el sucesor del servidor gráfico monolítico, basado en **Buffers Compartidos (SHM)** y **Cero Copia**.
+La memoria se gestiona en tres niveles estrictos:
 
-*   **Motor Omni v2.0:** Soporta Alpha Blending, sombras suaves y **Dirty Region Tracking** (ahorro del 80% de ancho de banda).
-*   **Protocolo:** Comunicación asíncrona vía Unix Domain Sockets (`AF_UNIX`).
-*   **Aislamiento:** Cada ventana reside en su propio espacio de memoria, protegida por el kernel.
+### 1. Physical Memory Manager (PMM)
+*   **Estructura:** Bitmap (1 bit por cada frame de 4KB). ~4KB de bitmap por cada 128MB de RAM.
+*   **Algoritmo:** **Next-Fit** con un puntero "rover" y escaneo por palabras (Word-Scanning) para lograr O(1) amortizado.
+*   **Features:** Soporta conteo de referencias (`pmm_ref_page`) crucial para la implementación de Copy-on-Write.
 
----
+### 2. Virtual Memory Manager (VMM)
+*   **Arquitectura:** Paginación de 4 niveles (PML4 → PDPT → PD → PT) propia de x86_64.
+*   **Copy-on-Write (CoW):** Al hacer `fork()`, no se copia la memoria física. Las páginas se marcan como "Read-Only". Un Page Fault en escritura duplica la página al vuelo.
+*   **TLB Shootdown:** En entornos SMP, modificar una tabla de paginación requiere enviar una IPI (Inter-Processor Interrupt) a los demás núcleos para que invaliden su TLB (Translation Lookaside Buffer).
 
-## 📦 EterStore y Compatibilidad Total (ACS)
+### 3. Heap Dinámico (`kmalloc`)
+*   **Algoritmo:** Next-Fit con listas doblemente enlazadas y **Coalescing** automático (fusión de bloques libres adyacentes).
+*   **Seguridad:** Implementa *canary checks* (magic numbers) para detectar desbordamientos de buffer o dobles liberaciones.
 
-éterOS busca la utilidad inmediata mediante sus **Aether Compatibility Subsystems (ACS)**:
-
-1.  **Aether-Linux:** Traducción de ~70 syscalls Linux (RAX para el número, RDI/RSI/RDX para argumentos). Ejecuta binarios ELF64 sin modificaciones.
-2.  **Aether-Droid:** Soporte para **Binder IPC** y **ART Shim** para ejecutar aplicaciones de Android (en desarrollo).
-3.  **Aether-Win32:** Cargador de binarios PE (`.exe`) y puente para APIs de Windows (Kernel32.dll, User32.dll).
-4.  **EterStore:** Gestor de paquetes que instala `.deb` (vía mapeo de VFS) y el formato nativo **.epk** (imágenes montables con Zstd).
-
----
-
-## 🚀 Hoja de Ruta (Roadmap)
-
-### Fase 1: Cimientos ✅
-*   [x] Long Mode x86_64, PMM/VMM/Heap.
-*   [x] SMP (Symmetric Multiprocessing) y ACPI.
-*   [x] GDT, IDT, PIT, PIC, RTC.
-
-### Fase 2: Hardware y E/S ✅
-*   [x] Drivers: VGA, Framebuffer, PS/2 Keyboard/Mouse, PCI, E1000.
-*   [x] Networking: lwIP 2.2.0 (TCP/IP, DHCP, DNS, HTTP client).
-*   [x] VFS: Initrd, DevFS, ProcFS, FAT32.
-
-### Fase 3: Userland y POSIX ✅
-*   [x] Syscalls `SYSCALL`/`SYSRET`.
-*   [x] ELF Loader y Mini-LibC.
-*   [x] Futexes (Fast Userspace Mutexes) y Semáforos.
-
-### Fase 4: Ecosistema y Estética (Actual) 🚧
-*   [ ] Eterland Zero-Copy Compositor.
-*   [ ] Flux UI (Desktop Environment).
-*   [ ] ACS: Aether-Linux robusto (Copy-on-Write perfeccionado).
+#### Mapa de Memoria Virtual (x86_64)
+| Rango de Dirección | Contenido |
+|--------------------|-----------|
+| `0x0000000000000000` | Inicio (Identity mapped los primeros 4GB por el bootloader) |
+| `0x0000000000100000` | Kernel Heap Start |
+| `0x0000000200000000` | User Code (Ring 3 ELF Load Address) |
+| `0x0000000300000000` | User Stack (Ring 3) |
+| `0xFFFF800000000000` | Kernel High-Half (Reservado para diseño futuro) |
 
 ---
 
-## 🛠️ Tabla de Syscalls (Estado)
+## 5. Planificador, SMP y Sincronización
 
-| ID | Syscall | Estado | Notas |
-|:--- |:--- |:--- |:--- |
-| 0 | `read` | ✅ | Soporta VFS, Sockets, Pipes |
-| 1 | `write` | ✅ | Salida a TTY, Serial y Archivos |
-| 2 | `open` | ✅ | Creación y apertura de nodos |
-| 57 | `fork` | ✅ | Clonación de proceso con CoW |
-| 59 | `execve` | ✅ | Cargador ELF64 completo |
-| 60 | `exit` | ✅ | Limpieza de recursos y códigos de retorno |
-| 202 | `futex` | ✅ | Sincronización rápida Ring 3 |
+### Scheduler (Round-Robin Preemptivo)
+El planificador de éterOS escala para múltiples núcleos.
+*   **Estados:** `READY`, `RUNNING`, `SLEEPING`, `BLOCKED`, `ZOMBIE`.
+*   **Context Switch:** Ultra-optimizado en ensamblador (`context_switch.asm`). Guarda RSP, cambia espacio de direcciones (CR3) si es necesario, y salta.
+*   **Tick:** Impulsado por el timer PIT a 100Hz (10ms por quantum).
 
----
+### SMP (Symmetric Multiprocessing)
+éterOS no es mononúcleo.
+*   **AP Booting:** El procesador principal (BSP) copia un trampolín de 16 bits a memoria baja y envía señales `INIT` y `STARTUP` (SIPI) a los Application Processors (APs).
+*   **Per-CPU Data:** Utiliza el registro `GS_BASE` de x86_64 para almacenar punteros al contexto actual de cada CPU de forma aislada, evitando locks globales masivos.
 
-## 📱 Soporte de Hardware Específico
-
-### Rockchip RK3566 (ARM64)
-éterOS es capaz de arrancar en tablets basadas en RK3566.
-*   **Estado:** Experimental (Serial Debug únicamente).
-*   **Flasheo:** 
-    1. Compilar: `.\build.ps1 -Target all -Arch aarch64`.
-    2. Conectar en modo **Loader** (Volumen + y conectar USB).
-    3. Usar **RKDevTool** para escribir `kernel.bin` en la partición `boot`.
-    4. Baudrate: 1.5M baudios para log de arranque.
+### Primitivas de Sincronización
+1.  **Spinlocks:** Bloqueos activos para proteger estructuras críticas del kernel (Heap, VFS, PMM) del acceso concurrente entre núcleos.
+2.  **Semáforos:** Para suspender hilos a la espera de I/O (ej. red, disco).
+3.  **Futexes (Fast Userspace Mutexes):** La joya de la corona para compatibilidad Linux. Implementados en `futex.c` con colas de espera en Ring 0 para que la Mini-LibC gestione hilos POSIX sin overhead.
 
 ---
 
-## 🔧 Compilación y Ejecución
+## 6. Sistema de Archivos Virtual (VFS)
 
-### Requisitos (Ubuntu/Debian)
-```bash
-sudo apt install build-essential nasm qemu-system-x86 xorriso mtools
+El VFS abstrae el almacenamiento tras una API unificada (`read_fs`, `write_fs`, `open_fs`, `mount`). 
+
+**Árbol de Montajes:**
+*   `/` **(Initrd):** Initial Ramdisk cargado por el bootloader. Contiene `sh.elf`, binarios de prueba y assets gráficos. Solo lectura.
+*   `/dev/` **(DevFS):** Nodos virtuales. Implementados: `null`, `zero`, `tty`, `random` (PRNG), `urandom`, `input` (Ring buffer de eventos de teclado/mouse).
+*   `/proc/` **(ProcFS):** Estado del núcleo. `/proc/uptime`, `/proc/version`, `/proc/meminfo`.
+*   `/mnt/` **(FAT32):** Soporte estable para lectura/escritura de particiones FAT32 (nombres 8.3) con soporte para offsets de partición MBR.
+*   `/data/` **(JFS):** Prototipo de Journaling File System en memoria.
+
+---
+
+## 7. Networking y Stack TCP/IP
+
+éterOS posee capacidades de red avanzadas a través de su driver nativo **Intel PRO/1000 (e1000)** (descubierto vía escaneo PCI).
+
+### Integración lwIP 2.2.0
+El kernel integra el stack industrial **lwIP** (`kernel/net/lwip_port`).
+*   **DHCP:** Negociación automática de IP al inicio (`network_task`).
+*   **Sockets:** Soporte para Sockets BSD a través de la capa de syscalls.
+*   **DNS & TCP:** Soporte completo. El comando `wget` en la shell permite descargar archivos vía HTTP.
+
+---
+
+## 8. Eterland: Servidor Gráfico y Motor Omni
+
+**Eterland** es el compositor gráfico diseñado bajo el principio de **Cero Copia (Zero-Copy)**.
+
+### Arquitectura de Composición
+1.  **Shared Buffers (SHM):** Las aplicaciones en Ring 3 piden un buffer. El kernel lo mapea en el proceso y en el compositor (`sys_mmap(MAP_SHARED)`).
+2.  **IPC:** La app dibuja (CPU/GPU) y notifica al compositor vía Unix Domain Sockets.
+3.  **Motor Omni v2.0:** El compositor mezcla las ventanas aplicando:
+    *   **Alpha Blending (256 niveles)** para Glassmorphism.
+    *   **Dirty Region Tracking:** Solo actualiza los rectángulos del framebuffer que sufrieron cambios.
+    *   **Fast-Path Geometry:** Primitivas que escriben directamente en el buffer de video LFB (Linear Framebuffer) obtenido vía VBE/GOP.
+
+---
+
+## 9. Espacio de Usuario y Compatibilidad (ACS)
+
+La transición a Ring 3 se realiza configurando los segmentos de usuario en la GDT y ejecutando la instrucción `SYSRET`.
+
+### Cargador ELF64
+El kernel parsea cabeceras ELF, mapea los segmentos `PT_LOAD` en memoria virtual y configura el heap del proceso (gestionado vía la syscall `brk`).
+
+### ACS: Aether-Linux Subsystem
+El objetivo es ejecutar binarios ELF de Linux sin modificarlos.
+*   **Multiplexor:** El manejador `syscall_entry.asm` intercepta la instrucción `syscall` y traduce los registros estándar de Linux (RAX=id, RDI, RSI, RDX, R10, R8, R9=args) a funciones nativas.
+*   **Tabla de Syscalls Implementadas (~70):**
+    *   *I/O:* `read`, `write`, `open`, `close`, `lseek`, `ioctl`, `readv`, `writev`, `dup2`, `pipe`.
+    *   *Procesos:* `fork`, `execve`, `exit`, `wait4`, `getpid`, `kill`.
+    *   *Memoria:* `mmap`, `brk`, `mprotect` (stub), `munmap`.
+    *   *Sincronización:* `futex`, `arch_prctl` (esencial para Thread Local Storage `FS/GS base`).
+    *   *FS:* `stat`, `fstat`, `mkdir`, `unlink`.
+
+### Mini-LibC (POSIX)
+Para aplicaciones nativas de éterOS, proveemos una librería en `userspace/libc/` con soporte para:
+*   Asignación dinámica (`malloc`/`free` usando bloques sobre `brk`).
+*   Manipulación de cadenas (`string.h`).
+*   Señales (`signal.h` con colas de interrupción diferida en el scheduler).
+
+---
+
+## 10. EterStore: Gestión de Paquetes
+
+La infraestructura para instalar software se basa en dos fases:
+1.  **Fase de Adopción:** Herramientas CLI capaces de extraer paquetes Debian (`.deb`) mapeando sus dependencias mediante capas de traducción.
+2.  **Fase Nativa (Formato `.epk`):** Paquetes EterPackage. Archivos SquashFS/Zstd de solo lectura que el kernel monta dinámicamente en tiempo de ejecución, garantizando desinstalaciones limpias y sandboxing.
+
+---
+
+## 11. Guía de Soporte ARM64 (Rockchip RK3566)
+
+éterOS está portando su HAL a la arquitectura AArch64 para correr en tablets y SBCs.
+*   **Estado:** Experimental (Bootea, inicializa UART, Serial Debug 1.5M baudios. Sin display aún).
+*   **Flasheo:**
+    1. Compilar cross-compiler: `.\build.ps1 -Target all -Arch aarch64`
+    2. Conectar dispositivo en modo LOADER/MASKROM.
+    3. Usar **RKDevTool** para escribir `build/aarch64/kernel.bin` en la partición `boot`.
+
+---
+
+## 12. Compilación y Toolchain
+
+El sistema se puede compilar en Windows (PowerShell) o Linux (WSL).
+**Requisitos:** `x86_64-elf-gcc`, `nasm`, `x86_64-elf-ld`, `qemu-system-x86_64`, `xorriso`.
+
+### Entorno Windows (Nativo)
+El script `build.ps1` orquesta todo el proceso:
+```powershell
+.\build.ps1 -Target all     # Compila boot, kernel, userspace e initrd
+.\build.ps1 -Target run     # Lanza QEMU con red (e1000) y Serial COM1
+.\build.ps1 -Target vbox    # Empaqueta en un disco VDI para VirtualBox
+.\build.ps1 -Target clean   # Limpia el directorio de build
 ```
 
-### Comandos de Makefile
-*   `make all`: Compila boot, kernel e imagen.
-*   `make run`: Inicia en QEMU con networking habilitado.
-*   `make iso`: Genera `eteros.iso` para hardware real.
-
-### PowerShell (Windows Nativo)
-*   `.\build.ps1 -Target run`: Compila y arranca en QEMU.
-*   `.\build.ps1 -Target vbox`: Genera imagen VDI para VirtualBox.
+### Entorno Linux / WSL
+```bash
+make all      # Genera build/eteros.img
+make run      # Ejecuta QEMU
+make iso      # Genera un ISO booteable para grabar en USB
+```
 
 ---
 
-## 📂 Estructura del Proyecto
-*   `/boot`: El despertar del metal (x86_64 / ARM64).
-*   `/kernel`: Ether-Core (mm, fs, net, arch, drivers, shell).
-*   `/include`: API del sistema y headers de la HAL.
-*   `/userspace`: Mini-LibC y aplicaciones Ring 3.
-*   `/tests`: Suite masiva de pruebas unitarias y benchmarks.
+## 13. Hoja de Ruta y Faltantes Críticos
+
+Aunque éterOS v0.2.0 es altamente funcional, las siguientes áreas son la prioridad actual de desarrollo:
+
+🔴 **Críticos (Blockers):**
+1.  **Resolución DNS Nativa:** lwIP la soporta, pero falta exponerla a la capa VFS para que comandos como `ntp` y `ota` no dependan de IPs hardcodeadas.
+2.  **Persistencia JFS:** El driver de Journaling actual guarda todo en RAM. Falta el puente para volcar el journal al driver de disco duro físico a través de la capa `bcache`.
+3.  **Gestión de Energía (ACPI):** Se parsea la topología de la CPU, pero falta implementar el apagado suave (`S5`) y suspensión mediante las tablas FADT.
+
+🟡 **Mejoras Arquitectónicas:**
+4.  **Aether-Droid:** Implementación del driver `/dev/binder` en el kernel para habilitar IPC estilo Android.
+5.  **Cargador de Librerías Dinámicas (`.so`):** Actualmente el loader ELF asume compilación estática.
+6.  **Sistema Multiusuario:** Existen UIDs en la estructura del proceso, pero falta el binario `login.elf` interactuando con `/etc/shadow` y aplicando permisos en el VFS.
 
 ---
 
-## 📜 Licencia
+## 📜 Licencia y Créditos
 
-© 2026 **Tudex Networks**. Todos los derechos reservados.
-*"Hacia el infinito, a través del éter."*
+© 2026 **Tudex Networks**. Desarrollado por el equipo de éterOS.
+Este proyecto es una obra de ingeniería dedicada a la exploración de nuevos paradigmas en sistemas operativos, empujando los límites del silicio.
+
+---
+*"El éter es la plataforma; éterOS es la inteligencia que la habita."*
