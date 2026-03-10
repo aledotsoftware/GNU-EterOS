@@ -192,6 +192,7 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
         /* ⚡ BOLT Optimization: Use linear pointer assignment */
         uint32_t* dest_pixel = img->pixels;
         for (uint32_t y = 0; y < height; y++) {
+            uint32_t g_shift = ((y * 255) / height) << 8;
             for (uint32_t x = 0; x < width; x++) {
                 uint8_t r = (x * 255) / width;
                 uint8_t g = (y * 255) / height;
