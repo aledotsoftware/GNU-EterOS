@@ -189,12 +189,14 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
 
     if (out_len != expected_size) {
         /* Fallback to gradient if not valid uncompressed PNG */
+        /* ⚡ BOLT Optimization: Use linear pointer assignment */
+        uint32_t* dest_pixel = img->pixels;
         for (uint32_t y = 0; y < height; y++) {
             for (uint32_t x = 0; x < width; x++) {
                 uint8_t r = (x * 255) / width;
                 uint8_t g = (y * 255) / height;
                 uint8_t b = 128;
-                img->pixels[y * width + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                *dest_pixel++ = 0xFF000000 | (r << 16) | (g << 8) | b;
             }
         }
         kfree(uncompressed);
@@ -204,6 +206,7 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
     /* Apply PNG Filters and convert to ARGB */
     uint32_t stride = width * bpp;
     uint8_t* prev_row = NULL;
+    uint32_t* dest_pixel = img->pixels;
 
     for (uint32_t y = 0; y < height; y++) {
         uint8_t* row = uncompressed + y * (stride + 1);
@@ -258,12 +261,23 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
         }
 
         /* Copy to ARGB buffer */
-        for (uint32_t x = 0; x < width; x++) {
-            uint8_t r = pixels[x * bpp];
-            uint8_t g = pixels[x * bpp + 1];
-            uint8_t b = pixels[x * bpp + 2];
-            uint8_t a = (bpp == 4) ? pixels[x * bpp + 3] : 255;
-            img->pixels[y * width + x] = (a << 24) | (r << 16) | (g << 8) | b;
+        /* ⚡ BOLT Optimization: Hoist pointer arithmetic and loop-invariant check out of the loop */
+        uint8_t* src_pixel = pixels;
+        if (bpp == 4) {
+            for (uint32_t x = 0; x < width; x++) {
+                uint8_t r = *src_pixel++;
+                uint8_t g = *src_pixel++;
+                uint8_t b = *src_pixel++;
+                uint8_t a = *src_pixel++;
+                *dest_pixel++ = (a << 24) | (r << 16) | (g << 8) | b;
+            }
+        } else {
+            for (uint32_t x = 0; x < width; x++) {
+                uint8_t r = *src_pixel++;
+                uint8_t g = *src_pixel++;
+                uint8_t b = *src_pixel++;
+                *dest_pixel++ = 0xFF000000 | (r << 16) | (g << 8) | b;
+            }
         }
 
         prev_row = pixels;
