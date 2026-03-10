@@ -189,13 +189,15 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
 
     if (out_len != expected_size) {
         /* Fallback to gradient if not valid uncompressed PNG */
-        /* ⚡ BOLT Optimization: Lift y-dependent g calculation and use linear pointer advancement */
+        /* ⚡ BOLT Optimization: Use linear pointer assignment */
         uint32_t* dest_pixel = img->pixels;
         for (uint32_t y = 0; y < height; y++) {
             uint32_t g_shift = ((y * 255) / height) << 8;
             for (uint32_t x = 0; x < width; x++) {
                 uint8_t r = (x * 255) / width;
-                *dest_pixel++ = 0xFF000000 | (r << 16) | g_shift | 128;
+                uint8_t g = (y * 255) / height;
+                uint8_t b = 128;
+                *dest_pixel++ = 0xFF000000 | (r << 16) | (g << 8) | b;
             }
         }
         kfree(uncompressed);
@@ -205,6 +207,7 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
     /* Apply PNG Filters and convert to ARGB */
     uint32_t stride = width * bpp;
     uint8_t* prev_row = NULL;
+    uint32_t* dest_pixel = img->pixels;
 
     for (uint32_t y = 0; y < height; y++) {
         uint8_t* row = uncompressed + y * (stride + 1);
@@ -258,8 +261,8 @@ png_image_t* png_decode(const uint8_t* data, size_t size) {
             }
         }
 
-        /* ⚡ BOLT Optimization: Lift loop-invariant condition (bpp == 4) and use linear pointer advancement */
-        uint32_t* dest_pixel = &img->pixels[y * width];
+        /* Copy to ARGB buffer */
+        /* ⚡ BOLT Optimization: Hoist pointer arithmetic and loop-invariant check out of the loop */
         uint8_t* src_pixel = pixels;
         if (bpp == 4) {
             for (uint32_t x = 0; x < width; x++) {

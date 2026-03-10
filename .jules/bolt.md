@@ -61,6 +61,6 @@
 **Learning:** In fallback rendering paths (e.g., legacy BPP support for windows or images), per-pixel math like `buffer[y * width + x]` adds massive overhead inside nested `y`/`x` loops.
 **Action:** When a fallback path cannot utilize block memory operations (`memcpy`), hoist coordinate calculations out of the inner loop and use simple linear pointer increments (`*src++`) whenever drawing contiguous pixel regions.
 
-## 2024-03-10 - Pointer Advancement Over Array Indexing
-**Learning:** In highly iterated loops such as image decoding and pixel data manipulation (`kernel/gfx/png.c`), maintaining the pixel array index by recalculating coordinates (`[y * width + x]`) causes a large overhead. By simply maintaining a pointer and incrementing it per iteration (e.g., `*dest++` and `*src++`), you bypass continuous index recalculation. Also, lifting simple condition checking (`bpp == 4`) to the exterior of the loop saves significant execution time.
-**Action:** When iterating over contiguous C arrays sequentially in multi-dimensional logic, employ pointer tracking (`++`) instead of recalculating 1D indexes via multiplying and adding loop variables.
+## 2026-03-10 - [Glassmorphism Rendering Optimization]
+**Learning:** Calculating glassmorphism (per-pixel SWAR alpha blending reading the current background) is extremely slow when evaluated pixel by pixel, especially when the window is mostly transparent.
+**Action:** Unroll glassmorphism alpha blending loops (e.g., by 4x) and utilize a combined bitwise OR zero-check `(c0 | c1 | c2 | c3) == 0` to skip evaluating branches or executing math for entirely transparent multi-pixel chunks. This significantly reduces instruction count and branch misses.
