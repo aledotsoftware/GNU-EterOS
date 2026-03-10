@@ -61,6 +61,6 @@
 **Learning:** In fallback rendering paths (e.g., legacy BPP support for windows or images), per-pixel math like `buffer[y * width + x]` adds massive overhead inside nested `y`/`x` loops.
 **Action:** When a fallback path cannot utilize block memory operations (`memcpy`), hoist coordinate calculations out of the inner loop and use simple linear pointer increments (`*src++`) whenever drawing contiguous pixel regions.
 
-## 2026-03-09 - [Framebuffer Small Rect Optimization]
-**Learning:** `memset32` relies on the `rep stosq` microcode instruction. While extremely fast for bulk memory operations, it incurs significant setup overhead for very small block copies per row (like drawing 1px to 16px wide UI borders). Calling `memset32` repeatedly for narrow rectangles creates a performance bottleneck.
-**Action:** Add an explicit fast-path for small widths (`w <= 16`) in rendering functions like `framebuffer_rect`. Unroll the per-pixel assignment loop (e.g., by 4 pixels) to bypass `memset32` overhead. This yields massive speedups (~150x) for drawing vertical UI borders and small elements.
+## 2026-03-10 - [Glassmorphism Rendering Optimization]
+**Learning:** Calculating glassmorphism (per-pixel SWAR alpha blending reading the current background) is extremely slow when evaluated pixel by pixel, especially when the window is mostly transparent.
+**Action:** Unroll glassmorphism alpha blending loops (e.g., by 4x) and utilize a combined bitwise OR zero-check `(c0 | c1 | c2 | c3) == 0` to skip evaluating branches or executing math for entirely transparent multi-pixel chunks. This significantly reduces instruction count and branch misses.
