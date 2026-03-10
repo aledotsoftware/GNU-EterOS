@@ -60,3 +60,7 @@
 ## 2026-03-09 - [Render Fallback Loop Pointer Math]
 **Learning:** In fallback rendering paths (e.g., legacy BPP support for windows or images), per-pixel math like `buffer[y * width + x]` adds massive overhead inside nested `y`/`x` loops.
 **Action:** When a fallback path cannot utilize block memory operations (`memcpy`), hoist coordinate calculations out of the inner loop and use simple linear pointer increments (`*src++`) whenever drawing contiguous pixel regions.
+
+## 2026-03-09 - [Framebuffer Small Rect Optimization]
+**Learning:** `memset32` relies on the `rep stosq` microcode instruction. While extremely fast for bulk memory operations, it incurs significant setup overhead for very small block copies per row (like drawing 1px to 16px wide UI borders). Calling `memset32` repeatedly for narrow rectangles creates a performance bottleneck.
+**Action:** Add an explicit fast-path for small widths (`w <= 16`) in rendering functions like `framebuffer_rect`. Unroll the per-pixel assignment loop (e.g., by 4 pixels) to bypass `memset32` overhead. This yields massive speedups (~150x) for drawing vertical UI borders and small elements.

@@ -253,6 +253,29 @@ void framebuffer_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t c
         /* ⚡ BOLT Optimization: Contiguous memory fast path */
         if (w * 4 == fb_pitch) {
             memset32((uint32_t*)base_addr, color, w * h);
+        } else if (w <= 16) {
+            /* ⚡ BOLT Optimization: Fast path for small widths (e.g., UI borders, scrollbars)
+               Bypasses the overhead of memset32 function call and x86 `rep stosq` microcode setup
+               which is significant for very short, repeated row fills. */
+            for (uint32_t i = 0; i < h; i++) {
+                uint32_t* dest = (uint32_t*)base_addr;
+                uint32_t j = 0;
+
+                /* Unroll by 4 for efficiency */
+                for (; j + 4 <= w; j += 4) {
+                    dest[j] = color;
+                    dest[j+1] = color;
+                    dest[j+2] = color;
+                    dest[j+3] = color;
+                }
+
+                /* Remainder */
+                for (; j < w; j++) {
+                    dest[j] = color;
+                }
+
+                base_addr += fb_pitch;
+            }
         } else {
             for (uint32_t i = 0; i < h; i++) {
                 memset32((uint32_t*)base_addr, color, w);
