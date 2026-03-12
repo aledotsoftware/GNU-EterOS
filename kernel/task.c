@@ -17,7 +17,6 @@
 #include "../include/mm.h"
 #include "../include/string.h"
 #include "../include/serial.h"
-#include "../include/vga.h"
 #include "../include/timer.h"
 #include "../include/gdt.h"
 #include "../include/cpu.h"
@@ -368,6 +367,17 @@ void task_init_ap(void) {
     serial_write_string("\n");
 }
 
+/**
+ * @brief Creates a new kernel task.
+ *
+ * Allocates a free slot, a kernel stack (with guard page unmapped for safety),
+ * and sets up the initial execution context to start at the given entry function.
+ * The task is then added to the ready queue.
+ *
+ * @param name The name of the new task.
+ * @param entry Function pointer to the task's entry point.
+ * @return The ID of the newly created task, or -1 if the max task limit is reached or out of memory.
+ */
 int task_create(const char* name, void (*entry)(void)) {
     __asm__ volatile("cli");
     spin_lock(&sched_lock);
@@ -499,6 +509,14 @@ static task_t* find_next_task(task_t* current) {
     return NULL; /* No hay tareas ejecutables */
 }
 
+/**
+ * @brief Main scheduler function (Round-Robin SMP).
+ *
+ * Performs context switching by finding the next READY task in the queue.
+ * Handles SMP CPU load tracking, updates TLS (FS/GS bases),
+ * switches address spaces (CR3) if necessary, and performs the architecture-specific
+ * context switch. Uses spinlocks to safely modify global state.
+ */
 void schedule(void) {
     if (!scheduler_active) return;
 
@@ -827,6 +845,16 @@ int task_get_cpu_load(void) {
     return cpu_last_load;
 }
 
+/**
+ * @brief Duplicates the current process (fork).
+ *
+ * Allocates a new task slot and clones the parent's address space using Copy-on-Write (CoW).
+ * It copies the POSIX structures (file descriptors, signal handlers) while properly
+ * increasing reference counts. The child process returns 0 via RAX.
+ *
+ * @param regs_ptr Pointer to the syscall registers state to be restored on return.
+ * @return The ID of the child process in the parent, or -1 on failure.
+ */
 int task_fork(void* regs_ptr) {
     struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;
 
@@ -951,6 +979,21 @@ int task_fork(void* regs_ptr) {
     return tasks[slot].id;
 }
 
+/**
+ * @brief Creates a new thread or process based on clone flags.
+ *
+ * Serves as the backbone for both thread creation and process duplication.
+ * Depending on `clone_flags` (e.g., CLONE_VM, CLONE_THREAD), it may share the
+ * address space or create a new one, share file descriptors, and configure Thread Local Storage (TLS).
+ *
+ * @param clone_flags Flags indicating what resources to share (Linux compatible).
+ * @param stack_top The user stack pointer for the new thread.
+ * @param parent_tid Pointer to store the child's TID in the parent's memory.
+ * @param child_tid Pointer to the child's TID (handled by userspace).
+ * @param tls The thread local storage base address (FS base).
+ * @param regs_ptr Pointer to the current syscall registers state.
+ * @return The TID of the newly created thread/process, or -1 on failure.
+ */
 int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs_ptr) {
     struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;
 

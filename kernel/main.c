@@ -15,9 +15,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
-#include <io.h>
 #include <boot.h>
-#include <mouse.h>
 #include <shell.h>
 #include <mm.h>
 #include <pmm.h>
@@ -315,24 +313,25 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 static void kernel_print_banner(void) {
     hal_console_write("\n");
     
-    /* Logo de éterOS en arte ASCII (Monocromático para portabilidad) */
-    hal_console_write("          _             ___  ____  \n");
-    hal_console_write("     ___ | |_ ___  _ _ / _ \\/ ___| \n");
-    hal_console_write("    / _ \\| __/ _ \\| '_| | | \\___ \\ \n");
-    hal_console_write("   |  __/| ||  __/| | | |_| |___) |\n");
-    hal_console_write("    \\___| \\__\\___||_|  \\___/|____/ \n");
+    /* Logo de éterOS en arte ASCII (Austral Aurora theme) */
+    hal_console_write("\033[38;2;135;206;235m"); /* Sky blue */
+    hal_console_write("          _             \033[38;2;64;224;208m___  ____  \n");
+    hal_console_write("     \033[38;2;135;206;235m___ | |_ ___  _ _ \033[38;2;64;224;208m/ _ \\/ ___| \n");
+    hal_console_write("    \033[38;2;135;206;235m/ _ \\| __/ _ \\| '_|\033[38;2;64;224;208m | | \\___ \\ \n");
+    hal_console_write("   \033[38;2;135;206;235m|  __/| ||  __/| | \033[38;2;64;224;208m| |_| |___) |\n");
+    hal_console_write("    \033[38;2;135;206;235m\\___| \\__\\___||_|\033[38;2;64;224;208m  \\___/|____/ \033[0m\n");
 
     hal_console_write("\n");
-    hal_console_write("  ========================================\n");
+    hal_console_write("\033[38;2;0;191;255m  ========================================\033[0m\n");
     
     /* Versión y codename */
-    kprintf("    Version %d.%d.%d (\"%s\")\n",
+    kprintf("    \033[1;37mVersion %d.%d.%d (\"%s\")\033[0m\n",
             ETEROS_VERSION_MAJOR, ETEROS_VERSION_MINOR, ETEROS_VERSION_PATCH, ETEROS_CODENAME);
 
     /* Copyright */
-    hal_console_write("    (c) 2026 Tudex Networks\n");
+    hal_console_write("    \033[90m(c) 2026 Tudex Networks\033[0m\n");
     
-    hal_console_write("  ========================================\n");
+    hal_console_write("\033[38;2;0;191;255m  ========================================\033[0m\n");
     hal_console_write("\n");
 }
 
