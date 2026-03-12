@@ -269,7 +269,7 @@ Aunque éterOS v0.2.0 es altamente funcional, las siguientes áreas son la prior
 
 ## 📜 Licencia y Créditos
 
-© 2026 **Tudex Networks**. Desarrollado por el equipo de éterOS.
+© 2025 **Tudex Networks**. Desarrollado por el equipo de éterOS.
 Este proyecto es una obra de ingeniería dedicada a la exploración de nuevos paradigmas en sistemas operativos, empujando los límites del silicio.
 
 ---
