@@ -72,3 +72,8 @@
 **Vulnerability:** The `sys_chdir` system call failed to enforce execute/search permission (`+x`) on the target directory, allowing users to enter restricted directories.
 **Learning:** Checking that a target is a directory `((node->flags & 0x7) == FS_DIRECTORY)` is not sufficient for traversal; explicit authorization via `check_node_permission(node, 1)` must be performed before updating `current->cwd`.
 **Prevention:** Always evaluate execute permissions on directory nodes before allowing traversal, open, or chdir operations.
+
+## 2026-06-03 - Extensive Heap Allocation for Kernel Path Buffers
+**Vulnerability:** Several system calls (`sys_newfstatat`, `sys_readlinkat`, `sys_chdir`, and the `task_exec` internal handler) were still using fixed-size stack arrays (`char kpath[256];`) for resolving user-provided paths. This pattern is vulnerable to stack exhaustion/overflows, especially in deeply nested call paths, and poses a DoS risk.
+**Learning:** Vulnerable patterns often proliferate through copy-pasting during early development stages. A fix in one high-visibility area (like `sys_openat`) doesn't guarantee the pattern is eliminated across the entire subsystem.
+**Prevention:** Perform sweeping audits for known anti-patterns (like `char buffer[N];` on the stack inside syscalls) rather than fixing them piecemeal as they are discovered. Always prefer dynamic allocation via `kmalloc` with strict error handling and guaranteed cleanup (`kfree`) for external inputs.

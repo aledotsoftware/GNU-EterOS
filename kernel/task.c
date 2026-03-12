@@ -1192,12 +1192,19 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     char* kenvp[33];
 
     /* 1. Validate */
-    char kpath[256];
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
     res = vmm_strncpy_from_user(kpath, path, 256);
-    if (res < 0) return res;
+    if (res < 0) {
+        kfree(kpath);
+        return res;
+    }
 
     if (argv) {
-        if (!vmm_verify_user_access(argv, sizeof(char*), 0)) return -EFAULT;
+        if (!vmm_verify_user_access(argv, sizeof(char*), 0)) {
+            res = -EFAULT;
+            goto cleanup_error;
+        }
         for (int i=0; i<32; i++) {
             if (!vmm_verify_user_access(&argv[i], sizeof(char*), 0)) {
                 res = -EFAULT;
@@ -1408,9 +1415,11 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     /* 8. Destroy Old Address Space */
     vmm_destroy_pml4(old_cr3);
 
+    kfree(kpath);
     return 0;
 
 cleanup_error:
+    kfree(kpath);
     for (int i=0; i<argc; i++) kfree(kargv[i]);
     for (int i=0; i<envc; i++) kfree(kenvp[i]);
     return res;

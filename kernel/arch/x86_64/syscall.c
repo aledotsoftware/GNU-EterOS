@@ -777,22 +777,25 @@ static int64_t sys_unlink(const char* path) {
 static int64_t __attribute__((unused)) sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
     if (!vmm_verify_user_access(buf, bufsiz, 1)) return -EFAULT;
 
-    char kpath[256];
-    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
-    if (res < 0) return res;
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+    int res = resolve_path(dirfd, path, kpath, 256);
+    if (res < 0) { kfree(kpath); return res; }
 
     fs_node_t* node = vfs_lookup_ext(fs_root, kpath, 0); // 0 means do not follow the last symlink
-    if (!node) return -ENOENT;
+    if (!node) { kfree(kpath); return -ENOENT; }
 
     ssize_t read_bytes = 0;
     if ((node->flags & 0x7) == FS_SYMLINK && node->read != NULL) {
          read_bytes = node->read(node, 0, bufsiz, (uint8_t*)buf);
     } else {
         kfree(node);
+        kfree(kpath);
         return -EINVAL; // Not a symlink
     }
 
     kfree(node);
+    kfree(kpath);
     return read_bytes;
 }
 
@@ -1172,18 +1175,20 @@ static int64_t sys_fstat(int fd, struct linux_stat* buf) {
 
 static int64_t sys_newfstatat(int dirfd, const char* path, struct linux_stat* buf, int flags) {
     (void)flags;
-    char kpath[256];
-    int res = resolve_path(dirfd, path, kpath, sizeof(kpath));
-    if (res < 0) return res;
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+    int res = resolve_path(dirfd, path, kpath, 256);
+    if (res < 0) { kfree(kpath); return res; }
 
-    if (!vmm_verify_user_access(buf, sizeof(struct linux_stat), 1)) { return -EFAULT; }
+    if (!vmm_verify_user_access(buf, sizeof(struct linux_stat), 1)) { kfree(kpath); return -EFAULT; }
     fs_node_t* node = vfs_lookup(fs_root, kpath);
-    if (!node) { return -ENOENT; }
+    if (!node) { kfree(kpath); return -ENOENT; }
     memset(buf, 0, sizeof(struct linux_stat));
     buf->st_ino = node->inode; buf->st_size = node->length; buf->st_mode = 0100644;
     buf->st_blksize = 4096; buf->st_blocks = (node->length + 511) / 512;
     if ((node->flags & 0x7) == FS_DIRECTORY) buf->st_mode = 0040755;
     kfree(node);
+    kfree(kpath);
     return 0;
 }
 
@@ -2121,20 +2126,23 @@ static int64_t sys_getcwd(char* buf, size_t size) {
 }
 
 static int64_t sys_chdir(const char* path) {
-    char kpath[256];
-    int res = resolve_path(AT_FDCWD, path, kpath, sizeof(kpath));
-    if (res < 0) return res;
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+    int res = resolve_path(AT_FDCWD, path, kpath, 256);
+    if (res < 0) { kfree(kpath); return res; }
 
     fs_node_t* node = vfs_lookup(fs_root, kpath);
-    if (!node) return -ENOENT;
+    if (!node) { kfree(kpath); return -ENOENT; }
     if ((node->flags & 0x7) != FS_DIRECTORY) {
         kfree(node);
+        kfree(kpath);
         return -ENOTDIR;
     }
 
     /* SECURITY FIX: Enforce execute/search permission for directory traversal */
     if (!check_node_permission(node, 1)) {
         kfree(node);
+        kfree(kpath);
         return -EACCES;
     }
 
@@ -2142,6 +2150,7 @@ static int64_t sys_chdir(const char* path) {
 
     task_t* current = task_get_current();
     strlcpy(current->cwd, kpath, sizeof(current->cwd));
+    kfree(kpath);
     return 0;
 }
 
