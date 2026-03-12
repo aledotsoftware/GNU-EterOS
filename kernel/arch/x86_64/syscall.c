@@ -774,7 +774,7 @@ static int64_t sys_unlink(const char* path) {
     return sys_unlinkat(AT_FDCWD, path, 0);
 }
 
-static int64_t __attribute__((unused)) sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
+static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
     if (!vmm_verify_user_access(buf, bufsiz, 1)) return -EFAULT;
 
     char kpath[256];
@@ -794,6 +794,23 @@ static int64_t __attribute__((unused)) sys_readlinkat(int dirfd, const char* pat
 
     kfree(node);
     return read_bytes;
+}
+
+
+static int64_t sys_readlink(const char* path, char* buf, size_t bufsiz) {
+    return sys_readlinkat(AT_FDCWD, path, buf, bufsiz);
+}
+
+
+static int64_t sys_symlinkat(const char* target, int newdirfd, const char* linkpath);
+static int64_t sys_renameat(int olddirfd, const char* oldpath, int newdirfd, const char* newpath);
+
+static int64_t sys_symlink(const char* target, const char* linkpath) {
+    return sys_symlinkat(target, AT_FDCWD, linkpath);
+}
+
+static int64_t sys_rename(const char* oldpath, const char* newpath) {
+    return sys_renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath);
 }
 
 static int64_t sys_renameat(int olddirfd, const char* oldpath, int newdirfd, const char* newpath) {
@@ -2272,6 +2289,10 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [318] = (syscall_ptr_t)sys_getrandom,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
+    [82] = (syscall_ptr_t)sys_rename,
+    [88] = (syscall_ptr_t)sys_symlink,
+    [89] = (syscall_ptr_t)sys_readlink,
+    [267] = (syscall_ptr_t)sys_readlinkat,
 };
 
 static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
@@ -2362,6 +2383,10 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [318] = (syscall_ptr_t)sys_getrandom,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
+    [82] = (syscall_ptr_t)sys_rename,
+    [88] = (syscall_ptr_t)sys_symlink,
+    [89] = (syscall_ptr_t)sys_readlink,
+    [267] = (syscall_ptr_t)sys_readlinkat,
 };
 
 #pragma GCC diagnostic pop

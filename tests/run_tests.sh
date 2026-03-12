@@ -271,6 +271,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_rt_sigaction.c kernel/st
 rm tests/test_syscall_rt_sigaction
 
 
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_linux_readlink..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_linux_readlink.c kernel/string.c -o tests/test_syscall_linux_readlink
+./tests/test_syscall_linux_readlink
+rm tests/test_syscall_linux_readlink
+
 echo "All tests passed!"
 
 # Test Omni Gradient Math
