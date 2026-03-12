@@ -50,6 +50,9 @@ struct sigaction {
 /* Functions */
 sighandler_t signal(int sig, sighandler_t handler);
 int sigaction(int sig, const struct sigaction *act, struct sigaction *oldact);
+int sigemptyset(sigset_t *set);
+int sigfillset(sigset_t *set);
+int sigaddset(sigset_t *set, int signum);
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 int raise(int sig);
 

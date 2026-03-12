@@ -3,6 +3,7 @@
 #include <sys/syscall.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 #ifdef __ETEROS_HOST_TEST__
 // In host test mode, we might want to just call host functions or mock them.
@@ -151,6 +152,17 @@ struct tm *gmtime_r(const time_t *timep, struct tm *result) {
 
     return result;
 #endif
+}
+
+struct tm *localtime(const time_t *timep) {
+    // For now, assume UTC. A full implementation would check TZ environment variable
+    return gmtime(timep);
+}
+
+int gettimeofday(struct timeval *tv, struct timezone *tz) {
+    long ret = _time_syscall2(96, (long)tv, (long)tz); // SYS_gettimeofday
+    if (ret < 0) { errno = (int)-ret; return -1; }
+    return 0;
 }
 
 struct tm *gmtime(const time_t *timep) {

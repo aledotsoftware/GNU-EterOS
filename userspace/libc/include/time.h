@@ -17,6 +17,8 @@
 #define gmtime eteros_gmtime
 #undef gmtime_r
 #define gmtime_r eteros_gmtime_r
+#undef localtime
+#define localtime eteros_localtime
 #undef mktime
 #define mktime eteros_mktime
 #undef strftime
@@ -72,6 +74,7 @@ int eteros_clock_gettime(int clock_id, struct timespec *tp);
 time_t eteros_time(time_t *tloc);
 struct tm *eteros_gmtime(const time_t *timep);
 struct tm *eteros_gmtime_r(const time_t *timep, struct tm *result);
+struct tm *eteros_localtime(const time_t *timep);
 time_t eteros_mktime(struct tm *tm);
 size_t eteros_strftime(char *s, size_t max, const char *format, const struct tm *tm);
 char *eteros_asctime(const struct tm *tm);
@@ -83,6 +86,7 @@ int clock_gettime(int clock_id, struct timespec *tp);
 time_t time(time_t *tloc);
 struct tm *gmtime(const time_t *timep);
 struct tm *gmtime_r(const time_t *timep, struct tm *result);
+struct tm *localtime(const time_t *timep);
 time_t mktime(struct tm *tm);
 size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
 char *asctime(const struct tm *tm);

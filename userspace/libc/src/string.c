@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 void *memcpy(void *dest, const void *src, size_t n) {
 #ifdef __x86_64__
@@ -506,6 +507,31 @@ char *strcat(char *dest, const char *src) {
     return dest;
 }
 
+char *strsep(char **stringp, const char *delim) {
+    char *s;
+    const char *spanp;
+    int c, sc;
+    char *tok;
+
+    if ((s = *stringp) == NULL)
+        return NULL;
+
+    for (tok = s; ; ) {
+        c = *s++;
+        spanp = delim;
+        do {
+            if ((sc = *spanp++) == c) {
+                if (c == 0)
+                    s = NULL;
+                else
+                    s[-1] = 0;
+                *stringp = s;
+                return tok;
+            }
+        } while (sc != 0);
+    }
+}
+
 void *memchr(const void *s, int c, size_t n) {
 #ifdef __x86_64__
     const unsigned char *p = (const unsigned char *)s;
@@ -558,6 +584,45 @@ void *memchr(const void *s, int c, size_t n) {
     }
     return (void *)0;
 #endif
+}
+
+char *strdup(const char *s) {
+    if (!s) return NULL;
+    size_t len = strlen(s) + 1;
+    char *new_s = (char*)malloc(len);
+    if (new_s) {
+        memcpy(new_s, s, len);
+    }
+    return new_s;
+}
+
+char *strpbrk(const char *s, const char *accept) {
+    while (*s) {
+        if (strchr(accept, *s)) return (char *)s;
+        s++;
+    }
+    return NULL;
+}
+
+int strncasecmp(const char *s1, const char *s2, size_t n) {
+    if (n == 0) return 0;
+    while (n-- > 0) {
+        unsigned char c1 = *(const unsigned char *)s1++;
+        unsigned char c2 = *(const unsigned char *)s2++;
+        if (c1 >= 'A' && c1 <= 'Z') c1 += 'a' - 'A';
+        if (c2 >= 'A' && c2 <= 'Z') c2 += 'a' - 'A';
+        if (c1 != c2) return c1 - c2;
+        if (c1 == '\0') return 0;
+    }
+    return 0;
+}
+
+void *memrchr(const void *s, int c, size_t n) {
+    const unsigned char *p = (const unsigned char *)s + n;
+    while (n-- > 0) {
+        if (*--p == (unsigned char)c) return (void *)p;
+    }
+    return NULL;
 }
 
 char *strerror(int errnum) {

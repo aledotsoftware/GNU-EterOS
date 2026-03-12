@@ -54,6 +54,39 @@ static inline long syscall6(long n, long a1, long a2, long a3, long a4, long a5,
 
 /* Wrappers */
 
+long syscall(long nr, ...) {
+    long ret;
+    long arg1, arg2, arg3, arg4, arg5, arg6;
+    __builtin_va_list ap;
+    __builtin_va_start(ap, nr);
+
+    arg1 = __builtin_va_arg(ap, long);
+    arg2 = __builtin_va_arg(ap, long);
+    arg3 = __builtin_va_arg(ap, long);
+    arg4 = __builtin_va_arg(ap, long);
+    arg5 = __builtin_va_arg(ap, long);
+    arg6 = __builtin_va_arg(ap, long);
+
+    __builtin_va_end(ap);
+
+    register long r10 __asm__("r10") = arg4;
+    register long r8  __asm__("r8")  = arg5;
+    register long r9  __asm__("r9")  = arg6;
+
+    __asm__ volatile (
+        "syscall"
+        : "=a"(ret)
+        : "a"(nr), "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10), "r"(r8), "r"(r9)
+        : "rcx", "r11", "memory"
+    );
+
+    if (ret > -4096 && ret < 0) {
+        errno = -ret;
+        return -1;
+    }
+    return ret;
+}
+
 void exit(int status) {
     syscall1(SYS_exit, status);
     for(;;);

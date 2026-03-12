@@ -85,6 +85,7 @@
 #define SYS_ftruncate           77
 #define SYS_getdents            78
 #define SYS_getcwd              79
+#define SYS_getdents64          217
 #define SYS_chdir               80
 #define SYS_fchdir              81
 #define SYS_rename              82
@@ -113,5 +114,7 @@
 #define SYS_geteuid             107
 #define SYS_getegid             108
 #define SYS_clock_gettime       228
+
+long syscall(long nr, ...);
 
 #endif /* _SYS_SYSCALL_H */

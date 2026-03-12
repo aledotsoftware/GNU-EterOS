@@ -13,9 +13,6 @@ typedef struct {
 #define FD_CLR(fd, set) do { ((fd_set *)(set))->fds_bits[(fd) / 64] &= ~(1ULL << ((fd) % 64)); } while(0)
 #define FD_ISSET(fd, set) (((fd_set *)(set))->fds_bits[(fd) / 64] & (1ULL << ((fd) % 64)))
 
-struct timeval {
-    int64_t tv_sec;
-    int64_t tv_usec;
-};
+#include <sys/time.h>
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 #endif

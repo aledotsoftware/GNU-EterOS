@@ -119,6 +119,9 @@ int   putenv(char *string);
 
 void  abort(void) __attribute__((noreturn));
 
+int   system(const char *command);
+int   atexit(void (*func)(void));
+
 /* Misc */
 #ifndef NULL
 #define NULL ((void *)0)

@@ -477,6 +477,21 @@ FILE *fopen(const char *pathname, const char *mode) {
     return f;
 }
 
+int fileno(FILE *stream) {
+    if (!stream) return -1;
+    return stream->fd;
+}
+
+int feof(FILE *stream) {
+    if (!stream) return 0;
+    return stream->eof;
+}
+
+int ferror(FILE *stream) {
+    if (!stream) return 0;
+    return stream->error;
+}
+
 int fclose(FILE *stream) {
     if (!stream) return EOF;
     fflush(stream);
@@ -591,11 +606,31 @@ int fputc(int c, FILE *stream) {
     return (unsigned char)c;
 }
 
+int putc(int c, FILE *stream) {
+    return fputc(c, stream);
+}
+
 int fgetc(FILE *stream) {
     if (!stream) return EOF;
     unsigned char c;
     if (fread(&c, 1, 1, stream) != 1) return EOF;
     return (int)c;
+}
+
+int getc(FILE *stream) {
+    return fgetc(stream);
+}
+
+int ungetc(int c, FILE *stream) {
+    if (!stream || c == EOF) return EOF;
+    // We do a simple lseek backwards since our buffer implementation
+    // doesn't have an ungetc buffer.
+    if (lseek(stream->fd, -1, SEEK_CUR) < 0) {
+        stream->error = 1;
+        return EOF;
+    }
+    stream->eof = 0;
+    return c;
 }
 
 char *fgets(char *s, int size, FILE *stream) {

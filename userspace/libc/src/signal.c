@@ -62,6 +62,33 @@ int sigaction(int sig, const struct sigaction *act, struct sigaction *oldact) {
     return 0;
 }
 
+int sigemptyset(sigset_t *set) {
+    if (!set) {
+        errno = EINVAL;
+        return -1;
+    }
+    *set = 0;
+    return 0;
+}
+
+int sigfillset(sigset_t *set) {
+    if (!set) {
+        errno = EINVAL;
+        return -1;
+    }
+    *set = ~0ULL;
+    return 0;
+}
+
+int sigaddset(sigset_t *set, int signum) {
+    if (!set || signum < 1 || signum > 64) {
+        errno = EINVAL;
+        return -1;
+    }
+    *set |= (1ULL << (signum - 1));
+    return 0;
+}
+
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
     long ret = syscall4_sig(SYS_rt_sigprocmask, how, (long)set, (long)oldset, 8);
     if (ret < 0) { errno = (int)(-ret); return -1; }

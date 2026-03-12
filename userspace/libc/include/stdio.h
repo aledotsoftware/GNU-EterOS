@@ -130,6 +130,9 @@ int fprintf(FILE *stream, const char *format, ...);
 /* File I/O */
 FILE *fopen(const char *pathname, const char *mode);
 int   fclose(FILE *stream);
+int   fileno(FILE *stream);
+int   feof(FILE *stream);
+int   ferror(FILE *stream);
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
 int   fseek(FILE *stream, long offset, int whence);
@@ -140,6 +143,9 @@ int   fflush(FILE *stream);
 /* Character/String I/O */
 int   fputc(int c, FILE *stream);
 int   fgetc(FILE *stream);
+int   getc(FILE *stream);
+int   putc(int c, FILE *stream);
+int   ungetc(int c, FILE *stream);
 char *fgets(char *s, int size, FILE *stream);
 int   fputs(const char *s, FILE *stream);
 

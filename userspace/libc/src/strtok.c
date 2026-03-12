@@ -1,38 +1,41 @@
 #include <string.h>
 #include <stddef.h>
 
-char *strtok(char *str, const char *delim) {
-    static char *next_token = NULL;
+char *strtok_r(char *str, const char *delim, char **saveptr) {
     char *token;
 
-    if (str) next_token = str;
-    if (!next_token) return NULL;
+    if (str) *saveptr = str;
+    if (!*saveptr) return NULL;
 
     /* Skip leading delimiters */
-    while (*next_token) {
-        if (!strchr(delim, *next_token)) break;
-        next_token++;
+    while (**saveptr) {
+        if (!strchr(delim, **saveptr)) break;
+        (*saveptr)++;
     }
 
-    if (!*next_token) {
-        next_token = NULL;
+    if (!**saveptr) {
+        *saveptr = NULL;
         return NULL;
     }
 
-    token = next_token;
+    token = *saveptr;
 
     /* Find end of token */
-    while (*next_token) {
-        if (strchr(delim, *next_token)) {
-            *next_token = '\0';
-            next_token++;
-            /* Store state for next call */
+    while (**saveptr) {
+        if (strchr(delim, **saveptr)) {
+            **saveptr = '\0';
+            (*saveptr)++;
             return token;
         }
-        next_token++;
+        (*saveptr)++;
     }
 
     /* End of string reached, next call returns NULL */
-    next_token = NULL;
+    *saveptr = NULL;
     return token;
+}
+
+char *strtok(char *str, const char *delim) {
+    static char *next_token = NULL;
+    return strtok_r(str, delim, &next_token);
 }
