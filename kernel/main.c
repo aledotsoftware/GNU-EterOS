@@ -55,7 +55,7 @@
 /* ========================================================================= */
 static void kernel_print_banner(void);
 static void kernel_print_sysinfo(void);
-static void show_splash(void);
+static void show_splash(void) __attribute__((unused));
 
 extern void net_poll(void);
 extern uint32_t my_ip;
@@ -340,6 +340,7 @@ static void kernel_print_sysinfo(void) {
     kprintf("  [INFO] Board/Target: Generic\n");
 }
 
+static void show_splash(void) __attribute__((unused));
 static void show_splash(void) {
     uint32_t size = 0;
     void* logo_data = initrd_read_file("logo.raw", &size);

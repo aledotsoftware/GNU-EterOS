@@ -1,13 +1,11 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-12
 **Commit:** HEAD
-**Estado de build:** ✅ COMPILA (con 1 advertencia menor de `-Wunused-function`)
+**Estado de build:** ✅ COMPILA (0 advertencias)
 **Estado de boot:** ✅ ARRANCA (Booted correctly in QEMU. Entró en User Mode con eterland.elf exitosamente)
 
 ## Errores de Compilación
-| # | Tipo | Archivo | Línea | Error | Agente Responsable |
-|---|---|---|---|---|---|
-| 1 | W-UNUS | kernel/main.c | 346 | warning: ‘show_splash’ defined but not used | `graphics-power-panel-bot` |
+*(Ninguno)*
 
 ## Estado por Módulo
 | Módulo | Estado | Notas |
@@ -26,10 +24,11 @@
 | Tests | ✅ OK | El loader inicializa y levanta la shell grafica `eterland.elf` |
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `graphics-power-panel-bot` — Razón: Resolver la advertencia de `-Wunused-function` en `show_splash` (idealmente marcándola con la macro requerida según las memorias o reactivando el splash de inicio si corresponde).
-2. `kernel-stability-boot-bot` — Razón: Chequeo general de advertencias y configuración del entorno de arranque si procede.
+1. `linux-syscall-compliance-bot` — Razón: Verificar el nivel de cumplimiento de las llamadas al sistema Linux y asegurar la estabilidad de Ring 3 (eterland.elf generó un Page Fault menor al inicio del Ring 3).
+2. `vfs-posix-filesystem-bot` — Razón: Continuar con soporte POSIX del filesystem.
 
 ## Correcciones de Integración Aplicadas
+- **Corrección en `kernel/main.c`:** Se agregó `__attribute__((unused))` a la función `show_splash` para silenciar el warning de `-Wunused-function`, dejando el build con 0 advertencias.
 - **Eliminación de variables no utilizadas en drivers (Glue/Warning fixes):** Se removió la variable `buf` en `mouse_init()` (`kernel/drivers/input/mouse.c`) y `g_shift` en `png_decode()` (`kernel/gfx/png.c`). Los warnings correspondientes se solucionaron (modificación de <= 3 líneas cada una).
 - **Nota sobre compilación de userspace:** En ciclos previos, se identificó que requerían limpiarse los builds de apps con `make clean && make all` para su correcto empaquetado en el `initrd.img`. Tras auditar el entorno, se aplicó una recompilación limpia, asegurando que todos los binarios inicien correctamente al brincar a Ring 3.
 
