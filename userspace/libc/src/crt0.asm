@@ -23,7 +23,7 @@ _start:
     lea rdx, [rsp + rdi*8 + 8] ; envp
 
     ; Save envp in the global 'environ' variable
-    mov [environ], rdx
+    mov [rel environ], rdx
 
     ; 4. Find auxv
     ; envp is an array of pointers (null-terminated).
@@ -59,16 +59,16 @@ _start:
     jmp .next_auxv
 
 .save_pagesz:
-    mov [__auxv_pagesz], r10
+    mov [rel __auxv_pagesz], r10
     jmp .next_auxv
 .save_phdr:
-    mov [__auxv_phdr], r10
+    mov [rel __auxv_phdr], r10
     jmp .next_auxv
 .save_entry:
-    mov [__auxv_entry], r10
+    mov [rel __auxv_entry], r10
     jmp .next_auxv
 .save_random:
-    mov [__auxv_random], r10
+    mov [rel __auxv_random], r10
     jmp .next_auxv
 
 .next_auxv:
