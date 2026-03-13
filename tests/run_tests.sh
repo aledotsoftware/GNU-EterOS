@@ -254,6 +254,10 @@ rm tests/test_syscall_mmap_fixed
 
 echo "---------------------------------------------------"
 echo "Running test_syscall_clone..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_linux_clone3.c -o tests/test_syscall_linux_clone3
+./tests/test_syscall_linux_clone3
+rm tests/test_syscall_linux_clone3
+
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_clone.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_clone
 ./tests/test_syscall_clone
 rm tests/test_syscall_clone

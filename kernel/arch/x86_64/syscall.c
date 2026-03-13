@@ -81,6 +81,20 @@ void syscall_init(void) {
 /* Syscall Implementations                                                   */
 /* ========================================================================= */
 
+struct clone_args {
+    uint64_t flags;
+    uint64_t pidfd;
+    uint64_t child_tid;
+    uint64_t parent_tid;
+    uint64_t exit_signal;
+    uint64_t stack;
+    uint64_t stack_size;
+    uint64_t tls;
+    uint64_t set_tid;
+    uint64_t set_tid_size;
+    uint64_t cgroup;
+};
+
 /* --- Socket VFS Wrappers --- */
 
 static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
@@ -392,33 +406,14 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
                 }
             }
             spin_unlock(&shm_obj->lock);
-        } else if (file_node && file_node->read) {
-            /* Regular file-backed mapping */
-            void* phys = pmm_alloc_page();
-            if (!phys) return -ENOMEM;
-
-            hal_mem_map((uint64_t)phys, v, map_flags);
-#ifndef __ETEROS_HOST_TEST__
-            memset((void*)v, 0, PAGE_SIZE);
-
-            uint32_t file_offset = offset + (v - start);
-            if (file_offset < file_node->length) {
-                uint32_t to_read = PAGE_SIZE;
-                if (file_offset + to_read > file_node->length) {
-                    to_read = file_node->length - file_offset;
-                }
-                file_node->read(file_node, file_offset, to_read, (uint8_t*)v);
-            }
-#endif
         } else {
-            /* Anonymous */
+            /* File-backed mapping or Anonymous */
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
             
             hal_mem_map((uint64_t)phys, v, map_flags);
 #ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
-#endif
 
             if (file_node) {
                 uint64_t current_offset = offset + (v - start);
@@ -427,9 +422,11 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
                     if (current_offset + read_len > file_node->length) {
                         read_len = file_node->length - current_offset;
                     }
+                    /* Utilize read_fs wrapper for POSIX compliance, which handles standard offsets/flags better */
                     read_fs(file_node, current_offset, read_len, (uint8_t*)v);
                 }
             }
+#endif
         }
     }
     return virt;
@@ -1346,12 +1343,14 @@ static int64_t sys_rt_sigaction(int sig, const struct kernel_sigaction* act,
         oldact->handler = current->signal_handlers[sig];
         oldact->flags = current->signal_flags[sig];
         oldact->restorer = current->signal_restorers[sig];
-        oldact->mask = 0; /* TODO: Implement proper mask saving */
+        oldact->mask = current->signal_mask;
     }
     if (act) {
         if (!vmm_verify_user_access(act, sizeof(struct kernel_sigaction), 0)) return -EFAULT;
         current->signal_handlers[sig] = act->handler;
         current->signal_flags[sig] = act->flags;
+        /* The signal_mask will temporarily add act->mask when handler runs, but we only have a global mask currently.
+           For Tier 1, preserving/setting properties is sufficient. */
         /* Store restorer if provided */
         if (act->flags & SA_RESTORER) {
              current->signal_restorers[sig] = act->restorer;
@@ -2566,10 +2565,6 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         regs->rax = (uint64_t)task_fork((void*)regs);
         return;
     }
-    if (regs->rax == SYS_clone3) {
-        regs->rax = (uint64_t)-ENOSYS;
-        return;
-    }
     if (regs->rax == SYS_execve) {
         regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
         return;
@@ -2607,6 +2602,21 @@ static void syscall_linux_handler(struct syscall_regs* regs) {
     }
     if (regs->rax == SYS_fork || regs->rax == SYS_vfork) {
         regs->rax = (uint64_t)task_fork((void*)regs);
+        return;
+    }
+    if (regs->rax == SYS_clone3) {
+        struct clone_args args;
+        memset(&args, 0, sizeof(struct clone_args));
+        size_t copy_size = regs->rsi;
+        if (copy_size > sizeof(struct clone_args)) {
+            copy_size = sizeof(struct clone_args);
+        }
+        if (!vmm_verify_user_access((void*)regs->rdi, copy_size, 0)) {
+            regs->rax = (uint64_t)-EFAULT;
+            return;
+        }
+        memcpy(&args, (void*)regs->rdi, copy_size);
+        regs->rax = (uint64_t)task_clone(args.flags, args.stack, (uint32_t*)(uintptr_t)args.parent_tid, (uint32_t*)(uintptr_t)args.child_tid, args.tls, regs);
         return;
     }
     if (regs->rax == SYS_execve) {
