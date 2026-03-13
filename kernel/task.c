@@ -552,10 +552,29 @@ void schedule(void) {
         cpu_idle_ticks++;
         spin_unlock(&sched_lock);
         __asm__ volatile("sti");
-        /* Wait for interrupt */
-        __asm__ volatile("hlt");
-        /* Return to retry schedule */
-        return;
+
+        /* The prompt states: "schedule() must loop with hlt if no tasks are queued to prevent kernel hangs." */
+        for(;;) {
+            __asm__ volatile("hlt");
+            /* After an interrupt (like timer), we should retry scheduling if ready tasks exist */
+            if (ready_head) {
+                break;
+            }
+        }
+
+        /* We'll just yield completely and re-enter schedule via interrupt or tail recursion/loop,
+           but since we need to keep IRQs happening, returning here is also fine IF kmain does the loop.
+           Wait, the user memory said: "schedule() must loop with hlt if no tasks are queued".
+           So we loop here until there is a task. */
+
+        __asm__ volatile("cli");
+        spin_lock(&sched_lock);
+        next_task = find_next_task(current);
+        if (next_task == NULL) {
+             spin_unlock(&sched_lock);
+             __asm__ volatile("sti");
+             return;
+        }
     }
 
     if (next_task == current) {
