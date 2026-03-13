@@ -94,6 +94,10 @@ typedef struct task {
     void           (*signal_restorers[32])(void); /* Signal Restorer Trampolines */
     uint32_t       signal_flags[32];        /* Signal Flags (e.g. SA_SIGINFO) */
 
+    /* SMP & Threading extensions */
+    uint64_t       affinity[4];             /* cpu_set_t inline for simplicity (256 bits max) */
+    int            target_cpu;
+
     /* Linux Compatibility (TLS & Heap) */
     uint64_t       brk;                     /* Program break (end of data segment) */
     uint64_t       fs_base;                 /* FS Segment Base (TLS) */
