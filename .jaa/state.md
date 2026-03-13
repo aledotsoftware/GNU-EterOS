@@ -13,3 +13,13 @@ Los siguientes puntos fueron verificados:
 - El mmap soportado para carga de archivos y operaciones.
 - Struct de stats con el formato de Linux (`struct linux_stat`).
 - Soporte de Futex (`FUTEX_WAIT`, `FUTEX_WAKE`, etc).
+
+## Mini-LibC POSIX
+**Estado**: Completado.
+Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están terminados:
+- `syscall()` genérico en x86_64.
+- `stdio.h` con I/O con buffer.
+- Implementación de extensiones para `stdlib.h` y `string.h`.
+- Sincronización con `pthreads` vía clone/futex.
+- Soporte de `signal.h`, `time.h`, `sys/socket.h`, etc.
+- Entorno de runtime en `crt0.asm` cargando `argc`, `argv`, `envp`, `auxv` usando `nasm`.
