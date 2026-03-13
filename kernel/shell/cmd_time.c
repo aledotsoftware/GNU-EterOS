@@ -33,23 +33,28 @@ void cmd_timezone(const char* args) {
 #define NTP_TIMESTAMP_DELTA 2208988800ull
 
 // Simple UNIX timestamp to RTC time conversion
-static void unix_to_rtc(uint32_t timestamp, rtc_time_t* t) {
-    uint32_t z = timestamp / 86400;
-    uint32_t time_of_day = timestamp % 86400;
+static void unix_to_rtc(time_t timestamp, rtc_time_t* t) {
+    int64_t z = timestamp / 86400;
+    int64_t time_of_day = timestamp % 86400;
+
+    if (time_of_day < 0) {
+        z--;
+        time_of_day += 86400;
+    }
 
     t->hours = time_of_day / 3600;
     t->minutes = (time_of_day % 3600) / 60;
     t->seconds = time_of_day % 60;
 
     z += 719468; // Days between 0000-03-01 and 1970-01-01
-    uint32_t era = z / 146097;
-    uint32_t doe = z - era * 146097;
-    uint32_t yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
-    uint32_t y = yoe + era * 400;
-    uint32_t doy = doe - (365*yoe + yoe/4 - yoe/100);
-    uint32_t mp = (5*doy + 2)/153;
-    uint32_t d = doy - (153*mp+2)/5 + 1;
-    uint32_t m = mp + (mp < 10 ? 3 : -9);
+    int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+    int64_t doe = z - era * 146097;
+    int64_t yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+    int64_t y = yoe + era * 400;
+    int64_t doy = doe - (365*yoe + yoe/4 - yoe/100);
+    int64_t mp = (5*doy + 2)/153;
+    int64_t d = doy - (153*mp+2)/5 + 1;
+    int64_t m = mp + (mp < 10 ? 3 : -9);
 
     t->year = y + (m <= 2 ? 1 : 0);
     t->month = m;
@@ -116,7 +121,14 @@ void cmd_ntp(const char* args) {
         return;
     }
 
-    uint32_t unix_time = ntp_secs - NTP_TIMESTAMP_DELTA;
+    time_t unix_time;
+    if ((ntp_secs & 0x80000000) == 0) {
+        // MSB is 0, NTP timestamp has rolled over to era 1 (starts in 2036)
+        unix_time = (time_t)ntp_secs + 0x100000000ull - NTP_TIMESTAMP_DELTA;
+    } else {
+        // Era 0
+        unix_time = (time_t)ntp_secs - NTP_TIMESTAMP_DELTA;
+    }
 
     rtc_time_t new_time;
     unix_to_rtc(unix_time, &new_time);
