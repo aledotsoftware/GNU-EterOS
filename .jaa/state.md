@@ -28,5 +28,5 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 **Estado**: Auditado y verificado con éxito.
 - Se verificó que el sistema compila (`make clean && make all`) sin errores ni advertencias severas, confirmando que la integración anterior sigue estable y operativa.
 - Se instalaron utilidades de sistema operativas necesarias (`nasm`, `mtools`, `xorriso`, `qemu-system-x86`).
-- Se ha validado que el sistema de arranque (QEMU test end-to-end) funciona correctamente cargando userspace y ejecutando el loader de UI/Shell con Ring 3 sin PANIC, FAULT o ASSERTs.
-- `ORCHESTRATOR_REPORT.md` actualizado recomendando la ejecución de `linux-syscall-compliance-bot`, `network-control-panel-bot`, y `devices-time-panel-bot`.
+- Se ha validado que el sistema de arranque (QEMU test end-to-end) funciona correctamente cargando userspace y ejecutando el loader de UI/Shell con Ring 3 sin PANIC, FAULT o ASSERTs. La carga de ELF (`eterland.elf`) reporta éxito.
+- `ORCHESTRATOR_REPORT.md` actualizado recomendando la ejecución de `graphics-power-panel-bot`, `devices-time-panel-bot`, y `network-control-panel-bot`.
