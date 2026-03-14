@@ -24,10 +24,11 @@
 | Tests | ✅ OK | El loader inicializa y levanta la shell grafica `eterland.elf` |
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `linux-syscall-compliance-bot` — Razón: Verificar el nivel de cumplimiento de las llamadas al sistema Linux y asegurar la estabilidad de Ring 3 (eterland.elf generó un Page Fault menor al inicio del Ring 3).
+1. `linux-syscall-compliance-bot` — Razón: Verificar el nivel de cumplimiento de las llamadas al sistema Linux y asegurar la estabilidad de Ring 3 (eterland.elf generó un Page Fault menor al inicio del Ring 3 que ya ha sido resuelto).
 2. `vfs-posix-filesystem-bot` — Razón: Continuar con soporte POSIX del filesystem.
 
 ## Correcciones de Integración Aplicadas
+- **Corrección en `kernel/apps/user_loader.c`:** Se agregó el valor nulo correspondiente al vector auxiliar (`auxv`) luego del puntero final nulo para las variables de entorno (`envp`). Esto evita un Page Fault al momento que `libc/src/crt0.asm` analiza los valores en su pila en Ring 3 (buscando `AT_NULL` pero desbordando sobre el espacio y rompiendo el proceso).
 - **Corrección en `kernel/main.c`:** Se agregó `__attribute__((unused))` a la función `show_splash` para silenciar el warning de `-Wunused-function`, dejando el build con 0 advertencias.
 - **Eliminación de variables no utilizadas en drivers (Glue/Warning fixes):** Se removió la variable `buf` en `mouse_init()` (`kernel/drivers/input/mouse.c`) y `g_shift` en `png_decode()` (`kernel/gfx/png.c`). Los warnings correspondientes se solucionaron (modificación de <= 3 líneas cada una).
 - **Nota sobre compilación de userspace:** En ciclos previos, se identificó que requerían limpiarse los builds de apps con `make clean && make all` para su correcto empaquetado en el `initrd.img`. Tras auditar el entorno, se aplicó una recompilación limpia, asegurando que todos los binarios inicien correctamente al brincar a Ring 3.
@@ -36,6 +37,6 @@
 | Milestone | Progreso | Blocker |
 |-----------|----------|---------|
 | Kernel boota | ✅ | Ninguno |
-| sh.elf en Ring 3 | ✅ | En este ciclo el linker cargó `eterland.elf` antes (priorizado), pero el sistema es capaz de entrar a Ring 3 con éxito. |
+| sh.elf en Ring 3 | ✅ | En este ciclo el linker cargó `eterland.elf` antes (priorizado), pero el sistema es capaz de entrar a Ring 3 con éxito y no genera Page Fault. |
 | busybox ash funciona | ❌ | Falta la compilación y adaptación de Busybox como un app port. |
 | Apache httpd sirve HTML | ❌ | Se necesita asegurar puertos, sockets e integraciones de red completas. |
