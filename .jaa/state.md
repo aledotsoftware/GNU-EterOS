@@ -26,8 +26,8 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 
 ## Orchestrator-Meta-Agent
 **Estado**: Auditado y limpiado.
-- Se ha verificado que tanto el kernel como las apps (userspace) compilen con 0 warnings.
+- Se ha verificado que tanto el kernel como las apps (userspace) compilen con 0 warnings/errores tras una build completa.
 - Se ha verificado de nuevo que el build desde cero (`make clean && make all`) compila y levanta sin problemas.
-- Se aplicaron 'glue fixes' a warnings originados desde `gcc` (signed/unsigned), unused variables en `sh.c`, y avisos de linker (PHDRS `RWX`) al compilar los binarios de usuario previamente.
-- El build actual arranca sin problemas usando QEMU de cabeza a cola, levantando la shell gráfica `eterland.elf`.
+- Se instalaron utilidades de sistema operativas necesarias (`nasm`, `mtools`, `xorriso`, `qemu-system-x86`).
+- El build actual arranca sin problemas usando QEMU de cabeza a cola, levantando la shell gráfica `eterland.elf` que logra cargar Ring 3 con éxito.
 - Se ha actualizado `ORCHESTRATOR_REPORT.md` proponiendo continuar con `linux-syscall-compliance-bot`.
