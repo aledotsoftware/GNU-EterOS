@@ -7,7 +7,7 @@
 #define MAX_CMD_LEN 256
 #define MAX_ARGS 16
 
-int main(int argc, char *argv[]) {
+int main(int argc __attribute__((unused)), char *argv[] __attribute__((unused))) {
     char cmd_buf[MAX_CMD_LEN];
     char *args[MAX_ARGS];
 

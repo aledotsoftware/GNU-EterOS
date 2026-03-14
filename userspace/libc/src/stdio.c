@@ -542,11 +542,11 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
             if (fflush(stream) == EOF) return written / size;
         }
 
-        int chunk = stream->buf_size - stream->buf_pos;
+        size_t chunk = stream->buf_size - stream->buf_pos;
         if (chunk > total_bytes) chunk = total_bytes;
 
         // Optimize: If buffer is empty and data is large, write directly
-        if (stream->buf_pos == 0 && chunk == stream->buf_size) {
+        if (stream->buf_pos == 0 && chunk == (size_t)stream->buf_size) {
              ssize_t ret = write(stream->fd, p, total_bytes);
              if (ret < 0) {
                  stream->error = 1;
@@ -564,7 +564,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
 
         if (stream->buf_mode == _IOLBF) {
              // Scan for newline in the chunk we just added
-             for (int i = 0; i < chunk; i++) {
+             for (size_t i = 0; i < chunk; i++) {
                  if (p[-chunk + i] == '\n') {
                      if (fflush(stream) == EOF) return written / size;
                      break;

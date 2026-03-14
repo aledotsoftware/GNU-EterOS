@@ -23,3 +23,10 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 - Sincronización con `pthreads` vía clone/futex.
 - Soporte de `signal.h`, `time.h`, `sys/socket.h`, etc.
 - Entorno de runtime en `crt0.asm` cargando `argc`, `argv`, `envp`, `auxv` usando `nasm`.
+
+## Orchestrator-Meta-Agent
+**Estado**: Auditado y limpiado.
+- Se ha verificado que tanto el kernel como las apps (userspace) compilen con 0 warnings.
+- Se aplicaron 'glue fixes' a warnings originados desde `gcc` (signed/unsigned), unused variables en `sh.c`, y avisos de linker (PHDRS `RWX`) al compilar los binarios de usuario.
+- El build actual arranca sin problemas usando QEMU de cabeza a cola, levantando la shell gráfica `eterland.elf`.
+- Se ha actualizado `ORCHESTRATOR_REPORT.md` proponiendo al siguiente agente para `linux-syscall-compliance`.
