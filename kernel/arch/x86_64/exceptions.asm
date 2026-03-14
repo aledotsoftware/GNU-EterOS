@@ -84,3 +84,7 @@ EXCEPTION_STUB 19
 EXCEPTION_STUB 20
 EXCEPTION_STUB_ERR 21
 EXCEPTION_STUB 128
+
+%ifidn __OUTPUT_FORMAT__, elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif

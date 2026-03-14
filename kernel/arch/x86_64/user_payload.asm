@@ -20,3 +20,7 @@ user_payload_start:
     jmp $
 
 user_payload_end:
+
+%ifidn __OUTPUT_FORMAT__, elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif

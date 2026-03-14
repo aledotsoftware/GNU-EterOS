@@ -117,3 +117,7 @@ __auxv_pagesz: resq 1
 __auxv_phdr:   resq 1
 __auxv_entry:  resq 1
 __auxv_random: resq 1
+
+%ifidn __OUTPUT_FORMAT__, elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif
