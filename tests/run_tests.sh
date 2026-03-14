@@ -331,3 +331,10 @@ echo "Running bench_gfx_rect..."
 gcc -O3 -D__ETEROS_HOST_TEST__ -Iinclude tests/bench_gfx_rect.c kernel/string.c -o tests/bench_gfx_rect
 ./tests/bench_gfx_rect
 rm tests/bench_gfx_rect
+
+# Test Wget Parse URL
+echo "---------------------------------------------------"
+echo "Running test_wget_parse_url..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_wget_parse_url.c kernel/string.c -o tests/test_wget_parse_url
+./tests/test_wget_parse_url
+rm tests/test_wget_parse_url
