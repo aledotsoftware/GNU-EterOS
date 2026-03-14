@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2024-05-24
-**Commit:** 076981c4eb3b186928196b5e60b779d46c5eb369
+**Commit:** 2f9aebd9cf484115f3a1c4471e22ac4816f04af8
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA
 
@@ -31,6 +31,7 @@ Ninguno detectado. Todo compila correctamente tras fresh make.
 ## Correcciones de Integración Aplicadas
 - Ejecuté las pre-validaciones del bot actual (`make clean && make all` y tests headless en QEMU) para verificar boot correctos sin "PANIC", "FAULT", o "ERROR".
 - Se reinstalaron y validaron herramientas dependientes al host sandbox (`nasm`, `mtools`, `qemu-system-x86`, `xorriso`, `gcc-multilib`).
+- Se eliminaron los logs generados de build y boot (`build_output.txt`, `qemu_output.txt`, `qemu_output_clean.txt`).
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
