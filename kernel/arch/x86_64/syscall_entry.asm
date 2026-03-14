@@ -45,3 +45,7 @@ syscall_entry:
 
     ; 9. Return to Ring 3
     o64 sysret
+
+%ifidn __OUTPUT_FORMAT__, elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif

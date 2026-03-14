@@ -19,3 +19,7 @@ cpu_init_ap_wrapper:
 .halt:
     hlt
     jmp .halt
+
+%ifidn __OUTPUT_FORMAT__, elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif

@@ -41,3 +41,7 @@ tss_flush:
     mov ax, 0x28                ; Offset del TSS en la GDT (Index 5 * 8 = 40 = 0x28)
     ltr ax
     ret
+
+%ifidn __OUTPUT_FORMAT__, elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif

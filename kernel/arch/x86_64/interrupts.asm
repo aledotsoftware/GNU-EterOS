@@ -155,3 +155,7 @@ isr_stub_tlb_shootdown:
     swapgs
 .ts2:
     iretq
+
+%ifidn __OUTPUT_FORMAT__, elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+%endif
