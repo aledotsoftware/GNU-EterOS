@@ -134,6 +134,7 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
         fnode->ref_count = 1;
         strlcpy(fnode->name, vdir->name, sizeof(fnode->name));
         fnode->inode = vdir->inode;
+        fnode->mask = 0755; /* Directories typically rwxr-xr-x */
         fnode->flags = FS_DIRECTORY;
         /* No ops for virtual dir, it's just a placeholder for mounting */
         return fnode;
@@ -153,6 +154,7 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
              fnode->name[name_len] = '\0';
 
              fnode->inode = i;
+             fnode->mask = 0755; /* Files typically rwxr-xr-x (executable for elf) */
              fnode->flags = FS_FILE;
              fnode->read = &initrd_read;
              fnode->write = 0;
@@ -236,7 +238,8 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     memset(initrd_root, 0, sizeof(fs_node_t));
     initrd_root->ref_count = 1;
     strlcpy(initrd_root->name, "initrd", sizeof(initrd_root->name));
-    initrd_root->mask = initrd_root->uid = initrd_root->gid = initrd_root->inode = initrd_root->length = 0;
+    initrd_root->mask = 0755;
+    initrd_root->uid = initrd_root->gid = initrd_root->inode = initrd_root->length = 0;
     initrd_root->flags = FS_DIRECTORY;
     initrd_root->read = 0;
     initrd_root->write = 0;

@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
-**Fecha:** 2026-03-14
-**Commit:** 246b23f193aafe0fa34e78d9c340eeaea545a1e9
+**Fecha:** 2025-05-20 (Actual)
+**Commit:** 5fbaffeedaa23a64e3768a74f948cc7b94fdb79a
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA
 
@@ -20,7 +20,7 @@
 | Scheduler | ✅ | Round-Robin inicializado, fork funcional |
 | VFS | ✅ | Initrd montado, mkdir funciona, JFS inicializado |
 | Syscall Table | ✅ | x86_64 mechanism enabled |
-| ELF Loader | ✅ | Carga eterland.elf correctamente (Detected Linux ABI) |
+| ELF Loader | ✅ | Carga eterland.elf correctamente (Detected Linux ABI) y sin errores de parseo de nombre o permisos |
 | Userspace | ✅ | Sh.elf/eterland.elf disponible, saltando a Ring 3 con éxito |
 | Networking | ✅ | E1000 detectado y stack de red iniciado |
 | Tests | ✅ | Compilan correctamente los binarios en userspace |
@@ -32,6 +32,7 @@
 
 ## Correcciones de Integración Aplicadas
 - Se forzó un `make clean && make all` para asegurar que mkinitrd.py empaquetara correctamente los binarios de userspace (sh.elf, eterland.elf) en initrd.img tras detectar un cache-miss en el boot.
+- Se agregó un fix de integración en `kernel/fs/initrd.c` para dar permisos de ejecución (`mask = 0755`) por defecto a los archivos parseados en el Initrd. Anteriormente, la validación de `elf_load_file` denegaba el acceso por `Missing execute permission`.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
