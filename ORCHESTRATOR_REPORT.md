@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-14
-**Commit:** e9ad6498b3c7862f23ba557f67fc0a2585658e00
+**Commit:** 704132c1fe24ddf3e247ca6f5a6b7b3ce9a911a3
 **Estado de build:** ✅ COMPILA (0 advertencias en kernel y userspace tras ejecución correcta)
 **Estado de boot:** ✅ ARRANCA (Booted correctly in QEMU. Entró en User Mode con eterland.elf exitosamente)
 
