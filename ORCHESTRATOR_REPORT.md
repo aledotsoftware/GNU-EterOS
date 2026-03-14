@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-14
-**Commit:** HEAD
+**Commit:** 2033524b06d3bbab55875b1f843b8c88498b58f6
 **Estado de build:** ✅ COMPILA (0 advertencias en kernel y userspace)
 **Estado de boot:** ✅ ARRANCA (Booted correctly in QEMU. Entró en User Mode con eterland.elf exitosamente)
 
@@ -12,7 +12,7 @@
 |---|---|---|
 | boot.asm | ✅ OK | Carga kernel + initrd, entra a Long Mode sin problemas |
 | kmain() → hal_init() | ✅ OK | Secuencia completa sin crash, SMP detectado correctamente |
-| PMM | ✅ OK | E820 parseado, RAM libre detectada: 127228 KB |
+| PMM | ✅ OK | E820 parseado, RAM libre detectada: 127220 KB |
 | VMM | ✅ OK | Identity map y page tables funcionales |
 | Heap | ✅ OK | kmalloc inicializado (96 MB dinámicos) |
 | Scheduler | ✅ OK | Round-Robin inicializado, context switch activo |
@@ -28,6 +28,7 @@
 2. `vfs-posix-filesystem-bot` — Razón: Continuar con soporte POSIX del filesystem.
 
 ## Correcciones de Integración Aplicadas
+- **Limpieza del Entorno:** Se ejecutó `make clean && make all` para evitar usar artefactos obsoletos o desactualizados, lo que aseguró el correcto empaquetado del archivo initrd (`initrd.img`) con 12 archivos, incluyendo el entorno userspace.
 - **Correcciones en el Build de Userspace:** Se corrigieron warnings generados por GCC y el linker al compilar los binarios de `userspace`:
   - Se definieron `PHDRS` en `userspace/linker.ld` para establecer correctamente los permisos de lectura, escritura y ejecución (`RWX`) de los segmentos de código y datos, solucionando el warning del linker `LOAD segment with RWX permissions`.
   - Se corrigieron los warnings de tipo `signed/unsigned comparison` en `userspace/libc/src/stdio.c` actualizando las variables a tipo `size_t`.
