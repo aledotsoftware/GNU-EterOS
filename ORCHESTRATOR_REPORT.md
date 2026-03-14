@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-14
-**Commit:** 7e7027185496fd413ab512645f815f41121a3996
+**Commit:** 246b23f193aafe0fa34e78d9c340eeaea545a1e9
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA
 
@@ -31,7 +31,7 @@
 3. `network-control-panel-bot` — Razón: Validar funcionamiento completo del stack de red para aplicaciones de usuario (wget, etc.) tras la detección del E1000.
 
 ## Correcciones de Integración Aplicadas
-- Ninguna necesaria en este ciclo. El build fue exitoso tras asegurar que mkinitrd.py empaquetara correctamente los binarios de userspace.
+- Se forzó un `make clean && make all` para asegurar que mkinitrd.py empaquetara correctamente los binarios de userspace (sh.elf, eterland.elf) en initrd.img tras detectar un cache-miss en el boot.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
