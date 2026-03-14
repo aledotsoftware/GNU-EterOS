@@ -150,6 +150,9 @@ void user_loader_entry(void) {
     /* 3. Push pointers */
     uint64_t* stack_ptr = (uint64_t*)sp;
 
+    /* Auxv (NULL) */
+    *(--stack_ptr) = 0;
+
     /* envp[0] = NULL */
     *(--stack_ptr) = 0;
 
