@@ -17,9 +17,9 @@ global context_switch
 section .text
 
 ; -----------------------------------------------------------------------------
-; context_switch(uint64_t* old_rsp, uint64_t new_rsp, void* old_fpu, void* new_fpu)
+; context_switch(uint64_t* old_rsp, uint64_t* new_rsp, void* old_fpu, void* new_fpu)
 ;   RDI = puntero donde guardar el RSP actual (de la tarea saliente)
-;   RSI = RSP de la tarea entrante (a restaurar)
+;   RSI = puntero al RSP de la tarea entrante (a restaurar)
 ;   RDX = puntero al buffer FPU (fpu_state) de la tarea saliente
 ;   RCX = puntero al buffer FPU (fpu_state) de la tarea entrante
 ; -----------------------------------------------------------------------------
@@ -41,8 +41,8 @@ context_switch:
     ; Guardar el RSP actual en *old_rsp
     mov [rdi], rsp
 
-    ; Cargar el RSP de la nueva tarea (new_rsp)
-    mov rsp, rsi
+    ; Cargar el RSP de la nueva tarea (*new_rsp)
+    mov rsp, [rsi]
 
     ; Restaurar registros callee-saved del stack de la nueva tarea
     pop r15

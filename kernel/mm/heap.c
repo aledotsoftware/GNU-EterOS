@@ -269,6 +269,10 @@ static void* _kmalloc_impl(size_t size) {
                  curr = get_free_node(curr)->next_free;
                  continue;
             }
+            if (curr->magic != HEAP_MAGIC) {
+                 serial_write_string("[MM] CRITICAL: Heap corruption detected in free list!\n");
+                 ASSERT(0 && "Heap corruption detected: Invalid magic number in free list");
+            }
 
             if (curr->size >= aligned_size) {
                 /* Found a fit! */

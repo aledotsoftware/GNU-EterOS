@@ -33,7 +33,7 @@ STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
 TEMP_KERNEL_ADDR    equ 0x10000         ; Buffer temporal bajo 1MB para BIOS (movido a 64KB)
 TEMP_INITRD_ADDR    equ 0x50000         ; Buffer temporal para initrd (después de 256KB de kernel)
 FINAL_KERNEL_ADDR   equ 0x100000        ; Dirección final en 1MB (donde BSS tiene espacio)
-STACK_TOP           equ 0x8000000       ; Stack en 128MB (Lejos del heap de 96MB)
+STACK_TOP           equ 0x90000         ; Stack en 0x90000
 
 ; =============================================================================
 ; Punto de entrada - Stage 1
@@ -346,7 +346,7 @@ load_kernel:
     ; Leer sectores del Kernel
     mov eax, KERNEL_START_LBA       ; LBA Inicio
     mov ecx, KERNEL_SECTORS         ; Cantidad de sectores
-    mov edi, KERNEL_LOAD_ADDR       ; Destino (Linear Addr 0x10000)
+    mov edi, KERNEL_LOAD_ADDR       ; Destino temporal (Linear Addr 0x10000)
 
     call read_sectors_lba
     ret
@@ -711,7 +711,7 @@ protected_mode_start:
     ; Indicador visual en VGA: "PM" (Protected Mode) en verde
     mov word [0xB8000], 0x2F50          ; 'P' verde
     mov word [0xB8002], 0x2F4D          ; 'M' verde
-    
+
     ; ---- Relocalizar Kernel a su posición final (1MB+) ----
     ; Esto lo hacemos en Modo Protegido para superar el límite de 1MB de la BIOS
     ; y evitar colisiones de BSS con el stack/EBDA.

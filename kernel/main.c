@@ -121,7 +121,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 1. Inicializar Hardware Abstraction Layer (HAL) ---- */
     /* Esto configura relojes, interrupciones, consola, timer, etc. */
     extern bool mm_initialized;
+    extern bool pmm_initialized_flag;
+    extern bool vmm_initialized_flag;
     ASSERT(mm_initialized == false && "Heap initialized before HAL!");
+    ASSERT(pmm_initialized_flag == false && "PMM initialized before HAL!");
+    ASSERT(vmm_initialized_flag == false && "VMM initialized before HAL!");
     hal_init();
     
     serial_write_string("[DEBUG] HAL Initialized returned to main.\n");
@@ -150,6 +154,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         #if defined(ARCH_X86_64)
             /* x86 specific PMM init (uses E820) */
             ASSERT(mm_initialized == false && "Heap initialized before PMM!");
+            ASSERT(vmm_initialized_flag == false && "VMM initialized before PMM!");
             pmm_init();
             ASSERT(pmm_get_total_ram() > 0);
 
@@ -166,11 +171,16 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
         #if ETEROS_HAS_MMU
             ASSERT(mm_initialized == false && "Heap initialized before VMM!");
+            ASSERT(pmm_initialized_flag == true && "VMM initialized before PMM!");
             hal_mmu_init(); /* Configura paginación virtual */
             serial_write_string("[DEBUG] VMM Initialized.\n");
         #endif
 
         /* Heap Manager (Generic) */
+        ASSERT(pmm_initialized_flag == true && "Heap initialized before PMM!");
+        #if ETEROS_HAS_MMU
+        ASSERT(vmm_initialized_flag == true && "Heap initialized before VMM!");
+        #endif
         mm_init(boot_info);
         ASSERT(mm_get_total_memory() > 0);
         serial_write_string("[DEBUG] Heap Initialized.\n");

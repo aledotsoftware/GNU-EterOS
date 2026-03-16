@@ -32,3 +32,14 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 - `ORCHESTRATOR_REPORT.md` actualizado recomendando la ejecución de `graphics-power-panel-bot`, `devices-time-panel-bot`, y `network-control-panel-bot`. No se observaron corrupciones de dependencias. Se forzó un rebuild para que los ELF carguen desde el initrd.
 - Fix de glue / integración: Se actualizaron los permisos (`mask`) en el `initrd.c` para los nodos virtuales en memoria y la raíz para tener ejecución `0755` y permitir al VFS cargarlos en `elf_load_file` que ahora cuenta con restricciones de lectura de permisos de archivo.
 - Fix de glue / integración: Se corrigió una dependencia faltante en el `Makefile` para que `$(INITRD_IMG)` espere a la finalización de la compilación de `userspace` antes de empaquetar los ELFs con `mkinitrd.py`.
+
+## Kernel Stability & Boot Hardening
+**Estado**: Completado.
+- Se resolvieron los Kernel Panics y hangs durante el boot resolviendo vulnerabilidades críticas de memoria.
+- Memory map verificado y PMM bitmap reubicado en una zona segura de manera explícita (0x1A000).
+- Orden de inicialización verificado a través de ASSERT checks en `kmain()`.
+- Stack de kernel protegido con un mapped guard page y realineado en memoria según el linker script.
+- Prevención de Exception 6 / #UD mediante adopción y cumplimiento estricto de la convención de punteros (Opción A) en `context_switch`.
+- Fix del Triple Fault al asignar el puntero del tope del stack modificado (`kernel_stack_top`) directamente en la estructura de `TSS RSP0`.
+- Se corrigió la lógica en la carga del Kernel a memoria alta al usar el loader real mode en BIOS int 0x13 usando un buffer temporal y luego re-relocándolo en Protected Mode.
+- Se resolvió un bug de race condition en el loop del Idle Scheduler que generaba un loop eterno con interrupciones cortadas (perdidas).
