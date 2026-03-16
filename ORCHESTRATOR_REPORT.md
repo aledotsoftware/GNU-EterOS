@@ -32,11 +32,12 @@
 
 ## Correcciones de Integración Aplicadas
 - Ninguna requerida en esta iteración. El sistema bootea y transiciona correctamente al userspace sin modificaciones extra del orquestador.
+- Fix de glue / integración: Se corrigió una dependencia faltante en el `Makefile` para que `$(INITRD_IMG)` se empaquete con `mkinitrd.py` correctamente esperando a la compilación de `userspace`.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
 |-----------|----------|---------|
 | Kernel boota | ✅ | Ninguno |
-| sh.elf en Ring 3 | ✅ | (Marea/Eterland arrancando en su lugar, pero ELF y Ring 3 funcionales) |
+| sh.elf en Ring 3 | ✅ | (Marea/Eterland arrancando en su lugar, `eterland.elf` carga y transiciona a Ring 3) |
 | busybox ash funciona | ❌ | Falta empaquetar o portar busybox |
 | Apache httpd sirve HTML | ❌ | Falta empaquetar o portar httpd |

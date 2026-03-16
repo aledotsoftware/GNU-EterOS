@@ -28,6 +28,7 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 **Estado**: Auditado y verificado con éxito.
 - Se verificó que el sistema compila (`make clean && make all`) sin errores ni advertencias severas, confirmando que la integración anterior sigue estable y operativa.
 - Se instalaron utilidades de sistema operativas necesarias (`nasm`, `mtools`, `xorriso`, `qemu-system-x86`).
-- Se ha validado que el sistema de arranque (QEMU test end-to-end) funciona correctamente cargando userspace y ejecutando el loader de UI/Shell con Ring 3 sin PANIC, FAULT o ASSERTs. La carga de ELF (`eterland.elf`) reporta éxito.
+- Se ha validado que el sistema de arranque (QEMU test end-to-end) funciona correctamente cargando userspace y ejecutando el loader de UI/Shell con Ring 3 sin PANIC, FAULT o ASSERTs. La carga de ELF (`eterland.elf`) reporta éxito y transiciona a Ring 3 (Compositor UI) correctamente.
 - `ORCHESTRATOR_REPORT.md` actualizado recomendando la ejecución de `graphics-power-panel-bot`, `devices-time-panel-bot`, y `network-control-panel-bot`. No se observaron corrupciones de dependencias. Se forzó un rebuild para que los ELF carguen desde el initrd.
 - Fix de glue / integración: Se actualizaron los permisos (`mask`) en el `initrd.c` para los nodos virtuales en memoria y la raíz para tener ejecución `0755` y permitir al VFS cargarlos en `elf_load_file` que ahora cuenta con restricciones de lectura de permisos de archivo.
+- Fix de glue / integración: Se corrigió una dependencia faltante en el `Makefile` para que `$(INITRD_IMG)` espere a la finalización de la compilación de `userspace` antes de empaquetar los ELFs con `mkinitrd.py`.

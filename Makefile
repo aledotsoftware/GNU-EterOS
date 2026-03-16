@@ -333,9 +333,9 @@ userspace:
 	cp userspace/eterland.elf $(INITRD_DIR)/
 
 # ---- Initrd ----
-initrd: userspace $(INITRD_IMG)
+initrd: $(INITRD_IMG)
 
-$(INITRD_IMG):
+$(INITRD_IMG): userspace
 	@echo "[INITRD] Generando initrd..."
 	@mkdir -p $(INITRD_DIR)
 	./tools/mkinitrd.py $(INITRD_DIR) $(INITRD_IMG)
