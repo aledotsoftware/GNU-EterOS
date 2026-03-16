@@ -354,7 +354,7 @@ load_kernel:
 ; -----------------------------------------------------------------------------
 ; load_initrd: Carga el Initrd desde disco
 ; -----------------------------------------------------------------------------
-INITRD_LOAD_ADDR    equ 0x4000000     ; Mover Initrd a 0x4000000 (64 MB)
+INITRD_LOAD_ADDR    equ 0x2000000     ; Mover Initrd a 0x2000000 (32 MB) para soportar 64MB RAM
 %ifndef INITRD_SECTORS
 INITRD_SECTORS      equ 512         ; Keep the increased limit (default)
 %endif
@@ -720,7 +720,7 @@ protected_mode_start:
     mov ecx, KERNEL_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores
     rep movsd
 
-    ; ---- Relocalizar Initrd a su posición final (64MB) ----
+    ; ---- Relocalizar Initrd a su posición final (32MB) ----
     mov esi, TEMP_INITRD_ADDR
     mov edi, INITRD_LOAD_ADDR
     mov ecx, INITRD_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores

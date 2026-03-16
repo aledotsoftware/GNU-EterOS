@@ -179,7 +179,9 @@ void mm_init(boot_info_t* boot_info) {
                     /* (Mínimo 1MB para ser útil) */
                     if (available_size >= 1024 * 1024) {
                         best_start = (uintptr_t)region_start;
-                        best_size = (size_t)available_size;
+
+                        /* Leave 25% of RAM for PMM (Page Tables, Tasks, IO) */
+                        best_size = (size_t)(available_size * 3 / 4);
                         
                         /* Limit heap size to keep some physical memory for PMM/Process tables */
                         if (best_size > MAX_HEAP_SIZE) {
