@@ -54,6 +54,11 @@ static const shell_command_t commands[] = {
     { "timezone", "Configurar zona horaria (offset UTC)",        cmd_timezone},
     { "ntp",      "Sincronizar RTC via red (NTP)",               cmd_ntp     },
     { "user",     "Administrar usuarios y seguridad",            cmd_user    },
+    { "run",      "Ejecuta un binario ELF (uso: run <path>)",    cmd_run     },
+    { "ls",       "Lista archivos en un directorio",             cmd_ls      },
+    { "cd",       "Cambia el directorio actual",                 cmd_cd      },
+    { "pwd",      "Muestra el directorio actual",                cmd_pwd     },
+    { "cat",      "Muestra el contenido de un archivo",          cmd_cat     },
 };
 
 #define NUM_COMMANDS  (sizeof(commands) / sizeof(commands[0]))

@@ -44,42 +44,14 @@ void user_loader_entry(void) {
     uint64_t entry_point = 0;
 
     /* Try to load ELF from Initrd */
-    /* Load Eterland (User requested to work on eterland UI) */
-    entry_point = elf_load_file("eterland.elf", 0x200000000);
+    /* Primary: Load Userspace Shell (Terminal Mode requested by user) */
+    entry_point = elf_load_file("sh.elf", 0x200000000);
+    if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
 
     if (entry_point == 0) {
-        entry_point = elf_load_file("/eterland.elf", 0x200000000);
-    }
-
-    /* Fallback: Load Marea Shell (Wayland-like Desktop Environment) */
-    if (entry_point == 0) {
-        entry_point = elf_load_file("marea_shell.elf", 0x200000000);
-    }
-
-    if (entry_point == 0) {
-        entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
-    }
-
-    if (entry_point == 0) {
-        entry_point = elf_load_file("login.elf", 0x200000000);
-    }
-
-    if (entry_point == 0) {
-        entry_point = elf_load_file("/login.elf", 0x200000000);
-    }
-
-    /* Fallback to sh.elf if login missing */
-    if (entry_point == 0) {
-         serial_write_string("[USER] login.elf not found, falling back to sh.elf\n");
-         entry_point = elf_load_file("sh.elf", 0x200000000);
-         if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
-    }
-
-    /* Fallback to test.elf if sh.elf missing */
-    if (entry_point == 0) {
-         serial_write_string("[USER] sh.elf not found, falling back to test.elf\n");
-         entry_point = elf_load_file("test.elf", 0x200000000);
-         if (entry_point == 0) entry_point = elf_load_file("/test.elf", 0x200000000);
+        serial_write_string("[USER] Warning: sh.elf not found. Automatic user-mode shell disabled.\n");
+        serial_write_string("[USER] You can use the kernel shell to launch binaries manually.\n");
+        while(1) { task_yield(); hal_cpu_halt(); }
     }
 
     if (entry_point != 0) {
@@ -118,55 +90,76 @@ void user_loader_entry(void) {
     /* Map it to 0x300000000 (12GB) to avoid conflict with Bootloader 4GB Identity Map */
 
     uint64_t user_stack_virt = 0x300000000;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 4; i++) { /* 16KB stack */
         void* stack_phys = pmm_alloc_page();
         if (!stack_phys) {
-            serial_write_string("[USER] Failed to allocate stack page\n");
+            serial_write_string("[USER] Error: Failed to allocate stack page\n");
             return;
         }
         /* Stack: READ | WRITE | USER (No Exec) */
         if (hal_mem_map((uint64_t)stack_phys, user_stack_virt - (i * PAGE_SIZE), HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER) < 0) {
-             serial_write_string("[USER] Failed to map stack page\n");
+             serial_write_string("[USER] Error: Failed to map stack page\n");
              return;
         }
     }
 
-    uint64_t user_stack_top = user_stack_virt + PAGE_SIZE;
+    /* System V ABI requires 16-byte alignment for main() entry */
+    /* The stack should look like this (from high to low):
+     * [envp[n]] = NULL
+     * ...
+     * [envp[0]] = ptr
+     * [argv[m]] = NULL
+     * ...
+     * [argv[0]] = ptr
+     * [argc]    = value  <-- RSP points here
+     */
 
-    /* Push arguments to stack (argc, argv) */
-    char* sp = (char*)user_stack_top;
+    uint64_t* sp = (uint64_t*)(user_stack_virt + PAGE_SIZE);
 
-    /* 1. Push strings */
-    const char* argv0_str = "marea_shell";
-    size_t len = strlen(argv0_str) + 1;
-    sp -= len;
-    memcpy(sp, argv0_str, len);
-    char* argv0_ptr = sp;
+    /* 1. Push environment strings (empty for now) */
+    /* 2. Push argument strings */
+    const char* arg0 = "sh";
+    size_t arg0_len = strlen(arg0) + 1;
+    char* arg0_user_ptr = (char*)((uintptr_t)sp - arg0_len);
+    memcpy(arg0_user_ptr, arg0, arg0_len);
+    sp = (uint64_t*)((uintptr_t)arg0_user_ptr & ~7); /* Align for pointers */
 
-    uintptr_t current_sp = (uintptr_t)sp;
-    current_sp &= ~0xF; // Align down to 16 bytes
-    sp = (char*)current_sp;
+    /* 3. Construct the pointer arrays */
+    /* Push NULL for envp */
+    *(--sp) = 0; 
+    
+    /* Push NULL for argv */
+    *(--sp) = 0;
+    /* Push argv[0] */
+    *(--sp) = (uint64_t)arg0_user_ptr;
 
-    /* 3. Push pointers */
-    uint64_t* stack_ptr = (uint64_t*)sp;
+    /* Push argc */
+    uint64_t argc = 1;
+    *(--sp) = argc;
 
-    /* Auxv (NULL) */
-    *(--stack_ptr) = 0;
+    /* Ensure RSP is 16-byte aligned before calling main (crt0 does pop rdi first) */
+    /* After 'pop rdi', RSP must be 16-byte aligned. */
+    /* So before pop, RSP should be 8-byte aligned but NOT 16-byte aligned? 
+     * Actually, System V says: The stack is 16-byte aligned BEFORE the 'call'.
+     * 'call' pushes RIP (8 bytes), so main() sees RSP+8 aligned.
+     * Our crt0 starts at _start, pops argc (8 bytes). 
+     * So we need (RSP - 8) to be 16-byte aligned. */
+    
+    uintptr_t final_sp = (uintptr_t)sp;
+    if ((final_sp % 16) == 0) {
+        /* If it's 16-aligned, we subtract 8 to make it (16n - 8) */
+        /* When crt0 pops argc, it becomes 16-aligned. */
+        sp--; 
+        *sp = argc; /* Re-push argc at new position */
+    }
 
-    /* envp[0] = NULL */
-    *(--stack_ptr) = 0;
+    serial_write_string("[USER] Jumping to Ring 3 (RIP=");
+    char buf_rip[32]; utoa_hex_s(entry_point, buf_rip, sizeof(buf_rip)); serial_write_string(buf_rip);
+    serial_write_string(", RSP=");
+    char buf_rsp[32]; utoa_hex_s((uint64_t)sp, buf_rsp, sizeof(buf_rsp)); serial_write_string(buf_rsp);
+    serial_write_string(")...\n");
 
-    /* argv[1] = NULL */
-    *(--stack_ptr) = 0;
-
-    /* argv[0] = ptr */
-    *(--stack_ptr) = (uint64_t)argv0_ptr;
-
-    /* argc = 1 */
-    *(--stack_ptr) = 1;
-
-    serial_write_string("[USER] Jumping to Ring 3...\n");
-    enter_user_mode((void*)entry_point, (void*)stack_ptr);
+    enter_user_mode((void*)entry_point, (void*)sp);
 
     /* Should never return here */
     serial_write_string("[USER] Error: Returned from Ring 3 (unexpected)\n");

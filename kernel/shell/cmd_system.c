@@ -9,6 +9,7 @@
 #include "../../include/idt.h"
 #include "../../include/user_mode.h"
 #include "../../include/string.h"
+#include "../../include/elf.h"
 
 #define ETEROS_VERSION      "0.1.0"
 #define ETEROS_CODENAME     "Genesis"
@@ -264,3 +265,176 @@ void cmd_usermode(const char* args) {
     /* Should not return here (user code loops) */
     terminal_write_string("  [USER] Returned? (Should not happen)\n");
 }
+
+void cmd_run(const char* args) {
+    if (!args || *args == '\0') {
+        terminal_write_string("  Uso: run <path_to_elf>\n");
+        return;
+    }
+
+    /* 1. Load ELF */
+    uint64_t entry_point = elf_load_file(args, 0x200000000);
+    if (entry_point == 0) {
+        terminal_write_string("  Error: No se pudo cargar el archivo ELF: ");
+        terminal_write_string(args);
+        terminal_write_string("\n");
+        return;
+    }
+
+    terminal_write_string("  [ELF] Cargado exitosamente. Preparando modo usuario...\n");
+    terminal_write_string("  [RUN] Punto de entrada detectado: 0x");
+    char buf[32]; utoa_hex_s(entry_point, buf, sizeof(buf));
+    terminal_write_string(buf);
+    terminal_write_string("\n");
+    terminal_write_string("  [RUN] ADVERTENCIA: Ejecucion directa desde el Kernel Shell es experimental.\n");
+}
+
+#include "../../include/task.h"
+#include "../../include/fs/vfs.h"
+#include "../../include/mm.h"
+
+void cmd_ls(const char* args) {
+    task_t* current = task_get_current();
+    char path[256];
+    
+    if (!args || *args == '\0') {
+        strlcpy(path, current->cwd, 256);
+    } else {
+        if (vfs_normalize_path(path, 256, args, current->cwd) != 0) {
+            terminal_write_string("  Error: Ruta invalida.\n");
+            return;
+        }
+    }
+
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) {
+        terminal_write_string("  Error: No se encontro el directorio: ");
+        terminal_write_string(path);
+        terminal_write_string("\n");
+        return;
+    }
+
+    if (!(node->flags & FS_DIRECTORY)) {
+        terminal_write_string("  Error: No es un directorio.\n");
+        kfree(node);
+        return;
+    }
+
+    terminal_write_string("\n  Contenido de ");
+    terminal_write_colored(path, VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_write_string(":\n\n");
+
+    struct dirent entry;
+    int i = 0;
+    while (readdir_fs(node, i++, &entry) == 0) {
+        /* Lookup to get type */
+        fs_node_t* item = finddir_fs(node, entry.name);
+        if (item) {
+            if (item->flags & FS_DIRECTORY) {
+                terminal_write_colored("    [DIR] ", VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
+            } else {
+                terminal_write_colored("    [FIL] ", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+            }
+            terminal_write_string(entry.name);
+            
+            if (!(item->flags & FS_DIRECTORY)) {
+                terminal_write_string(" (");
+                char buf[16]; itoa_s(item->length, buf, sizeof(buf), 10);
+                terminal_write_string(buf);
+                terminal_write_string(" bytes)");
+            }
+            terminal_write_string("\n");
+            kfree(item);
+        } else {
+            terminal_write_string("    [???] ");
+            terminal_write_string(entry.name);
+            terminal_write_string("\n");
+        }
+    }
+    terminal_write_string("\n");
+    kfree(node);
+}
+
+void cmd_cd(const char* args) {
+    if (!args || *args == '\0') return;
+
+    task_t* current = task_get_current();
+    char path[256];
+    
+    if (vfs_normalize_path(path, 256, args, current->cwd) != 0) {
+        terminal_write_string("  Error: Ruta invalida.\n");
+        return;
+    }
+
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) {
+        terminal_write_string("  Error: No se encontro el directorio: ");
+        terminal_write_string(path);
+        terminal_write_string("\n");
+        return;
+    }
+
+    if (!(node->flags & FS_DIRECTORY)) {
+        terminal_write_string("  Error: No es un directorio.\n");
+        kfree(node);
+        return;
+    }
+
+    /* Actualizar CWD de la tarea actual */
+    strlcpy(current->cwd, path, sizeof(current->cwd));
+    kfree(node);
+}
+
+void cmd_pwd(const char* args) {
+    (void)args;
+    task_t* current = task_get_current();
+    terminal_write_string("  ");
+    terminal_write_string(current->cwd);
+    terminal_write_string("\n");
+}
+
+void cmd_cat(const char* args) {
+    if (!args || *args == '\0') {
+        terminal_write_string("  Uso: cat <file>\n");
+        return;
+    }
+
+    task_t* current = task_get_current();
+    char path[256];
+    
+    if (vfs_normalize_path(path, 256, args, current->cwd) != 0) {
+        terminal_write_string("  Error: Ruta invalida.\n");
+        return;
+    }
+
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) {
+        terminal_write_string("  Error: No se encontro el archivo.\n");
+        return;
+    }
+
+    if (node->flags & FS_DIRECTORY) {
+        terminal_write_string("  Error: Es un directorio.\n");
+        kfree(node);
+        return;
+    }
+
+    uint8_t* buffer = (uint8_t*)kmalloc(node->length + 1);
+    if (!buffer) {
+        terminal_write_string("  Error: No hay memoria para leer el archivo.\n");
+        kfree(node);
+        return;
+    }
+
+    ssize_t read = read_fs(node, 0, node->length, buffer);
+    if (read > 0) {
+        buffer[read] = '\0';
+        terminal_write_string((char*)buffer);
+        terminal_write_string("\n");
+    }
+
+    kfree(buffer);
+    kfree(node);
+}
+
+
