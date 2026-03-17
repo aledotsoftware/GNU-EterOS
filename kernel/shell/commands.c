@@ -112,14 +112,17 @@ void cmd_help(const char* args) {
     terminal_write_colored("  Comandos del sistema:\n\n",
                           VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
 
+    static const char spaces[] = "            "; // 12 spaces
+
     for (size_t i = 0; i < NUM_COMMANDS; i++) {
         terminal_write_colored("    ", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+
         terminal_write_colored(commands[i].name,
                               VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
         size_t name_len = strlen(commands[i].name);
         size_t pad = (name_len < 12) ? 12 - name_len : 1;
-        while (pad--) terminal_write_string(" ");
+        terminal_write_string(spaces + (12 - pad));
 
         terminal_write_string(commands[i].description);
         terminal_write_string("\n");
@@ -131,12 +134,13 @@ void cmd_help(const char* args) {
 
     for (size_t i = 0; i < NUM_APPS; i++) {
         terminal_write_colored("    ", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+
         terminal_write_colored(apps[i].name,
                               VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
 
         size_t name_len = strlen(apps[i].name);
         size_t pad = (name_len < 12) ? 12 - name_len : 1;
-        while (pad--) terminal_write_string(" ");
+        terminal_write_string(spaces + (12 - pad));
 
         terminal_write_string(apps[i].description);
         terminal_write_colored(" v", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
