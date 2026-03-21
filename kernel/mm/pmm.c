@@ -245,6 +245,10 @@ void pmm_init(void) {
     
     uint64_t pmm_end = p_ref_counts + ref_counts_size;
     free_mem_start = PAGE_ALIGN_UP(pmm_end);
+    last_free_idx = free_mem_start / PAGE_SIZE;
+    if (last_free_idx >= total_pages) {
+        last_free_idx = 0;
+    }
 
     /* Stats Report */
     char free_str[32];

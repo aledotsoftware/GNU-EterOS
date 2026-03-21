@@ -33,6 +33,18 @@
 
 extern void fork_return(void);
 
+static inline uint64_t task_irq_save(void) {
+    uint64_t flags;
+    __asm__ volatile ("pushfq; popq %0; cli" : "=r"(flags) : : "memory");
+    return flags;
+}
+
+static inline void task_irq_restore(uint64_t flags) {
+    if (flags & 0x200) {
+        __asm__ volatile ("sti");
+    }
+}
+
 /* ========================================================================= */
 /* Helper de Stack de Kernel                                                 */
 /* ========================================================================= */
@@ -390,13 +402,13 @@ void task_init_ap(void) {
  * @return The ID of the newly created task, or -1 if the max task limit is reached or out of memory.
  */
 int task_create(const char* name, void (*entry)(void)) {
-    __asm__ volatile("cli");
+    uint64_t irq_flags = task_irq_save();
     spin_lock(&sched_lock);
 
     if (task_count >= MAX_TASKS) {
         serial_write_string("[SCHED] Error: Maximo de tareas alcanzado\n");
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
 
@@ -404,7 +416,7 @@ int task_create(const char* name, void (*entry)(void)) {
     int slot = find_free_slot();
     if (slot == -1) {
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
 
@@ -414,7 +426,7 @@ int task_create(const char* name, void (*entry)(void)) {
         serial_write_string("[SCHED] Error: No hay memoria para el stack\n");
         task_bitmap &= ~(1ULL << slot);
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
     /* Note: alloc_kernel_stack already memsets to 0 */
@@ -493,7 +505,7 @@ int task_create(const char* name, void (*entry)(void)) {
 
     enqueue_ready(&tasks[slot]);
     spin_unlock(&sched_lock);
-    __asm__ volatile("sti");
+    task_irq_restore(irq_flags);
 
     serial_write_string("[SCHED] Tarea creada: ");
     serial_write_string(name);

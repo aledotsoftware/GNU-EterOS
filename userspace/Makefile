@@ -6,7 +6,7 @@ LDFLAGS = -T linker.ld -nostdlib -m elf_x86_64
 LIBC_SRC = libc/src/crt0.o libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/stdlib.c libc/src/signal.c libc/src/sha256.c libc/src/strtok.c libc/src/pthread.c libc/src/dirent.c libc/src/time.c
 LIBC_OBJ = $(LIBC_SRC:.c=.o)
 
-all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf test_stdio.elf test_malloc.elf test_pthread.elf login.elf passwd.elf useradd.elf userdel.elf sh.elf test_security.elf test_shm.elf marea_shell.elf eterland.elf
+all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf test_stdio.elf test_malloc.elf test_pthread.elf login.elf passwd.elf useradd.elf userdel.elf sh.elf test_security.elf test_shm.elf marea_shell.elf eterland.elf apt-get.elf
 
 libc/src/%.o: libc/src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -130,3 +130,9 @@ eterland.o: eterland.c
 
 eterland.elf: $(LIBC_OBJ) eterland.o
 	$(LD) $(LDFLAGS) -o eterland.elf $(LIBC_OBJ) eterland.o
+
+apt_get.o: apt_get.c
+	$(CC) $(CFLAGS) -c apt_get.c -o apt_get.o
+
+apt-get.elf: $(LIBC_OBJ) apt_get.o
+	$(LD) $(LDFLAGS) -o apt-get.elf $(LIBC_OBJ) apt_get.o

@@ -17,6 +17,7 @@
 #include "../../../include/timer.h"
 #include "../../../include/pic.h"
 #include "../../../include/sem.h"
+#include "../../../include/task.h"
 #include <net/nic.h>
 
 extern sem_t net_sem;
@@ -33,12 +34,13 @@ static uint8_t mac_address[6];
 static volatile uint8_t* mmio_base;
 static int e1000_active = 0;
 
-/* Punteros a los anillos de descriptores (Allocated via pmm_alloc_page) */
+/* Punteros a los anillos de descriptores */
 static volatile struct e1000_rx_desc* rx_descs;
 static volatile struct e1000_tx_desc* tx_descs;
 
 /* Buffers de recepción */
 static uint8_t* rx_buffers[NUM_RX_DESC];
+static uint8_t* tx_buffers[NUM_TX_DESC];
 
 /* Indices actuales (Head/Tail software tracking) */
 static uint16_t rx_cur;
@@ -63,13 +65,22 @@ static uint32_t e1000_read_reg(uint16_t offset) {
 /* ========================================================================= */
 
 static void e1000_init_rx(void) {
-    /* 1. Asignar memoria para descriptores (debe estar alineada a 128 bytes, pmm_alloc_page lo garantiza) */
-    rx_descs = (volatile struct e1000_rx_desc*)pmm_alloc_page();
+    /* 1. Asignar memoria para descriptores */
+    rx_descs = (volatile struct e1000_rx_desc*)kmalloc(PAGE_SIZE);
+    if (!rx_descs) {
+        serial_write_string("[E1000] ERROR: Failed to allocate RX descriptors.\n");
+        return;
+    }
     memset((void*)rx_descs, 0, PAGE_SIZE);
     
     /* 2. Asignar buffers para cada descriptor */
     for (int i = 0; i < NUM_RX_DESC; i++) {
-        rx_buffers[i] = (uint8_t*)kmalloc(RX_BUFFER_SIZE);
+        rx_buffers[i] = (uint8_t*)kmalloc(PAGE_SIZE);
+        if (!rx_buffers[i]) {
+            serial_write_string("[E1000] ERROR: Failed to allocate RX buffer.\n");
+            return;
+        }
+        memset(rx_buffers[i], 0, PAGE_SIZE);
         rx_descs[i].addr = (uint64_t)(uintptr_t)rx_buffers[i];
         rx_descs[i].status = 0;
     }
@@ -98,9 +109,24 @@ static void e1000_init_rx(void) {
 }
 
 static void e1000_init_tx(void) {
-    /* 1. Asignar memoria para descriptores TX (alineación 128 bytes mandatoria) */
-    tx_descs = (volatile struct e1000_tx_desc*)pmm_alloc_page();
+    /* 1. Asignar memoria para descriptores TX */
+    tx_descs = (volatile struct e1000_tx_desc*)kmalloc(PAGE_SIZE);
+    if (!tx_descs) {
+        serial_write_string("[E1000] ERROR: Failed to allocate TX descriptors.\n");
+        return;
+    }
     memset((void*)tx_descs, 0, PAGE_SIZE);
+
+    for (int i = 0; i < NUM_TX_DESC; i++) {
+        tx_buffers[i] = (uint8_t*)kmalloc(PAGE_SIZE);
+        if (!tx_buffers[i]) {
+            serial_write_string("[E1000] ERROR: Failed to allocate TX buffer.\n");
+            return;
+        }
+        memset(tx_buffers[i], 0, PAGE_SIZE);
+        tx_descs[i].addr = (uint64_t)(uintptr_t)tx_buffers[i];
+        tx_descs[i].status = E1000_STA_DD;
+    }
     
     /* 2. Configurar registros TDBAL/TDBAH */
     uint64_t base_addr = (uint64_t)(uintptr_t)tx_descs;
@@ -224,12 +250,8 @@ int e1000_init(pci_device_t* pci_dev_ptr) {
     uint32_t ctrl = e1000_read_reg(E1000_CTRL);
     e1000_write_reg(E1000_CTRL, ctrl | E1000_CTRL_SLU);
     
-    /* Habilitar Interrupciones (Link Status, RX Timer, Receive Overrun) */
-    /* Bit 2: LSC, Bit 7: RXT0, Bit 6: RXO, Bit 4: RXDMT0 */
-    e1000_write_reg(E1000_IMS, (1 << 2) | (1 << 7) | (1 << 6) | (1 << 4));
-
-    /* Unmask IRQ 11 in PIC (Legacy Mode) */
-    pic_unmask_irq(11);
+    /* VirtualBox resulta mas estable en polling puro que con IRQ legacy. */
+    e1000_write_reg(E1000_IMC, 0xFFFFFFFF);
 
     nic_register_driver(&e1000_driver);
 
@@ -261,8 +283,14 @@ uint8_t* e1000_get_mac(void) {
 
 int e1000_send_packet(const void* data, uint16_t len) {
     if (!e1000_active) return -1;
+    if (len > PAGE_SIZE) return -1;
+
+    while (!(tx_descs[tx_cur].status & E1000_STA_DD)) {
+        task_yield();
+    }
     
-    tx_descs[tx_cur].addr = (uint64_t)(uintptr_t)data;
+    memcpy(tx_buffers[tx_cur], data, len);
+    tx_descs[tx_cur].addr = (uint64_t)(uintptr_t)tx_buffers[tx_cur];
     tx_descs[tx_cur].length = len;
     tx_descs[tx_cur].cmd = E1000_CMD_EOP | E1000_CMD_IFCS | E1000_CMD_RS; // End of Packet, Insert FCS, Report Status
     tx_descs[tx_cur].status = 0;

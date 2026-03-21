@@ -28,32 +28,41 @@
 
 void hal_init(void) {
     /* 1. Initialize Console (VGA + Serial) */
+    terminal_write_string("[HAL] console\n");
     hal_console_init();
 
     /* 2. Initialize GDT */
+    terminal_write_string("[HAL] gdt\n");
     gdt_init();
 
     /* 3. Initialize PIC (Remap IRQs) */
+    terminal_write_string("[HAL] pic\n");
     pic_init();
     pic_unmask_irq(4); /* Serial COM1 */
 
     /* 4. Initialize IDT */
+    terminal_write_string("[HAL] idt\n");
     idt_init();
 
     /* 5. Initialize Syscalls (MSRs) */
+    terminal_write_string("[HAL] syscall\n");
     syscall_init();
 
     /* 6. Initialize Input (Event System + Keyboard) */
+    terminal_write_string("[HAL] input\n");
     input_init();
     hal_input_init();
 
     /* 6. Initialize Timer (PIT) */
     /* Default to 100Hz as per original kmain */
+    terminal_write_string("[HAL] timer\n");
     hal_timer_init(100);
 
-    /* 7. Enable Interrupts */
-    hal_interrupts_enable();
-    serial_write_string("[HAL] Interrupts enabled.\n");
+    /* 7. Interrupts stay disabled here.
+     * They are enabled later from kmain once PMM/VMM/scheduler are ready.
+     */
+    terminal_write_string("[HAL] irq-late\n");
+    serial_write_string("[HAL] Interrupts deferred until late boot.\n");
 }
 
 void hal_interrupts_enable(void) {

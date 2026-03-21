@@ -71,9 +71,6 @@ static void network_task(void) {
     net_poll();
 
     while(1) {
-        /* Wait for network interrupt (packet received) */
-        sem_wait(&net_sem);
-
         net_poll();
 
         /* Update status */
@@ -81,6 +78,8 @@ static void network_task(void) {
             network_ready = 1;
             hal_console_write("  [NET]  DHCP Bound! IP assigned.\n");
         }
+
+        timer_sleep(10);
     }
 }
 
@@ -195,6 +194,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
     lapic_init();   /* Inicializar Local APIC del core principal */
     smp_init();     /* Despertar los Application Processors (APs) */
+    serial_write_string("[DEBUG] Interrupts still deferred after scheduler/APIC init.\n");
     #endif
 
     #if ETEROS_TIER >= 2
@@ -204,7 +204,12 @@ void __attribute__((section(".text.boot"))) kmain(void) {
             fs_root = initialise_initrd(boot_info->initrd_addr, boot_info->initrd_size);
             if (fs_root) {
                 hal_console_write("[VFS] Initrd mounted at /\n");
-                desktop_autostart = (finddir_fs(fs_root, "marea_shell.elf") != NULL);
+                desktop_autostart = boot_info &&
+                                    boot_info->signature == 0x544F424B &&
+                                    boot_info->fb_addr != 0 &&
+                                    boot_info->fb_width != 0 &&
+                                    boot_info->fb_height != 0 &&
+                                    (finddir_fs(fs_root, "marea_shell.elf") != NULL);
 
                 /* Dynamic Mounts */
                 vfs_mkdir("/dev", 0);
@@ -262,8 +267,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
     if (e1000_init(NULL) == 0) {
         hal_console_write("  [NET]  Hardware inicializado.\n");
+        serial_write_string("[DEBUG] main: calling init_network()\n");
         init_network();
+        serial_write_string("[DEBUG] main: creating network task\n");
         task_create("Network", network_task);
+        serial_write_string("[DEBUG] main: network task created\n");
     } else {
         hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
         hal_console_write("         (El sistema continuara sin red)\n");
@@ -282,15 +290,20 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     }
 
     /* ---- 7.1 Inicializar Futex ---- */
+    serial_write_string("[DEBUG] main: futex_init()\n");
     futex_init();
 
     /* ---- 7.5 Lanzar Test de Espacio de Usuario ---- */
     hal_console_write("  [INIT] Lanzando User Mode Test...\n");
     extern void user_loader_entry(void);
+    serial_write_string("[DEBUG] main: creating user loader task\n");
     task_create("UserLoader", user_loader_entry);
+    serial_write_string("[DEBUG] main: user loader task created\n");
  
     /* ---- 8. Lanzar shell interactivo ---- */
+    serial_write_string("[DEBUG] main: entering final shell/desktop phase\n");
     hal_interrupts_enable();
+    serial_write_string("[DEBUG] Interrupts enabled for runtime scheduling.\n");
 
     if (desktop_autostart) {
         terminal_set_silent(true);

@@ -7,6 +7,7 @@
 #include "../../include/cpu.h"
 #include "../../include/elf.h"
 #include "../../include/fs/vfs.h"
+#include "../../include/boot.h"
 
 extern uint8_t user_payload_start[];
 extern uint8_t user_payload_end[];
@@ -102,13 +103,30 @@ void user_loader_entry(void) {
     setup_user_stdio();
 
     uint64_t entry_point = 0;
+    const char* program_name = "sh";
+    boot_info_t* boot_info = get_boot_info();
+    int have_framebuffer = boot_info &&
+                           boot_info->signature == 0x544F424B &&
+                           boot_info->fb_addr != 0 &&
+                           boot_info->fb_width != 0 &&
+                           boot_info->fb_height != 0;
 
     /* Try to load ELF from Initrd */
-    /* Primary: Load Userspace Shell (Terminal Mode requested by user) */
-    entry_point = elf_load_file("sh.elf", 0x200000000);
-    if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
-    if (entry_point == 0) entry_point = elf_load_file("marea_shell.elf", 0x200000000);
-    if (entry_point == 0) entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
+    /* Primary: boot into Marea only when a framebuffer is available. */
+    if (have_framebuffer) {
+        entry_point = elf_load_file("marea_shell.elf", 0x200000000);
+        if (entry_point == 0) entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
+        if (entry_point != 0) {
+            program_name = "marea_shell";
+        }
+    } else {
+        serial_write_string("[USER] No framebuffer available, using text shell fallback.\n");
+    }
+
+    if (entry_point == 0) {
+        entry_point = elf_load_file("sh.elf", 0x200000000);
+        if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
+    }
 
     if (entry_point == 0) {
         serial_write_string("[USER] Warning: No user shell binary found in initrd. Automatic user-mode shell disabled.\n");
@@ -148,7 +166,7 @@ void user_loader_entry(void) {
         entry_point = user_code_virt;
     }
 
-    enter_loaded_user_program(entry_point, "sh");
+    enter_loaded_user_program(entry_point, program_name);
 
     /* Should never return here */
     serial_write_string("[USER] Error: Returned from Ring 3 (unexpected)\n");

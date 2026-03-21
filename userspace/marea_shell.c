@@ -177,6 +177,7 @@ typedef struct {
     int term_cols, term_rows;
     char input_buf[256];
     int input_len;
+    char cwd[128];
 } marea_window_t;
 
 static marea_window_t windows[MAX_WINDOWS];
@@ -761,6 +762,9 @@ static void term_init_window(marea_window_t* win) {
     win->term_rows = (win->h - TERM_MARGIN_T - 8) / 16;
     win->input_len = 0;
     memset(win->input_buf, 0, sizeof(win->input_buf));
+    if (!getcwd(win->cwd, sizeof(win->cwd))) {
+        strlcpy(win->cwd, "/", sizeof(win->cwd));
+    }
 }
 
 static void term_clear(marea_window_t* win) {
@@ -830,68 +834,183 @@ static void term_print(marea_window_t* win, const char* str, uint32_t fg) {
 
 static void term_draw_prompt(marea_window_t* win) {
     term_print(win, "user@eteros", COL_TERM_PROMPT_USER);
-    term_print(win, " ~ $ ", COL_TERM_PROMPT_DIR);
+    term_print(win, " ", COL_TERM_FG);
+    term_print(win, win->cwd, COL_TERM_PROMPT_DIR);
+    term_print(win, " $ ", COL_TERM_PROMPT_DIR);
+}
+
+static int split_args(char *line, char *argv[], int max_args) {
+    int argc = 0;
+    char *token = strtok(line, " ");
+
+    while (token && argc < max_args - 1) {
+        argv[argc++] = token;
+        token = strtok(NULL, " ");
+    }
+
+    argv[argc] = NULL;
+    return argc;
+}
+
+static int resolve_command_path(const char *cmd, char *out, size_t out_size) {
+    static const char *search_dirs[] = { "", "/", "/gnu/bin/", "/bin/" };
+    static const char *suffixes[] = { "", ".elf" };
+
+    if (!cmd || !cmd[0]) return -1;
+
+    if (strchr(cmd, '/')) {
+        strlcpy(out, cmd, out_size);
+        if (access(out, F_OK) == 0) return 0;
+        return -1;
+    }
+
+    for (size_t i = 0; i < sizeof(search_dirs) / sizeof(search_dirs[0]); ++i) {
+        for (size_t j = 0; j < sizeof(suffixes) / sizeof(suffixes[0]); ++j) {
+            out[0] = '\0';
+            strlcat(out, search_dirs[i], out_size);
+            strlcat(out, cmd, out_size);
+            strlcat(out, suffixes[j], out_size);
+            if (access(out, F_OK) == 0) return 0;
+        }
+    }
+
+    return -1;
+}
+
+static void term_run_external(marea_window_t* win, char *argv[], int argc) {
+    char path[256];
+    char busybox_path[256];
+    int pipefd[2];
+    int status = 0;
+
+    if (argc <= 0 || !argv[0]) {
+        return;
+    }
+
+    if (resolve_command_path(argv[0], path, sizeof(path)) != 0) {
+        if (resolve_command_path("busybox", busybox_path, sizeof(busybox_path)) == 0) {
+            char *bb_argv[34];
+            int bb_argc = 0;
+
+            bb_argv[bb_argc++] = busybox_path;
+            bb_argv[bb_argc++] = argv[0];
+            for (int i = 1; i < argc && bb_argc < 33; ++i) {
+                bb_argv[bb_argc++] = argv[i];
+            }
+            bb_argv[bb_argc] = NULL;
+            argv = bb_argv;
+            argc = bb_argc;
+            strlcpy(path, busybox_path, sizeof(path));
+        } else {
+            term_print(win, "\nComando no encontrado: ", COL_DANGER);
+            term_print(win, argv[0], COL_DANGER);
+            term_print(win, "\n", COL_TERM_FG);
+            return;
+        }
+    }
+
+    if (pipe(pipefd) < 0) {
+        term_print(win, "\nError: pipe failed\n", COL_DANGER);
+        return;
+    }
+
+    {
+        int pid = fork();
+        if (pid == 0) {
+            dup2(pipefd[1], STDOUT_FILENO);
+            dup2(pipefd[1], STDERR_FILENO);
+            close(pipefd[0]);
+            close(pipefd[1]);
+            execve(path, argv, NULL);
+            write(STDERR_FILENO, "exec failed\n", 12);
+            exit(1);
+        } else if (pid > 0) {
+            char buf[129];
+            ssize_t nread;
+
+            close(pipefd[1]);
+            while ((nread = read(pipefd[0], buf, sizeof(buf) - 1)) > 0) {
+                buf[nread] = '\0';
+                term_print(win, buf, COL_TERM_FG);
+            }
+            close(pipefd[0]);
+            waitpid(pid, &status, 0);
+        } else {
+            close(pipefd[0]);
+            close(pipefd[1]);
+            term_print(win, "\nError: fork failed\n", COL_DANGER);
+        }
+    }
 }
 
 static void term_execute(marea_window_t* win) {
     win->input_buf[win->input_len] = '\0';
 
     if (win->input_len > 0) {
-        char cmd[256];
-        int i = 0;
-        while (win->input_buf[i] && win->input_buf[i] != ' ' && i < 255) {
-            cmd[i] = win->input_buf[i];
-            i++;
-        }
-        cmd[i] = '\0';
+        char line[256];
+        char *argv[32];
+        int argc;
 
-        if (strcmp(cmd, "help") == 0) {
+        strlcpy(line, win->input_buf, sizeof(line));
+        argc = split_args(line, argv, 32);
+        if (argc == 0) {
+            term_print(win, "\n", COL_TERM_FG);
+            win->input_len = 0;
+            term_draw_prompt(win);
+            return;
+        }
+
+        if (strcmp(argv[0], "help") == 0) {
             term_print(win, "\n", COL_TERM_FG);
             term_print(win, "Marea Shell Terminal\n", COL_ACCENT);
-            term_print(win, "Comandos: help, clear, echo, uname,\n", COL_TERM_FG);
-            term_print(win, "  ls, cat, run, exit\n", COL_TERM_FG);
-        } else if (strcmp(cmd, "clear") == 0) {
+            term_print(win, "Builtins: help, clear, echo, uname, cd, pwd, exit\n", COL_TERM_FG);
+            term_print(win, "Externos: se resuelven en /gnu/bin, /bin y /\n", COL_TERM_FG);
+        } else if (strcmp(argv[0], "clear") == 0) {
             term_clear(win);
             win->input_len = 0;
             term_draw_prompt(win);
             return;
-        } else if (strcmp(cmd, "uname") == 0) {
+        } else if (strcmp(argv[0], "uname") == 0) {
             term_print(win, "\n", COL_TERM_FG);
             term_print(win, "eterOS Marea Shell v1.0\n", COL_ACCENT);
             term_print(win, "Compositor: Wayland-like (SHM)\n", COL_TERM_FG);
             term_print(win, "Arch: x86_64 Long Mode\n", COL_TERM_FG);
-        } else if (strcmp(cmd, "echo") == 0) {
+        } else if (strcmp(argv[0], "echo") == 0) {
             term_print(win, "\n", COL_TERM_FG);
-            if (win->input_buf[i] == ' ') i++;
-            term_print(win, win->input_buf + i, COL_TERM_FG);
+            for (int i = 1; i < argc; ++i) {
+                if (i > 1) term_print(win, " ", COL_TERM_FG);
+                term_print(win, argv[i], COL_TERM_FG);
+            }
             term_print(win, "\n", COL_TERM_FG);
-        } else if (strcmp(cmd, "run") == 0) {
-            if (win->input_buf[i] == ' ') i++;
-            char* arg = win->input_buf + i;
-            if (strlen(arg) > 0) {
-                term_print(win, "\nEjecutando ", COL_TERM_FG);
-                term_print(win, arg, COL_WARNING);
-                term_print(win, "...\n", COL_TERM_FG);
-
-                int child = fork();
-                if (child == 0) {
-                    char path[256] = "/";
-                    strlcat(path, arg, sizeof(path));
-                    char *argv[] = { path, NULL };
-                    char *envp[] = { NULL };
-                    execve(path, argv, envp);
-                    exit(1);
+        } else if (strcmp(argv[0], "cd") == 0) {
+            const char *target = (argc > 1) ? argv[1] : "/";
+            if (chdir(target) == 0) {
+                if (!getcwd(win->cwd, sizeof(win->cwd))) {
+                    strlcpy(win->cwd, target, sizeof(win->cwd));
                 }
             } else {
-                term_print(win, "\nUso: run <archivo.elf>\n", COL_WARNING);
+                term_print(win, "\ncd: no se pudo cambiar al directorio\n", COL_DANGER);
             }
-        } else if (strcmp(cmd, "exit") == 0) {
+        } else if (strcmp(argv[0], "pwd") == 0) {
+            if (!getcwd(win->cwd, sizeof(win->cwd))) {
+                strlcpy(win->cwd, "/", sizeof(win->cwd));
+            }
+            term_print(win, "\n", COL_TERM_FG);
+            term_print(win, win->cwd, COL_TERM_FG);
+            term_print(win, "\n", COL_TERM_FG);
+        } else if (strcmp(argv[0], "run") == 0) {
+            if (argc > 1) {
+                term_print(win, "\n", COL_TERM_FG);
+                term_run_external(win, &argv[1], argc - 1);
+            } else {
+                term_print(win, "\nUso: run <archivo>\n", COL_WARNING);
+            }
+        } else if (strcmp(argv[0], "exit") == 0) {
             term_print(win, "\nSaliendo...\n", COL_DANGER);
             exit(0);
         } else {
-            term_print(win, "\nComando no encontrado: ", COL_DANGER);
-            term_print(win, cmd, COL_DANGER);
             term_print(win, "\n", COL_TERM_FG);
+            term_run_external(win, argv, argc);
         }
     } else {
         term_print(win, "\n", COL_TERM_FG);
