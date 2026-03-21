@@ -133,9 +133,17 @@ static int mouse_btn = 0;
 #define CURSOR_W 12
 #define CURSOR_H 18
 static uint32_t cursor_save[CURSOR_W * CURSOR_H];
+static int dragging = 0;
+static int drag_win = -1;
+static int drag_offset_x = 0, drag_offset_y = 0;
 
 static void handle_mouse_event(const input_event_t* ev);
 static void handle_keyboard_char(char c);
+static int hit_start_button(int mx, int my);
+static int hit_titlebar(marea_window_t* win, int mx, int my);
+static int find_window_at(int mx, int my);
+static int hit_menu_item(int mx, int my);
+static void redraw_all(void);
 
 /* ========================================================================= */
 /* Menu State                                                                */
@@ -1112,10 +1120,6 @@ static void redraw_all(void) {
 /* ========================================================================= */
 /* Drag State                                                                */
 /* ========================================================================= */
-
-static int dragging = 0;
-static int drag_win = -1;
-static int drag_offset_x = 0, drag_offset_y = 0;
 
 /* ========================================================================= */
 /* Main Entry                                                                */
