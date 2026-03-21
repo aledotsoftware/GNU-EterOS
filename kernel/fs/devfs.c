@@ -7,6 +7,7 @@
 #include <vga.h>
 #include <input/event.h>
 #include <lock.h>
+#include <ioctl.h>
 #include <crypto/sha256.h>
 #include <framebuffer.h>
 
