@@ -473,6 +473,19 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test.elf"; exit 1 }
 
+    # sh.elf
+    $shSrc = "$userDir\sh.c"
+    $shObj = "$BUILD_DIR\userspace\sh.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $shSrc -o $shObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar sh.c"; exit 1 }
+
+    $shElf = "$initrdRoot\sh.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $shElf $shObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar sh.elf"; exit 1 }
+
     # eterland.elf
     $eterlandSrc = "$userDir\eterland.c"
     $eterlandObj = "$BUILD_DIR\userspace\eterland.o"
@@ -499,7 +512,7 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar marea_shell.elf"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $eterlandElf, $mareaShellElf"
+    Write-Step "OK" "Userspace construido: $testElf, $shElf, $eterlandElf, $mareaShellElf"
 }
 
 function Invoke-InitrdBuild {

@@ -47,9 +47,11 @@ void user_loader_entry(void) {
     /* Primary: Load Userspace Shell (Terminal Mode requested by user) */
     entry_point = elf_load_file("sh.elf", 0x200000000);
     if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
+    if (entry_point == 0) entry_point = elf_load_file("marea_shell.elf", 0x200000000);
+    if (entry_point == 0) entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
 
     if (entry_point == 0) {
-        serial_write_string("[USER] Warning: sh.elf not found. Automatic user-mode shell disabled.\n");
+        serial_write_string("[USER] Warning: No user shell binary found in initrd. Automatic user-mode shell disabled.\n");
         serial_write_string("[USER] You can use the kernel shell to launch binaries manually.\n");
         while(1) { task_yield(); hal_cpu_halt(); }
     }

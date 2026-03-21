@@ -207,12 +207,19 @@ void __attribute__((section(".text.boot"))) kmain(void) {
                 /* Dynamic Mounts */
                 vfs_mkdir("/dev", 0);
                 vfs_mount("/dev", devfs_init());
-                vfs_mkdir("/dev/shm", 0);
-                vfs_mount("/dev/shm", shmfs_init());
                 vfs_mkdir("/proc", 0);
                 vfs_mount("/proc", procfs_init());
+                fs_node_t* writable_fs = jfs_init();
                 vfs_mkdir("/data", 0);
-                vfs_mount("/data", jfs_init());
+                vfs_mount("/data", writable_fs);
+                vfs_mkdir("/gnu", 0);
+                vfs_mount("/gnu", writable_fs);
+                vfs_mkdir("/tmp", 0);
+                vfs_mount("/tmp", shmfs_init());
+                mkdir_fs(writable_fs, "bin", 0755);
+                mkdir_fs(writable_fs, "lib", 0755);
+                mkdir_fs(writable_fs, "include", 0755);
+                mkdir_fs(writable_fs, "tmp", 01777);
 
                 /* List files using VFS */
                 struct dirent entry;

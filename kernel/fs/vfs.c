@@ -285,6 +285,7 @@ fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
 }
 
 fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) {
+    (void)follow_symlink;
     if (!root || !path) return 0;
 
     /* Hack for /dev/tty */
