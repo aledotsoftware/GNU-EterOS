@@ -791,8 +791,9 @@ function Invoke-VBoxRun {
         # Desmontar disco anterior
         & $VBOXMANAGE storageattach $vmName --storagectl "SATA" --port 0 --device 0 --medium none 2>&1 | Out-Null
 
-        # Asegurar tipo de red E1000 y el uso del mouse PS/2
-        & $VBOXMANAGE modifyvm $vmName --nic1 nat --nictype1 82540EM --mouse ps2 2>&1 | Out-Null
+        # Mantener video moderno, pero evitar SMP hasta estabilizar TLB/input.
+        & $VBOXMANAGE modifyvm $vmName --memory 768 --cpus 1 --vram 64 --graphicscontroller VMSVGA --accelerate3d on --nic1 nat --nictype1 82540EM --mouse ps2 2>&1 | Out-Null
+        & $VBOXMANAGE setextradata $vmName "CustomVideoMode1" "1280x720x32" 2>&1 | Out-Null
 
         # Cerrar medio anterior si existe  
         & $VBOXMANAGE closemedium disk $vdiPath 2>&1 | Out-Null
@@ -828,11 +829,13 @@ function Invoke-VBoxRun {
         $longMode = if ($Arch -eq "x86_64") { "on" } else { "off" }
         
         & $VBOXMANAGE modifyvm $vmName `
-            --memory 128 `
+            --memory 768 `
             --cpus 1 `
+            --vram 64 `
             --firmware bios `
             --long-mode $longMode `
-            --graphicscontroller VBoxVGA `
+            --graphicscontroller VMSVGA `
+            --accelerate3d on `
             --nic1 nat `
             --nictype1 82540EM `
             --audio-driver none `
@@ -840,6 +843,7 @@ function Invoke-VBoxRun {
             --keyboard ps2 `
             --uart1 0x3F8 4 `
             --uartmode1 file "$((Get-Location).Path)\build\$Arch\serial.log" 2>&1 | Out-Null
+        & $VBOXMANAGE setextradata $vmName "CustomVideoMode1" "1280x720x32" 2>&1 | Out-Null
 
         # Crear controladora SATA
         & $VBOXMANAGE storagectl $vmName --name "SATA" --add sata --controller IntelAhci --portcount 1 2>&1 | Out-Null
@@ -852,7 +856,7 @@ function Invoke-VBoxRun {
 
         $ErrorActionPreference = "Stop"
 
-        Write-Step "OK" "VM '$vmName' creada (BIOS, 128MB, disco: $OS_VDI)"
+        Write-Step "OK" "VM '$vmName' creada (BIOS, 768MB RAM, 1 CPU, video VMSVGA, disco: $OS_VDI)"
     }
 
     # Iniciar la VM
@@ -870,7 +874,7 @@ function Invoke-QemuRun {
 
     $qemuArgs = @(
         "-drive", "format=raw,file=$OS_IMAGE,index=0,media=disk",
-        "-m", "128M",
+        "-m", "512M",
         "-no-reboot",
         "-no-shutdown"
     )
