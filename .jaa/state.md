@@ -36,5 +36,6 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 ## Orchestrator-Meta-Agent (Nuevo Ciclo)
 **Estado**: Auditado y verificado con éxito.
 - Compilación restaurada: Se agregó `libc/src/netdb.c` a la lista `LIBC_SRC` en `userspace/Makefile` para corregir referencias no definidas a `getaddrinfo` y `freeaddrinfo` al enlazar `apt_get.o`.
+- Tests locales restaurados: Se corrigieron dependencias rotas (`undefined reference to input_pending`) en el host test `tests/test_devfs.c` añadiendo los stub methods para emular eventos de entrada en el filesystem virtual del host.
 - Boot test end-to-end exitoso (cero crashes).
 - Generado `ORCHESTRATOR_REPORT.md` actualizando el estado de todos los módulos.

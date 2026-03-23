@@ -30,6 +30,7 @@ No hay errores de compilación.
 
 ## Correcciones de Integración Aplicadas
 - Agregado `libc/src/netdb.c` a `LIBC_SRC` en `userspace/Makefile` para resolver undefined references a `getaddrinfo` y `freeaddrinfo` al compilar `apt_get.c`.
+- Agregados mock objects `input_pending` e `input_mouse_pending` en `tests/test_devfs.c` para resolver errores de linker en `run_tests.sh` causados por dependencias en host tests.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
