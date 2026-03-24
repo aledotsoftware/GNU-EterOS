@@ -1,0 +1,47 @@
+[USER] Compilando userspace...
+make -C userspace
+make[1]: Entering directory '/app/userspace'
+gcc -m64 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -Ilibc/include -c libc/src/netdb.c -o libc/src/netdb.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_net.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_net.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o exec_test.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o exec_test.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_libc_advanced.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_libc_advanced.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_signal.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_signal.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_futex_security.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_futex_security.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_stdio.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_stdio.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_malloc.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_malloc.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_pthread.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_pthread.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o login.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o login.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o passwd.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o passwd.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o useradd.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o useradd.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o userdel.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o userdel.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o sh.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o sh.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_security.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_security.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o test_shm.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o test_shm.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o marea_shell.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o marea_shell.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o eterland.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o eterland.o
+ld -T linker.ld -nostdlib -m elf_x86_64 -o apt-get.elf libc/src/crt0.o libc/src/syscall.o libc/src/stdio.o libc/src/string.o libc/src/malloc.o libc/src/errno.o libc/src/network.o libc/src/posix.o libc/src/netdb.o libc/src/stdlib.o libc/src/signal.o libc/src/sha256.o libc/src/strtok.o libc/src/pthread.o libc/src/dirent.o libc/src/time.o apt_get.o
+make[1]: Leaving directory '/app/userspace'
+cp userspace/login.elf initrd_root/
+cp userspace/passwd.elf initrd_root/
+cp userspace/useradd.elf initrd_root/
+cp userspace/userdel.elf initrd_root/
+cp userspace/sh.elf initrd_root/
+cp userspace/marea_shell.elf initrd_root/
+cp userspace/eterland.elf initrd_root/
+[INITRD] Generando initrd...
+./tools/mkinitrd.py initrd_root build/initrd.img
+Created initrd 'build/initrd.img' with 11 files. Total size: 293495 bytes.
+[ASM]  boot/x86_64/boot.asm (Dynamic Sectors)
+Detected: Kernel=301 sectors, Initrd=574 sectors
+[IMG]  Generando imagen de disco...
+dd if=/dev/zero of=build/eteros.img bs=512 count=2880 2>/dev/null
+dd if=build/boot.bin of=build/eteros.img bs=512 conv=notrunc 2>/dev/null
+Writing Initrd at sector 318 (Boot=17, Kernel=301)
+[IMG]  Imagen generada: build/eteros.img (1474560 bytes)
+
+================================================
+  eterOS construido exitosamente! (ARCH=x86_64)
+  Imagen: build/eteros.img
+  Ejecutar: make run
+================================================

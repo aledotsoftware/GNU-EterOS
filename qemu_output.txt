@@ -1,0 +1,37 @@
+[USER] Compilando userspace...
+make -C userspace
+make[1]: Entering directory '/app/userspace'
+make[1]: Nothing to be done for 'all'.
+make[1]: Leaving directory '/app/userspace'
+cp userspace/login.elf initrd_root/
+cp userspace/passwd.elf initrd_root/
+cp userspace/useradd.elf initrd_root/
+cp userspace/userdel.elf initrd_root/
+cp userspace/sh.elf initrd_root/
+cp userspace/marea_shell.elf initrd_root/
+cp userspace/eterland.elf initrd_root/
+[INITRD] Generando initrd...
+./tools/mkinitrd.py initrd_root build/initrd.img
+Created initrd 'build/initrd.img' with 11 files. Total size: 293495 bytes.
+[ASM]  boot/x86_64/boot.asm (Dynamic Sectors)
+Detected: Kernel=301 sectors, Initrd=574 sectors
+[IMG]  Generando imagen de disco...
+dd if=/dev/zero of=build/eteros.img bs=512 count=2880 2>/dev/null
+dd if=build/boot.bin of=build/eteros.img bs=512 conv=notrunc 2>/dev/null
+Writing Initrd at sector 318 (Boot=17, Kernel=301)
+[IMG]  Imagen generada: build/eteros.img (1474560 bytes)
+
+================================================
+  eterOS construido exitosamente! (ARCH=x86_64)
+  Imagen: build/eteros.img
+  Ejecutar: make run
+================================================
+
+[QEMU] Iniciando eterOS...
+qemu-system-x86_64 -drive format=raw,file=build/eteros.img,index=0,if=ide,media=disk \
+        -serial stdio                                 \
+        -m 128M                                       \
+        -no-reboot                                    \
+        -no-shutdown
+gtk initialization failed
+make: *** [Makefile:385: run] Error 1
