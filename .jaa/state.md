@@ -24,16 +24,10 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 - Soporte de `signal.h`, `time.h`, `sys/socket.h`, etc.
 - Entorno de runtime en `crt0.asm` cargando `argc`, `argv`, `envp`, `auxv` usando `nasm`.
 
-## Orchestrator-Meta-Agent
-**Estado**: Auditado y verificado con éxito.
-- Se verificó que el sistema compila (`make clean && make all`) sin errores ni advertencias severas, confirmando que la integración anterior sigue estable y operativa.
-- Se instalaron utilidades de sistema operativas necesarias (`nasm`, `mtools`, `xorriso`, `qemu-system-x86`).
-- Se ha validado que el sistema de arranque (QEMU test end-to-end) funciona correctamente cargando userspace y ejecutando el loader de UI/Shell con Ring 3 sin PANIC, FAULT o ASSERTs. La carga de ELF (`eterland.elf`) reporta éxito y transiciona a Ring 3 (Compositor UI) correctamente.
-- `ORCHESTRATOR_REPORT.md` actualizado recomendando la ejecución de `graphics-power-panel-bot`, `devices-time-panel-bot`, y `network-control-panel-bot`. No se observaron corrupciones de dependencias. Se forzó un rebuild para que los ELF carguen desde el initrd.
-- Fix de glue / integración: Se actualizaron los permisos (`mask`) en el `initrd.c` para los nodos virtuales en memoria y la raíz para tener ejecución `0755` y permitir al VFS cargarlos en `elf_load_file` que ahora cuenta con restricciones de lectura de permisos de archivo.
-- Fix de glue / integración: Se corrigió una dependencia faltante en el `Makefile` para que `$(INITRD_IMG)` espere a la finalización de la compilación de `userspace` antes de empaquetar los ELFs con `mkinitrd.py`.
-
 ## Orchestrator-Meta-Agent (2026-03-24)
 **Estado**: Auditado y verificado con éxito.
-- Se verificó exitosamente que la integración del ciclo anterior sigue completamente estable. La compilación y el boot pasaron de manera exitosa sin intervenciones ni arreglos de glue code. Marea Shell Desktop Environment (Marea) arrancó correctamente desde Ring 3.
-- Se actualizó el archivo `ORCHESTRATOR_REPORT.md` con la fecha del día de hoy y el hash del commit actual. Las recomendaciones previas para los agentes (`graphics-power-panel-bot`, `devices-time-panel-bot`, `network-control-panel-bot`) se mantienen pertinentes dada la estabilidad y progresión documentada.
+- Se verificó que el sistema compila (`make clean && make all`) sin errores ni advertencias severas, confirmando que la integración anterior sigue estable y operativa.
+- Se han validado dependencias e instalado utilidades de sistema necesarias (`nasm`, `mtools`, `xorriso`, `qemu-system-x86`).
+- Se ha validado que el sistema de arranque (QEMU test end-to-end) funciona correctamente cargando userspace y ejecutando el loader de UI/Shell con Ring 3 sin PANIC, FAULT o ASSERTs. La carga de ELF (`marea_shell.elf`) reporta éxito y transiciona a Ring 3 (Marea Shell Desktop Environment) correctamente.
+- `ORCHESTRATOR_REPORT.md` actualizado con fecha y commit actual. Recomendando la ejecución de `graphics-power-panel-bot`, `devices-time-panel-bot`, y `network-control-panel-bot`. No se observaron corrupciones de dependencias. Se forzó un rebuild y se corrió exitosamente.
+- Fix de glue / integración: Ninguno requerido en la ejecución actual. Marea Shell arranca sin problemas de la fase anterior.
