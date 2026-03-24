@@ -26,7 +26,10 @@ void kfree(void* ptr) {
     free(ptr);
 }
 
-/* Mock keyboard dependencies */
+/* Mock keyboard and input dependencies */
+int input_pending(void) { return 0; }
+int input_mouse_pending(void) { return 0; }
+
 char keyboard_getchar(void) {
     return 'a';
 }

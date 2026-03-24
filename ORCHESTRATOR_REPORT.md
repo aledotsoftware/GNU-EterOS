@@ -31,8 +31,10 @@
 3. `network-control-panel-bot` — Razón: Validar funcionamiento completo del stack de red para aplicaciones de usuario (wget, etc.) tras la detección del E1000.
 
 ## Correcciones de Integración Aplicadas
-- Ninguna requerida en esta iteración. El sistema bootea y transiciona correctamente al userspace sin modificaciones extra del orquestador.
-- Fix de glue / integración: Se corrigió una dependencia faltante en el `Makefile` para que `$(INITRD_IMG)` se empaquete con `mkinitrd.py` correctamente esperando a la compilación de `userspace`.
+- Ninguna requerida en la ejecución base. El sistema bootea y transiciona correctamente al userspace.
+- Fix de glue / integración: Se corrigió una dependencia faltante en el `Makefile` global para que `$(INITRD_IMG)` se empaquete con `mkinitrd.py` correctamente esperando a la compilación de `userspace`.
+- Fix de glue / integración: Se resolvió un error de enlazado `undefined reference to getaddrinfo / freeaddrinfo` al compilar la utilidad `apt_get.elf`. Se agregó `libc/src/netdb.c` a la variable `LIBC_SRC` del `userspace/Makefile` para que las funciones de red se incluyan en `userspace/libc/`. Adicionalmente, se parcheó un warning (`unused variable`) de compilación en el mismo archivo.
+- Fix de glue / integración: Se solucionó un error en el CI al enlazar `tests/test_devfs.c` por la falta de referencia a las dependencias de input. Se simularon `input_pending()` e `input_mouse_pending()` en el archivo de prueba bajo `__ETEROS_HOST_TEST__`.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
