@@ -154,8 +154,16 @@ void cmd_help(const char* args) {
     terminal_write_string("\n");
 }
 
+#include "../../include/task.h"
+
 int shell_exec(char* input) {
     if (!input || !*input) return 0;
+
+    task_t* current = task_get_current();
+    if (current && current->uid != 0) {
+        terminal_write_colored("  Permiso denegado: Se requiere nivel de privilegio Root (UID 0).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+        return -1;
+    }
 
     for (size_t i = 0; i < NUM_COMMANDS; i++) {
         const char* args = match_command(input, commands[i].name);

@@ -42,13 +42,14 @@ static void draw_panel_menu(void) {
     terminal_write_colored("          Panel de Control - eterOS       \n", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     terminal_write_colored("  ========================================\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
-    // Items are roughly at lines 4, 5, 6, 7, 8
+    // Items are roughly at lines 4, 5, 6, 7, 8, 9
     terminal_write_string("    1. Configurar Teclado (Layout & Typematic)\n"); // Y=4
     terminal_write_string("    2. Configurar Mouse (Sensibilidad & Zurdo/Diestro)\n"); // Y=5
     terminal_write_string("    3. Estado de Almacenamiento (A/B Slots & Initrd)\n"); // Y=6
     terminal_write_string("    4. Configurar Tiempo (Zona Horaria & NTP)\n"); // Y=7
-    terminal_write_string("    5. Salir del Panel\n"); // Y=8
-    terminal_write_string("\n  Use teclas [1-5] o click para seleccionar.\n");
+    terminal_write_string("    5. Usuarios y Seguridad (Auto-login)\n"); // Y=8
+    terminal_write_string("    6. Salir del Panel\n"); // Y=9
+    terminal_write_string("\n  Use teclas [1-6] o click para seleccionar.\n");
 
     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
 }
@@ -362,7 +363,7 @@ void cmd_panel(const char* args) {
         if (keyboard_has_input()) {
             opt = keyboard_getchar();
             if (opt == KB_KEY_ESCAPE || opt == 'q') {
-                opt = '5'; // Exit
+                opt = '6'; // Exit
             }
         }
 
@@ -373,6 +374,7 @@ void cmd_panel(const char* args) {
             else if (panel_mouse_y == 6) opt = '3';
             else if (panel_mouse_y == 7) opt = '4';
             else if (panel_mouse_y == 8) opt = '5';
+            else if (panel_mouse_y == 9) opt = '6';
         }
 
         if (panel_mouse_moved) {
@@ -394,6 +396,39 @@ void cmd_panel(const char* args) {
                 panel_time();
                 draw_panel_menu();
             } else if (opt == '5') {
+                cmd_clear("");
+                terminal_write_string("\n  -- Usuarios y Seguridad --\n");
+                terminal_write_string("  1. Habilitar Auto-login (autologin on)\n");
+                terminal_write_string("  2. Deshabilitar Auto-login (autologin off)\n");
+                terminal_write_string("  3. Crear Usuario (add)\n");
+                terminal_write_string("  4. Eliminar Usuario (del)\n");
+                terminal_write_string("  5. Cambiar Contrasena (passwd)\n");
+                terminal_write_string("\n  Elija [1-5] o ESC para volver.\n");
+                char c = 0;
+                while (1) {
+                    if (keyboard_has_input()) {
+                        c = keyboard_getchar();
+                        if ((c >= '1' && c <= '5') || c == KB_KEY_ESCAPE) break;
+                    }
+                    __asm__ volatile("cli");
+                    if (!keyboard_has_input()) __asm__ volatile("sti; hlt");
+                    else __asm__ volatile("sti");
+                }
+                terminal_write_string("\n");
+                if (c == '1') cmd_user("autologin on");
+                else if (c == '2') cmd_user("autologin off");
+                else if (c == '3') {
+                    terminal_write_string("  Ejecute en la linea de comandos: user add <usuario> <password>\n");
+                }
+                else if (c == '4') {
+                    terminal_write_string("  Ejecute en la linea de comandos: user del <usuario>\n");
+                }
+                else if (c == '5') {
+                    terminal_write_string("  Ejecute en la linea de comandos: user passwd <usuario> <nuevo_password>\n");
+                }
+                if (c != KB_KEY_ESCAPE) wait_for_enter();
+                draw_panel_menu();
+            } else if (opt == '6') {
                 terminal_write_string("\nSaliendo del Panel de Control...\n");
                 panel_running = false;
                 break;
