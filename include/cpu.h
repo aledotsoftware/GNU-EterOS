@@ -61,14 +61,15 @@ typedef struct {
     void* gdt;                        /* struct gdt_entry* */
     void* tss;                        /* struct tss_struct* */
     
-    /* Scheduler Local */
-    /* Aquí irían las colas de ejecución locales (runqueues) */
-    /* struct runqueue local_runqueue; */
-    
-    /* Stack de Kernel (para syscall entry) */
+    /* Stack de Kernel (para syscall entry) MUST REMAIN AT OFFSET 64 and 72 */
     uint64_t kernel_stack_top;  /* RSP0 en TSS */
     uint64_t user_stack_scratch; /* Espacio temporal para swapgs */
     
+    /* Scheduler Local */
+    void* local_ready_head;
+    void* local_ready_tail;
+    int local_task_count;
+
     /* Estadísticas */
     uint64_t context_switches;
     uint64_t uptime_ticks;

@@ -1,5 +1,15 @@
 # JAA State
 
+## Scheduler SMP-Aware, Threading y IPC Avanzado
+**Estado**: Completado.
+Todos los objetivos relacionados con el soporte de multithreading, SMP y `clone()` se implementaron con éxito.
+- Run Queues y balanceo de carga (`target_cpu`, `local_ready_head`) por CPU implementados en `task.c`.
+- Envío de IPIs en el scheduler para reprogramar tareas a otros CPUs (`0x20` vector).
+- `clone()` actualizado para soportar semánticas de Linux: `CLONE_VM`, `CLONE_FS`, `CLONE_FILES`, `CLONE_SIGHAND`, `CLONE_THREAD`, `CLONE_PARENT_SETTID` y `CLONE_CHILD_CLEARTID` compartiendo el Thread Group ID.
+- `sys_exit_group()` implementado y validado en conjunto con los hilos.
+- Sincronización robusta en Futex: Soporte implementado y validado de `wake_tick` y `TASK_BLOCKED`.
+- Los procesos y colas de Linux funcionan e inician normalmente en QEMU.
+
 ## Subsistema de Compatibilidad Linux (Aether-Linux-Subsystem) - Fase 5.5
 **Estado**: Completado.
 Todos los objetivos correspondientes a la Fase 5.5 ya se encuentran implementados, compilados y testeados correctamente en la base de código.

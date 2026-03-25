@@ -81,7 +81,8 @@ typedef struct task {
     struct task*   prev_sleep;              /* Previous task in sleep queue */
 
     /* POSIX Compatibility */
-    file_descriptor_t fd_table[MAX_FD];     /* File Descriptor Table */
+    file_descriptor_t* fd_table;            /* Pointer to File Descriptor Table (shared in threads) */
+    file_descriptor_t fd_table_internal[MAX_FD]; /* Internal FD table for processes */
     char           cwd[256];                /* Current Working Directory */
     struct fs_node* cwd_node;               /* Current Working Directory Node */
     uint32_t       signal_mask;             /* Mask of blocked signals */
@@ -90,9 +91,13 @@ typedef struct task {
     uint32_t       euid;                    /* Effective User ID */
     uint32_t       egid;                    /* Effective Group ID */
     uint32_t       signal_pending;          /* Bitmap of pending signals */
-    void           (*signal_handlers[32])(int); /* Signal Handlers */
-    void           (*signal_restorers[32])(void); /* Signal Restorer Trampolines */
-    uint32_t       signal_flags[32];        /* Signal Flags (e.g. SA_SIGINFO) */
+
+    void           (**signal_handlers)(int); /* Signal Handlers Pointer (shared in threads) */
+    void*          signal_handlers_internal[32];
+    void           (**signal_restorers)(void); /* Signal Restorer Trampolines Pointer */
+    void*          signal_restorers_internal[32];
+    uint32_t*      signal_flags;            /* Signal Flags Pointer */
+    uint32_t       signal_flags_internal[32];
 
     /* SMP & Threading extensions */
     uint64_t       affinity[4];             /* cpu_set_t inline for simplicity (256 bits max) */

@@ -219,6 +219,7 @@ int main() {
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
     current_task_mock.id = 1;
+    current_task_mock.fd_table = current_task_mock.fd_table_internal;
 
     fs_node_t dummy_node;
     memset(&dummy_node, 0, sizeof(fs_node_t));

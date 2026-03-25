@@ -256,6 +256,7 @@ int main() {
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
     current_task_mock.id = 1;
+    current_task_mock.fd_table = current_task_mock.fd_table_internal;
 
     // Setup a directory fd
     fs_node_t* node = (fs_node_t*)malloc(sizeof(fs_node_t));

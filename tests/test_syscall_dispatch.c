@@ -124,6 +124,7 @@ int main() {
     /* Setup mock task */
     memset(&current_task_mock, 0, sizeof(task_t));
     current_task_mock.id = 1234;
+    current_task_mock.fd_table = current_task_mock.fd_table_internal;
 
     printf("Testing Syscall Dispatcher...\n");
 
