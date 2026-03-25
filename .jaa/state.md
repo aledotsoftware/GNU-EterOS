@@ -76,3 +76,12 @@ Se verificaron los requerimientos del módulo AetherGraphics y ACPI:
 - Funcionalidad de Dark/Light mode toggle operativa (`flux_set_theme()`).
 - Temporizador de Screen Sleep habilitado tras 30s de inactividad, con reanudación mediante entrada.
 - Fallback para resolución dinámica añadida (`// TODO: dynamic resolution requires GOP protocol support`).
+
+## Panel de Control - Actualizaciones y Sistema (Infraestructura OTA)
+**Estado**: Completado.
+Se verificaron los requerimientos de la infraestructura de actualizaciones OTA:
+- Implementación del comando `ota` (`kernel/shell/cmd_ota.c`) que permite descargar actualizaciones mediante sockets directos sobre TCP/IPv4.
+- Verificación criptográfica con firmas Ed25519 implementada y funcional con un par de claves documentadas en `tools/updater/keypair.md`.
+- El sistema escribe el payload verificado atómicamente en la partición inactiva (A o B) usando `partition_get_passive_root()` y actualiza el NVRAM (con `nvram_set_boot_partition`) solo si la escritura es exitosa.
+- Se ha comprobado que el estado de los slots activo/pasivo aparece correctamente en la salida de `sysinfo`.
+- Tests de compilación y emulación con QEMU completados con éxito sin provocar kernel panics.
