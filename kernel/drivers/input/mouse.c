@@ -24,6 +24,8 @@ static uint8_t mouse_cycle = 0;
 static uint8_t mouse_bytes[3];
 static uint8_t prev_buttons = 0;
 static mouse_callback_t active_callback = (void*)0;
+static uint8_t mouse_sensitivity = 5; // Default middle
+static bool mouse_left_handed = false;
 #define MOUSE_DEBUG_LOG_PACKETS 0
 #if MOUSE_DEBUG_LOG_PACKETS
 static uint32_t mouse_debug_packets = 0;
@@ -129,6 +131,24 @@ void mouse_process_byte(uint8_t byte) {
         int32_t dy = (int8_t)mouse_bytes[2];
         uint8_t buttons = mouse_bytes[0] & 0x07;
 
+        // Apply sensitivity (default 5, lower is slower, higher is faster)
+        // A simple multiplier/divider for now. Real systems use acceleration curves.
+        if (mouse_sensitivity < 5) {
+            dx = (dx * mouse_sensitivity) / 5;
+            dy = (dy * mouse_sensitivity) / 5;
+        } else if (mouse_sensitivity > 5) {
+            dx = (dx * (mouse_sensitivity - 3)) / 2;
+            dy = (dy * (mouse_sensitivity - 3)) / 2;
+        }
+
+        // Apply handedness swap
+        if (mouse_left_handed) {
+            uint8_t new_buttons = buttons & 0x04; // Keep middle button
+            if (buttons & 0x01) new_buttons |= 0x02; // Left becomes Right
+            if (buttons & 0x02) new_buttons |= 0x01; // Right becomes Left
+            buttons = new_buttons;
+        }
+
         #if MOUSE_DEBUG_LOG_PACKETS
         if (mouse_debug_packets < 12 && (dx != 0 || dy != 0 || buttons != prev_buttons)) {
             serial_write_string("[MOUSE] Packet dx=");
@@ -162,6 +182,12 @@ void mouse_set_callback(mouse_callback_t callback) {
     active_callback = callback;
 }
 
-// Stubs para mantener compatibilidad con la shell
-void mouse_set_sensitivity(uint8_t sens) { (void)sens; }
-void mouse_set_handedness(bool left_handed) { (void)left_handed; }
+void mouse_set_sensitivity(uint8_t sens) {
+    if (sens < 1) sens = 1;
+    if (sens > 10) sens = 10;
+    mouse_sensitivity = sens;
+}
+
+void mouse_set_handedness(bool left_handed) {
+    mouse_left_handed = left_handed;
+}

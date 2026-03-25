@@ -59,6 +59,7 @@ static const shell_command_t commands[] = {
     { "cd",       "Cambia el directorio actual",                 cmd_cd      },
     { "pwd",      "Muestra el directorio actual",                cmd_pwd     },
     { "cat",      "Muestra el contenido de un archivo",          cmd_cat     },
+    { "panel",    "Abre el Panel de Control",                    cmd_panel   },
 };
 
 #define NUM_COMMANDS  (sizeof(commands) / sizeof(commands[0]))

@@ -58,3 +58,11 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 
 ## Mini-LibC POSIX (Review Run)
 **Estado**: Completado. Verificado que Mini-LibC implementa exitosamente las extensiones pedidas. Todos los tests de la pipeline de e2e para la C Library fueron aprobados.
+
+## Panel de Control - Dispositivos y Tiempo
+**Estado**: Completado.
+Se implementó y verificó el soporte de configuración de dispositivos y tiempo en el Panel de Control.
+- **Teclado**: Se validaron las llamadas a `keyboard_set_layout()` para distribuciones EN/ES y `keyboard_set_typematic()` para ajustes de retraso y tasa de repetición.
+- **Mouse**: Se implementaron en `mouse.c` las funciones `mouse_set_sensitivity()` con escalado en base a un umbral por defecto (5) y `mouse_set_handedness()` intercambiando las banderas binarias para zurdos/diestros en el driver PS/2.
+- **Almacenamiento**: Se validó el listado de A/B slots mediante `nvram_get_boot_partition()`, además del escaneo del tamaño del Initrd/VFS ramdisk con reportes de espacio.
+- **Tiempo**: RTC Y2K38 compliance (64-bit `time_t`) validado. Sincronización local, zonas horarias y cliente NTP funcional actualizando el RTC global del sistema. Tests exitosos.

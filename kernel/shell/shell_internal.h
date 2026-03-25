@@ -40,6 +40,7 @@ void cmd_cd(const char* args);
 void cmd_pwd(const char* args);
 void cmd_cat(const char* args);
 void cmd_wget(const char* args);
+void cmd_panel(const char* args);
 void cmd_user(const char* args);
 void cmd_test_compositor(const char* args);
 void wget_run(const char* url_in);
