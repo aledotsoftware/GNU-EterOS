@@ -111,21 +111,32 @@ void user_loader_entry(void) {
                            boot_info->fb_width != 0 &&
                            boot_info->fb_height != 0;
 
-    /* Try to load ELF from Initrd */
-    /* Primary: boot into Marea only when a framebuffer is available. */
-    if (have_framebuffer) {
-        entry_point = elf_load_file("marea_shell.elf", 0x200000000);
-        if (entry_point == 0) entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
-        if (entry_point != 0) {
-            program_name = "marea_shell";
+    /* Load login.elf as the primary entry point */
+    entry_point = elf_load_file("login.elf", 0x200000000);
+    if (entry_point == 0) entry_point = elf_load_file("/login.elf", 0x200000000);
+
+    if (entry_point != 0) {
+        program_name = "login";
+        /* We pass the preferred shell based on framebuffer availability */
+        if (have_framebuffer) {
+            program_name = "login marea_shell.elf";
+        } else {
+            serial_write_string("[USER] No framebuffer available, using text shell fallback.\n");
+            program_name = "login sh.elf";
         }
     } else {
-        serial_write_string("[USER] No framebuffer available, using text shell fallback.\n");
-    }
+        /* Fallback if login.elf isn't found for some reason */
+        if (have_framebuffer) {
+            entry_point = elf_load_file("marea_shell.elf", 0x200000000);
+            if (entry_point == 0) entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
+            if (entry_point != 0) program_name = "marea_shell";
+        }
 
-    if (entry_point == 0) {
-        entry_point = elf_load_file("sh.elf", 0x200000000);
-        if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
+        if (entry_point == 0) {
+            entry_point = elf_load_file("sh.elf", 0x200000000);
+            if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
+            if (entry_point != 0) program_name = "sh";
+        }
     }
 
     if (entry_point == 0) {

@@ -85,3 +85,11 @@ Se verificaron los requerimientos de la infraestructura de actualizaciones OTA:
 - El sistema escribe el payload verificado atómicamente en la partición inactiva (A o B) usando `partition_get_passive_root()` y actualiza el NVRAM (con `nvram_set_boot_partition`) solo si la escritura es exitosa.
 - Se ha comprobado que el estado de los slots activo/pasivo aparece correctamente en la salida de `sysinfo`.
 - Tests de compilación y emulación con QEMU completados con éxito sin provocar kernel panics.
+
+## Panel de Control - Usuarios y Seguridad
+**Estado**: Completado.
+El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
+- **Loader Principal Modificado**: Se ajustó `kernel/apps/user_loader.c` para arrancar siempre con `login.elf` y pasar el shell preferido como `argv[1]` dependiendo si existe o no framebuffer (e.g. `marea_shell.elf` vs `sh.elf`).
+- **Niveles de Privilegio (Root vs User)**: Se impidió el uso de comandos de Kernel (`kernel/shell/commands.c`) si el usuario activo no posee `UID 0` (`Root`), verificando dinámicamente con `task_get_current()->uid`.
+- **Sesión Automática**: Modificado el `login.c` para respetar el archivo `/etc/autologin` y realizar auto-login transparente de Root; las opciones pertinentes (ON/OFF) se agregaron visualmente al menú `Usuarios y Seguridad` del Kernel Control Panel (`cmd_panel.c`).
+- **Gestión de Cuentas (`/etc/shadow`)**: Las utilidades para administrar cuentas (`add`, `del`, `passwd`) con generación de contraseñas hasheadas en `SHA-256` fueron unificadas e inyectadas nativamente al comando shell base `user` dentro del Kernel, garantizando acceso directo de administración y persistencia en el VFS (`/etc/shadow`).
