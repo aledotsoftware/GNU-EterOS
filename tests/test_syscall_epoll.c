@@ -252,11 +252,12 @@ int main() {
         return 1;
     }
 
-    // Call sys_epoll_ctl on invalid fd
+    // Call sys_epoll_ctl on valid fd to satisfy stub validations
     struct epoll_event ev;
     memset(&ev, 0, sizeof(ev));
     ev.events = EPOLLIN;
-    ev.data = 4; // Not set up
+    ev.data = 4;
+    current_task_mock.fd_table[4].node = (fs_node_t*)kmalloc(sizeof(fs_node_t)); // Mock node 4
     int64_t ctl_res = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, 4, &ev);
     if (ctl_res == 0) {
         printf("PASSED: sys_epoll_ctl stub returned 0\n");

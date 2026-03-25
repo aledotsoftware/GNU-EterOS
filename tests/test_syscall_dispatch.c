@@ -81,6 +81,7 @@ __attribute__((weak)) void* pmm_alloc_page(void) { return NULL; }
 __attribute__((weak)) void pmm_unref_page(void* addr) {}
 __attribute__((weak)) void vmm_unmap_page(uint64_t virt_addr) {}
 __attribute__((weak)) int vmm_validate_user_ptr(const void* addr, size_t size) { return 1; }
+__attribute__((weak)) int vmm_check_user_string(const char* str, size_t max_len) { return 1; }
 __attribute__((weak)) int vmm_strncpy_from_user(char* dst, const char* src, size_t max) { return 0; }
 
 __attribute__((weak)) int net_socket(int domain, int type, int protocol) { return -1; }
