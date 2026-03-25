@@ -348,6 +348,14 @@ void scheduler_init(void) {
     serial_write_string("[SCHED] Scheduler Round-Robin inicializado\n");
 }
 
+/**
+ * @brief Initializes the scheduler for an Application Processor (AP).
+ *
+ * Creates a specific idle task for the current CPU core and prepares
+ * its local run queue.
+ *
+ * @return None.
+ */
 void task_init_ap(void) {
     /* Inicializar la tarea "Idle" para este AP */
     __asm__ volatile("cli");
@@ -428,7 +436,7 @@ void task_init_ap(void) {
  * and sets up the initial execution context to start at the given entry function.
  * The task is then added to the ready queue.
  *
- * @param name The name of the new task.
+ * @param name The name of the new task (for debugging).
  * @param entry Function pointer to the task's entry point.
  * @return The ID of the newly created task, or -1 if the max task limit is reached or out of memory.
  */
@@ -993,7 +1001,7 @@ int task_get_cpu_load(void) {
  * increasing reference counts. The child process returns 0 via RAX.
  *
  * @param regs_ptr Pointer to the syscall registers state to be restored on return.
- * @return The ID of the child process in the parent, or -1 on failure.
+ * @return The ID of the child process in the parent, or -1 on failure. Child returns 0 via RAX.
  */
 int task_fork(void* regs_ptr) {
     struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;

@@ -27,8 +27,12 @@ struct syscall_regs;
 #define KERNEL_STACK_GUARD_SIZE 4096  /* 4KB Guard Page */
 
 /**
- * Inicializa el scheduler para un Application Processor (AP).
- * Crea una tarea idle específica para este núcleo.
+ * @brief Initializes the scheduler for an Application Processor (AP).
+ *
+ * Creates a specific idle task for the current CPU core and prepares
+ * its local run queue.
+ *
+ * @return None.
  */
 void task_init_ap(void);
 
