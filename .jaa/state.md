@@ -66,3 +66,13 @@ Se implementó y verificó el soporte de configuración de dispositivos y tiempo
 - **Mouse**: Se implementaron en `mouse.c` las funciones `mouse_set_sensitivity()` con escalado en base a un umbral por defecto (5) y `mouse_set_handedness()` intercambiando las banderas binarias para zurdos/diestros en el driver PS/2.
 - **Almacenamiento**: Se validó el listado de A/B slots mediante `nvram_get_boot_partition()`, además del escaneo del tamaño del Initrd/VFS ramdisk con reportes de espacio.
 - **Tiempo**: RTC Y2K38 compliance (64-bit `time_t`) validado. Sincronización local, zonas horarias y cliente NTP funcional actualizando el RTC global del sistema. Tests exitosos.
+
+## Panel de Control - Visualización y Energía
+**Estado**: Completado.
+Se verificaron los requerimientos del módulo AetherGraphics y ACPI:
+- ACPI FADT parsing y `acpi_poweroff()` validados.
+- PNG parser nativo carga archivos correctamente sin crash (`png.c`).
+- Glassmorphism implementado en `window.c` usando blend rápido bitwise (`>> 8`).
+- Funcionalidad de Dark/Light mode toggle operativa (`flux_set_theme()`).
+- Temporizador de Screen Sleep habilitado tras 30s de inactividad, con reanudación mediante entrada.
+- Fallback para resolución dinámica añadida (`// TODO: dynamic resolution requires GOP protocol support`).
