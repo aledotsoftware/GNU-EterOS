@@ -332,6 +332,11 @@ userspace:
 	cp userspace/sh.elf $(INITRD_DIR)/
 	cp userspace/marea_shell.elf $(INITRD_DIR)/
 	cp userspace/eterland.elf $(INITRD_DIR)/
+	cp userspace/test_pthread.elf $(INITRD_DIR)/
+	cp userspace/test_malloc.elf $(INITRD_DIR)/
+	cp userspace/test_stdio.elf $(INITRD_DIR)/
+	cp userspace/test.elf $(INITRD_DIR)/
+	cp userspace/exec_test.elf $(INITRD_DIR)/
 
 # ---- Initrd ----
 initrd: $(INITRD_IMG)

@@ -28,6 +28,12 @@ This file documents known bugs, vulnerabilities, and testing issues in the éter
     *   **Fix:** Added a check for `FS_DIRECTORY` against write-mode flags. Returns `-EISDIR`.
     *   **Regression Test:** `tests/test_sys_open.c`
 
+*   **Warning: Unused parameter warnings in `kernel/arch/x86_64/syscall.c`**
+    *   **Status:** Resolved
+    *   **Description:** Syscall functions `sys_utimensat` and `sys_epoll_ctl` defined unused parameters causing compiler warnings (`[-Wunused-parameter]`).
+    *   **Fix:** Explicitly cast unused parameters to `(void)` inside the implementations.
+    *   **Regression Test:** Compile with `make all` checking for `[-Wunused-parameter]` in `syscall.c`.
+
 ## Open Issues
 
 *   (None currently tracked.)

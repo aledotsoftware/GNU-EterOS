@@ -338,3 +338,8 @@ echo "Running test_wget_parse_url..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_wget_parse_url.c kernel/string.c -o tests/test_wget_parse_url
 ./tests/test_wget_parse_url
 rm tests/test_wget_parse_url
+echo "---------------------------------------------------"
+echo "Running test_syscall_utimensat..."
+gcc -D__ETEROS_HOST_TEST__ tests/test_syscall_utimensat.c -o tests/test_syscall_utimensat
+./tests/test_syscall_utimensat
+rm tests/test_syscall_utimensat
