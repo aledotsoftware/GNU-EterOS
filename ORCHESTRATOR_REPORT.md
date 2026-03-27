@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
-**Fecha:** 2026-03-25
-**Commit:** 26a1cda19bf750b39ea1438ef4f720fe6a20c85b
+**Fecha:** 2026-03-27
+**Commit:** 911bf1b09f62d87c23becbb2f3235656542fe735
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA
 
@@ -26,12 +26,12 @@
 | Tests | ✅ | Compilan correctamente los binarios en userspace |
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `graphics-power-panel-bot` — Razón: Marea Shell Desktop arranca pero falta verificación y enriquecimiento del stack gráfico y manejo de ACPI.
-2. `devices-time-panel-bot` — Razón: Para asegurar correcta integración de RTC, input (ratón inicializado, falta más test) y NTP para tiempo real en UI.
-3. `network-control-panel-bot` — Razón: Validar funcionamiento completo del stack de red para aplicaciones de usuario (wget, etc.) tras la detección del E1000.
+1. `ota-update-panel-bot` — Razón: Finalizar la robustez del sistema de slots A/B, el comando OTA ya está integrado y funcional pero requiere validaciones más amplias de red para entornos reales.
+2. `graphics-power-panel-bot` — Razón: Expandir UI base de Marea, enriquecer el stack gráfico (ya hay prototipos de window alpha blending, pero el uso real es limitado) y trabajar en suspensión ACPI.
+3. `linux-syscall-compliance-bot` — Razón: Escalar el número de Syscalls y portar Busybox o Apache en ring 3 para demostrar usabilidad real de tipo Linux.
 
 ## Correcciones de Integración Aplicadas
-- Ninguna requerida en la ejecución base. El sistema bootea y transiciona correctamente al userspace (Marea Shell).
+- Ninguna requerida en la ejecución base. El sistema bootea y transiciona correctamente al userspace (Marea Shell). Los paneles de control (Tiempo, Dispositivos, Usuarios, Red) fueron verificados como operativos en ring 0.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
