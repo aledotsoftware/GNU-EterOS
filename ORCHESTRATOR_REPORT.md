@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-27
-**Commit:** 7c247f5506e31cf93f56a91c64ac44ca2f65096b
+**Commit:** 5283ec00728e845f6a85e698d92a53f8ce981b15
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
@@ -12,26 +12,6 @@
 ## Estado por Módulo (Basado en Auditoría Actual)
 | Módulo | Estado | Notas |
 |---|---|---|
-| boot.asm | ✅ | Carga kernel + initrd, entra a Long Mode |
-| kmain() → hal_init() | ✅ | Secuencia completa sin crash |
-| PMM | ✅ | E820 parseado, bitmap correcto |
-| VMM | ✅ | Identity map, CoW funcional |
-| Heap | ✅ | kmalloc/kfree sin corruption |
-| Scheduler | ✅ | fork/exit/waitpid/clone funcionales |
-| VFS | ✅ | open/read/write/close/openat/getdents64 |
-| Syscall Table | ✅ | ≥70 syscalls, dispatch correcto |
-| ELF Loader | ✅ | Carga binarios estáticos x86_64 |
-| Userspace | ✅ | sh.elf arranca en Ring 3 |
-| Networking | ✅ | lwIP init + DHCP + sockets básicos |
-| Tests | ✅ | Todos pasan (0 failures) |
-
-## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `kernel-stability-boot-bot` — Razón: Verificación de estabilidad y hardening base.
-2. `scheduler-smp-ipc-bot` — Razón: Validación de IPC y concurrencia.
-3. `vfs-posix-filesystem-bot` — Razón: Confirmación de APIs POSIX VFS.
-
-## Correcciones de Integración Aplicadas
-- Aplicado fix de unused parameter `esp0` en `write_tss` dentro de `kernel/arch/x86_64/gdt.c` con directiva explícita `(void)esp0`.
 | boot.asm | ✅ | Carga kernel + initrd, entra a Long Mode. Detectado 1 CPU, RAM 127MB. |
 | kmain() → hal_init() | ✅ | Secuencia completa sin crash. PIT a 100Hz, ACPI/MADT parseados. |
 | PMM & VMM | ✅ | E820 parseado, bitmap correcto. VMM Identity map y nuevas tablas funcionales. |
@@ -45,6 +25,7 @@
 | Shell y Paneles | ✅ | Comandos base (ota, panel, user, time, dev) compilados y linkeados. |
 | Tests | ✅ | Compilan correctamente todos los binarios y pipelines en userspace y kernel. |
 
+
 ## Brechas y Riesgos Observados (Hacia "GNU sobre Eter")
 - **Resolución DNS Nativa:** A pesar del stack lwIP funcional, falta la integración DNS con el VFS (Blocker crónico) para resolver hostnames en vez de IPs harcodeadas (ej. para NTP y OTA).
 - **Cargador ELF (Bibliotecas Compartidas):** Actualmente asume binarios enlazados estáticamente. Para ejecutar utilidades GNU reales (coreutils, busybox) de forma eficiente se requiere soportar `.so` e intérpretes dinámicos.
@@ -56,7 +37,7 @@
 3. `network-socket-api-bot` — Razón: Resolver la resolución DNS nativa. Exponer el DNS de lwIP a nivel de sistema habilitará al sistema para descargas de repositorios GNU reales usando hostnames.
 
 ## Correcciones de Integración Aplicadas
-- Se aplicó un fix menor en `kernel/arch/x86_64/gdt.c` para resolver una advertencia/error de variable sin usar (`esp0`), usando `(void)esp0;` y previniendo que `make` fallase (tratamiento de warnings como errores por `-Werror` o flags estrictas implícitas en `-Wall -Wextra`).
+- Ninguna requerida en la ejecución actual.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
@@ -72,3 +53,4 @@
 | GNU Desktop sobre Eter | ❌ | Requiere maduración de syscalls + X11/Wayland bridge |
 | Apache httpd sirve HTML | ❌ | Falta empaquetar y robustez total en Sockets/VFS |
 | Android Base (Binder) | ❌ | Requiere finalización del objetivo Linux-Subsystem primero |
+| GNU sobre Eter | ❌ | Requiere maduración de syscalls |
