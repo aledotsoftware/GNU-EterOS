@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-27
-**Commit:** 7c247f5506e31cf93f56a91c64ac44ca2f65096b
+**Commit:** 5283ec00728e845f6a85e698d92a53f8ce981b15
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
@@ -31,14 +31,18 @@
 3. `vfs-posix-filesystem-bot` — Razón: Confirmación de APIs POSIX VFS.
 
 ## Correcciones de Integración Aplicadas
-- Aplicado fix de unused parameter `esp0` en `write_tss` dentro de `kernel/arch/x86_64/gdt.c` con directiva explícita `(void)esp0`.
+- Ninguna necesaria en este ciclo. El fix de parameter `esp0` anterior probó ser exitoso y persistente.
+
+## Estado por Módulo (Extendido y Profundo)
+| Módulo | Estado | Notas |
+|---|---|---|
 | boot.asm | ✅ | Carga kernel + initrd, entra a Long Mode. Detectado 1 CPU, RAM 127MB. |
 | kmain() → hal_init() | ✅ | Secuencia completa sin crash. PIT a 100Hz, ACPI/MADT parseados. |
 | PMM & VMM | ✅ | E820 parseado, bitmap correcto. VMM Identity map y nuevas tablas funcionales. |
 | Heap | ✅ | kmalloc/kfree inicializado dinámicamente sin corrupción (96MB heap). |
 | Scheduler & Futex | ✅ | Round-Robin inicializado, Futex listos. |
 | VFS | ✅ | Initrd montado (`/`), mkdir funciona (`/dev`, `/proc`, `/tmp`, `/data`, `/gnu`). JFS inicializado. |
-| Syscall Table | ✅ | x86_64 mechanism enabled. Intercepción de syscalls Linux operativa. |
+| Syscall Table | ✅ | x86_64 mechanism enabled. Intercepción de syscalls Linux operativa (~70). |
 | ELF Loader | ✅ | Carga `login.elf` correctamente (Linux ABI) ignorando offset base. Salto exitoso a Ring 3. |
 | Userspace | ✅ | Login interactivo arranca con éxito en Ring 3. |
 | Networking | ✅ | Driver E1000 detectado y stack lwIP iniciado. Tarea de red creada y activa. |
