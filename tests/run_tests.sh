@@ -345,3 +345,10 @@ echo "Running test_wget_parse_url..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_wget_parse_url.c kernel/string.c -o tests/test_wget_parse_url
 ./tests/test_wget_parse_url
 rm tests/test_wget_parse_url
+
+# Test VFS Normalize Path
+echo "---------------------------------------------------"
+echo "Running test_vfs_normalize_path..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_normalize_path.c -o tests/test_vfs_normalize_path
+./tests/test_vfs_normalize_path
+rm tests/test_vfs_normalize_path
