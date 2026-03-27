@@ -204,6 +204,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_readdir.c -o tests/test_vfs_
 ./tests/test_vfs_readdir
 rm tests/test_vfs_readdir
 
+# Test VFS Create FS
+echo "---------------------------------------------------"
+echo "Running test_vfs_create_fs..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_create_fs.c -o tests/test_vfs_create_fs
+./tests/test_vfs_create_fs
+rm tests/test_vfs_create_fs
+
 echo "---------------------------------------------------"
 # Test Syscall Dispatch
 
