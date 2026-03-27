@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-27
-**Commit:** 7c247f5506e31cf93f56a91c64ac44ca2f65096b
+**Commit:** 5283ec00728e845f6a85e698d92a53f8ce981b15
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
@@ -26,9 +26,9 @@
 | Tests | ✅ | Todos pasan (0 failures) |
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `kernel-stability-boot-bot` — Razón: Verificación de estabilidad y hardening base.
-2. `scheduler-smp-ipc-bot` — Razón: Validación de IPC y concurrencia.
-3. `vfs-posix-filesystem-bot` — Razón: Confirmación de APIs POSIX VFS.
+1. `linux-syscall-compliance-bot` — Razón: Prioritario para la meta de "GNU sobre Eter". Aumentar cobertura de syscalls x86_64 para habilitar la compatibilidad progresiva de binarios de escritorio complejos (ej. bash, coreutils).
+2. `aether-linux-subsystem-bot` — Razón: Mejorar la capa de traducción ABI. Relacionado con syscall-compliance, es necesario para soportar las peculiaridades de libc/GNU sin tener que recompilarlas, sentando base para un `init` system más robusto.
+3. `network-socket-api-bot` — Razón: Resolver la resolución DNS nativa. Exponer el DNS de lwIP a nivel de sistema habilitará al sistema para descargas de repositorios GNU reales usando hostnames.
 
 ## Correcciones de Integración Aplicadas
 - Aplicado fix de unused parameter `esp0` en `write_tss` dentro de `kernel/arch/x86_64/gdt.c` con directiva explícita `(void)esp0`.
