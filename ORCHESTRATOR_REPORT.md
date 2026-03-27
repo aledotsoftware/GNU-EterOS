@@ -1,13 +1,13 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-27
-**Commit:** b7e76e03bc96c3dbd0771b81fab2d3db2520d01e
-**Estado de build:** ✅ COMPILA (0 errores tras aplicar fix)
+**Commit:** 28686562f5bfde575ed2f43a53e8360590050980
+**Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA
 
 ## Errores de Compilación
 | # | Tipo | Archivo | Línea | Error | Agente Responsable |
 |---|---|---|---|---|---|
-| 1 | Warning/Error | `kernel/arch/x86_64/syscall.c` | 934, 1820 | unused parameter ‘flags’/‘op’ | `orchestrator-meta-agent` (Resuelto) |
+| - | Ninguno | N/A | N/A | N/A | N/A |
 
 ## Estado por Módulo
 | Módulo | Estado | Notas |
@@ -31,7 +31,7 @@
 3. `network-socket-api-bot` — Razón: Resolver "Blocker 1" (Resolución DNS Nativa). Necesario para exponer lwIP DNS al VFS, desbloqueando `ntp` y `ota` dinámicos basados en hostnames, clave para robustez.
 
 ## Correcciones de Integración Aplicadas
-- Se aplicó `__attribute__((unused))` a parámetros no utilizados en `sys_utimensat` y `sys_epoll_ctl` dentro de `kernel/arch/x86_64/syscall.c` para prevenir que fallos del compilador detengan los builds de CI/CD.
+- Ninguna requerida en este ciclo.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
