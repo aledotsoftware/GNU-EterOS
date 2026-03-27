@@ -1,3 +1,0 @@
-1. Refactor `kernel/main.c` kernel banner to use Premium Aesthetics (Austral Aurora theme).
-2. Clean up redundant `#include`s in `kernel/main.c`.
-3. Add Doxygen comments to critical scheduler functions in `kernel/task.c`.

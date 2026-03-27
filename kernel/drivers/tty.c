@@ -100,6 +100,11 @@ static int tty_ioctl(fs_node_t *node, int request, void *arg) {
             memcpy(&tty_state->termios_state, t, sizeof(struct termios));
             return 0;
         }
+        case FIONREAD: {
+            int *bytes = (int *)arg;
+            *bytes = keyboard_has_input() ? 1 : 0;
+            return 0;
+        }
         default:
             return -EINVAL;
     }

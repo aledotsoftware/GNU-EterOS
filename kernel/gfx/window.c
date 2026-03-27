@@ -272,6 +272,12 @@ int display_sleep_mode = 0;
 uint64_t last_input_ticks = 0;
 int dark_mode_enabled = 1;
 
+void gfx_set_resolution(uint32_t width, uint32_t height) {
+    (void)width;
+    (void)height;
+    // TODO: dynamic resolution requires GOP protocol support
+}
+
 void flux_set_theme(int is_dark) {
     dark_mode_enabled = is_dark;
     gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());

@@ -2,6 +2,7 @@
 #define _UNISTD_H
 
 #include <stdint.h>
+#include <stdarg.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 
@@ -32,11 +33,13 @@
 #define X_OK    1
 
 /* File I/O */
-int open(const char *pathname, int flags);
+int open(const char *pathname, int flags, ...);
+int creat(const char *pathname, mode_t mode);
 int close(int fd);
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 int64_t lseek(int fd, int64_t offset, int whence);
+int mkdir(const char *pathname, mode_t mode);
 int unlink(const char *pathname);
 int rmdir(const char *pathname);
 int ftruncate(int fd, int64_t length);
@@ -55,6 +58,7 @@ void exit(int status);
 int pipe(int pipefd[2]);
 int dup2(int oldfd, int newfd);
 int access(const char *pathname, int mode);
+int chdir(const char *pathname);
 
 /* Memory */
 void *brk(void *addr);

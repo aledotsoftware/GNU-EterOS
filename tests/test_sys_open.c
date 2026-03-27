@@ -227,6 +227,7 @@ int main() {
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
     current_task_mock.id = 1;
+    current_task_mock.fd_table = current_task_mock.fd_table_internal;
 
     // Test case: Open directory for writing
     printf("Attempting to open directory '/some/dir' with O_WRONLY...\n");

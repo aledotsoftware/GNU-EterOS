@@ -105,15 +105,13 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) {
     task_t *current = task_get_current();
 
     if (has_timeout) {
-        current->wake_tick = target_tick;
+        task_block_with_timeout(target_tick);
     } else {
         current->wake_tick = 0;
-    }
-
-    current->state = TASK_BLOCKED;
-
-    if (has_timeout) {
-        task_block_with_timeout(target_tick);
+        /* Manually block if no timeout since task_block_with_timeout adds to sleep queue */
+        /* To properly block without timeout, we can set state and just yield, but must ensure we are removed from ready queue */
+        /* The schedule() function will remove us from ready queue if state != TASK_RUNNING */
+        current->state = TASK_BLOCKED;
     }
 
     spin_unlock(&b->lock);

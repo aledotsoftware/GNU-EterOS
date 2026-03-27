@@ -53,6 +53,23 @@ void framebuffer_init(boot_info_t* info) {
     serial_write_string(" mapped to Virtual: ");
     utoa_hex_s((uint64_t)fb_buffer, buf, sizeof(buf));
     serial_write_string(buf);
+    serial_write_string(" size=");
+    utoa_hex_s((uint64_t)fb_size_bytes, buf, sizeof(buf));
+    serial_write_string(buf);
+    serial_write_string("\n");
+
+    serial_write_string("[FB] Mode: ");
+    utoa_hex_s(fb_width, buf, sizeof(buf));
+    serial_write_string(buf);
+    serial_write_string("x");
+    utoa_hex_s(fb_height, buf, sizeof(buf));
+    serial_write_string(buf);
+    serial_write_string(" bpp=");
+    utoa_hex_s(fb_bpp, buf, sizeof(buf));
+    serial_write_string(buf);
+    serial_write_string(" pitch=");
+    utoa_hex_s(fb_pitch, buf, sizeof(buf));
+    serial_write_string(buf);
     serial_write_string("\n");
 
     /* Default to front buffer */

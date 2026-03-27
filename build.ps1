@@ -224,6 +224,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\shell\cmd_devices.c",
     "$KERNEL_DIR\shell\cmd_time.c",
     "$KERNEL_DIR\shell\cmd_user.c",
+    "$KERNEL_DIR\shell\cmd_panel.c",
     "$KERNEL_DIR\drivers\video\vga.c",
     "$KERNEL_DIR\drivers\video\framebuffer.c",
     "$KERNEL_DIR\drivers\video\font.c",
@@ -344,6 +345,49 @@ function Initialize-BuildDirs {
     }
 }
 
+function Get-SectorCount {
+    param([long]$SizeBytes)
+
+    if ($SizeBytes -le 0) { return 0 }
+    return [int][Math]::Ceiling($SizeBytes / 512.0)
+}
+
+function Get-KernelSectorCount {
+    $kernelPath = Join-Path (Get-Location) $KERNEL_BIN
+    if (!(Test-Path $kernelPath)) { return 0 }
+    return Get-SectorCount ((Get-Item $kernelPath).Length)
+}
+
+function Get-InitrdSectorCount {
+    $initrdPath = Join-Path (Get-Location) "$BUILD_DIR\initrd.bin"
+    if (!(Test-Path $initrdPath)) { return 0 }
+    return Get-SectorCount ((Get-Item $initrdPath).Length)
+}
+
+function Get-BootAsmDefines {
+    if ($Arch -ne "x86_64") {
+        return @()
+    }
+
+    $defines = @()
+    $kernelPath = Join-Path (Get-Location) $KERNEL_BIN
+    if (Test-Path $kernelPath) {
+        $kernelSize = (Get-Item $kernelPath).Length
+        $kernelSectors = Get-SectorCount $kernelSize
+        $defines += "-dKERNEL_SECTORS=$kernelSectors"
+    }
+
+    $initrdPath = Join-Path (Get-Location) "$BUILD_DIR\initrd.bin"
+    if (Test-Path $initrdPath) {
+        $initrdSize = (Get-Item $initrdPath).Length
+        $initrdSectors = Get-SectorCount $initrdSize
+        $defines += "-dINITRD_SECTORS=$initrdSectors"
+        $defines += "-dINITRD_SIZE_BYTES=$initrdSize"
+    }
+
+    return $defines
+}
+
 function Invoke-BootBuild {
     Write-Step "ASM" $BOOT_SRC
     if ($Arch -eq "aarch64") {
@@ -352,7 +396,11 @@ function Invoke-BootBuild {
         & $CC $CFLAGS -c $BOOT_SRC -o "$BUILD_DIR\boot.o"
     }
     else {
-        & $AS -f bin $BOOT_SRC -o $BOOT_BIN
+        $bootDefines = Get-BootAsmDefines
+        if ($Target -eq "vbox") {
+            $bootDefines += "-dDISABLE_VBE"
+        }
+        & $AS -f bin @bootDefines $BOOT_SRC -o $BOOT_BIN
     }
 
     if ($LASTEXITCODE -ne 0) {
@@ -433,7 +481,6 @@ function Invoke-UserspaceBuild {
     $libcSrc = "$userDir\libc\src"
     $libcObjDir = "$BUILD_DIR\userspace\libc"
     $initrdRoot = "initrd_root"
-
     if (!(Test-Path $libcObjDir)) { New-Item -ItemType Directory -Force -Path $libcObjDir | Out-Null }
     if (!(Test-Path $initrdRoot)) { New-Item -ItemType Directory -Force -Path $initrdRoot | Out-Null }
 
@@ -473,6 +520,19 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test.elf"; exit 1 }
 
+    # sh.elf
+    $shSrc = "$userDir\sh.c"
+    $shObj = "$BUILD_DIR\userspace\sh.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $shSrc -o $shObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar sh.c"; exit 1 }
+
+    $shElf = "$initrdRoot\sh.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $shElf $shObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar sh.elf"; exit 1 }
+
     # eterland.elf
     $eterlandSrc = "$userDir\eterland.c"
     $eterlandObj = "$BUILD_DIR\userspace\eterland.o"
@@ -499,7 +559,20 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar marea_shell.elf"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $eterlandElf, $mareaShellElf"
+    # apt-get.elf
+    $aptGetSrc = "$userDir\apt_get.c"
+    $aptGetObj = "$BUILD_DIR\userspace\apt_get.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $aptGetSrc -o $aptGetObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar apt_get.c"; exit 1 }
+
+    $aptGetElf = "$initrdRoot\apt-get.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $aptGetElf $aptGetObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar apt-get.elf"; exit 1 }
+
+    Write-Step "OK" "Userspace construido: $testElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf"
 }
 
 function Invoke-InitrdBuild {
@@ -512,6 +585,11 @@ function Invoke-InitrdBuild {
 
     Write-Step "BIN" "Generando Initrd.bin..."
     & python tools/gen_logo.py
+    if (Test-Path "$initrdSrc\logo.raw") {
+        # El splash raw no se usa en el arranque actual y ocupa demasiado initrd
+        # para el buffer BIOS de VirtualBox.
+        Remove-Item -Force "$initrdSrc\logo.raw"
+    }
     & python tools/mkinitrd.py $initrdSrc $initrdBin
     if ($LASTEXITCODE -ne 0) {
         Write-Step "ERR" "Fallo al generar Initrd (Asegurate de tener Python instalado)"
@@ -561,14 +639,12 @@ function Invoke-ImageBuild {
     $kernelOffset = 17 * 512
     [System.Array]::Copy($kernelData, 0, $imageData, $kernelOffset, $kernelData.Length)
 
-    # Leer el Initrd y copiarlo después del kernel
-    # El bootloader espera el initrd en el sector después del kernel (Sector 1 + 16 + 512 = 529)
+    # Leer el Initrd y copiarlo después del kernel real.
     $initrdPath = "$BUILD_DIR\initrd.bin"
     if (Test-Path $initrdPath) {
         $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
-        # El offset debe ser mayor que el final del kernel. Usamos un offset fijo seguro.
-        # En x84_64-elf-gcc el kernel suele ser pequeño (<256KB), pero dejamos 512 sectores (256KB) para el kernel.
-        $initrdOffset = (1 + 16 + 512) * 512
+        $kernelSectors = Get-KernelSectorCount
+        $initrdOffset = (1 + 16 + $kernelSectors) * 512
         if ($initrdOffset + $initrdData.Length -le $imageSize) {
             [System.Array]::Copy($initrdData, 0, $imageData, $initrdOffset, $initrdData.Length)
             Write-Step "OK" "Initrd inyectado en la imagen."
@@ -631,16 +707,21 @@ function Invoke-VdiBuild {
 
 function Invoke-PxeBuild {
     Write-Step "PXE" "Generando imagen PXE (Monolitica)..."
-    
-    # 1. Compilar Bootloader con flag PXE
-    Write-Step "ASM" "boot.asm (MODO PXE)"
-    & $AS -f bin $BOOT_SRC -dPXE -o "$BUILD_DIR\boot_pxe.bin"
-    
-    # 2. Asegurar que tenemos Kernel e Initrd construidos
+
+    # 1. Asegurar que tenemos Kernel e Initrd construidos
     Invoke-KernelBuild
     Invoke-UserspaceBuild
     Invoke-InitrdBuild
-    
+
+    # 2. Compilar Bootloader con flag PXE y tamaño real del initrd
+    Write-Step "ASM" "boot.asm (MODO PXE)"
+    $bootDefines = Get-BootAsmDefines
+    & $AS -f bin @bootDefines $BOOT_SRC -dPXE -o "$BUILD_DIR\boot_pxe.bin"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Step "ERR" "Fallo al ensamblar el bootloader PXE"
+        exit 1
+    }
+
     # 3. Ensamblar la imagen monolitica (igual que Invoke-ImageBuild)
     $pxePath = "$BUILD_DIR\eteros.pxe"
     $imageSize = 2880 * 512
@@ -662,7 +743,11 @@ function Invoke-PxeBuild {
     }
     
     # Escribir el archivo final (truncado al tamaño real ocupado para ahorrar TFTP bandwidth)
-    $actualSize = (1 + 16 + 512 + 64) * 512 # MBR + S2 + KERN + INITRD_MAX
+    $kernelSectors = Get-KernelSectorCount
+    $actualSize = (1 + 16 + $kernelSectors) * 512
+    if (Test-Path $initrdPath) {
+        $actualSize += (Get-Item $initrdPath).Length
+    }
     $pxeData = New-Object byte[] $actualSize
     [System.Array]::Copy($imageData, 0, $pxeData, 0, $actualSize)
     
@@ -673,12 +758,10 @@ function Invoke-PxeBuild {
 
 function Invoke-UsbBuild {
     Write-Step "IMG" "Generando imagen USB HDD (32MB)..."
-    Invoke-BootBuild
-    Invoke-KernelBuild
-    Invoke-BootBuild
     Invoke-KernelBuild
     Invoke-UserspaceBuild
     Invoke-InitrdBuild
+    Invoke-BootBuild
     
     # Tamaño fijo de 32MB para asegurar compatibilidad con Etcher/BIOS
     $imagePath = "$BUILD_DIR\eteros_usb.img"
@@ -698,11 +781,12 @@ function Invoke-UsbBuild {
     $kernelData = [System.IO.File]::ReadAllBytes($kernelPath)
     [System.Array]::Copy($kernelData, 0, $imageData, 17 * 512, $kernelData.Length)
     
-    # 4. Initrd 
+    # 4. Initrd
     $initrdPath = "$BUILD_DIR\initrd.bin"
     if (Test-Path $initrdPath) {
         $initrdData = [System.IO.File]::ReadAllBytes($initrdPath)
-        $initrdOffset = (1 + 16 + 512) * 512
+        $kernelSectors = Get-KernelSectorCount
+        $initrdOffset = (1 + 16 + $kernelSectors) * 512
         [System.Array]::Copy($initrdData, 0, $imageData, $initrdOffset, $initrdData.Length)
     }
     
@@ -721,12 +805,10 @@ function Invoke-IsoBuild {
     Write-Step "ISO" "Generando ISO bootable (El Torito)..."
     
     # Asegurar que tenemos la imagen base
-    Invoke-BootBuild
-    Invoke-KernelBuild
-    Invoke-BootBuild
     Invoke-KernelBuild
     Invoke-UserspaceBuild
     Invoke-InitrdBuild
+    Invoke-BootBuild
     Invoke-ImageBuild
     
     $isoRoot = "$BUILD_DIR\iso_root"
@@ -778,8 +860,9 @@ function Invoke-VBoxRun {
         # Desmontar disco anterior
         & $VBOXMANAGE storageattach $vmName --storagectl "SATA" --port 0 --device 0 --medium none 2>&1 | Out-Null
 
-        # Asegurar tipo de red E1000 y el uso del mouse PS/2
-        & $VBOXMANAGE modifyvm $vmName --nic1 nat --nictype1 82540EM --mouse ps2 2>&1 | Out-Null
+        # Usar una configuracion de video conservadora para BIOS/VBE.
+        & $VBOXMANAGE modifyvm $vmName --memory 768 --cpus 1 --vram 64 --graphicscontroller VBoxVGA --accelerate3d off --firmware bios --nic1 nat --nictype1 82540EM --mouse ps2 --keyboard ps2 --uart1 0x3F8 4 --uartmode1 file "$((Get-Location).Path)\build\$Arch\serial.log" 2>&1 | Out-Null
+        & $VBOXMANAGE setextradata $vmName "CustomVideoMode1" "1024x768x32" 2>&1 | Out-Null
 
         # Cerrar medio anterior si existe  
         & $VBOXMANAGE closemedium disk $vdiPath 2>&1 | Out-Null
@@ -815,11 +898,13 @@ function Invoke-VBoxRun {
         $longMode = if ($Arch -eq "x86_64") { "on" } else { "off" }
         
         & $VBOXMANAGE modifyvm $vmName `
-            --memory 128 `
+            --memory 768 `
             --cpus 1 `
+            --vram 64 `
             --firmware bios `
             --long-mode $longMode `
             --graphicscontroller VBoxVGA `
+            --accelerate3d off `
             --nic1 nat `
             --nictype1 82540EM `
             --audio-driver none `
@@ -827,6 +912,7 @@ function Invoke-VBoxRun {
             --keyboard ps2 `
             --uart1 0x3F8 4 `
             --uartmode1 file "$((Get-Location).Path)\build\$Arch\serial.log" 2>&1 | Out-Null
+        & $VBOXMANAGE setextradata $vmName "CustomVideoMode1" "1024x768x32" 2>&1 | Out-Null
 
         # Crear controladora SATA
         & $VBOXMANAGE storagectl $vmName --name "SATA" --add sata --controller IntelAhci --portcount 1 2>&1 | Out-Null
@@ -839,7 +925,7 @@ function Invoke-VBoxRun {
 
         $ErrorActionPreference = "Stop"
 
-        Write-Step "OK" "VM '$vmName' creada (BIOS, 128MB, disco: $OS_VDI)"
+        Write-Step "OK" "VM '$vmName' creada (BIOS, 768MB RAM, 1 CPU, video VMSVGA, disco: $OS_VDI)"
     }
 
     # Iniciar la VM
@@ -857,7 +943,7 @@ function Invoke-QemuRun {
 
     $qemuArgs = @(
         "-drive", "format=raw,file=$OS_IMAGE,index=0,media=disk",
-        "-m", "128M",
+        "-m", "512M",
         "-no-reboot",
         "-no-shutdown"
     )
@@ -937,10 +1023,10 @@ Write-Host ""
 switch ($Target) {
     "all" {
         Initialize-BuildDirs
-        Invoke-BootBuild
         Invoke-KernelBuild
         Invoke-UserspaceBuild
         Invoke-InitrdBuild
+        Invoke-BootBuild
         Invoke-ImageBuild
         Invoke-VdiBuild
         if ($MKISOFS) { Invoke-IsoBuild }
@@ -972,54 +1058,54 @@ switch ($Target) {
     }
     "image" {
         Initialize-BuildDirs
-        Invoke-BootBuild
         Invoke-KernelBuild
         Invoke-UserspaceBuild
         Invoke-InitrdBuild
+        Invoke-BootBuild
         Invoke-ImageBuild
     }
     "run" {
         Initialize-BuildDirs
-        Invoke-BootBuild
         Invoke-KernelBuild
         Invoke-UserspaceBuild
         Invoke-InitrdBuild
+        Invoke-BootBuild
         Invoke-ImageBuild
         Invoke-QemuRun
     }
     "run-nographic" {
         Initialize-BuildDirs
-        Invoke-BootBuild
         Invoke-KernelBuild
         Invoke-UserspaceBuild
         Invoke-InitrdBuild
+        Invoke-BootBuild
         Invoke-ImageBuild
         Invoke-QemuRun -NoGraphic $true
     }
     "debug" {
         Initialize-BuildDirs
-        Invoke-BootBuild
         Invoke-KernelBuild
         Invoke-UserspaceBuild
         Invoke-InitrdBuild
+        Invoke-BootBuild
         Invoke-ImageBuild
         Invoke-QemuRun -DebugMode $true
     }
     "vdi" {
         Initialize-BuildDirs
-        Invoke-BootBuild
         Invoke-KernelBuild
         Invoke-UserspaceBuild
         Invoke-InitrdBuild
+        Invoke-BootBuild
         Invoke-ImageBuild
         Invoke-VdiBuild
     }
     "vbox" {
         Initialize-BuildDirs
-        Invoke-BootBuild
         Invoke-KernelBuild
         Invoke-UserspaceBuild
         Invoke-InitrdBuild
+        Invoke-BootBuild
         Invoke-ImageBuild
         Invoke-VBoxRun
     }

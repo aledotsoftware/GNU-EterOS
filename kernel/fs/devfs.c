@@ -7,11 +7,42 @@
 #include <vga.h>
 #include <input/event.h>
 #include <lock.h>
+#include <ioctl.h>
 #include <crypto/sha256.h>
 #include <framebuffer.h>
+#include <serial.h>
 
 /* Global root node for DevFS */
 static fs_node_t* devfs_root = NULL;
+static uint32_t dev_mouse_read_debug = 0;
+
+static void devfs_debug_write_i32(int32_t value) {
+    char buf[16];
+    int i = 0;
+    uint32_t magnitude;
+
+    if (value == 0) {
+        serial_write_string("0");
+        return;
+    }
+
+    if (value < 0) {
+        serial_write_string("-");
+        magnitude = (uint32_t)(-value);
+    } else {
+        magnitude = (uint32_t)value;
+    }
+
+    while (magnitude > 0 && i < (int)sizeof(buf)) {
+        buf[i++] = (char)('0' + (magnitude % 10));
+        magnitude /= 10;
+    }
+
+    while (i-- > 0) {
+        char out[2] = { buf[i], '\0' };
+        serial_write_string(out);
+    }
+}
 
 /* ========================================================================= */
 /* /dev/null Implementation                                                  */
@@ -75,6 +106,16 @@ static ssize_t dev_event_read(fs_node_t *node, uint32_t offset, uint32_t size, u
     return read * sizeof(input_event_t);
 }
 
+static int dev_event_ioctl(fs_node_t *node, int request, void *arg) {
+    (void)node;
+    if (!arg) return -1;
+    if (request == FIONREAD) {
+        *(int*)arg = input_pending() * (int)sizeof(input_event_t);
+        return 0;
+    }
+    return -1;
+}
+
 /* ========================================================================= */
 /* /dev/input/mouse0 Implementation                                          */
 /* ========================================================================= */
@@ -86,7 +127,29 @@ static ssize_t dev_mouse_read(fs_node_t *node, uint32_t offset, uint32_t size, u
     int count = size / sizeof(input_event_t);
     int read = input_read_mouse((input_event_t*)buffer, count);
 
+    if (read > 0 && dev_mouse_read_debug < 12) {
+        input_event_t *ev = (input_event_t*)buffer;
+        serial_write_string("[DEVFS] mouse0 read type=");
+        devfs_debug_write_i32(ev[0].type);
+        serial_write_string(" code=");
+        devfs_debug_write_i32(ev[0].code);
+        serial_write_string(" value=");
+        devfs_debug_write_i32(ev[0].value);
+        serial_write_string("\n");
+        dev_mouse_read_debug++;
+    }
+
     return read * sizeof(input_event_t);
+}
+
+static int dev_mouse_ioctl(fs_node_t *node, int request, void *arg) {
+    (void)node;
+    if (!arg) return -1;
+    if (request == FIONREAD) {
+        *(int*)arg = input_mouse_pending() * (int)sizeof(input_event_t);
+        return 0;
+    }
+    return -1;
 }
 
 /* ========================================================================= */
@@ -120,10 +183,12 @@ static fs_node_t *devfs_input_finddir(fs_node_t *node, char *name) {
     if (strcmp(name, "event0") == 0) {
         strlcpy(fnode->name, "event0", sizeof(fnode->name));
         fnode->read = dev_event_read;
+        fnode->ioctl = dev_event_ioctl;
         fnode->inode = 7;
     } else if (strcmp(name, "mouse0") == 0) {
         strlcpy(fnode->name, "mouse0", sizeof(fnode->name));
         fnode->read = dev_mouse_read;
+        fnode->ioctl = dev_mouse_ioctl;
         fnode->inode = 6;
     } else {
         kfree(fnode);

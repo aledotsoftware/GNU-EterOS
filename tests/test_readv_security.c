@@ -244,6 +244,7 @@ int main() {
     current_task_mock.id = 1;
 
     // Setup FD 0 as valid
+    current_task_mock.fd_table = current_task_mock.fd_table_internal;
     current_task_mock.fd_table[0].node = (fs_node_t*)malloc(sizeof(fs_node_t));
     memset(current_task_mock.fd_table[0].node, 0, sizeof(fs_node_t));
     current_task_mock.fd_table[0].node->flags = 0; // File

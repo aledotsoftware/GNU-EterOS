@@ -4,82 +4,145 @@
 #include "../../include/string.h"
 #include "../../include/serial.h"
 #include "../../include/task.h"
+#include "../../include/cpu.h"
 #include "../../include/elf.h"
 #include "../../include/fs/vfs.h"
+#include "../../include/boot.h"
 
 extern uint8_t user_payload_start[];
 extern uint8_t user_payload_end[];
 extern void enter_user_mode(void* entry, void* stack);
+extern cpu_info_t* get_current_cpu(void);
+
+static void setup_user_stdio(void) {
+    fs_node_t* tty_node = vfs_lookup(fs_root, "/dev/tty");
+
+    if (!tty_node) {
+        serial_write_string("[USER] Warning: Failed to open /dev/tty\n");
+        return;
+    }
+
+    task_t* current = task_get_current();
+    current->fd_table[0].node = tty_node;
+    current->fd_table[0].flags = 2;
+    current->fd_table[0].offset = 0;
+    tty_node->ref_count++;
+
+    current->fd_table[1].node = tty_node;
+    current->fd_table[1].flags = 2;
+    current->fd_table[1].offset = 0;
+    tty_node->ref_count++;
+
+    current->fd_table[2].node = tty_node;
+    current->fd_table[2].flags = 2;
+    current->fd_table[2].offset = 0;
+}
+
+static void enter_loaded_user_program(uint64_t entry_point, const char* arg0) {
+    uint64_t stack_top = 0x300000000 + PAGE_SIZE;
+    for (int i = 1; i <= 4; i++) {
+        void* stack_phys = pmm_alloc_page();
+        if (!stack_phys) {
+            serial_write_string("[USER] Error: Failed to allocate stack page\n");
+            return;
+        }
+        uint64_t stack_page = stack_top - ((uint64_t)i * PAGE_SIZE);
+        if (hal_mem_map((uint64_t)stack_phys, stack_page, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER) < 0) {
+            serial_write_string("[USER] Error: Failed to map stack page\n");
+            return;
+        }
+        memset((void*)stack_page, 0, PAGE_SIZE);
+    }
+
+    uint64_t rsp = stack_top;
+    size_t arg0_len = strlen(arg0) + 1;
+    rsp -= arg0_len;
+    memcpy((void*)rsp, arg0, arg0_len);
+    uint64_t arg0_user_ptr = rsp;
+    uint64_t uargv[2];
+    uint64_t uenvp[1];
+
+    uargv[0] = arg0_user_ptr;
+    uargv[1] = 0;
+    uenvp[0] = 0;
+
+    rsp &= ~0xFULL;
+
+    /* Auxv terminator entry: { AT_NULL, 0 } */
+    rsp -= 16;
+    ((uint64_t*)rsp)[0] = 0;
+    ((uint64_t*)rsp)[1] = 0;
+
+    rsp -= sizeof(uenvp);
+    memcpy((void*)rsp, uenvp, sizeof(uenvp));
+
+    rsp -= sizeof(uargv);
+    memcpy((void*)rsp, uargv, sizeof(uargv));
+
+    /* argc */
+    rsp -= 8;
+    *(uint64_t*)rsp = 1;
+
+    task_t* current = task_get_current();
+    current->user_rsp = rsp;
+    cpu_info_t* cpu = get_current_cpu();
+    if (cpu) cpu->user_stack_scratch = rsp;
+
+    serial_write_string("[USER] Jumping to Ring 3 (RIP=");
+    char buf_rip[32]; utoa_hex_s(entry_point, buf_rip, sizeof(buf_rip)); serial_write_string(buf_rip);
+    serial_write_string(", RSP=");
+    char buf_rsp[32]; utoa_hex_s(rsp, buf_rsp, sizeof(buf_rsp)); serial_write_string(buf_rsp);
+    serial_write_string(")...\n");
+
+    enter_user_mode((void*)entry_point, (void*)rsp);
+}
 
 void user_loader_entry(void) {
     serial_write_string("[USER] Starting User Mode Loader...\n");
 
-    /* Setup Stdin/Stdout/Stderr to TTY */
-    fs_node_t* tty_node = vfs_lookup(fs_root, "/dev/tty");
-
-    if (tty_node) {
-        task_t* current = task_get_current();
-        /* FD 0: Stdin */
-        current->fd_table[0].node = tty_node;
-        current->fd_table[0].flags = 2; /* O_RDWR */
-        current->fd_table[0].offset = 0;
-        tty_node->ref_count++;
-
-        /* FD 1: Stdout */
-        current->fd_table[1].node = tty_node;
-        current->fd_table[1].flags = 2;
-        current->fd_table[1].offset = 0;
-        tty_node->ref_count++;
-
-        /* FD 2: Stderr */
-        current->fd_table[2].node = tty_node;
-        current->fd_table[2].flags = 2;
-        current->fd_table[2].offset = 0;
-        tty_node->ref_count++;
-
-    } else {
-        serial_write_string("[USER] Warning: Failed to open /dev/tty\n");
-    }
+    setup_user_stdio();
 
     uint64_t entry_point = 0;
+    const char* program_name = "sh";
+    boot_info_t* boot_info = get_boot_info();
+    int have_framebuffer = boot_info &&
+                           boot_info->signature == 0x544F424B &&
+                           boot_info->fb_addr != 0 &&
+                           boot_info->fb_width != 0 &&
+                           boot_info->fb_height != 0;
 
-    /* Try to load ELF from Initrd */
-    /* Load Eterland (User requested to work on eterland UI) */
-    entry_point = elf_load_file("eterland.elf", 0x200000000);
+    /* Load login.elf as the primary entry point */
+    entry_point = elf_load_file("login.elf", 0x200000000);
+    if (entry_point == 0) entry_point = elf_load_file("/login.elf", 0x200000000);
 
-    if (entry_point == 0) {
-        entry_point = elf_load_file("/eterland.elf", 0x200000000);
+    if (entry_point != 0) {
+        program_name = "login";
+        /* We pass the preferred shell based on framebuffer availability */
+        if (have_framebuffer) {
+            program_name = "login marea_shell.elf";
+        } else {
+            serial_write_string("[USER] No framebuffer available, using text shell fallback.\n");
+            program_name = "login sh.elf";
+        }
+    } else {
+        /* Fallback if login.elf isn't found for some reason */
+        if (have_framebuffer) {
+            entry_point = elf_load_file("marea_shell.elf", 0x200000000);
+            if (entry_point == 0) entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
+            if (entry_point != 0) program_name = "marea_shell";
+        }
+
+        if (entry_point == 0) {
+            entry_point = elf_load_file("sh.elf", 0x200000000);
+            if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
+            if (entry_point != 0) program_name = "sh";
+        }
     }
 
-    /* Fallback: Load Marea Shell (Wayland-like Desktop Environment) */
     if (entry_point == 0) {
-        entry_point = elf_load_file("marea_shell.elf", 0x200000000);
-    }
-
-    if (entry_point == 0) {
-        entry_point = elf_load_file("/marea_shell.elf", 0x200000000);
-    }
-
-    if (entry_point == 0) {
-        entry_point = elf_load_file("login.elf", 0x200000000);
-    }
-
-    if (entry_point == 0) {
-        entry_point = elf_load_file("/login.elf", 0x200000000);
-    }
-
-    /* Fallback to sh.elf if login missing */
-    if (entry_point == 0) {
-         serial_write_string("[USER] login.elf not found, falling back to sh.elf\n");
-         entry_point = elf_load_file("sh.elf", 0x200000000);
-         if (entry_point == 0) entry_point = elf_load_file("/sh.elf", 0x200000000);
-    }
-
-    /* Fallback to test.elf if sh.elf missing */
-    if (entry_point == 0) {
-         serial_write_string("[USER] sh.elf not found, falling back to test.elf\n");
-         entry_point = elf_load_file("test.elf", 0x200000000);
-         if (entry_point == 0) entry_point = elf_load_file("/test.elf", 0x200000000);
+        serial_write_string("[USER] Warning: No user shell binary found in initrd. Automatic user-mode shell disabled.\n");
+        serial_write_string("[USER] You can use the kernel shell to launch binaries manually.\n");
+        while(1) { task_yield(); hal_cpu_halt(); }
     }
 
     if (entry_point != 0) {
@@ -114,59 +177,7 @@ void user_loader_entry(void) {
         entry_point = user_code_virt;
     }
 
-    /* Allocate User Stack Page */
-    /* Map it to 0x300000000 (12GB) to avoid conflict with Bootloader 4GB Identity Map */
-
-    uint64_t user_stack_virt = 0x300000000;
-    for (int i = 0; i < 2; i++) {
-        void* stack_phys = pmm_alloc_page();
-        if (!stack_phys) {
-            serial_write_string("[USER] Failed to allocate stack page\n");
-            return;
-        }
-        /* Stack: READ | WRITE | USER (No Exec) */
-        if (hal_mem_map((uint64_t)stack_phys, user_stack_virt - (i * PAGE_SIZE), HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER) < 0) {
-             serial_write_string("[USER] Failed to map stack page\n");
-             return;
-        }
-    }
-
-    uint64_t user_stack_top = user_stack_virt + PAGE_SIZE;
-
-    /* Push arguments to stack (argc, argv) */
-    char* sp = (char*)user_stack_top;
-
-    /* 1. Push strings */
-    const char* argv0_str = "marea_shell";
-    size_t len = strlen(argv0_str) + 1;
-    sp -= len;
-    memcpy(sp, argv0_str, len);
-    char* argv0_ptr = sp;
-
-    uintptr_t current_sp = (uintptr_t)sp;
-    current_sp &= ~0xF; // Align down to 16 bytes
-    sp = (char*)current_sp;
-
-    /* 3. Push pointers */
-    uint64_t* stack_ptr = (uint64_t*)sp;
-
-    /* Auxv (NULL) */
-    *(--stack_ptr) = 0;
-
-    /* envp[0] = NULL */
-    *(--stack_ptr) = 0;
-
-    /* argv[1] = NULL */
-    *(--stack_ptr) = 0;
-
-    /* argv[0] = ptr */
-    *(--stack_ptr) = (uint64_t)argv0_ptr;
-
-    /* argc = 1 */
-    *(--stack_ptr) = 1;
-
-    serial_write_string("[USER] Jumping to Ring 3...\n");
-    enter_user_mode((void*)entry_point, (void*)stack_ptr);
+    enter_loaded_user_program(entry_point, program_name);
 
     /* Should never return here */
     serial_write_string("[USER] Error: Returned from Ring 3 (unexpected)\n");

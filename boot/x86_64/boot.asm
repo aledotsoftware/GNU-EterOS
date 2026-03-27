@@ -31,7 +31,7 @@ KERNEL_SECTORS      equ 512            ; Sectores del kernel (256 KB default)
 %endif
 STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
 TEMP_KERNEL_ADDR    equ 0x10000         ; Buffer temporal bajo 1MB para BIOS (movido a 64KB)
-TEMP_INITRD_ADDR    equ 0x50000         ; Buffer temporal para initrd (después de 256KB de kernel)
+TEMP_INITRD_ADDR    equ TEMP_KERNEL_ADDR + (KERNEL_SECTORS * 512)
 FINAL_KERNEL_ADDR   equ 0x100000        ; Dirección final en 1MB (donde BSS tiene espacio)
 STACK_TOP           equ 0x90000         ; Stack en 0x90000
 
@@ -101,8 +101,8 @@ stage1_start:
     rep movsd
     cld
 
-    ; Relocalizar Initrd: 0x29E00 -> 0x40000 (32 KB fijo o dinámico)
-    mov cx, (64 * 512) / 4 ; 64 sectores
+    ; Relocalizar Initrd completo a su dirección final
+    mov cx, INITRD_SECTORS * 128
     mov esi, 0x29E00
     mov edi, 0x4000000
     rep movsd
@@ -358,6 +358,9 @@ INITRD_LOAD_ADDR    equ 0x2000000     ; Mover Initrd a 0x2000000 (32 MB) para so
 %ifndef INITRD_SECTORS
 INITRD_SECTORS      equ 512         ; Keep the increased limit (default)
 %endif
+%ifndef INITRD_SIZE_BYTES
+INITRD_SIZE_BYTES   equ (INITRD_SECTORS * 512)
+%endif
 INITRD_START_LBA    equ 1 + STAGE2_SECTORS + KERNEL_SECTORS
 
 load_initrd:
@@ -465,9 +468,12 @@ setup_vbe:
     mov si, s2_msg_vbe_init
     call print_16
 
-    ; 1. Buscar el mejor modo VBE disponible
-    call find_best_vbe_mode
-    mov bx, ax                          ; Guardar modo seleccionado en BX (incluye bit 14 LFB)
+%ifdef DISABLE_VBE
+    jmp .fill_bootinfo_no_video
+%endif
+
+    ; 1. Usar un modo fijo y conservador para mejorar compatibilidad con VirtualBox.
+    mov bx, VBE_DEFAULT_MODE
 
     ; 2. Obtener información del modo seleccionado (para llenar BootInfo)
     push bx
@@ -533,17 +539,40 @@ setup_vbe:
     ; Initrd Info
     mov dword [di + 40], INITRD_LOAD_ADDR
     mov dword [di + 44], 0
-    mov dword [di + 48], (INITRD_SECTORS * 512)
+    mov dword [di + 48], INITRD_SIZE_BYTES
 
+    ret
+
+.fill_bootinfo_no_video:
+    mov di, BOOT_INFO_ADDR
+    mov dword [di], 0x544F424B          ; Signature "KBOT"
+
+    ; Memoria (E820)
+    mov eax, [MEM_MAP_ADDR]
+    mov [di + 4], eax
+    mov dword [di + 8], MEM_MAP_ADDR
+    mov dword [di + 12], 0
+
+    ; Video deshabilitado / fallback a texto
+    mov dword [di + 16], 0
+    mov dword [di + 20], 0
+    mov dword [di + 24], 0
+    mov dword [di + 28], 0
+    mov dword [di + 32], 0
+    mov dword [di + 36], 0
+
+    ; Initrd Info
+    mov dword [di + 40], INITRD_LOAD_ADDR
+    mov dword [di + 44], 0
+    mov dword [di + 48], INITRD_SIZE_BYTES
     ret
 
 .vbe_fail:
     mov si, s2_msg_vbe_err
     call print_16
-    ; Si falla, continuamos en modo texto VGA estándar (ya activo)
-    ; Pero marcamos BootInfo como inválido (Signature 0) para que el kernel sepa
-    mov dword [BOOT_INFO_ADDR], 0
-    ret
+    ; Si falla, continuamos en modo texto VGA manteniendo BootInfo valido,
+    ; pero sin framebuffer para que el kernel pueda seguir montando initrd.
+    jmp .fill_bootinfo_no_video
 
 .done:
     ret
@@ -706,7 +735,7 @@ protected_mode_start:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x9F000                    ; Stack alto para modo protegido
+    mov esp, 0x90000                    ; Stack en RAM convencional segura (< 0xA0000, fuera del initrd actual)
 
     ; Indicador visual en VGA: "PM" (Protected Mode) en verde
     mov word [0xB8000], 0x2F50          ; 'P' verde

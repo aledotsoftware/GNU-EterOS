@@ -21,7 +21,6 @@
 #include <pmm.h>
 #include <vmm.h>
 #include <fs/initrd.h>
-#include <fs/vfs.h>
 #include <fs/devfs.h>
 #include <fs/shmfs.h>
 #include <fs/procfs.h>
@@ -61,6 +60,7 @@ extern void net_poll(void);
 extern uint32_t my_ip;
 
 extern void dhcp_discover(void);
+static bool desktop_autostart = false;
 
 static void network_task(void) {
     /* Ejecutar DHCP Discover ahora que las interrupciones y el scheduler están activos */
@@ -70,9 +70,6 @@ static void network_task(void) {
     net_poll();
 
     while(1) {
-        /* Wait for network interrupt (packet received) */
-        sem_wait(&net_sem);
-
         net_poll();
 
         /* Update status */
@@ -80,6 +77,8 @@ static void network_task(void) {
             network_ready = 1;
             hal_console_write("  [NET]  DHCP Bound! IP assigned.\n");
         }
+
+        timer_sleep(10);
     }
 }
 
@@ -193,7 +192,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         /* Now that PMM, VMM, and heap are ready, switch console to framebuffer */
         if (boot_info && boot_info->fb_addr != 0) {
             terminal_switch_to_framebuffer(boot_info);
-            // terminal_set_silent(true); /* Deshabilitado para depuración visual completa */
+            terminal_set_silent(true);
         }
     #endif
 
@@ -204,6 +203,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
     lapic_init();   /* Inicializar Local APIC del core principal */
     smp_init();     /* Despertar los Application Processors (APs) */
+    serial_write_string("[DEBUG] Interrupts still deferred after scheduler/APIC init.\n");
     #endif
 
     #if ETEROS_TIER >= 2
@@ -213,16 +213,29 @@ void __attribute__((section(".text.boot"))) kmain(void) {
             fs_root = initialise_initrd(boot_info->initrd_addr, boot_info->initrd_size);
             if (fs_root) {
                 hal_console_write("[VFS] Initrd mounted at /\n");
+                desktop_autostart = boot_info &&
+                                    boot_info->signature == 0x544F424B &&
+                                    boot_info->fb_addr != 0 &&
+                                    boot_info->fb_width != 0 &&
+                                    boot_info->fb_height != 0 &&
+                                    (finddir_fs(fs_root, "marea_shell.elf") != NULL);
 
                 /* Dynamic Mounts */
                 vfs_mkdir("/dev", 0);
                 vfs_mount("/dev", devfs_init());
-                vfs_mkdir("/dev/shm", 0);
-                vfs_mount("/dev/shm", shmfs_init());
                 vfs_mkdir("/proc", 0);
                 vfs_mount("/proc", procfs_init());
+                fs_node_t* writable_fs = jfs_init();
                 vfs_mkdir("/data", 0);
-                vfs_mount("/data", jfs_init());
+                vfs_mount("/data", writable_fs);
+                vfs_mkdir("/gnu", 0);
+                vfs_mount("/gnu", writable_fs);
+                vfs_mkdir("/tmp", 0);
+                vfs_mount("/tmp", shmfs_init());
+                mkdir_fs(writable_fs, "bin", 0755);
+                mkdir_fs(writable_fs, "lib", 0755);
+                mkdir_fs(writable_fs, "include", 0755);
+                mkdir_fs(writable_fs, "tmp", 01777);
 
                 /* List files using VFS */
                 struct dirent entry;
@@ -263,8 +276,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     hal_console_write("\n  [NET]  Escaneando dispositivos de red...\n");
     if (e1000_init(NULL) == 0) {
         hal_console_write("  [NET]  Hardware inicializado.\n");
+        serial_write_string("[DEBUG] main: calling init_network()\n");
         init_network();
+        serial_write_string("[DEBUG] main: creating network task\n");
         task_create("Network", network_task);
+        serial_write_string("[DEBUG] main: network task created\n");
     } else {
         hal_console_write("  [NET]  Info: No se detecto tarjeta de red compatible.\n");
         hal_console_write("         (El sistema continuara sin red)\n");
@@ -283,27 +299,41 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     }
 
     /* ---- 7.1 Inicializar Futex ---- */
+    serial_write_string("[DEBUG] main: futex_init()\n");
     futex_init();
 
     /* ---- 7.5 Lanzar Test de Espacio de Usuario ---- */
     hal_console_write("  [INIT] Lanzando User Mode Test...\n");
     extern void user_loader_entry(void);
+    serial_write_string("[DEBUG] main: creating user loader task\n");
     task_create("UserLoader", user_loader_entry);
+    serial_write_string("[DEBUG] main: user loader task created\n");
  
     /* ---- 8. Lanzar shell interactivo ---- */
+    serial_write_string("[DEBUG] main: entering final shell/desktop phase\n");
     hal_interrupts_enable();
+    serial_write_string("[DEBUG] Interrupts enabled for runtime scheduling.\n");
+
+    if (desktop_autostart) {
+        terminal_set_silent(true);
+        serial_write_string("[ETER] Desktop autostart detected. Kernel framebuffer terminal disabled.\n");
+        while(1) {
+            hal_cpu_halt();
+            task_yield();
+        }
+    }
  
     /* Show system splash screen */
     // show_splash();
  
     /* Kernel shell (fallback until userspace shell is ready) */
-    terminal_set_silent(true); /* Silence kernel terminal for Marea */
+    terminal_set_silent(false); 
     terminal_clear();
  
-    serial_write_string("[ETER] System ready, entering idle loop (Shell disabled for Userspace Marea)...\n");
-    serial_write_string("  [INIT] Sistema listo. Cediendo control a Marea Shell...\n");
+    serial_write_string("[ETER] System ready, starting interactive terminal...\n");
+    serial_write_string("  [INIT] Sistema listo. Iniciando Terminal...\n");
  
-    /* shell_run(); // Disabled so it doesn't fight with Marea Shell over fb0 */
+    shell_run(); 
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
     while(1) {
@@ -322,23 +352,26 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 static void kernel_print_banner(void) {
     hal_console_write("\n");
     
-    /* Logo de éterOS en arte ASCII (Austral Aurora theme) */
-    hal_console_write("\033[38;2;142;240;227m      __              \033[38;2;64;224;208m____  ____  \n");
-    hal_console_write("\033[38;2;135;206;235m  ___/ /____ ____ ___ \033[38;2;50;180;180m/ __ \\/ ___|\n");
-    hal_console_write("\033[38;2;100;180;250m / -_) __/ -_) __/ _ \\\033[38;2;40;150;160m /_/ /\\__ \\ \n");
-    hal_console_write("\033[38;2;65;105;225m \\__/\\__/\\__/_/  \\___/\033[38;2;30;120;140m\\____/____/ \033[0m\n");
+    /* Logo de éterOS en arte ASCII (Austral Aurora theme - Premium) */
+    hal_console_write("\033[38;2;85;255;255m   :::::::::: ::::::::::: :::::::::: :::::::::   ::::::::   ::::::::  \033[0m\n");
+    hal_console_write("\033[38;2;75;230;255m  :+:             :+:     :+:        :+:    :+: :+:    :+: :+:    :+: \033[0m\n");
+    hal_console_write("\033[38;2;65;200;255m  +:+             +:+     +:+        +:+    +:+ +:+    +:+ +:+        \033[0m\n");
+    hal_console_write("\033[38;2;55;175;255m  +#++:++#        +#+     +#++:++#   +#++:++#:  +#+    +:+ +#++:++#++ \033[0m\n");
+    hal_console_write("\033[38;2;45;150;255m  +#+             +#+     +#+        +#+    +#+ +#+    +#+        +#+ \033[0m\n");
+    hal_console_write("\033[38;2;35;120;255m  #+#             #+#     #+#        #+#    #+# #+#    #+# #+#    #+# \033[0m\n");
+    hal_console_write("\033[38;2;25;90;255m  ##########      ###     ########## ###    ###  ########   ########  \033[0m\n");
 
     hal_console_write("\n");
-    hal_console_write("\033[38;2;40;180;200m  ========================================\033[0m\n");
+    hal_console_write("\033[38;2;0;200;255m  ====================================================================\033[0m\n");
     
     /* Versión y codename */
-    kprintf("    \033[38;2;255;255;255mVersion %d.%d.%d (\"%s\")\033[0m\n",
+    kprintf("       \033[38;2;255;255;255mVersion %d.%d.%d \033[38;2;150;150;150m// \033[38;2;0;255;200m\"%s\"\033[0m\n",
             ETEROS_VERSION_MAJOR, ETEROS_VERSION_MINOR, ETEROS_VERSION_PATCH, ETEROS_CODENAME);
 
     /* Copyright */
-    hal_console_write("    \033[38;2;150;150;150m(c) 2026 Tudex Networks\033[0m\n");
+    hal_console_write("       \033[38;2;120;120;120m(c) 2026 Tudex Networks \033[38;2;80;80;80m| Premium Edition\033[0m\n");
     
-    hal_console_write("\033[38;2;40;180;200m  ========================================\033[0m\n");
+    hal_console_write("\033[38;2;0;200;255m  ====================================================================\033[0m\n");
     hal_console_write("\n");
 }
 

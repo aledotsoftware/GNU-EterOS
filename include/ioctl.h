@@ -19,6 +19,7 @@ struct winsize {
 };
 
 /* Standard File IOCTLs */
+#define FIONREAD 0x541B
 #define FIONBIO 0x5421
 
 #endif /* ETEROS_IOCTL_H */

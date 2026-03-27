@@ -29,6 +29,20 @@ static fs_node_t *initrd_root = NULL;             /* The root directory node */
 static initrd_dir_t *virtual_dirs = NULL;
 static uint32_t virtual_dirs_count = 0;
 
+ssize_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer);
+int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry);
+int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission);
+fs_node_t *initrd_finddir(fs_node_t *node, char *name);
+
+static int initrd_is_root_handle(fs_node_t *node) {
+    if (!node) return 0;
+    return ((node->flags & 0x7) == FS_DIRECTORY) &&
+           node->inode == 0 &&
+           node->impl == 0 &&
+           node->readdir == &initrd_readdir &&
+           node->finddir == &initrd_finddir;
+}
+
 /* Virtual Dir Helper */
 static initrd_dir_t* find_virtual_dir(const char* name) {
     initrd_dir_t* current = virtual_dirs;
@@ -65,7 +79,7 @@ ssize_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *bu
 }
 
 int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
-    if (node != initrd_root)
+    if (!initrd_is_root_handle(node))
         return -1;
 
     /* Virtual entries from dynamic list */
@@ -122,7 +136,7 @@ int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
 }
 
 fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
-    if (node != initrd_root)
+    if (!initrd_is_root_handle(node))
         return 0;
 
     /* Check for virtual directories */

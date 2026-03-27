@@ -1,8 +1,12 @@
 #include <sys/syscall.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <poll.h>
 #include <sys/socket.h>
+#include <stdarg.h>
 
 static inline long syscall0(long n) {
     long ret;
@@ -92,10 +96,22 @@ void exit(int status) {
     for(;;);
 }
 
-int open(const char *pathname, int flags) {
-    long ret = syscall3(SYS_open, (long)pathname, flags, 0);
+int open(const char *pathname, int flags, ...) {
+    mode_t mode = 0;
+    if (flags & O_CREAT) {
+        va_list ap;
+        va_start(ap, flags);
+        mode = va_arg(ap, mode_t);
+        va_end(ap);
+    }
+
+    long ret = syscall3(SYS_open, (long)pathname, flags, mode);
     if (ret < 0) { errno = -ret; return -1; }
     return (int)ret;
+}
+
+int creat(const char *pathname, mode_t mode) {
+    return open(pathname, O_CREAT | O_WRONLY | O_TRUNC, mode);
 }
 
 
@@ -109,6 +125,34 @@ int ioctl(int fd, int request, void *arg) {
     long ret = syscall3(SYS_ioctl, fd, request, (long)arg);
     if (ret < 0) { errno = -ret; return -1; }
     return (int)ret;
+}
+
+int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
+    long ret = syscall3(SYS_poll, (long)fds, (long)nfds, timeout);
+    if (ret >= 0) {
+        return (int)ret;
+    }
+
+    /* Fallback for early kernels where SYS_poll is still incomplete.
+       We only need POLLIN readiness for tty/input devices right now. */
+    if (-ret == ENOSYS || -ret == EINVAL) {
+        int ready = 0;
+
+        for (nfds_t i = 0; i < nfds; ++i) {
+            int available = 0;
+            fds[i].revents = 0;
+
+            if ((fds[i].events & POLLIN) && ioctl(fds[i].fd, FIONREAD, &available) == 0 && available > 0) {
+                fds[i].revents |= POLLIN;
+                ready++;
+            }
+        }
+
+        return ready;
+    }
+
+    errno = (int)-ret;
+    return -1;
 }
 
 int close(int fd) {
@@ -135,6 +179,24 @@ int64_t lseek(int fd, int64_t offset, int whence) {
     return (int64_t)ret;
 }
 
+int stat(const char *pathname, struct stat *buf) {
+    long ret = syscall2(SYS_stat, (long)pathname, (long)buf);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int fstat(int fd, struct stat *buf) {
+    long ret = syscall2(SYS_fstat, fd, (long)buf);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int mkdir(const char *pathname, mode_t mode) {
+    long ret = syscall2(SYS_mkdir, (long)pathname, mode);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
 int unlink(const char *pathname) {
     long ret = syscall1(SYS_unlink, (long)pathname);
     if (ret < 0) { errno = -ret; return -1; }
@@ -143,6 +205,12 @@ int unlink(const char *pathname) {
 
 int rmdir(const char *pathname) {
     long ret = syscall1(SYS_rmdir, (long)pathname);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int chdir(const char *pathname) {
+    long ret = syscall1(SYS_chdir, (long)pathname);
     if (ret < 0) { errno = -ret; return -1; }
     return 0;
 }

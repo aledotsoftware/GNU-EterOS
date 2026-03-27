@@ -17,6 +17,8 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <poll.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include "font.h"
@@ -75,7 +77,79 @@ typedef struct {
 } fb_info_t;
 
 static uint8_t* fb_ptr = NULL;
+static uint8_t* backbuffer_ptr = NULL;
 static fb_info_t fb_info;
+static int dirty_valid = 0;
+static int dirty_x1 = 0;
+static int dirty_y1 = 0;
+static int dirty_x2 = 0;
+static int dirty_y2 = 0;
+
+static inline uint8_t* active_surface(void) {
+    return backbuffer_ptr ? backbuffer_ptr : fb_ptr;
+}
+
+static void mark_dirty_rect(int x, int y, int w, int h) {
+    int x2;
+    int y2;
+
+    if (w <= 0 || h <= 0) return;
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (x >= (int)fb_info.width || y >= (int)fb_info.height) return;
+    if (x + w > (int)fb_info.width) w = (int)fb_info.width - x;
+    if (y + h > (int)fb_info.height) h = (int)fb_info.height - y;
+    if (w <= 0 || h <= 0) return;
+
+    x2 = x + w;
+    y2 = y + h;
+
+    if (!dirty_valid) {
+        dirty_x1 = x;
+        dirty_y1 = y;
+        dirty_x2 = x2;
+        dirty_y2 = y2;
+        dirty_valid = 1;
+        return;
+    }
+
+    if (x < dirty_x1) dirty_x1 = x;
+    if (y < dirty_y1) dirty_y1 = y;
+    if (x2 > dirty_x2) dirty_x2 = x2;
+    if (y2 > dirty_y2) dirty_y2 = y2;
+}
+
+static void present(void) {
+    int x;
+    int y;
+    int w;
+    int h;
+    int bytes_per_pixel;
+    size_t row_bytes;
+
+    if (!fb_ptr || !backbuffer_ptr) {
+        return;
+    }
+
+    if (!dirty_valid) {
+        return;
+    }
+
+    x = dirty_x1;
+    y = dirty_y1;
+    w = dirty_x2 - dirty_x1;
+    h = dirty_y2 - dirty_y1;
+    bytes_per_pixel = (int)(fb_info.bpp / 8);
+    row_bytes = (size_t)w * bytes_per_pixel;
+
+    for (int row = 0; row < h; ++row) {
+        uint8_t* src = backbuffer_ptr + (y + row) * fb_info.pitch + x * bytes_per_pixel;
+        uint8_t* dst = fb_ptr + (y + row) * fb_info.pitch + x * bytes_per_pixel;
+        memcpy(dst, src, row_bytes);
+    }
+
+    dirty_valid = 0;
+}
 
 #define TASKBAR_HEIGHT 44
 #define TITLEBAR_HEIGHT 32
@@ -83,6 +157,12 @@ static fb_info_t fb_info;
 #define MENU_WIDTH 260
 #define MENU_ITEM_HEIGHT 36
 #define MENU_PADDING 8
+#define EDITOR_BUFFER_SIZE 4096
+
+typedef enum {
+    WINDOW_KIND_TERMINAL = 0,
+    WINDOW_KIND_EDITOR = 1,
+} window_kind_t;
 
 /* ========================================================================= */
 /* Window Management                                                         */
@@ -96,6 +176,7 @@ typedef struct {
     int visible;
     int focused;
     int minimized;
+    int kind;
     char title[32];
 
     /* Terminal state (inline for demo) */
@@ -103,6 +184,14 @@ typedef struct {
     int term_cols, term_rows;
     char input_buf[256];
     int input_len;
+    char cwd[128];
+
+    /* Simple text editor state */
+    char editor_path[128];
+    char editor_status[96];
+    char editor_buf[EDITOR_BUFFER_SIZE];
+    int editor_len;
+    int editor_dirty;
 } marea_window_t;
 
 static marea_window_t windows[MAX_WINDOWS];
@@ -124,6 +213,7 @@ typedef struct {
 #define REL_X    0x00
 #define REL_Y    0x01
 #define BTN_LEFT 0x110
+#define MOUSE_SENSITIVITY 3
 
 static int mouse_x, mouse_y;
 static int mouse_btn = 0;
@@ -132,6 +222,20 @@ static int mouse_btn = 0;
 #define CURSOR_W 12
 #define CURSOR_H 18
 static uint32_t cursor_save[CURSOR_W * CURSOR_H];
+static int dragging = 0;
+static int drag_win = -1;
+static int drag_offset_x = 0, drag_offset_y = 0;
+
+static void handle_mouse_event(const input_event_t* ev);
+static void handle_keyboard_char(char c);
+static void drain_mouse_events(int fd);
+static void draw_window_chrome(marea_window_t* win);
+static int hit_start_button(int mx, int my);
+static int hit_titlebar(marea_window_t* win, int mx, int my);
+static int hit_editor_save_button(marea_window_t* win, int mx, int my);
+static int find_window_at(int mx, int my);
+static int hit_menu_item(int mx, int my);
+static void redraw_all(void);
 
 /* ========================================================================= */
 /* Menu State                                                                */
@@ -162,12 +266,14 @@ static const menu_item_t menu_items[] = {
 /* ========================================================================= */
 
 static inline void put_pixel(int x, int y, uint32_t color) {
+    uint8_t* surface = active_surface();
+
     if (x < 0 || x >= (int)fb_info.width || y < 0 || y >= (int)fb_info.height) return;
     if (fb_info.bpp == 32) {
-        uint32_t* p = (uint32_t*)(fb_ptr + y * fb_info.pitch + x * 4);
+        uint32_t* p = (uint32_t*)(surface + y * fb_info.pitch + x * 4);
         *p = color;
     } else if (fb_info.bpp == 24) {
-        uint8_t* p = fb_ptr + y * fb_info.pitch + x * 3;
+        uint8_t* p = surface + y * fb_info.pitch + x * 3;
         p[0] = color & 0xFF;
         p[1] = (color >> 8) & 0xFF;
         p[2] = (color >> 16) & 0xFF;
@@ -175,17 +281,21 @@ static inline void put_pixel(int x, int y, uint32_t color) {
 }
 
 static inline uint32_t get_pixel(int x, int y) {
+    uint8_t* surface = active_surface();
+
     if (x < 0 || x >= (int)fb_info.width || y < 0 || y >= (int)fb_info.height) return 0;
     if (fb_info.bpp == 32) {
-        return *(uint32_t*)(fb_ptr + y * fb_info.pitch + x * 4);
+        return *(uint32_t*)(surface + y * fb_info.pitch + x * 4);
     } else if (fb_info.bpp == 24) {
-        uint8_t* p = fb_ptr + y * fb_info.pitch + x * 3;
+        uint8_t* p = surface + y * fb_info.pitch + x * 3;
         return 0xFF000000 | ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | p[0];
     }
     return 0;
 }
 
 static void fill_rect(int x, int y, int w, int h, uint32_t color) {
+    uint8_t* surface = active_surface();
+
     /* Clip */
     if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
@@ -196,7 +306,7 @@ static void fill_rect(int x, int y, int w, int h, uint32_t color) {
     if (fb_info.bpp == 32) {
         /* ⚡ BOLT Optimization: Build the first row once, then copy it with memcpy
            to subsequent rows instead of per-pixel assignments. */
-        uint32_t* first_row = (uint32_t*)(fb_ptr + y * fb_info.pitch + x * 4);
+        uint32_t* first_row = (uint32_t*)(surface + y * fb_info.pitch + x * 4);
         for (int j = 0; j < w; j++) {
             first_row[j] = color;
         }
@@ -213,7 +323,7 @@ static void fill_rect(int x, int y, int w, int h, uint32_t color) {
         uint8_t r = (color >> 16) & 0xFF;
 
         /* ⚡ BOLT Optimization: Build the first row segment once, then use memcpy */
-        uint8_t* first_row = fb_ptr + y * fb_info.pitch + x * 3;
+        uint8_t* first_row = surface + y * fb_info.pitch + x * 3;
         uint8_t* p = first_row;
         for (int j = 0; j < w; j++) {
             *p++ = b;
@@ -231,6 +341,8 @@ static void fill_rect(int x, int y, int w, int h, uint32_t color) {
 }
 
 static void fill_rect_alpha(int x, int y, int w, int h, uint32_t color) {
+    uint8_t* surface = active_surface();
+
     uint32_t a = (color >> 24) & 0xFF;
     if (a == 0xFF) { fill_rect(x, y, w, h, color); return; }
     if (a == 0) return;
@@ -244,7 +356,7 @@ static void fill_rect_alpha(int x, int y, int w, int h, uint32_t color) {
     uint32_t inv_a = 255 - a;
     if (fb_info.bpp == 32) {
         for (int i = 0; i < h; i++) {
-            uint32_t* row = (uint32_t*)(fb_ptr + (y + i) * fb_info.pitch + x * 4);
+            uint32_t* row = (uint32_t*)(surface + (y + i) * fb_info.pitch + x * 4);
             for (int j = 0; j < w; j++) {
                 uint32_t dc = row[j];
                 uint32_t rb = (((color & 0xFF00FF) * a + (dc & 0xFF00FF) * inv_a) >> 8) & 0xFF00FF;
@@ -396,6 +508,7 @@ static void draw_desktop_gradient(void) {
     int h = fb_info.height - TASKBAR_HEIGHT;
     int mid = h / 2;
     int bytes_pp = fb_info.bpp / 8;
+    uint8_t* surface = active_surface();
 
     for (int y = 0; y < h; y++) {
         uint32_t color;
@@ -405,7 +518,7 @@ static void draw_desktop_gradient(void) {
             color = lerp_color(GRAD_MID & 0xFFFFFF, GRAD_BOTTOM & 0xFFFFFF, y - mid, h - mid);
         }
 
-        uint8_t* row = fb_ptr + y * fb_info.pitch;
+        uint8_t* row = surface + y * fb_info.pitch;
         uint8_t b = color & 0xFF;
         uint8_t g = (color >> 8) & 0xFF;
         uint8_t r = (color >> 16) & 0xFF;
@@ -665,6 +778,9 @@ static void term_init_window(marea_window_t* win) {
     win->term_rows = (win->h - TERM_MARGIN_T - 8) / 16;
     win->input_len = 0;
     memset(win->input_buf, 0, sizeof(win->input_buf));
+    if (!getcwd(win->cwd, sizeof(win->cwd))) {
+        strlcpy(win->cwd, "/", sizeof(win->cwd));
+    }
 }
 
 static void term_clear(marea_window_t* win) {
@@ -679,14 +795,15 @@ static void term_scroll(marea_window_t* win) {
     int by = win->y + TERM_MARGIN_T;
     int bw = win->w - TERM_MARGIN_L * 2;
     int bh = win->h - TERM_MARGIN_T - 8;
+    uint8_t* surface = active_surface();
 
     /* Move lines up by 16px */
     int bytes_per_pixel = fb_info.bpp / 8;
     int row_bytes = bw * bytes_per_pixel;
 
     for (int row = by; row < by + bh - 16; row++) {
-        uint8_t* dst = fb_ptr + row * fb_info.pitch + bx * bytes_per_pixel;
-        uint8_t* src = fb_ptr + (row + 16) * fb_info.pitch + bx * bytes_per_pixel;
+        uint8_t* dst = surface + row * fb_info.pitch + bx * bytes_per_pixel;
+        uint8_t* src = surface + (row + 16) * fb_info.pitch + bx * bytes_per_pixel;
         memmove(dst, src, row_bytes);
     }
 
@@ -733,68 +850,183 @@ static void term_print(marea_window_t* win, const char* str, uint32_t fg) {
 
 static void term_draw_prompt(marea_window_t* win) {
     term_print(win, "user@eteros", COL_TERM_PROMPT_USER);
-    term_print(win, " ~ $ ", COL_TERM_PROMPT_DIR);
+    term_print(win, " ", COL_TERM_FG);
+    term_print(win, win->cwd, COL_TERM_PROMPT_DIR);
+    term_print(win, " $ ", COL_TERM_PROMPT_DIR);
+}
+
+static int split_args(char *line, char *argv[], int max_args) {
+    int argc = 0;
+    char *token = strtok(line, " ");
+
+    while (token && argc < max_args - 1) {
+        argv[argc++] = token;
+        token = strtok(NULL, " ");
+    }
+
+    argv[argc] = NULL;
+    return argc;
+}
+
+static int resolve_command_path(const char *cmd, char *out, size_t out_size) {
+    static const char *search_dirs[] = { "", "/", "/gnu/bin/", "/bin/" };
+    static const char *suffixes[] = { "", ".elf" };
+
+    if (!cmd || !cmd[0]) return -1;
+
+    if (strchr(cmd, '/')) {
+        strlcpy(out, cmd, out_size);
+        if (access(out, F_OK) == 0) return 0;
+        return -1;
+    }
+
+    for (size_t i = 0; i < sizeof(search_dirs) / sizeof(search_dirs[0]); ++i) {
+        for (size_t j = 0; j < sizeof(suffixes) / sizeof(suffixes[0]); ++j) {
+            out[0] = '\0';
+            strlcat(out, search_dirs[i], out_size);
+            strlcat(out, cmd, out_size);
+            strlcat(out, suffixes[j], out_size);
+            if (access(out, F_OK) == 0) return 0;
+        }
+    }
+
+    return -1;
+}
+
+static void term_run_external(marea_window_t* win, char *argv[], int argc) {
+    char path[256];
+    char busybox_path[256];
+    int pipefd[2];
+    int status = 0;
+
+    if (argc <= 0 || !argv[0]) {
+        return;
+    }
+
+    if (resolve_command_path(argv[0], path, sizeof(path)) != 0) {
+        if (resolve_command_path("busybox", busybox_path, sizeof(busybox_path)) == 0) {
+            char *bb_argv[34];
+            int bb_argc = 0;
+
+            bb_argv[bb_argc++] = busybox_path;
+            bb_argv[bb_argc++] = argv[0];
+            for (int i = 1; i < argc && bb_argc < 33; ++i) {
+                bb_argv[bb_argc++] = argv[i];
+            }
+            bb_argv[bb_argc] = NULL;
+            argv = bb_argv;
+            argc = bb_argc;
+            strlcpy(path, busybox_path, sizeof(path));
+        } else {
+            term_print(win, "\nComando no encontrado: ", COL_DANGER);
+            term_print(win, argv[0], COL_DANGER);
+            term_print(win, "\n", COL_TERM_FG);
+            return;
+        }
+    }
+
+    if (pipe(pipefd) < 0) {
+        term_print(win, "\nError: pipe failed\n", COL_DANGER);
+        return;
+    }
+
+    {
+        int pid = fork();
+        if (pid == 0) {
+            dup2(pipefd[1], STDOUT_FILENO);
+            dup2(pipefd[1], STDERR_FILENO);
+            close(pipefd[0]);
+            close(pipefd[1]);
+            execve(path, argv, NULL);
+            write(STDERR_FILENO, "exec failed\n", 12);
+            exit(1);
+        } else if (pid > 0) {
+            char buf[129];
+            ssize_t nread;
+
+            close(pipefd[1]);
+            while ((nread = read(pipefd[0], buf, sizeof(buf) - 1)) > 0) {
+                buf[nread] = '\0';
+                term_print(win, buf, COL_TERM_FG);
+            }
+            close(pipefd[0]);
+            waitpid(pid, &status, 0);
+        } else {
+            close(pipefd[0]);
+            close(pipefd[1]);
+            term_print(win, "\nError: fork failed\n", COL_DANGER);
+        }
+    }
 }
 
 static void term_execute(marea_window_t* win) {
     win->input_buf[win->input_len] = '\0';
 
     if (win->input_len > 0) {
-        char cmd[256];
-        int i = 0;
-        while (win->input_buf[i] && win->input_buf[i] != ' ' && i < 255) {
-            cmd[i] = win->input_buf[i];
-            i++;
-        }
-        cmd[i] = '\0';
+        char line[256];
+        char *argv[32];
+        int argc;
 
-        if (strcmp(cmd, "help") == 0) {
+        strlcpy(line, win->input_buf, sizeof(line));
+        argc = split_args(line, argv, 32);
+        if (argc == 0) {
+            term_print(win, "\n", COL_TERM_FG);
+            win->input_len = 0;
+            term_draw_prompt(win);
+            return;
+        }
+
+        if (strcmp(argv[0], "help") == 0) {
             term_print(win, "\n", COL_TERM_FG);
             term_print(win, "Marea Shell Terminal\n", COL_ACCENT);
-            term_print(win, "Comandos: help, clear, echo, uname,\n", COL_TERM_FG);
-            term_print(win, "  ls, cat, run, exit\n", COL_TERM_FG);
-        } else if (strcmp(cmd, "clear") == 0) {
+            term_print(win, "Builtins: help, clear, echo, uname, cd, pwd, exit\n", COL_TERM_FG);
+            term_print(win, "Externos: se resuelven en /gnu/bin, /bin y /\n", COL_TERM_FG);
+        } else if (strcmp(argv[0], "clear") == 0) {
             term_clear(win);
             win->input_len = 0;
             term_draw_prompt(win);
             return;
-        } else if (strcmp(cmd, "uname") == 0) {
+        } else if (strcmp(argv[0], "uname") == 0) {
             term_print(win, "\n", COL_TERM_FG);
             term_print(win, "eterOS Marea Shell v1.0\n", COL_ACCENT);
             term_print(win, "Compositor: Wayland-like (SHM)\n", COL_TERM_FG);
             term_print(win, "Arch: x86_64 Long Mode\n", COL_TERM_FG);
-        } else if (strcmp(cmd, "echo") == 0) {
+        } else if (strcmp(argv[0], "echo") == 0) {
             term_print(win, "\n", COL_TERM_FG);
-            if (win->input_buf[i] == ' ') i++;
-            term_print(win, win->input_buf + i, COL_TERM_FG);
+            for (int i = 1; i < argc; ++i) {
+                if (i > 1) term_print(win, " ", COL_TERM_FG);
+                term_print(win, argv[i], COL_TERM_FG);
+            }
             term_print(win, "\n", COL_TERM_FG);
-        } else if (strcmp(cmd, "run") == 0) {
-            if (win->input_buf[i] == ' ') i++;
-            char* arg = win->input_buf + i;
-            if (strlen(arg) > 0) {
-                term_print(win, "\nEjecutando ", COL_TERM_FG);
-                term_print(win, arg, COL_WARNING);
-                term_print(win, "...\n", COL_TERM_FG);
-
-                int child = fork();
-                if (child == 0) {
-                    char path[256] = "/";
-                    strlcat(path, arg, sizeof(path));
-                    char *argv[] = { path, NULL };
-                    char *envp[] = { NULL };
-                    execve(path, argv, envp);
-                    exit(1);
+        } else if (strcmp(argv[0], "cd") == 0) {
+            const char *target = (argc > 1) ? argv[1] : "/";
+            if (chdir(target) == 0) {
+                if (!getcwd(win->cwd, sizeof(win->cwd))) {
+                    strlcpy(win->cwd, target, sizeof(win->cwd));
                 }
             } else {
-                term_print(win, "\nUso: run <archivo.elf>\n", COL_WARNING);
+                term_print(win, "\ncd: no se pudo cambiar al directorio\n", COL_DANGER);
             }
-        } else if (strcmp(cmd, "exit") == 0) {
+        } else if (strcmp(argv[0], "pwd") == 0) {
+            if (!getcwd(win->cwd, sizeof(win->cwd))) {
+                strlcpy(win->cwd, "/", sizeof(win->cwd));
+            }
+            term_print(win, "\n", COL_TERM_FG);
+            term_print(win, win->cwd, COL_TERM_FG);
+            term_print(win, "\n", COL_TERM_FG);
+        } else if (strcmp(argv[0], "run") == 0) {
+            if (argc > 1) {
+                term_print(win, "\n", COL_TERM_FG);
+                term_run_external(win, &argv[1], argc - 1);
+            } else {
+                term_print(win, "\nUso: run <archivo>\n", COL_WARNING);
+            }
+        } else if (strcmp(argv[0], "exit") == 0) {
             term_print(win, "\nSaliendo...\n", COL_DANGER);
             exit(0);
         } else {
-            term_print(win, "\nComando no encontrado: ", COL_DANGER);
-            term_print(win, cmd, COL_DANGER);
             term_print(win, "\n", COL_TERM_FG);
+            term_run_external(win, argv, argc);
         }
     } else {
         term_print(win, "\n", COL_TERM_FG);
@@ -805,6 +1037,158 @@ static void term_execute(marea_window_t* win) {
 }
 
 /* ========================================================================= */
+/* Editor Window                                                             */
+/* ========================================================================= */
+
+#define EDITOR_MARGIN_L 10
+#define EDITOR_MARGIN_T (TITLEBAR_HEIGHT + 34)
+#define EDITOR_LINE_H 16
+
+static void editor_set_status(marea_window_t* win, const char* message) {
+    if (!win) return;
+    strlcpy(win->editor_status, message ? message : "", sizeof(win->editor_status));
+}
+
+static void editor_load_file(marea_window_t* win, const char* path) {
+    FILE* fp;
+    size_t nread;
+
+    win->editor_len = 0;
+    win->editor_buf[0] = '\0';
+
+    fp = fopen(path, "rb");
+    if (!fp) {
+        editor_set_status(win, "Archivo nuevo. Usa Save para guardarlo.");
+        return;
+    }
+
+    nread = fread(win->editor_buf, 1, sizeof(win->editor_buf) - 1, fp);
+    fclose(fp);
+
+    win->editor_len = (int)nread;
+    win->editor_buf[win->editor_len] = '\0';
+    editor_set_status(win, "Archivo cargado desde /data.");
+}
+
+static int editor_save_file(marea_window_t* win) {
+    FILE* fp;
+
+    fp = fopen(win->editor_path, "wb");
+    if (!fp) {
+        editor_set_status(win, "No se pudo guardar el archivo.");
+        return -1;
+    }
+
+    if (win->editor_len > 0 && fwrite(win->editor_buf, 1, (size_t)win->editor_len, fp) != (size_t)win->editor_len) {
+        fclose(fp);
+        editor_set_status(win, "Error escribiendo en disco.");
+        return -1;
+    }
+
+    fclose(fp);
+    win->editor_dirty = 0;
+    editor_set_status(win, "Guardado en /data/notas.txt");
+    return 0;
+}
+
+static void editor_init_window(marea_window_t* win, const char* path) {
+    strlcpy(win->editor_path, path, sizeof(win->editor_path));
+    win->editor_dirty = 0;
+    editor_load_file(win, path);
+}
+
+static void editor_draw_content(marea_window_t* win) {
+    int body_x = win->x + 1;
+    int body_y = win->y + TITLEBAR_HEIGHT + 1;
+    int body_w = win->w - 2;
+    int body_h = win->h - TITLEBAR_HEIGHT - 2;
+    int toolbar_y = win->y + TITLEBAR_HEIGHT + 6;
+    int save_x = win->x + win->w - 88;
+    int save_y = win->y + 7;
+    int cursor_x = win->x + EDITOR_MARGIN_L;
+    int cursor_y = win->y + EDITOR_MARGIN_T;
+    int max_x = win->x + win->w - EDITOR_MARGIN_L - 8;
+    int max_y = win->y + win->h - 20;
+
+    fill_rect(body_x, body_y, body_w, body_h, 0xFFF7F3EA);
+    draw_hline(body_x, toolbar_y + 20, body_w, COL_BORDER);
+    draw_text(win->x + 10, toolbar_y, win->editor_path, COL_BG_TITLEBAR, 0xFFF7F3EA);
+    draw_text(win->x + 10, toolbar_y + 18, "Escribe texto. Ctrl+S o boton Save para guardar.", COL_TEXT_SECONDARY, 0xFFF7F3EA);
+
+    fill_rounded_rect(save_x, save_y, 72, 18, 5, COL_ACCENT);
+    draw_text(save_x + 16, save_y + 1, "Save", COL_TEXT_PRIMARY, 0);
+
+    for (int i = 0; i < win->editor_len; ++i) {
+        char c = win->editor_buf[i];
+
+        if (c == '\n') {
+            cursor_x = win->x + EDITOR_MARGIN_L;
+            cursor_y += EDITOR_LINE_H;
+            if (cursor_y > max_y) break;
+            continue;
+        }
+
+        if (cursor_x > max_x) {
+            cursor_x = win->x + EDITOR_MARGIN_L;
+            cursor_y += EDITOR_LINE_H;
+            if (cursor_y > max_y) break;
+        }
+
+        if (c >= 32 && c <= 126) {
+            draw_char(cursor_x, cursor_y, c, 0xFF1A1E28, 0xFFF7F3EA);
+        }
+        cursor_x += 8;
+    }
+
+    fill_rect(win->x + 8, win->y + win->h - 22, win->w - 16, 14, 0xFFEDE6D8);
+    draw_text(win->x + 12, win->y + win->h - 22, win->editor_status,
+              win->editor_dirty ? COL_WARNING : COL_SUCCESS, 0xFFEDE6D8);
+}
+
+static void redraw_window(marea_window_t* win) {
+    if (!win || !win->visible || win->minimized) {
+        return;
+    }
+
+    draw_window_chrome(win);
+    if (win->kind == WINDOW_KIND_EDITOR) {
+        editor_draw_content(win);
+    } else {
+        fill_rect(win->x + 1, win->y + TITLEBAR_HEIGHT + 1,
+                  win->w - 2, win->h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
+    }
+    mark_dirty_rect(win->x, win->y, win->w, win->h);
+}
+
+static void editor_handle_char(marea_window_t* win, char c) {
+    if (c == 0x13) {
+        editor_save_file(win);
+        return;
+    }
+
+    if (c == '\b' || c == 0x08 || c == 0x7F) {
+        if (win->editor_len > 0) {
+            win->editor_len--;
+            win->editor_buf[win->editor_len] = '\0';
+            win->editor_dirty = 1;
+            editor_set_status(win, "Editando...");
+        }
+        return;
+    }
+
+    if (c == '\r') {
+        c = '\n';
+    }
+
+    if ((c == '\n' || (c >= 32 && c <= 126)) && win->editor_len < (int)sizeof(win->editor_buf) - 1) {
+        win->editor_buf[win->editor_len++] = c;
+        win->editor_buf[win->editor_len] = '\0';
+        win->editor_dirty = 1;
+        editor_set_status(win, "Editando...");
+    }
+}
+
+/* ========================================================================= */
 /* Window Management                                                         */
 /* ========================================================================= */
 
@@ -812,6 +1196,7 @@ static int create_terminal_window(void) {
     if (window_count >= MAX_WINDOWS) return -1;
 
     marea_window_t* win = &windows[window_count];
+    memset(win, 0, sizeof(*win));
     win->id = window_count;
     win->w = (int)fb_info.width > 700 ? 640 : (int)fb_info.width - 60;
     win->h = (int)fb_info.height > 540 ? 420 : (int)fb_info.height - 120;
@@ -820,6 +1205,7 @@ static int create_terminal_window(void) {
     win->visible = 1;
     win->focused = 1;
     win->minimized = 0;
+    win->kind = WINDOW_KIND_TERMINAL;
     strlcpy(win->title, "Terminal", sizeof(win->title));
 
     /* Unfocus previous */
@@ -831,6 +1217,34 @@ static int create_terminal_window(void) {
     term_init_window(win);
     window_count++;
 
+    return win->id;
+}
+
+static int create_editor_window(void) {
+    marea_window_t* win;
+
+    if (window_count >= MAX_WINDOWS) return -1;
+
+    win = &windows[window_count];
+    memset(win, 0, sizeof(*win));
+    win->id = window_count;
+    win->w = (int)fb_info.width > 760 ? 700 : (int)fb_info.width - 40;
+    win->h = (int)fb_info.height > 560 ? 460 : (int)fb_info.height - 90;
+    win->x = ((int)fb_info.width - win->w) / 2 + window_count * 12;
+    win->y = ((int)fb_info.height - TASKBAR_HEIGHT - win->h) / 2 + window_count * 12;
+    win->visible = 1;
+    win->focused = 1;
+    win->minimized = 0;
+    win->kind = WINDOW_KIND_EDITOR;
+    strlcpy(win->title, "Archivos", sizeof(win->title));
+
+    if (focused_window >= 0) {
+        windows[focused_window].focused = 0;
+    }
+    focused_window = window_count;
+
+    editor_init_window(win, "/data/notas.txt");
+    window_count++;
     return win->id;
 }
 
@@ -890,6 +1304,184 @@ static void cursor_draw(int cx, int cy) {
     }
 }
 
+static void handle_mouse_event(const input_event_t* ev) {
+    if (ev->type == EV_REL) {
+        int delta = ev->value * MOUSE_SENSITIVITY;
+        int old_x = mouse_x;
+        int old_y = mouse_y;
+
+        cursor_restore_bg(mouse_x, mouse_y);
+        mark_dirty_rect(old_x, old_y, CURSOR_W, CURSOR_H);
+
+        if (ev->code == REL_X) mouse_x += delta;
+        if (ev->code == REL_Y) mouse_y += delta;
+
+        if (mouse_x < 0) mouse_x = 0;
+        if (mouse_y < 0) mouse_y = 0;
+        if (mouse_x >= (int)fb_info.width - CURSOR_W) mouse_x = fb_info.width - CURSOR_W;
+        if (mouse_y >= (int)fb_info.height - CURSOR_H) mouse_y = fb_info.height - CURSOR_H;
+
+        if (dragging && drag_win >= 0) {
+            windows[drag_win].x = mouse_x - drag_offset_x;
+            windows[drag_win].y = mouse_y - drag_offset_y;
+
+            if (windows[drag_win].y < 0) windows[drag_win].y = 0;
+            if (windows[drag_win].y + windows[drag_win].h > (int)fb_info.height - TASKBAR_HEIGHT) {
+                windows[drag_win].y = fb_info.height - TASKBAR_HEIGHT - windows[drag_win].h;
+            }
+
+            redraw_all();
+        }
+
+        cursor_save_bg(mouse_x, mouse_y);
+        cursor_draw(mouse_x, mouse_y);
+        mark_dirty_rect(mouse_x, mouse_y, CURSOR_W, CURSOR_H);
+        present();
+        return;
+    }
+
+    if (ev->type == EV_KEY && ev->code == BTN_LEFT) {
+        if (ev->value == 1) {
+            mouse_btn = 1;
+
+            if (menu_open) {
+                int item = hit_menu_item(mouse_x, mouse_y);
+                if (item >= 0) {
+                    if (strcmp(menu_items[item].label, "Terminal") == 0) {
+                        create_terminal_window();
+                    } else if (strcmp(menu_items[item].label, "Archivos") == 0) {
+                        create_editor_window();
+                    }
+                    menu_open = 0;
+                    redraw_all();
+                    cursor_save_bg(mouse_x, mouse_y);
+                    cursor_draw(mouse_x, mouse_y);
+                    present();
+                    return;
+                }
+            }
+
+            if (hit_start_button(mouse_x, mouse_y)) {
+                menu_open = !menu_open;
+                redraw_all();
+                cursor_save_bg(mouse_x, mouse_y);
+                cursor_draw(mouse_x, mouse_y);
+                present();
+                return;
+            }
+
+            if (menu_open) {
+                menu_open = 0;
+                redraw_all();
+                cursor_save_bg(mouse_x, mouse_y);
+                cursor_draw(mouse_x, mouse_y);
+                present();
+            }
+
+            int win_idx = find_window_at(mouse_x, mouse_y);
+            if (win_idx >= 0) {
+                marea_window_t* win = &windows[win_idx];
+
+                if (focused_window != win_idx) {
+                    if (focused_window >= 0) windows[focused_window].focused = 0;
+                    win->focused = 1;
+                    focused_window = win_idx;
+                    redraw_all();
+                    cursor_save_bg(mouse_x, mouse_y);
+                    cursor_draw(mouse_x, mouse_y);
+                    present();
+                }
+
+                if (hit_close_button(win, mouse_x, mouse_y)) {
+                    win->visible = 0;
+                    win->focused = 0;
+                    if (focused_window == win_idx) focused_window = -1;
+                    redraw_all();
+                    cursor_save_bg(mouse_x, mouse_y);
+                    cursor_draw(mouse_x, mouse_y);
+                    present();
+                    return;
+                }
+
+                if (win->kind == WINDOW_KIND_EDITOR && hit_editor_save_button(win, mouse_x, mouse_y)) {
+                    editor_save_file(win);
+                    redraw_window(win);
+                    cursor_save_bg(mouse_x, mouse_y);
+                    cursor_draw(mouse_x, mouse_y);
+                    present();
+                    return;
+                }
+
+                if (hit_titlebar(win, mouse_x, mouse_y)) {
+                    dragging = 1;
+                    drag_win = win_idx;
+                    drag_offset_x = mouse_x - win->x;
+                    drag_offset_y = mouse_y - win->y;
+                }
+            }
+        } else {
+            mouse_btn = 0;
+            dragging = 0;
+            drag_win = -1;
+        }
+    }
+}
+
+static void handle_keyboard_char(char c) {
+    int old_x = mouse_x;
+    int old_y = mouse_y;
+
+    if (focused_window < 0 || !windows[focused_window].visible) {
+        return;
+    }
+
+    marea_window_t* win = &windows[focused_window];
+    cursor_restore_bg(mouse_x, mouse_y);
+    mark_dirty_rect(old_x, old_y, CURSOR_W, CURSOR_H);
+
+    if (win->kind == WINDOW_KIND_EDITOR) {
+        editor_handle_char(win, c);
+        redraw_window(win);
+    } else {
+        if (c == '\r' || c == '\n') {
+            term_execute(win);
+        } else if (c == '\b' || c == 0x08 || c == 0x7F) {
+            if (win->input_len > 0) {
+                win->input_len--;
+                term_putchar(win, '\b', COL_TERM_FG);
+            }
+        } else if (c >= 32 && c <= 126) {
+            if (win->input_len < (int)sizeof(win->input_buf) - 1) {
+                win->input_buf[win->input_len++] = c;
+                term_putchar(win, c, COL_TERM_FG);
+            }
+        }
+    }
+
+    mark_dirty_rect(win->x, win->y, win->w, win->h);
+    cursor_save_bg(mouse_x, mouse_y);
+    cursor_draw(mouse_x, mouse_y);
+    mark_dirty_rect(mouse_x, mouse_y, CURSOR_W, CURSOR_H);
+    present();
+}
+
+static void drain_mouse_events(int fd) {
+    input_event_t ev;
+    int available = 0;
+
+    do {
+        if (read(fd, &ev, sizeof(ev)) != (ssize_t)sizeof(ev)) {
+            break;
+        }
+        handle_mouse_event(&ev);
+
+        available = 0;
+        if (ioctl(fd, FIONREAD, &available) != 0) {
+            break;
+        }
+    } while (available >= (int)sizeof(ev));
+}
+
 /* ========================================================================= */
 /* Hit Testing                                                               */
 /* ========================================================================= */
@@ -905,6 +1497,14 @@ static int hit_start_button(int mx, int my) {
 static int hit_titlebar(marea_window_t* win, int mx, int my) {
     return (mx >= win->x && mx < win->x + win->w &&
             my >= win->y && my < win->y + TITLEBAR_HEIGHT);
+}
+
+static int hit_editor_save_button(marea_window_t* win, int mx, int my) {
+    int save_x = win->x + win->w - 88;
+    int save_y = win->y + 7;
+
+    return (mx >= save_x && mx < save_x + 72 &&
+            my >= save_y && my < save_y + 18);
 }
 
 /* Find topmost window under point */
@@ -947,29 +1547,27 @@ static void redraw_all(void) {
     for (int i = 0; i < window_count; i++) {
         if (!windows[i].visible || windows[i].minimized) continue;
         draw_window_chrome(&windows[i]);
-        /* Redraw terminal content area */
-        fill_rect(windows[i].x + 1, windows[i].y + TITLEBAR_HEIGHT + 1,
-                  windows[i].w - 2, windows[i].h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
-
-        /* Re-render terminal from scratch (simplified: just prompt) */
-        windows[i].term_cx = 0;
-        windows[i].term_cy = 0;
-        term_print(&windows[i], "eterOS Marea Shell\n", COL_ACCENT);
-        term_print(&windows[i], "Escribe 'help' para comandos.\n\n", COL_TEXT_SECONDARY);
-        term_draw_prompt(&windows[i]);
+        if (windows[i].kind == WINDOW_KIND_EDITOR) {
+            editor_draw_content(&windows[i]);
+        } else {
+            fill_rect(windows[i].x + 1, windows[i].y + TITLEBAR_HEIGHT + 1,
+                      windows[i].w - 2, windows[i].h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
+            windows[i].term_cx = 0;
+            windows[i].term_cy = 0;
+            term_print(&windows[i], "eterOS Marea Shell\n", COL_ACCENT);
+            term_print(&windows[i], "Escribe 'help' para comandos.\n\n", COL_TEXT_SECONDARY);
+            term_draw_prompt(&windows[i]);
+        }
     }
 
     draw_taskbar();
     draw_menu();
+    mark_dirty_rect(0, 0, (int)fb_info.width, (int)fb_info.height);
 }
 
 /* ========================================================================= */
 /* Drag State                                                                */
 /* ========================================================================= */
-
-static int dragging = 0;
-static int drag_win = -1;
-static int drag_offset_x = 0, drag_offset_y = 0;
 
 /* ========================================================================= */
 /* Main Entry                                                                */
@@ -1001,6 +1599,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    backbuffer_ptr = malloc(fb_size);
+    if (!backbuffer_ptr) {
+        printf("[Marea] Error: backbuffer alloc failed\n");
+        return 1;
+    }
+
     /* 2. Initialize mouse position */
     mouse_x = fb_info.width / 2;
     mouse_y = fb_info.height / 2;
@@ -1026,190 +1630,64 @@ int main(int argc, char* argv[]) {
     /* Initial cursor */
     cursor_save_bg(mouse_x, mouse_y);
     cursor_draw(mouse_x, mouse_y);
+    present();
 
-    /* 4. Fork mouse reader */
-    int mouse_pid = fork();
-    if (mouse_pid == 0) {
-        /* Child: Mouse input loop */
-        sleep(1); /* Let parent render first */
-
-        int mfd = open("/dev/input/mouse0", O_RDONLY);
-        if (mfd < 0) {
-            printf("[Marea] Critical Error: Cannot open /dev/input/mouse0\n");
-            exit(1);
-        }
-
-        input_event_t ev;
-        while (read(mfd, &ev, sizeof(ev)) > 0) {
-            /* Visual debug: flick red square in top left when mouse events arrive */
-            fill_rect(0, 0, 8, 8, 0xFF0000); 
-
-            if (ev.type == EV_REL) {
-                /* Erase old cursor */
-                cursor_restore_bg(mouse_x, mouse_y);
-
-                if (ev.code == REL_X) mouse_x += ev.value;
-                if (ev.code == REL_Y) mouse_y += ev.value;
-
-                /* Clamp */
-                if (mouse_x < 0) mouse_x = 0;
-                if (mouse_y < 0) mouse_y = 0;
-                if (mouse_x >= (int)fb_info.width - CURSOR_W) mouse_x = fb_info.width - CURSOR_W;
-                if (mouse_y >= (int)fb_info.height - CURSOR_H) mouse_y = fb_info.height - CURSOR_H;
-
-                /* Dragging? */
-                if (dragging && drag_win >= 0) {
-                    windows[drag_win].x = mouse_x - drag_offset_x;
-                    windows[drag_win].y = mouse_y - drag_offset_y;
-
-                    /* Clamp window position */
-                    if (windows[drag_win].y < 0) windows[drag_win].y = 0;
-                    if (windows[drag_win].y + windows[drag_win].h > (int)fb_info.height - TASKBAR_HEIGHT)
-                        windows[drag_win].y = fb_info.height - TASKBAR_HEIGHT - windows[drag_win].h;
-
-                    /* Redraw everything (simple approach for now) */
-                    redraw_all();
-                } else {
-                    /* Not dragging, check if we need to redraw window chrome for hover states */
-                    static int last_hovered_win = -1;
-                    int hovered_win = find_window_at(mouse_x, mouse_y);
-                    if (hovered_win >= 0) {
-                        marea_window_t* win = &windows[hovered_win];
-                        if (mouse_y >= win->y && mouse_y <= win->y + TITLEBAR_HEIGHT) {
-                            draw_window_chrome(win);
-                        }
-                    }
-                    if (last_hovered_win >= 0 && last_hovered_win != hovered_win && windows[last_hovered_win].visible) {
-                        draw_window_chrome(&windows[last_hovered_win]);
-                    }
-                    last_hovered_win = hovered_win;
-                }
-
-                /* Draw new cursor */
-                cursor_save_bg(mouse_x, mouse_y);
-                cursor_draw(mouse_x, mouse_y);
-
-            } else if (ev.type == EV_KEY && ev.code == BTN_LEFT) {
-                if (ev.value == 1) {
-                    /* Mouse press */
-                    mouse_btn = 1;
-
-                    /* Check menu click first */
-                    if (menu_open) {
-                        int item = hit_menu_item(mouse_x, mouse_y);
-                        if (item >= 0) {
-                            /* Handle menu action */
-                            if (strcmp(menu_items[item].label, "Terminal") == 0) {
-                                create_terminal_window();
-                                redraw_all();
-                                cursor_save_bg(mouse_x, mouse_y);
-                                cursor_draw(mouse_x, mouse_y);
-                            }
-                            /* Close menu after action */
-                            menu_open = 0;
-                            redraw_all();
-                            cursor_save_bg(mouse_x, mouse_y);
-                            cursor_draw(mouse_x, mouse_y);
-                            continue;
-                        }
-                    }
-
-                    /* Check start button */
-                    if (hit_start_button(mouse_x, mouse_y)) {
-                        menu_open = !menu_open;
-                        redraw_all();
-                        cursor_save_bg(mouse_x, mouse_y);
-                        cursor_draw(mouse_x, mouse_y);
-                        continue;
-                    }
-
-                    /* Close menu if clicking elsewhere */
-                    if (menu_open) {
-                        menu_open = 0;
-                        redraw_all();
-                        cursor_save_bg(mouse_x, mouse_y);
-                        cursor_draw(mouse_x, mouse_y);
-                    }
-
-                    /* Check window interaction */
-                    int win_idx = find_window_at(mouse_x, mouse_y);
-                    if (win_idx >= 0) {
-                        marea_window_t* win = &windows[win_idx];
-
-                        /* Focus */
-                        if (focused_window != win_idx) {
-                            if (focused_window >= 0) windows[focused_window].focused = 0;
-                            win->focused = 1;
-                            focused_window = win_idx;
-                            redraw_all();
-                            cursor_save_bg(mouse_x, mouse_y);
-                            cursor_draw(mouse_x, mouse_y);
-                        }
-
-                        /* Close button */
-                        if (hit_close_button(win, mouse_x, mouse_y)) {
-                            win->visible = 0;
-                            win->focused = 0;
-                            if (focused_window == win_idx) focused_window = -1;
-                            redraw_all();
-                            cursor_save_bg(mouse_x, mouse_y);
-                            cursor_draw(mouse_x, mouse_y);
-                            continue;
-                        }
-
-                        /* Titlebar drag */
-                        if (hit_titlebar(win, mouse_x, mouse_y)) {
-                            dragging = 1;
-                            drag_win = win_idx;
-                            drag_offset_x = mouse_x - win->x;
-                            drag_offset_y = mouse_y - win->y;
-                        }
-                    }
-
-                } else {
-                    /* Mouse release */
-                    mouse_btn = 0;
-                    dragging = 0;
-                    drag_win = -1;
-                }
-            }
-        }
-        exit(0);
+    /* 4. Open input devices */
+    int mfd = open("/dev/input/mouse0", O_RDONLY);
+    if (mfd < 0) {
+        printf("[Marea] Warning: Cannot open /dev/input/mouse0\n");
     }
 
-    /* 5. Parent: Keyboard input loop */
+    /* 5. Keyboard input loop */
     int tfd = open("/dev/tty", O_RDWR);
     if (tfd < 0) {
         printf("[Marea] Warning: Cannot open /dev/tty\n");
+    } else {
+        struct termios tio;
+        if (ioctl(tfd, TCGETS, &tio) == 0) {
+            tio.c_lflag &= ~(ECHO | ICANON);
+            ioctl(tfd, TCSETS, &tio);
+        }
     }
 
     while (1) {
-        char c;
-        if (tfd >= 0 && read(tfd, &c, 1) > 0) {
-            /* Route to focused terminal window */
-            if (focused_window >= 0 && windows[focused_window].visible) {
-                marea_window_t* win = &windows[focused_window];
+        struct pollfd fds[2];
+        int nfds = 0;
 
-                /* Erase cursor briefly for redraw */
-                cursor_restore_bg(mouse_x, mouse_y);
+        if (mfd >= 0) {
+            fds[nfds].fd = mfd;
+            fds[nfds].events = POLLIN;
+            fds[nfds].revents = 0;
+            nfds++;
+        }
+        if (tfd >= 0) {
+            fds[nfds].fd = tfd;
+            fds[nfds].events = POLLIN;
+            fds[nfds].revents = 0;
+            nfds++;
+        }
 
-                if (c == '\r' || c == '\n') {
-                    term_execute(win);
-                } else if (c == '\b' || c == 0x08 || c == 0x7F) {
-                    if (win->input_len > 0) {
-                        win->input_len--;
-                        term_putchar(win, '\b', COL_TERM_FG);
-                    }
-                } else if (c >= 32 && c <= 126) {
-                    if (win->input_len < (int)sizeof(win->input_buf) - 1) {
-                        win->input_buf[win->input_len++] = c;
-                        term_putchar(win, c, COL_TERM_FG);
-                    }
+        if (nfds == 0) {
+            sleep(1);
+            continue;
+        }
+
+        if (poll(fds, (nfds_t)nfds, -1) <= 0) {
+            continue;
+        }
+
+        for (int i = 0; i < nfds; i++) {
+            if (!(fds[i].revents & POLLIN)) {
+                continue;
+            }
+
+            if (fds[i].fd == mfd) {
+                drain_mouse_events(mfd);
+            } else if (fds[i].fd == tfd) {
+                char c;
+                if (read(tfd, &c, 1) > 0) {
+                    handle_keyboard_char(c);
                 }
-
-                /* Restore cursor */
-                cursor_save_bg(mouse_x, mouse_y);
-                cursor_draw(mouse_x, mouse_y);
             }
         }
     }

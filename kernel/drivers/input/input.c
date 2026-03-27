@@ -91,6 +91,16 @@ int input_read(input_event_t* buffer, int count) {
     return events_read;
 }
 
+int input_pending(void) {
+    int pending;
+    uint64_t flags = save_irq();
+    spin_lock(&input_lock);
+    pending = (int)((head + INPUT_QUEUE_SIZE - tail) % INPUT_QUEUE_SIZE);
+    spin_unlock(&input_lock);
+    restore_irq(flags);
+    return pending;
+}
+
 void input_mouse_push(uint16_t type, uint16_t code, int32_t value) {
     /* 1. Push to dedicated mouse queue */
     uint64_t flags = save_irq();
@@ -135,4 +145,14 @@ int input_read_mouse(input_event_t* buffer, int count) {
     restore_irq(flags);
 
     return events_read;
+}
+
+int input_mouse_pending(void) {
+    int pending;
+    uint64_t flags = save_irq();
+    spin_lock(&mouse_lock);
+    pending = (int)((mouse_head + INPUT_QUEUE_SIZE - mouse_tail) % INPUT_QUEUE_SIZE);
+    spin_unlock(&mouse_lock);
+    restore_irq(flags);
+    return pending;
 }

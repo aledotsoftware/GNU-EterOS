@@ -9,6 +9,110 @@
 #include "../../include/idt.h"
 #include "../../include/user_mode.h"
 #include "../../include/string.h"
+#include "../../include/elf.h"
+#include "../../include/task.h"
+#include "../../include/cpu.h"
+#include "../../include/fs/vfs.h"
+#include "../../include/mm.h"
+
+extern cpu_info_t* get_current_cpu(void);
+
+static char pending_run_path[256];
+static int pending_run_argc = 0;
+static char pending_run_args[16][128];
+
+static void shell_run_user_task(void) {
+    char path[256];
+    uint64_t uargv[18];
+    const char* argv_src[18];
+    strlcpy(path, pending_run_path, sizeof(path));
+
+    fs_node_t* tty_node = vfs_lookup(fs_root, "/dev/tty");
+    task_t* current = task_get_current();
+    if (tty_node) {
+        current->fd_table[0].node = tty_node;
+        current->fd_table[0].flags = 2;
+        current->fd_table[0].offset = 0;
+        tty_node->ref_count++;
+
+        current->fd_table[1].node = tty_node;
+        current->fd_table[1].flags = 2;
+        current->fd_table[1].offset = 0;
+        tty_node->ref_count++;
+
+        current->fd_table[2].node = tty_node;
+        current->fd_table[2].flags = 2;
+        current->fd_table[2].offset = 0;
+    }
+
+    uint64_t entry_point = elf_load_file(path, 0x200000000);
+    if (entry_point == 0) {
+        serial_write_string("[RUN] Error: No se pudo cargar el ELF en la tarea de usuario.\n");
+        return;
+    }
+
+    uint64_t stack_top = 0x300000000 + PAGE_SIZE;
+    for (int i = 1; i <= 4; i++) {
+        void* stack_phys = pmm_alloc_page();
+        if (!stack_phys) {
+            serial_write_string("[RUN] Error: No se pudo asignar stack de usuario.\n");
+            return;
+        }
+        uint64_t stack_page = stack_top - ((uint64_t)i * PAGE_SIZE);
+        if (hal_mem_map((uint64_t)stack_phys, stack_page, HAL_MEM_READ | HAL_MEM_WRITE | HAL_MEM_USER) < 0) {
+            serial_write_string("[RUN] Error: No se pudo mapear stack de usuario.\n");
+            return;
+        }
+        memset((void*)stack_page, 0, PAGE_SIZE);
+    }
+
+    const char* arg0 = path;
+    const char* slash = path;
+    while (*slash) {
+        if (*slash == '/') arg0 = slash + 1;
+        slash++;
+    }
+    if (*arg0 == '\0') arg0 = path;
+
+    int argc = 1;
+    argv_src[0] = arg0;
+    for (int i = 0; i < pending_run_argc && argc < 17; i++) {
+        argv_src[argc++] = pending_run_args[i];
+    }
+
+    uint64_t rsp = stack_top;
+    uint64_t uenvp[1];
+    uenvp[0] = 0;
+
+    for (int i = argc - 1; i >= 0; i--) {
+        size_t arg_len = strlen(argv_src[i]) + 1;
+        rsp -= arg_len;
+        memcpy((void*)rsp, argv_src[i], arg_len);
+        uargv[i] = rsp;
+    }
+    uargv[argc] = 0;
+
+    rsp &= ~0xFULL;
+
+    rsp -= 16;
+    ((uint64_t*)rsp)[0] = 0; /* auxv AT_NULL */
+    ((uint64_t*)rsp)[1] = 0;
+
+    rsp -= sizeof(uenvp);
+    memcpy((void*)rsp, uenvp, sizeof(uenvp));
+
+    rsp -= (uint64_t)(argc + 1) * sizeof(uint64_t);
+    memcpy((void*)rsp, uargv, (size_t)(argc + 1) * sizeof(uint64_t));
+
+    rsp -= 8;
+    *(uint64_t*)rsp = (uint64_t)argc;
+
+    current->user_rsp = rsp;
+    cpu_info_t* cpu = get_current_cpu();
+    if (cpu) cpu->user_stack_scratch = rsp;
+
+    enter_user_mode((void*)entry_point, (void*)rsp);
+}
 
 #define ETEROS_VERSION      "0.1.0"
 #define ETEROS_CODENAME     "Genesis"
@@ -264,3 +368,228 @@ void cmd_usermode(const char* args) {
     /* Should not return here (user code loops) */
     terminal_write_string("  [USER] Returned? (Should not happen)\n");
 }
+
+void cmd_run(const char* args) {
+    char raw_path[256];
+    const char* p;
+    size_t path_len = 0;
+
+    if (!args || *args == '\0') {
+        terminal_write_string("  Uso: run <path_to_elf>\n");
+        return;
+    }
+
+    p = args;
+    while (*p == ' ') p++;
+    while (p[path_len] != '\0' && p[path_len] != ' ') {
+        path_len++;
+    }
+    if (path_len == 0 || path_len >= sizeof(raw_path)) {
+        terminal_write_string("  Error: Ruta invalida.\n");
+        return;
+    }
+
+    memcpy(raw_path, p, path_len);
+    raw_path[path_len] = '\0';
+    p += path_len;
+    while (*p == ' ') p++;
+
+    task_t* current = task_get_current();
+    char path[256];
+    if (vfs_normalize_path(path, sizeof(path), raw_path, current->cwd) != 0) {
+        terminal_write_string("  Error: Ruta invalida.\n");
+        return;
+    }
+
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) {
+        terminal_write_string("  Error: No se encontro el archivo ELF: ");
+        terminal_write_string(path);
+        terminal_write_string("\n");
+        return;
+    }
+    kfree(node);
+
+    strlcpy(pending_run_path, path, sizeof(pending_run_path));
+    pending_run_argc = 0;
+    while (*p != '\0' && pending_run_argc < 16) {
+        size_t arg_len = 0;
+        while (*p == ' ') p++;
+        while (p[arg_len] != '\0' && p[arg_len] != ' ') {
+            arg_len++;
+        }
+        if (arg_len == 0) break;
+
+        if (arg_len >= sizeof(pending_run_args[0])) {
+            arg_len = sizeof(pending_run_args[0]) - 1;
+        }
+        memcpy(pending_run_args[pending_run_argc], p, arg_len);
+        pending_run_args[pending_run_argc][arg_len] = '\0';
+        pending_run_argc++;
+        p += arg_len;
+    }
+
+    int pid = task_create("UserRun", shell_run_user_task);
+    if (pid < 0) {
+        terminal_write_string("  Error: No se pudo crear la tarea de usuario.\n");
+        return;
+    }
+
+    terminal_write_string("  [RUN] Tarea de usuario creada para: ");
+    terminal_write_string(path);
+    if (pending_run_argc > 0) {
+        terminal_write_string(" (args: ");
+        for (int i = 0; i < pending_run_argc; i++) {
+            if (i > 0) terminal_write_string(" ");
+            terminal_write_string(pending_run_args[i]);
+        }
+        terminal_write_string(")");
+    }
+    terminal_write_string("\n");
+}
+
+void cmd_ls(const char* args) {
+    task_t* current = task_get_current();
+    char path[256];
+    
+    if (!args || *args == '\0') {
+        strlcpy(path, current->cwd, 256);
+    } else {
+        if (vfs_normalize_path(path, 256, args, current->cwd) != 0) {
+            terminal_write_string("  Error: Ruta invalida.\n");
+            return;
+        }
+    }
+
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) {
+        terminal_write_string("  Error: No se encontro el directorio: ");
+        terminal_write_string(path);
+        terminal_write_string("\n");
+        return;
+    }
+
+    if (!(node->flags & FS_DIRECTORY)) {
+        terminal_write_string("  Error: No es un directorio.\n");
+        kfree(node);
+        return;
+    }
+
+    terminal_write_string("\n  Contenido de ");
+    terminal_write_colored(path, VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_write_string(":\n\n");
+
+    struct dirent entry;
+    int i = 0;
+    while (readdir_fs(node, i++, &entry) == 0) {
+        /* Lookup to get type */
+        fs_node_t* item = finddir_fs(node, entry.name);
+        if (item) {
+            if (item->flags & FS_DIRECTORY) {
+                terminal_write_colored("    [DIR] ", VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
+            } else {
+                terminal_write_colored("    [FIL] ", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+            }
+            terminal_write_string(entry.name);
+            
+            if (!(item->flags & FS_DIRECTORY)) {
+                terminal_write_string(" (");
+                char buf[16]; itoa_s(item->length, buf, sizeof(buf), 10);
+                terminal_write_string(buf);
+                terminal_write_string(" bytes)");
+            }
+            terminal_write_string("\n");
+            kfree(item);
+        } else {
+            terminal_write_string("    [???] ");
+            terminal_write_string(entry.name);
+            terminal_write_string("\n");
+        }
+    }
+    terminal_write_string("\n");
+    kfree(node);
+}
+
+void cmd_cd(const char* args) {
+    if (!args || *args == '\0') return;
+
+    task_t* current = task_get_current();
+    char path[256];
+    
+    if (vfs_normalize_path(path, 256, args, current->cwd) != 0) {
+        terminal_write_string("  Error: Ruta invalida.\n");
+        return;
+    }
+
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) {
+        terminal_write_string("  Error: No se encontro el directorio: ");
+        terminal_write_string(path);
+        terminal_write_string("\n");
+        return;
+    }
+
+    if (!(node->flags & FS_DIRECTORY)) {
+        terminal_write_string("  Error: No es un directorio.\n");
+        kfree(node);
+        return;
+    }
+
+    /* Actualizar CWD de la tarea actual */
+    strlcpy(current->cwd, path, sizeof(current->cwd));
+    kfree(node);
+}
+
+void cmd_pwd(const char* args) {
+    (void)args;
+    task_t* current = task_get_current();
+    terminal_write_string("  ");
+    terminal_write_string(current->cwd);
+    terminal_write_string("\n");
+}
+
+void cmd_cat(const char* args) {
+    if (!args || *args == '\0') {
+        terminal_write_string("  Uso: cat <file>\n");
+        return;
+    }
+
+    task_t* current = task_get_current();
+    char path[256];
+    
+    if (vfs_normalize_path(path, 256, args, current->cwd) != 0) {
+        terminal_write_string("  Error: Ruta invalida.\n");
+        return;
+    }
+
+    fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node) {
+        terminal_write_string("  Error: No se encontro el archivo.\n");
+        return;
+    }
+
+    if (node->flags & FS_DIRECTORY) {
+        terminal_write_string("  Error: Es un directorio.\n");
+        kfree(node);
+        return;
+    }
+
+    uint8_t* buffer = (uint8_t*)kmalloc(node->length + 1);
+    if (!buffer) {
+        terminal_write_string("  Error: No hay memoria para leer el archivo.\n");
+        kfree(node);
+        return;
+    }
+
+    ssize_t read = read_fs(node, 0, node->length, buffer);
+    if (read > 0) {
+        buffer[read] = '\0';
+        terminal_write_string((char*)buffer);
+        terminal_write_string("\n");
+    }
+
+    kfree(buffer);
+    kfree(node);
+}
+
+

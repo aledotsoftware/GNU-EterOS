@@ -72,7 +72,7 @@ static char he_addr_buf[4];
 struct hostent *gethostbyname(const char *name) {
     /* Check if it's already an IP */
     uint32_t ip[4];
-    int parsed = 0;
+    int parsed __attribute__((unused)) = 0;
     const char *s = name;
     for(int i=0; i<4; i++){
         int v = 0;

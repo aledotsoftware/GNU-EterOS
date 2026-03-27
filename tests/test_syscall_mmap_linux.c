@@ -221,6 +221,7 @@ int main() {
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
     current_task_mock.id = 1;
+    current_task_mock.fd_table = current_task_mock.fd_table_internal;
     current_task_mock.os_abi = ELFOSABI_LINUX;
     current_task_mock.fd_table[3].node = (fs_node_t*)malloc(sizeof(fs_node_t));
     memset(current_task_mock.fd_table[3].node, 0, sizeof(fs_node_t));

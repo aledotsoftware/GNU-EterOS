@@ -5,6 +5,7 @@
 
 #define TCGETS 0x5401
 #define TCSETS 0x5402
+#define FIONREAD 0x541B
 
 int ioctl(int fd, int request, void *arg);
 
