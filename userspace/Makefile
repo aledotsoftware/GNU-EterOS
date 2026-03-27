@@ -3,6 +3,7 @@ LD = ld
 CFLAGS = -m64 -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -Ilibc/include
 LDFLAGS = -T linker.ld -nostdlib -m elf_x86_64
 
+LIBC_SRC = libc/src/crt0.o libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/stdlib.c libc/src/signal.c libc/src/sha256.c libc/src/strtok.c libc/src/pthread.c libc/src/dirent.c libc/src/time.c libc/src/netdb.c
 LIBC_SRC = libc/src/crt0.o libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/netdb.c libc/src/stdlib.c libc/src/signal.c libc/src/sha256.c libc/src/strtok.c libc/src/pthread.c libc/src/dirent.c libc/src/time.c
 LIBC_OBJ = $(LIBC_SRC:.c=.o)
 

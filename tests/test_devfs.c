@@ -52,6 +52,14 @@ int input_read_mouse(input_event_t* events, int count) {
     return count;
 }
 
+int input_pending(void) {
+    return 1;
+}
+
+int input_mouse_pending(void) {
+    return 1;
+}
+
 /* Include DevFS source directly to test static functions */
 #include "../kernel/fs/devfs.c"
 
