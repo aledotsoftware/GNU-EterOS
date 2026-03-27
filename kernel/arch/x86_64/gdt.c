@@ -135,6 +135,7 @@ static void write_tss(int num, uint16_t ss0, uint64_t esp0) {
     tss.iomap_base = sizeof(tss); /* Sin I/O map */
     
     (void)ss0; /* Unused */
+    (void)esp0; /* Unused */
 }
 
 void gdt_init(void) {
