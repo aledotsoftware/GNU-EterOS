@@ -17,7 +17,9 @@ run_test() {
     sleep 30
 
     # Kill QEMU
-    kill $QEMU_PID || true
+    if kill -0 $QEMU_PID 2>/dev/null; then
+        kill $QEMU_PID || true
+    fi
 
     echo "Analyzing QEMU Output for ${ram}MB RAM..."
 

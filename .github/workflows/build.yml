@@ -73,6 +73,13 @@ jobs:
           chmod +x tests/run_integration.sh
           bash tests/run_integration.sh
 
+      - name: "Generar Reporte de Tests (Summary)"
+        run: |
+          echo "## Resumen de Pruebas y Construcción" >> $GITHUB_STEP_SUMMARY
+          echo "El pipeline se completó correctamente, y las pruebas se ejecutaron satisfactoriamente." >> $GITHUB_STEP_SUMMARY
+          echo "### Tamaños de Imagen:" >> $GITHUB_STEP_SUMMARY
+          ls -lh build/eteros.img | awk '{print "- " $9 ": " $5}' >> $GITHUB_STEP_SUMMARY || true
+
       # Comentado para evitar el error de "Artifact storage quota has been hit"
       # - name: "Subir artefactos de build"
       #   uses: actions/upload-artifact@v4
@@ -80,9 +87,7 @@ jobs:
       #     name: eteros-build
       #     path: |
       #       build/eteros.img
-      #       build/eteros.iso
-      #       build/serial_output.log
-      #     retention-days: 30
+      #     retention-days: 7
 
   # ---- Release automático cuando se pushea un tag v* ----
   release:
@@ -95,11 +100,22 @@ jobs:
       contents: write
 
     steps:
-      - name: "Descargar artefactos"
-        uses: actions/download-artifact@v4
+      - name: "Checkout código"
+        uses: actions/checkout@v4
         with:
-          name: eteros-build
-          path: artifacts/
+          persist-credentials: false
+
+      - name: "Instalar toolchain para Release"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm qemu-system-x86 xorriso mtools
+
+      - name: "Compilar para Release"
+        run: |
+          make all
+          mkdir -p artifacts
+          cp build/eteros.img artifacts/ || true
+          if [ -f build/eteros.iso ]; then cp build/eteros.iso artifacts/; fi
 
       - name: "Crear Release en GitHub"
         uses: softprops/action-gh-release@v2
