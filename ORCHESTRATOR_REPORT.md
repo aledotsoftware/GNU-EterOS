@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-27
-**Commit:** af0cad99ec90a0bdedee85c86ba4da34164ca80b
+**Commit:** a9fc8aa72d429845174c465a6815154dfb347d01
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
