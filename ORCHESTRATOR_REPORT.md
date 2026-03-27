@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-27
-**Commit:** 28686562f5bfde575ed2f43a53e8360590050980
+**Commit:** dd4af4e3358bf4bd354122dcc8b92cdd759666f5
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA
 
@@ -20,8 +20,8 @@
 | Scheduler | ✅ | Round-Robin inicializado, fork funcional |
 | VFS | ✅ | Initrd montado, mkdir funciona, JFS inicializado |
 | Syscall Table | ✅ | x86_64 mechanism enabled. 70+ syscalls, warnings eliminados. |
-| ELF Loader | ✅ | Carga marea_shell.elf correctamente (Detected Linux ABI) y salta a Ring 3 |
-| Userspace | ✅ | Marea Shell Desktop Environment arranca con éxito en Ring 3 |
+| ELF Loader | ✅ | Carga login.elf correctamente (Detected Linux ABI) y salta a Ring 3 |
+| Userspace | ✅ | Login interativo arranca con éxito en Ring 3 |
 | Networking | ✅ | E1000 detectado y stack de red iniciado |
 | Tests | ✅ | Compilan correctamente los binarios en userspace |
 
@@ -37,6 +37,6 @@
 | Milestone | Progreso | Blocker |
 |-----------|----------|---------|
 | Kernel boota | ✅ | Ninguno |
-| sh.elf en Ring 3 | ✅ | (Marea arrancando en su lugar, `marea_shell.elf` carga y transiciona a Ring 3) |
+| sh.elf en Ring 3 | ✅ | (Login arrancando en su lugar, `login.elf` carga y transiciona a Ring 3) |
 | busybox ash funciona | ❌ | Falta empaquetar o portar busybox |
 | Apache httpd sirve HTML | ❌ | Falta empaquetar o portar httpd |
