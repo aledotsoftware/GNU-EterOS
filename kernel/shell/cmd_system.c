@@ -18,9 +18,13 @@
 extern cpu_info_t* get_current_cpu(void);
 
 static char pending_run_path[256];
+static int pending_run_argc = 0;
+static char pending_run_args[16][128];
 
 static void shell_run_user_task(void) {
     char path[256];
+    uint64_t uargv[18];
+    const char* argv_src[18];
     strlcpy(path, pending_run_path, sizeof(path));
 
     fs_node_t* tty_node = vfs_lookup(fs_root, "/dev/tty");
@@ -70,17 +74,23 @@ static void shell_run_user_task(void) {
     }
     if (*arg0 == '\0') arg0 = path;
 
-    uint64_t rsp = stack_top;
-    size_t arg0_len = strlen(arg0) + 1;
-    rsp -= arg0_len;
-    memcpy((void*)rsp, arg0, arg0_len);
-    uint64_t arg0_user_ptr = rsp;
-    uint64_t uargv[2];
-    uint64_t uenvp[1];
+    int argc = 1;
+    argv_src[0] = arg0;
+    for (int i = 0; i < pending_run_argc && argc < 17; i++) {
+        argv_src[argc++] = pending_run_args[i];
+    }
 
-    uargv[0] = arg0_user_ptr;
-    uargv[1] = 0;
+    uint64_t rsp = stack_top;
+    uint64_t uenvp[1];
     uenvp[0] = 0;
+
+    for (int i = argc - 1; i >= 0; i--) {
+        size_t arg_len = strlen(argv_src[i]) + 1;
+        rsp -= arg_len;
+        memcpy((void*)rsp, argv_src[i], arg_len);
+        uargv[i] = rsp;
+    }
+    uargv[argc] = 0;
 
     rsp &= ~0xFULL;
 
@@ -91,11 +101,11 @@ static void shell_run_user_task(void) {
     rsp -= sizeof(uenvp);
     memcpy((void*)rsp, uenvp, sizeof(uenvp));
 
-    rsp -= sizeof(uargv);
-    memcpy((void*)rsp, uargv, sizeof(uargv));
+    rsp -= (uint64_t)(argc + 1) * sizeof(uint64_t);
+    memcpy((void*)rsp, uargv, (size_t)(argc + 1) * sizeof(uint64_t));
 
     rsp -= 8;
-    *(uint64_t*)rsp = 1;
+    *(uint64_t*)rsp = (uint64_t)argc;
 
     current->user_rsp = rsp;
     cpu_info_t* cpu = get_current_cpu();
@@ -360,14 +370,33 @@ void cmd_usermode(const char* args) {
 }
 
 void cmd_run(const char* args) {
+    char raw_path[256];
+    const char* p;
+    size_t path_len = 0;
+
     if (!args || *args == '\0') {
         terminal_write_string("  Uso: run <path_to_elf>\n");
         return;
     }
 
+    p = args;
+    while (*p == ' ') p++;
+    while (p[path_len] != '\0' && p[path_len] != ' ') {
+        path_len++;
+    }
+    if (path_len == 0 || path_len >= sizeof(raw_path)) {
+        terminal_write_string("  Error: Ruta invalida.\n");
+        return;
+    }
+
+    memcpy(raw_path, p, path_len);
+    raw_path[path_len] = '\0';
+    p += path_len;
+    while (*p == ' ') p++;
+
     task_t* current = task_get_current();
     char path[256];
-    if (vfs_normalize_path(path, sizeof(path), args, current->cwd) != 0) {
+    if (vfs_normalize_path(path, sizeof(path), raw_path, current->cwd) != 0) {
         terminal_write_string("  Error: Ruta invalida.\n");
         return;
     }
@@ -382,6 +411,24 @@ void cmd_run(const char* args) {
     kfree(node);
 
     strlcpy(pending_run_path, path, sizeof(pending_run_path));
+    pending_run_argc = 0;
+    while (*p != '\0' && pending_run_argc < 16) {
+        size_t arg_len = 0;
+        while (*p == ' ') p++;
+        while (p[arg_len] != '\0' && p[arg_len] != ' ') {
+            arg_len++;
+        }
+        if (arg_len == 0) break;
+
+        if (arg_len >= sizeof(pending_run_args[0])) {
+            arg_len = sizeof(pending_run_args[0]) - 1;
+        }
+        memcpy(pending_run_args[pending_run_argc], p, arg_len);
+        pending_run_args[pending_run_argc][arg_len] = '\0';
+        pending_run_argc++;
+        p += arg_len;
+    }
+
     int pid = task_create("UserRun", shell_run_user_task);
     if (pid < 0) {
         terminal_write_string("  Error: No se pudo crear la tarea de usuario.\n");
@@ -390,6 +437,14 @@ void cmd_run(const char* args) {
 
     terminal_write_string("  [RUN] Tarea de usuario creada para: ");
     terminal_write_string(path);
+    if (pending_run_argc > 0) {
+        terminal_write_string(" (args: ");
+        for (int i = 0; i < pending_run_argc; i++) {
+            if (i > 0) terminal_write_string(" ");
+            terminal_write_string(pending_run_args[i]);
+        }
+        terminal_write_string(")");
+    }
     terminal_write_string("\n");
 }
 

@@ -81,7 +81,7 @@ void task_exit(int status) {
 
 void task_yield(void) {}
 void schedule(void) {}
-void context_switch(uint64_t* old, uint64_t new, void* fpu1, void* fpu2) {}
+void context_switch(uint64_t* old, uint64_t* new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 
 void serial_write_string(const char* s) {}
@@ -241,6 +241,7 @@ int main() {
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
     current_task_mock.id = 1;
+    current_task_mock.fd_table = current_task_mock.fd_table_internal;
 
     // Call sys_epoll_create1
     int64_t epfd = sys_epoll_create1(0);
@@ -251,11 +252,12 @@ int main() {
         return 1;
     }
 
-    // Call sys_epoll_ctl on invalid fd
+    // Call sys_epoll_ctl on valid fd to satisfy stub validations
     struct epoll_event ev;
     memset(&ev, 0, sizeof(ev));
     ev.events = EPOLLIN;
-    ev.data = 4; // Not set up
+    ev.data = 4;
+    current_task_mock.fd_table[4].node = (fs_node_t*)kmalloc(sizeof(fs_node_t)); // Mock node 4
     int64_t ctl_res = sys_epoll_ctl(epfd, EPOLL_CTL_ADD, 4, &ev);
     if (ctl_res == 0) {
         printf("PASSED: sys_epoll_ctl stub returned 0\n");

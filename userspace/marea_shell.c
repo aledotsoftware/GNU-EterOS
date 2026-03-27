@@ -157,6 +157,12 @@ static void present(void) {
 #define MENU_WIDTH 260
 #define MENU_ITEM_HEIGHT 36
 #define MENU_PADDING 8
+#define EDITOR_BUFFER_SIZE 4096
+
+typedef enum {
+    WINDOW_KIND_TERMINAL = 0,
+    WINDOW_KIND_EDITOR = 1,
+} window_kind_t;
 
 /* ========================================================================= */
 /* Window Management                                                         */
@@ -170,6 +176,7 @@ typedef struct {
     int visible;
     int focused;
     int minimized;
+    int kind;
     char title[32];
 
     /* Terminal state (inline for demo) */
@@ -178,6 +185,13 @@ typedef struct {
     char input_buf[256];
     int input_len;
     char cwd[128];
+
+    /* Simple text editor state */
+    char editor_path[128];
+    char editor_status[96];
+    char editor_buf[EDITOR_BUFFER_SIZE];
+    int editor_len;
+    int editor_dirty;
 } marea_window_t;
 
 static marea_window_t windows[MAX_WINDOWS];
@@ -215,8 +229,10 @@ static int drag_offset_x = 0, drag_offset_y = 0;
 static void handle_mouse_event(const input_event_t* ev);
 static void handle_keyboard_char(char c);
 static void drain_mouse_events(int fd);
+static void draw_window_chrome(marea_window_t* win);
 static int hit_start_button(int mx, int my);
 static int hit_titlebar(marea_window_t* win, int mx, int my);
+static int hit_editor_save_button(marea_window_t* win, int mx, int my);
 static int find_window_at(int mx, int my);
 static int hit_menu_item(int mx, int my);
 static void redraw_all(void);
@@ -1021,6 +1037,158 @@ static void term_execute(marea_window_t* win) {
 }
 
 /* ========================================================================= */
+/* Editor Window                                                             */
+/* ========================================================================= */
+
+#define EDITOR_MARGIN_L 10
+#define EDITOR_MARGIN_T (TITLEBAR_HEIGHT + 34)
+#define EDITOR_LINE_H 16
+
+static void editor_set_status(marea_window_t* win, const char* message) {
+    if (!win) return;
+    strlcpy(win->editor_status, message ? message : "", sizeof(win->editor_status));
+}
+
+static void editor_load_file(marea_window_t* win, const char* path) {
+    FILE* fp;
+    size_t nread;
+
+    win->editor_len = 0;
+    win->editor_buf[0] = '\0';
+
+    fp = fopen(path, "rb");
+    if (!fp) {
+        editor_set_status(win, "Archivo nuevo. Usa Save para guardarlo.");
+        return;
+    }
+
+    nread = fread(win->editor_buf, 1, sizeof(win->editor_buf) - 1, fp);
+    fclose(fp);
+
+    win->editor_len = (int)nread;
+    win->editor_buf[win->editor_len] = '\0';
+    editor_set_status(win, "Archivo cargado desde /data.");
+}
+
+static int editor_save_file(marea_window_t* win) {
+    FILE* fp;
+
+    fp = fopen(win->editor_path, "wb");
+    if (!fp) {
+        editor_set_status(win, "No se pudo guardar el archivo.");
+        return -1;
+    }
+
+    if (win->editor_len > 0 && fwrite(win->editor_buf, 1, (size_t)win->editor_len, fp) != (size_t)win->editor_len) {
+        fclose(fp);
+        editor_set_status(win, "Error escribiendo en disco.");
+        return -1;
+    }
+
+    fclose(fp);
+    win->editor_dirty = 0;
+    editor_set_status(win, "Guardado en /data/notas.txt");
+    return 0;
+}
+
+static void editor_init_window(marea_window_t* win, const char* path) {
+    strlcpy(win->editor_path, path, sizeof(win->editor_path));
+    win->editor_dirty = 0;
+    editor_load_file(win, path);
+}
+
+static void editor_draw_content(marea_window_t* win) {
+    int body_x = win->x + 1;
+    int body_y = win->y + TITLEBAR_HEIGHT + 1;
+    int body_w = win->w - 2;
+    int body_h = win->h - TITLEBAR_HEIGHT - 2;
+    int toolbar_y = win->y + TITLEBAR_HEIGHT + 6;
+    int save_x = win->x + win->w - 88;
+    int save_y = win->y + 7;
+    int cursor_x = win->x + EDITOR_MARGIN_L;
+    int cursor_y = win->y + EDITOR_MARGIN_T;
+    int max_x = win->x + win->w - EDITOR_MARGIN_L - 8;
+    int max_y = win->y + win->h - 20;
+
+    fill_rect(body_x, body_y, body_w, body_h, 0xFFF7F3EA);
+    draw_hline(body_x, toolbar_y + 20, body_w, COL_BORDER);
+    draw_text(win->x + 10, toolbar_y, win->editor_path, COL_BG_TITLEBAR, 0xFFF7F3EA);
+    draw_text(win->x + 10, toolbar_y + 18, "Escribe texto. Ctrl+S o boton Save para guardar.", COL_TEXT_SECONDARY, 0xFFF7F3EA);
+
+    fill_rounded_rect(save_x, save_y, 72, 18, 5, COL_ACCENT);
+    draw_text(save_x + 16, save_y + 1, "Save", COL_TEXT_PRIMARY, 0);
+
+    for (int i = 0; i < win->editor_len; ++i) {
+        char c = win->editor_buf[i];
+
+        if (c == '\n') {
+            cursor_x = win->x + EDITOR_MARGIN_L;
+            cursor_y += EDITOR_LINE_H;
+            if (cursor_y > max_y) break;
+            continue;
+        }
+
+        if (cursor_x > max_x) {
+            cursor_x = win->x + EDITOR_MARGIN_L;
+            cursor_y += EDITOR_LINE_H;
+            if (cursor_y > max_y) break;
+        }
+
+        if (c >= 32 && c <= 126) {
+            draw_char(cursor_x, cursor_y, c, 0xFF1A1E28, 0xFFF7F3EA);
+        }
+        cursor_x += 8;
+    }
+
+    fill_rect(win->x + 8, win->y + win->h - 22, win->w - 16, 14, 0xFFEDE6D8);
+    draw_text(win->x + 12, win->y + win->h - 22, win->editor_status,
+              win->editor_dirty ? COL_WARNING : COL_SUCCESS, 0xFFEDE6D8);
+}
+
+static void redraw_window(marea_window_t* win) {
+    if (!win || !win->visible || win->minimized) {
+        return;
+    }
+
+    draw_window_chrome(win);
+    if (win->kind == WINDOW_KIND_EDITOR) {
+        editor_draw_content(win);
+    } else {
+        fill_rect(win->x + 1, win->y + TITLEBAR_HEIGHT + 1,
+                  win->w - 2, win->h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
+    }
+    mark_dirty_rect(win->x, win->y, win->w, win->h);
+}
+
+static void editor_handle_char(marea_window_t* win, char c) {
+    if (c == 0x13) {
+        editor_save_file(win);
+        return;
+    }
+
+    if (c == '\b' || c == 0x08 || c == 0x7F) {
+        if (win->editor_len > 0) {
+            win->editor_len--;
+            win->editor_buf[win->editor_len] = '\0';
+            win->editor_dirty = 1;
+            editor_set_status(win, "Editando...");
+        }
+        return;
+    }
+
+    if (c == '\r') {
+        c = '\n';
+    }
+
+    if ((c == '\n' || (c >= 32 && c <= 126)) && win->editor_len < (int)sizeof(win->editor_buf) - 1) {
+        win->editor_buf[win->editor_len++] = c;
+        win->editor_buf[win->editor_len] = '\0';
+        win->editor_dirty = 1;
+        editor_set_status(win, "Editando...");
+    }
+}
+
+/* ========================================================================= */
 /* Window Management                                                         */
 /* ========================================================================= */
 
@@ -1028,6 +1196,7 @@ static int create_terminal_window(void) {
     if (window_count >= MAX_WINDOWS) return -1;
 
     marea_window_t* win = &windows[window_count];
+    memset(win, 0, sizeof(*win));
     win->id = window_count;
     win->w = (int)fb_info.width > 700 ? 640 : (int)fb_info.width - 60;
     win->h = (int)fb_info.height > 540 ? 420 : (int)fb_info.height - 120;
@@ -1036,6 +1205,7 @@ static int create_terminal_window(void) {
     win->visible = 1;
     win->focused = 1;
     win->minimized = 0;
+    win->kind = WINDOW_KIND_TERMINAL;
     strlcpy(win->title, "Terminal", sizeof(win->title));
 
     /* Unfocus previous */
@@ -1047,6 +1217,34 @@ static int create_terminal_window(void) {
     term_init_window(win);
     window_count++;
 
+    return win->id;
+}
+
+static int create_editor_window(void) {
+    marea_window_t* win;
+
+    if (window_count >= MAX_WINDOWS) return -1;
+
+    win = &windows[window_count];
+    memset(win, 0, sizeof(*win));
+    win->id = window_count;
+    win->w = (int)fb_info.width > 760 ? 700 : (int)fb_info.width - 40;
+    win->h = (int)fb_info.height > 560 ? 460 : (int)fb_info.height - 90;
+    win->x = ((int)fb_info.width - win->w) / 2 + window_count * 12;
+    win->y = ((int)fb_info.height - TASKBAR_HEIGHT - win->h) / 2 + window_count * 12;
+    win->visible = 1;
+    win->focused = 1;
+    win->minimized = 0;
+    win->kind = WINDOW_KIND_EDITOR;
+    strlcpy(win->title, "Archivos", sizeof(win->title));
+
+    if (focused_window >= 0) {
+        windows[focused_window].focused = 0;
+    }
+    focused_window = window_count;
+
+    editor_init_window(win, "/data/notas.txt");
+    window_count++;
     return win->id;
 }
 
@@ -1151,10 +1349,8 @@ static void handle_mouse_event(const input_event_t* ev) {
                 if (item >= 0) {
                     if (strcmp(menu_items[item].label, "Terminal") == 0) {
                         create_terminal_window();
-                        redraw_all();
-                        cursor_save_bg(mouse_x, mouse_y);
-                        cursor_draw(mouse_x, mouse_y);
-                        present();
+                    } else if (strcmp(menu_items[item].label, "Archivos") == 0) {
+                        create_editor_window();
                     }
                     menu_open = 0;
                     redraw_all();
@@ -1207,6 +1403,15 @@ static void handle_mouse_event(const input_event_t* ev) {
                     return;
                 }
 
+                if (win->kind == WINDOW_KIND_EDITOR && hit_editor_save_button(win, mouse_x, mouse_y)) {
+                    editor_save_file(win);
+                    redraw_window(win);
+                    cursor_save_bg(mouse_x, mouse_y);
+                    cursor_draw(mouse_x, mouse_y);
+                    present();
+                    return;
+                }
+
                 if (hit_titlebar(win, mouse_x, mouse_y)) {
                     dragging = 1;
                     drag_win = win_idx;
@@ -1234,17 +1439,22 @@ static void handle_keyboard_char(char c) {
     cursor_restore_bg(mouse_x, mouse_y);
     mark_dirty_rect(old_x, old_y, CURSOR_W, CURSOR_H);
 
-    if (c == '\r' || c == '\n') {
-        term_execute(win);
-    } else if (c == '\b' || c == 0x08 || c == 0x7F) {
-        if (win->input_len > 0) {
-            win->input_len--;
-            term_putchar(win, '\b', COL_TERM_FG);
-        }
-    } else if (c >= 32 && c <= 126) {
-        if (win->input_len < (int)sizeof(win->input_buf) - 1) {
-            win->input_buf[win->input_len++] = c;
-            term_putchar(win, c, COL_TERM_FG);
+    if (win->kind == WINDOW_KIND_EDITOR) {
+        editor_handle_char(win, c);
+        redraw_window(win);
+    } else {
+        if (c == '\r' || c == '\n') {
+            term_execute(win);
+        } else if (c == '\b' || c == 0x08 || c == 0x7F) {
+            if (win->input_len > 0) {
+                win->input_len--;
+                term_putchar(win, '\b', COL_TERM_FG);
+            }
+        } else if (c >= 32 && c <= 126) {
+            if (win->input_len < (int)sizeof(win->input_buf) - 1) {
+                win->input_buf[win->input_len++] = c;
+                term_putchar(win, c, COL_TERM_FG);
+            }
         }
     }
 
@@ -1289,6 +1499,14 @@ static int hit_titlebar(marea_window_t* win, int mx, int my) {
             my >= win->y && my < win->y + TITLEBAR_HEIGHT);
 }
 
+static int hit_editor_save_button(marea_window_t* win, int mx, int my) {
+    int save_x = win->x + win->w - 88;
+    int save_y = win->y + 7;
+
+    return (mx >= save_x && mx < save_x + 72 &&
+            my >= save_y && my < save_y + 18);
+}
+
 /* Find topmost window under point */
 static int find_window_at(int mx, int my) {
     /* Search from top (highest index = last focused) */
@@ -1329,16 +1547,17 @@ static void redraw_all(void) {
     for (int i = 0; i < window_count; i++) {
         if (!windows[i].visible || windows[i].minimized) continue;
         draw_window_chrome(&windows[i]);
-        /* Redraw terminal content area */
-        fill_rect(windows[i].x + 1, windows[i].y + TITLEBAR_HEIGHT + 1,
-                  windows[i].w - 2, windows[i].h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
-
-        /* Re-render terminal from scratch (simplified: just prompt) */
-        windows[i].term_cx = 0;
-        windows[i].term_cy = 0;
-        term_print(&windows[i], "eterOS Marea Shell\n", COL_ACCENT);
-        term_print(&windows[i], "Escribe 'help' para comandos.\n\n", COL_TEXT_SECONDARY);
-        term_draw_prompt(&windows[i]);
+        if (windows[i].kind == WINDOW_KIND_EDITOR) {
+            editor_draw_content(&windows[i]);
+        } else {
+            fill_rect(windows[i].x + 1, windows[i].y + TITLEBAR_HEIGHT + 1,
+                      windows[i].w - 2, windows[i].h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
+            windows[i].term_cx = 0;
+            windows[i].term_cy = 0;
+            term_print(&windows[i], "eterOS Marea Shell\n", COL_ACCENT);
+            term_print(&windows[i], "Escribe 'help' para comandos.\n\n", COL_TEXT_SECONDARY);
+            term_draw_prompt(&windows[i]);
+        }
     }
 
     draw_taskbar();

@@ -23,6 +23,8 @@ typedef uint64_t pt_entry_t;
 /* Puntero a la tabla PML4 activa */
 static pt_entry_t* pml4 = (pt_entry_t*)BOOT_PML4_ADDR;
 
+bool vmm_initialized_flag = false;
+
 /* TLB Shootdown Globals */
 volatile uint64_t tlb_flush_addr = 0;
 volatile uint64_t tlb_ack_count = 0;
@@ -183,12 +185,14 @@ void vmm_init(void) {
     /* FIX: El Bootloader no configuró el flag de Usuario en la jerarquía inicial. */
     /* Necesitamos PAGE_USER en PML4[0] para permitir acceso a las aplicaciones Ring 3 */
     pml4[0] |= PAGE_USER;
-    
+
     char pml4_addr_buf[32];
     serial_write_string("[VMM] Usando PML4 del bootloader en 0x");
     utoa_hex_s((uint64_t)pml4, pml4_addr_buf, sizeof(pml4_addr_buf));
     serial_write_string(pml4_addr_buf);
     serial_write_string("\n");
+
+    vmm_initialized_flag = true;
 }
 
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) {

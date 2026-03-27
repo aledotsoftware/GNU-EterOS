@@ -224,6 +224,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\shell\cmd_devices.c",
     "$KERNEL_DIR\shell\cmd_time.c",
     "$KERNEL_DIR\shell\cmd_user.c",
+    "$KERNEL_DIR\shell\cmd_panel.c",
     "$KERNEL_DIR\drivers\video\vga.c",
     "$KERNEL_DIR\drivers\video\framebuffer.c",
     "$KERNEL_DIR\drivers\video\font.c",

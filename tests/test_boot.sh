@@ -1,36 +1,29 @@
 #!/bin/bash
-set -e
 
-echo "Compiling the kernel..."
-make clean
-make -j$(nproc)
+echo "Compiling eterOS..."
+make clean && make all > build_output.txt 2>&1
 
-echo "Booting in QEMU..."
-# Start QEMU headlessly and capture serial output
-qemu-system-x86_64 -m 128 -drive format=raw,file=build/eteros.img,index=0,if=ide,media=disk -serial file:serial.log -nographic -no-reboot -no-shutdown &
-QEMU_PID=$!
+if [ $? -ne 0 ]; then
+    echo "Compilation failed!"
+    cat build_output.txt
+    exit 1
+fi
 
-# Give it 10 seconds to boot
-sleep 10
+echo "Running QEMU boot test..."
+# Run QEMU headless with serial output redirected to a file, timeout 10 seconds
+timeout 30s qemu-system-x86_64 -serial file:serial.log -no-reboot -display none -m 128M -drive file=build/eteros.img,format=raw,index=0,media=disk || true
 
-# Kill QEMU
-kill $QEMU_PID 2>/dev/null || true
-
-# Verify output
+echo "Checking logs for success..."
 if grep -q "Version" serial.log; then
-    if grep -q -E "PANIC|FAULT|ERROR" serial.log; then
-        echo "Test FAILED: Boot encountered errors or panics."
+    if grep -q "PANIC" serial.log || grep -q "FAULT" serial.log || grep -q "ERROR" serial.log; then
+        echo "Boot failed: Errors found in serial log."
         cat serial.log
-        rm serial.log
         exit 1
-    else
-        echo "Test PASSED: Kernel booted successfully without panics."
-        rm serial.log
-        exit 0
     fi
+    echo "Boot Test Passed: Kernel loaded and no panics detected."
+    exit 0
 else
-    echo "Test FAILED: Boot banner not found."
+    echo "Boot failed: Kernel did not load successfully."
     cat serial.log
-    rm serial.log
     exit 1
 fi

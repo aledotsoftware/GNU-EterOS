@@ -36,6 +36,12 @@ int main(int argc, char *argv[]) {
         close(shadow_fd);
     }
 
+    /* Check for preferred shell from argv */
+    const char* preferred_shell = "sh.elf";
+    if (argc >= 2 && argv[1] != NULL && strlen(argv[1]) > 0) {
+        preferred_shell = argv[1];
+    }
+
     /* Check autologin */
     int auto_fd = open("/etc/autologin", O_RDONLY);
     if (auto_fd >= 0) {
@@ -48,8 +54,8 @@ int main(int argc, char *argv[]) {
                 printf("Error: Failed to drop privileges for autologin\n");
                 return 1;
             }
-            char *args[] = {"sh", NULL};
-            execve("sh.elf", args, NULL);
+            char *args[] = {(char*)preferred_shell, NULL};
+            execve(preferred_shell, args, NULL);
             return 1;
         }
     }
@@ -147,8 +153,8 @@ int main(int argc, char *argv[]) {
                         printf("Error: Failed to drop privileges\n");
                         exit(1);
                     }
-                    char *args[] = {"sh", NULL};
-                    execve("sh.elf", args, NULL);
+                    char *args[] = {(char*)preferred_shell, NULL};
+                    execve(preferred_shell, args, NULL);
 
                     /* Should not return */
                     printf("Failed to execute shell.\n");

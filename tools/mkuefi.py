@@ -198,7 +198,9 @@ def create_fat32_image(output_file, files):
 
         # 1. EFI/BOOT
         efi_boot_cluster = alloc_cluster()
-        # . point to self, .. point to parent (0 for now, will fix)
+        # 2. EFI
+        efi_cluster = alloc_cluster()
+        # . point to self, .. point to parent
 
         def create_dir_entry(name, ext, attr, cluster, size):
             # 8s(Name) 3s(Ext) B(Attr) B(NT) B(CrtTen) H(CrtTime) H(CrtDate) H(AccDate) H(High) H(WrtTime) H(WrtDate) H(Low) I(Size)
@@ -206,20 +208,13 @@ def create_fat32_image(output_file, files):
 
         dir_data = bytearray(CLUSTER_SIZE)
         dir_data[0:32]   = create_dir_entry(b'.       ', b'   ', ATTR_DIRECTORY, efi_boot_cluster, 0)
-        dir_data[32:64]  = create_dir_entry(b'..      ', b'   ', ATTR_DIRECTORY, 0, 0) # Placeholder
+        dir_data[32:64]  = create_dir_entry(b'..      ', b'   ', ATTR_DIRECTORY, efi_cluster, 0)
 
         offset = 64
         for entry in dirs['EFI/BOOT']:
             dir_data[offset:offset+32] = create_dir_entry(entry['name'], entry['ext'], entry['attr'], entry['cluster'], entry['size'])
             offset += 32
         write_cluster(efi_boot_cluster, dir_data)
-
-        # 2. EFI
-        efi_cluster = alloc_cluster()
-
-        # Fix .. in EFI/BOOT to point to EFI
-        dir_data[32:64] = create_dir_entry(b'..      ', b'   ', ATTR_DIRECTORY, efi_cluster, 0)
-        write_cluster(efi_boot_cluster, dir_data) # Update EFI/BOOT
 
         dir_data = bytearray(CLUSTER_SIZE)
         dir_data[0:32]   = create_dir_entry(b'.       ', b'   ', ATTR_DIRECTORY, efi_cluster, 0)

@@ -31,6 +31,8 @@ static uint16_t* pmm_ref_counts = NULL;
 /* Spinlock para proteger el estado del PMM en SMP */
 static spinlock_t pmm_lock = 0;
 
+bool pmm_initialized_flag = false;
+
 static uint64_t total_ram = 0;
 static uint64_t used_ram = 0;
 static uint64_t total_pages = 0;
@@ -174,16 +176,9 @@ void pmm_init(void) {
     pmm_bitmap = mock_pmm_bitmap;
     pmm_ref_counts = mock_pmm_ref_counts;
 #else
-    /* Ubicar el Bitmap justo después del kernel para evitar colisiones */
-    extern uint8_t _kernel_end;
-    uint64_t kernel_end_addr = PAGE_ALIGN_UP((uint64_t)&_kernel_end);
-
-    /* Enforzar mínimo de seguridad en 4MB por si acaso */
-    if (kernel_end_addr < 0x400000) {
-        kernel_end_addr = 0x400000;
-    }
-
-    pmm_bitmap = (uint8_t*)kernel_end_addr;
+    /* Ubicar el PMM Bitmap en una región segura de memoria (0x1A000) */
+    /* The prompt explicitly required fixing PMM bitmap placement. */
+    pmm_bitmap = (uint8_t*)0x1A000;
     
     /* Calcular tamaño del bitmap (1 bit por página) */
     pmm_bitmap_size = total_pages / 8;
@@ -191,13 +186,14 @@ void pmm_init(void) {
     if (total_pages % 8) pmm_bitmap_size++;
 
     /* Ubicar el RefCounts array después del bitmap (Alineado a 4KB) */
+    /* pmm_bitmap_size for 128MB is 4096 bytes. So 0x1B000 is perfectly aligned. */
     pmm_ref_counts = (uint16_t*)PAGE_ALIGN_UP((uint64_t)pmm_bitmap + pmm_bitmap_size);
 #endif
     
     /* Validar Layout de Memoria (Assertions) */
     extern uint8_t _kernel_start;
     ASSERT((uint64_t)&_kernel_start >= 0x100000 && "Kernel no esta cargado en 1MB!");
-    ASSERT((uint64_t)pmm_bitmap >= (uint64_t)&_kernel_end && "PMM Bitmap colisiona con el Kernel!");
+    ASSERT((uint64_t)pmm_bitmap == 0x1A000 && "PMM Bitmap no esta en la region correcta!");
     ASSERT((uint64_t)pmm_ref_counts > ((uint64_t)pmm_bitmap + pmm_bitmap_size) - 4096 && "PMM RefCounts colisionan con el Bitmap");
 
     /* Inicializar bitmap: MARCAR TODO COMO USADO (1) por defecto */
@@ -263,6 +259,8 @@ void pmm_init(void) {
     itoa_s((int)total_pages, free_str, sizeof(free_str), 10);
     serial_write_string(free_str);
     serial_write_string("\n");
+
+    pmm_initialized_flag = true;
 }
 
 static void* pmm_alloc_page_impl(void) {
@@ -420,6 +418,11 @@ void pmm_free_page(void* addr) {
     if (pmm_ref_counts) {
         if (pmm_ref_counts[page_idx] > 0) {
             pmm_ref_counts[page_idx]--;
+        } else {
+            serial_write_string("[PMM] ERROR: Double free or invalid unref detected!\n");
+            ASSERT(0 && "PMM Double free or invalid unref detected!");
+            spin_unlock(&pmm_lock);
+            return;
         }
         if (pmm_ref_counts[page_idx] > 0) {
             /* Still referenced, do not free */
@@ -463,6 +466,9 @@ void pmm_ref_page(void* addr) {
         /* Cap at 65535 to prevent overflow */
         if (pmm_ref_counts[page_idx] < 65535) {
             pmm_ref_counts[page_idx]++;
+        } else {
+            serial_write_string("[PMM] ERROR: Refcount overflow!\n");
+            ASSERT(0 && "PMM Refcount overflow!");
         }
     }
     spin_unlock(&pmm_lock);

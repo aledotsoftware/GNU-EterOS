@@ -130,7 +130,7 @@ static void write_tss(int num, uint16_t ss0, uint64_t esp0) {
 
     /* Configurar Stack de Ring 0 */
     extern uint64_t kernel_stack_top;
-    tss.rsp0 = kernel_stack_top ? kernel_stack_top : esp0;
+    tss.rsp0 = (uint64_t)kernel_stack_top;
     tss.ist[1] = tss.rsp0;
     tss.iomap_base = sizeof(tss); /* Sin I/O map */
     

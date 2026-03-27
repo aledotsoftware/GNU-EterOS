@@ -179,7 +179,9 @@ void mm_init(boot_info_t* boot_info) {
                     /* (Mínimo 1MB para ser útil) */
                     if (available_size >= 1024 * 1024) {
                         best_start = (uintptr_t)region_start;
-                        best_size = (size_t)available_size;
+
+                        /* Leave 25% of RAM for PMM (Page Tables, Tasks, IO) */
+                        best_size = (size_t)(available_size * 3 / 4);
                         
                         /* Limit heap size to keep some physical memory for PMM/Process tables */
                         if (best_size > MAX_HEAP_SIZE) {
@@ -268,6 +270,10 @@ static void* _kmalloc_impl(size_t size) {
                  /* Skip or remove? Safest to just move on for now. */
                  curr = get_free_node(curr)->next_free;
                  continue;
+            }
+            if (curr->magic != HEAP_MAGIC) {
+                 serial_write_string("[MM] CRITICAL: Heap corruption detected in free list!\n");
+                 ASSERT(0 && "Heap corruption detected: Invalid magic number in free list");
             }
 
             if (curr->size >= aligned_size) {

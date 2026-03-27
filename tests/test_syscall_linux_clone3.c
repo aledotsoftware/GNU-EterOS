@@ -53,7 +53,7 @@ int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint3
 void task_exit(int status) { exit(status); }
 void task_yield(void) {}
 void schedule(void) {}
-void context_switch(uint64_t* old, uint64_t new, void* fpu1, void* fpu2) {}
+void context_switch(uint64_t* old, uint64_t* new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 void serial_write_string(const char* s) {}
 void* kmalloc(size_t size) { return malloc(size); }

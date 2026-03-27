@@ -59,6 +59,7 @@ static const shell_command_t commands[] = {
     { "cd",       "Cambia el directorio actual",                 cmd_cd      },
     { "pwd",      "Muestra el directorio actual",                cmd_pwd     },
     { "cat",      "Muestra el contenido de un archivo",          cmd_cat     },
+    { "panel",    "Abre el Panel de Control",                    cmd_panel   },
 };
 
 #define NUM_COMMANDS  (sizeof(commands) / sizeof(commands[0]))
@@ -112,14 +113,17 @@ void cmd_help(const char* args) {
     terminal_write_colored("  Comandos del sistema:\n\n",
                           VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
 
+    static const char spaces[] = "            "; // 12 spaces
+
     for (size_t i = 0; i < NUM_COMMANDS; i++) {
         terminal_write_colored("    ", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+
         terminal_write_colored(commands[i].name,
                               VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
         size_t name_len = strlen(commands[i].name);
         size_t pad = (name_len < 12) ? 12 - name_len : 1;
-        while (pad--) terminal_write_string(" ");
+        terminal_write_string(spaces + (12 - pad));
 
         terminal_write_string(commands[i].description);
         terminal_write_string("\n");
@@ -131,12 +135,13 @@ void cmd_help(const char* args) {
 
     for (size_t i = 0; i < NUM_APPS; i++) {
         terminal_write_colored("    ", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+
         terminal_write_colored(apps[i].name,
                               VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
 
         size_t name_len = strlen(apps[i].name);
         size_t pad = (name_len < 12) ? 12 - name_len : 1;
-        while (pad--) terminal_write_string(" ");
+        terminal_write_string(spaces + (12 - pad));
 
         terminal_write_string(apps[i].description);
         terminal_write_colored(" v", VGA_COLOR_DARK_GREY, VGA_COLOR_BLACK);
@@ -153,8 +158,16 @@ void cmd_help(const char* args) {
     terminal_write_string("\n");
 }
 
+#include "../../include/task.h"
+
 int shell_exec(char* input) {
     if (!input || !*input) return 0;
+
+    task_t* current = task_get_current();
+    if (current && current->uid != 0) {
+        terminal_write_colored("  Permiso denegado: Se requiere nivel de privilegio Root (UID 0).\n", VGA_COLOR_RED, VGA_COLOR_BLACK);
+        return -1;
+    }
 
     for (size_t i = 0; i < NUM_COMMANDS; i++) {
         const char* args = match_command(input, commands[i].name);

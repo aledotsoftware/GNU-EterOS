@@ -30,6 +30,7 @@
 #include "../include/fcntl.h"
 #include "../include/sched.h"
 #include "../include/futex.h"
+#include "../include/apic.h"
 
 extern void fork_return(void);
 
@@ -102,9 +103,6 @@ static bool     scheduler_active = false; /* El scheduler está inicializado? */
 static spinlock_t sched_lock  = 0;    /* SMP protection */
 
 /* Queue Globals (O(1) Scheduler) */
-static task_t*  ready_head = NULL;
-static task_t*  ready_tail = NULL;
-
 static task_t*  sleep_head = NULL;
 
 static void enqueue_sleep(task_t* t) {
@@ -155,30 +153,51 @@ static void dequeue_sleep(task_t* t) {
 
 static void enqueue_ready(task_t* t) {
     if (!t) return;
-    /* Ensure we don't enqueue something already in queue?
-       Ideally caller ensures this. But for safety we could check.
-       However, checking is O(N) or requires a flag.
-       Let's assume caller correctness for O(1). */
+
+    /* Simple load balancing / target assignment */
+    cpu_info_t* target_cpu_ptr = NULL;
+    if (t->target_cpu >= 0 && t->target_cpu < total_cpus && cpus[t->target_cpu].state == CPU_STATE_ONLINE) {
+        target_cpu_ptr = &cpus[t->target_cpu];
+    } else {
+        /* Pick least loaded or simple round robin. For now, assign to CPU 0 if no valid target */
+        /* Let's find least tasks cpu */
+        int best_cpu = 0;
+        int min_tasks = 999999;
+        for (int i = 0; i < total_cpus; i++) {
+            if (cpus[i].state == CPU_STATE_ONLINE) {
+                if (cpus[i].local_task_count < min_tasks) {
+                    min_tasks = cpus[i].local_task_count;
+                    best_cpu = i;
+                }
+            }
+        }
+        target_cpu_ptr = &cpus[best_cpu];
+        t->target_cpu = best_cpu;
+    }
 
     t->next_ready = NULL;
-    t->prev_ready = ready_tail;
-    if (ready_tail) {
-        ready_tail->next_ready = t;
+    t->prev_ready = (task_t*)target_cpu_ptr->local_ready_tail;
+
+    if (target_cpu_ptr->local_ready_tail) {
+        ((task_t*)target_cpu_ptr->local_ready_tail)->next_ready = t;
     } else {
-        ready_head = t;
+        target_cpu_ptr->local_ready_head = t;
     }
-    ready_tail = t;
+    target_cpu_ptr->local_ready_tail = t;
+    target_cpu_ptr->local_task_count++;
 }
 
 static void dequeue_ready(task_t* t) {
     if (!t) return;
 
+    cpu_info_t* target_cpu_ptr = &cpus[t->target_cpu];
+
     if (t->prev_ready) {
         t->prev_ready->next_ready = t->next_ready;
     } else {
         /* If head is t */
-        if (ready_head == t) {
-            ready_head = t->next_ready;
+        if (target_cpu_ptr->local_ready_head == t) {
+            target_cpu_ptr->local_ready_head = t->next_ready;
         }
     }
 
@@ -186,13 +205,14 @@ static void dequeue_ready(task_t* t) {
         t->next_ready->prev_ready = t->prev_ready;
     } else {
         /* If tail is t */
-        if (ready_tail == t) {
-            ready_tail = t->prev_ready;
+        if (target_cpu_ptr->local_ready_tail == t) {
+            target_cpu_ptr->local_ready_tail = t->prev_ready;
         }
     }
 
     t->next_ready = NULL;
     t->prev_ready = NULL;
+    target_cpu_ptr->local_task_count--;
 }
 
 /* CPU Load Metrics */
@@ -201,7 +221,7 @@ static uint64_t cpu_idle_ticks = 0;
 static int      cpu_last_load = 0;
 
 /* Variable global para el stack del kernel (usada por syscall_entry) */
-uint64_t kernel_stack_top = 0;
+uint64_t kernel_stack_top = 0x90000;
 
 static int find_free_slot(void) {
     if (~task_bitmap == 0) return -1;
@@ -263,9 +283,6 @@ void scheduler_init(void) {
     memset(tasks, 0, sizeof(tasks));
     task_bitmap = 1; /* Task 0 used */
 
-    /* Initialize Queue */
-    ready_head = NULL;
-    ready_tail = NULL;
 
     /* Tarea 0: Representa el hilo de ejecución actual (kernel/shell) */
     tasks[0].id = next_id++;
@@ -283,21 +300,27 @@ void scheduler_init(void) {
     tasks[0].cr3 = cr3;
 
     /* Configurar stack inicial para Task 0 (Boot Stack en 128MB) */
-    kernel_stack_top = 0x7FF000;
-    tasks[0].kernel_stack = kernel_stack_top;
+    kernel_stack_top = 0x90000;
+    tasks[0].kernel_stack_top = kernel_stack_top;
 
     strlcpy(tasks[0].name, "kernel", sizeof(tasks[0].name));
 
     /* POSIX Init for Kernel Task */
-    memset(tasks[0].fd_table, 0, sizeof(tasks[0].fd_table));
+    tasks[0].fd_table = tasks[0].fd_table_internal;
+    memset(tasks[0].fd_table_internal, 0, sizeof(tasks[0].fd_table_internal));
     strlcpy(tasks[0].cwd, "/", sizeof(tasks[0].cwd));
     strlcpy(tasks[0].executable_path, "/kernel", sizeof(tasks[0].executable_path));
     tasks[0].cwd_node = fs_root;
     if (tasks[0].cwd_node) tasks[0].cwd_node->ref_count++;
     tasks[0].signal_mask = 0;
     tasks[0].signal_pending = 0;
-    memset(tasks[0].signal_handlers, 0, sizeof(tasks[0].signal_handlers));
-    memset(tasks[0].signal_restorers, 0, sizeof(tasks[0].signal_restorers));
+
+    tasks[0].signal_handlers = (void (**)(int))tasks[0].signal_handlers_internal;
+    tasks[0].signal_restorers = (void (**)(void))tasks[0].signal_restorers_internal;
+    tasks[0].signal_flags = tasks[0].signal_flags_internal;
+    memset(tasks[0].signal_handlers_internal, 0, sizeof(tasks[0].signal_handlers_internal));
+    memset(tasks[0].signal_restorers_internal, 0, sizeof(tasks[0].signal_restorers_internal));
+    memset(tasks[0].signal_flags_internal, 0, sizeof(tasks[0].signal_flags_internal));
 
     /* Linux Init */
     tasks[0].brk = 0;
@@ -325,6 +348,14 @@ void scheduler_init(void) {
     serial_write_string("[SCHED] Scheduler Round-Robin inicializado\n");
 }
 
+/**
+ * @brief Initializes the scheduler for an Application Processor (AP).
+ *
+ * Creates a specific idle task for the current CPU core and prepares
+ * its local run queue.
+ *
+ * @return None.
+ */
 void task_init_ap(void) {
     /* Inicializar la tarea "Idle" para este AP */
     __asm__ volatile("cli");
@@ -351,7 +382,7 @@ void task_init_ap(void) {
     uint64_t cr3;
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
     tasks[slot].cr3 = cr3;
-    tasks[slot].kernel_stack = 0;
+    tasks[slot].kernel_stack_top = 0;
 
     cpu_info_t* cpu = get_current_cpu();
     char name[32] = "Idle AP ";
@@ -364,7 +395,7 @@ void task_init_ap(void) {
         cpu->sched_ticks = 0;
         /* Set RSP0 in TSS for this AP (using its current stack top) */
         tss_set_rsp0(cpu->kernel_stack_top);
-        tasks[slot].kernel_stack = cpu->kernel_stack_top;
+        tasks[slot].kernel_stack_top = cpu->kernel_stack_top;
     } else {
         strlcat(name, "?", 32);
     }
@@ -372,12 +403,20 @@ void task_init_ap(void) {
     strlcpy(tasks[slot].name, name, sizeof(tasks[slot].name));
 
     /* Basic Init */
-    memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
+    tasks[slot].fd_table = tasks[slot].fd_table_internal;
+    memset(tasks[slot].fd_table_internal, 0, sizeof(tasks[slot].fd_table_internal));
     strlcpy(tasks[slot].cwd, "/", sizeof(tasks[slot].cwd));
     tasks[slot].fs_base = 0;
     tasks[slot].gs_base = 0;
     tasks[slot].uid = 0;
     tasks[slot].gid = 0;
+
+    tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
+    tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
+    tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    memset(tasks[slot].signal_handlers_internal, 0, sizeof(tasks[slot].signal_handlers_internal));
+    memset(tasks[slot].signal_restorers_internal, 0, sizeof(tasks[slot].signal_restorers_internal));
+    memset(tasks[slot].signal_flags_internal, 0, sizeof(tasks[slot].signal_flags_internal));
 
     if (slot >= task_count) {
         task_count = slot + 1;
@@ -397,7 +436,7 @@ void task_init_ap(void) {
  * and sets up the initial execution context to start at the given entry function.
  * The task is then added to the ready queue.
  *
- * @param name The name of the new task.
+ * @param name The name of the new task (for debugging).
  * @param entry Function pointer to the task's entry point.
  * @return The ID of the newly created task, or -1 if the max task limit is reached or out of memory.
  */
@@ -438,7 +477,7 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].stack_base = stack;
 
     /* Configurar stack de kernel y CR3 */
-    tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
+    tasks[slot].kernel_stack_top = (uint64_t)(stack + TASK_STACK_SIZE);
 
     /* Heredar CR3 del kernel (por ahora, luego cada proceso tendrá su PML4) */
     uint64_t cr3;
@@ -450,15 +489,20 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].entry = entry;
 
     /* POSIX Init for New Task */
-    memset(tasks[slot].fd_table, 0, sizeof(tasks[slot].fd_table));
+    tasks[slot].fd_table = tasks[slot].fd_table_internal;
+    memset(tasks[slot].fd_table_internal, 0, sizeof(tasks[slot].fd_table_internal));
     strlcpy(tasks[slot].cwd, "/", sizeof(tasks[slot].cwd));
     tasks[slot].cwd_node = fs_root;
     if (tasks[slot].cwd_node) tasks[slot].cwd_node->ref_count++;
     tasks[slot].signal_mask = 0;
     tasks[slot].signal_pending = 0;
-    memset(tasks[slot].signal_handlers, 0, sizeof(tasks[slot].signal_handlers));
-    memset(tasks[slot].signal_restorers, 0, sizeof(tasks[slot].signal_restorers));
-    memset(tasks[slot].signal_flags, 0, sizeof(tasks[slot].signal_flags));
+
+    tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
+    tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
+    tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    memset(tasks[slot].signal_handlers_internal, 0, sizeof(tasks[slot].signal_handlers_internal));
+    memset(tasks[slot].signal_restorers_internal, 0, sizeof(tasks[slot].signal_restorers_internal));
+    memset(tasks[slot].signal_flags_internal, 0, sizeof(tasks[slot].signal_flags_internal));
 
     /* Linux Init */
     tasks[slot].brk = 0;
@@ -519,9 +563,12 @@ int task_create(const char* name, void (*entry)(void)) {
  * @return Puntero a la siguiente tarea, o current_task si no hay otra.
  */
 static task_t* find_next_task(task_t* current) {
+    cpu_info_t* cpu = get_current_cpu();
+    if (!cpu) return NULL;
+
     /* O(1) Scheduler: Check ready queue */
-    if (ready_head) {
-        return ready_head;
+    if (cpu->local_ready_head) {
+        return (task_t*)cpu->local_ready_head;
     }
 
     /* Si no hay tareas listas y la actual esta muerta/durmiendo */
@@ -582,7 +629,7 @@ void schedule(void) {
         for(;;) {
             __asm__ volatile("hlt");
             /* After an interrupt (like timer), we should retry scheduling if ready tasks exist */
-            if (ready_head) {
+            if (cpu->local_ready_head) {
                 break;
             }
         }
@@ -644,8 +691,8 @@ void schedule(void) {
     cpu->current_task = next_task;
 
     /* Actualizar TSS RSP0 y Per-CPU Kernel Stack para Syscalls */
-    tss_set_rsp0(next_task->kernel_stack);
-    cpu->kernel_stack_top = next_task->kernel_stack;
+    tss_set_rsp0(next_task->kernel_stack_top);
+    cpu->kernel_stack_top = next_task->kernel_stack_top;
 
     /* Restore User Stack Pointer (for syscall exit / fork_return) */
     cpu->user_stack_scratch = next_task->user_rsp;
@@ -673,7 +720,7 @@ void schedule(void) {
 
     /* Context Switch holding the lock! */
     /* The next task will release it in schedule() return or task_entry_wrapper */
-    context_switch(&current->rsp, next_task->rsp, current->fpu_state, next_task->fpu_state);
+    context_switch(&current->rsp, &next_task->rsp, current->fpu_state, next_task->fpu_state);
 
     /* We are back in the old task (now current) */
     spin_unlock(&sched_lock);
@@ -768,6 +815,12 @@ void task_wakeup(task_t* t) {
         t->state = TASK_READY;
         dequeue_sleep(t);
         enqueue_ready(t);
+
+        cpu_info_t* current_cpu = get_current_cpu();
+        if (current_cpu && (uint32_t)t->target_cpu != current_cpu->index) {
+            /* Send IPI to the target CPU to wake it up or force schedule */
+            lapic_send_ipi(cpus[t->target_cpu].apic_id, 0x20); /* 0x20 is timer vector, forces schedule() */
+        }
     }
     spin_unlock(&sched_lock);
 
@@ -802,6 +855,30 @@ void task_exit(int status) {
         task_bitmap &= ~(1ULL << slot);
     }
     spin_unlock(&sched_lock);
+
+    /* Wake up any tasks waiting for this process */
+    __asm__ volatile("cli");
+    spin_lock(&sched_lock);
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_BLOCKED) {
+            /* Since waitpid loops over all tasks polling, the actual wakeup is handled by waking up any
+               potentially waiting tasks, or simply by the polling. The poll uses task_sleep. We can wake up
+               the parent. */
+            if (tasks[i].id == current->parent_id) {
+                tasks[i].state = TASK_READY;
+                dequeue_sleep(&tasks[i]);
+                enqueue_ready(&tasks[i]);
+
+                cpu_info_t* target_cpu = &cpus[tasks[i].target_cpu];
+                cpu_info_t* current_cpu = get_current_cpu();
+                if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index && target_cpu->state == CPU_STATE_ONLINE) {
+                    lapic_send_ipi(target_cpu->apic_id, 0x20);
+                }
+            }
+        }
+    }
+    spin_unlock(&sched_lock);
+    __asm__ volatile("sti");
 
     /* Yield forever until switched out */
     schedule();
@@ -847,11 +924,29 @@ int task_kill(uint32_t pid) {
 
             tasks[i].state = TASK_DEAD;
             task_bitmap &= ~(1ULL << i);
+
+            /* Clean up TID pointer if requested by clone */
+            if (tasks[i].clear_child_tid != NULL) {
+                if (vmm_verify_user_access(tasks[i].clear_child_tid, sizeof(uint32_t), 1)) {
+                    *tasks[i].clear_child_tid = 0;
+                    futex_wake(tasks[i].clear_child_tid, 1, FUTEX_WAKE);
+                }
+            }
+
             serial_write_string("[SCHED] Killed thread TID ");
             serial_write_string("\n");
             
             if (&tasks[i] == current) {
                 killed_self = 1;
+            } else {
+                /* Wake up its parent if parent is sleeping */
+                for (int j = 0; j < MAX_TASKS; j++) {
+                    if (tasks[j].id == tasks[i].parent_id && (tasks[j].state == TASK_SLEEPING || tasks[j].state == TASK_BLOCKED)) {
+                        tasks[j].state = TASK_READY;
+                        dequeue_sleep(&tasks[j]);
+                        enqueue_ready(&tasks[j]);
+                    }
+                }
             }
             found = 1;
         }
@@ -906,7 +1001,7 @@ int task_get_cpu_load(void) {
  * increasing reference counts. The child process returns 0 via RAX.
  *
  * @param regs_ptr Pointer to the syscall registers state to be restored on return.
- * @return The ID of the child process in the parent, or -1 on failure.
+ * @return The ID of the child process in the parent, or -1 on failure. Child returns 0 via RAX.
  */
 int task_fork(void* regs_ptr) {
     struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;
@@ -945,7 +1040,7 @@ int task_fork(void* regs_ptr) {
     tasks[slot].clear_child_tid = NULL;
     tasks[slot].state = TASK_READY;
     tasks[slot].stack_base = stack;
-    tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
+    tasks[slot].kernel_stack_top = (uint64_t)(stack + TASK_STACK_SIZE);
 
     /* 4. Clone Address Space (CoW) */
     /* Release lock to avoid deadlock during TLB shootdowns or heavy VM activity */
@@ -965,7 +1060,8 @@ int task_fork(void* regs_ptr) {
     /* Append (fork) to name? Optional */
 
     /* POSIX/Linux Fields */
-    memcpy(tasks[slot].fd_table, parent->fd_table, sizeof(parent->fd_table));
+    tasks[slot].fd_table = tasks[slot].fd_table_internal;
+    memcpy(tasks[slot].fd_table_internal, parent->fd_table_internal, sizeof(parent->fd_table_internal));
     strlcpy(tasks[slot].cwd, parent->cwd, sizeof(tasks[slot].cwd));
     /* VFS nodes are shared pointers! Refcounting handled here. */
     for (int i = 0; i < MAX_FD; i++) {
@@ -978,9 +1074,12 @@ int task_fork(void* regs_ptr) {
     if (tasks[slot].cwd_node) __atomic_fetch_add(&tasks[slot].cwd_node->ref_count, 1, __ATOMIC_SEQ_CST);
 
     tasks[slot].signal_mask = parent->signal_mask;
-    memcpy(tasks[slot].signal_handlers, parent->signal_handlers, sizeof(parent->signal_handlers));
-    memcpy(tasks[slot].signal_restorers, parent->signal_restorers, sizeof(parent->signal_restorers));
-    memcpy(tasks[slot].signal_flags, parent->signal_flags, sizeof(parent->signal_flags));
+    tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
+    tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
+    tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    memcpy(tasks[slot].signal_handlers_internal, parent->signal_handlers, sizeof(parent->signal_handlers_internal));
+    memcpy(tasks[slot].signal_restorers_internal, parent->signal_restorers, sizeof(parent->signal_restorers_internal));
+    memcpy(tasks[slot].signal_flags_internal, parent->signal_flags, sizeof(parent->signal_flags_internal));
     tasks[slot].brk = parent->brk;
     tasks[slot].fs_base = parent->fs_base;
     tasks[slot].gs_base = parent->gs_base;
@@ -994,7 +1093,7 @@ int task_fork(void* regs_ptr) {
 
     /* 6. Setup Child Stack for Return */
     /* We need to copy `regs` to child stack top */
-    uint64_t* sp = (uint64_t*)tasks[slot].kernel_stack;
+    uint64_t* sp = (uint64_t*)tasks[slot].kernel_stack_top;
 
     /* Push syscall_regs */
     sp = (uint64_t*)((uint8_t*)sp - sizeof(struct syscall_regs));
@@ -1094,7 +1193,7 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
 
     tasks[slot].state = TASK_READY;
     tasks[slot].stack_base = stack;
-    tasks[slot].kernel_stack = (uint64_t)(stack + TASK_STACK_SIZE);
+    tasks[slot].kernel_stack_top = (uint64_t)(stack + TASK_STACK_SIZE);
 
     if (clone_flags & CLONE_VM) {
         tasks[slot].cr3 = parent->cr3;
@@ -1113,12 +1212,15 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     strlcpy(tasks[slot].name, parent->name, sizeof(tasks[slot].name));
     strlcpy(tasks[slot].executable_path, parent->executable_path, sizeof(tasks[slot].executable_path));
 
-    /* Warning: Array copies - true shared structs needed for full POSIX thread behavior
-       with file descriptors and signal handlers. But this is enough to start. */
-    memcpy(tasks[slot].fd_table, parent->fd_table, sizeof(parent->fd_table));
-    for (int i = 0; i < MAX_FD; i++) {
-        if (tasks[slot].fd_table[i].node) {
-            __atomic_fetch_add(&tasks[slot].fd_table[i].node->ref_count, 1, __ATOMIC_SEQ_CST);
+    if (clone_flags & CLONE_FILES) {
+        tasks[slot].fd_table = parent->fd_table;
+    } else {
+        tasks[slot].fd_table = tasks[slot].fd_table_internal;
+        memcpy(tasks[slot].fd_table_internal, parent->fd_table, sizeof(parent->fd_table_internal));
+        for (int i = 0; i < MAX_FD; i++) {
+            if (tasks[slot].fd_table[i].node) {
+                __atomic_fetch_add(&tasks[slot].fd_table[i].node->ref_count, 1, __ATOMIC_SEQ_CST);
+            }
         }
     }
 
@@ -1127,9 +1229,18 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     if (tasks[slot].cwd_node) __atomic_fetch_add(&tasks[slot].cwd_node->ref_count, 1, __ATOMIC_SEQ_CST);
 
     tasks[slot].signal_mask = parent->signal_mask;
-    memcpy(tasks[slot].signal_handlers, parent->signal_handlers, sizeof(parent->signal_handlers));
-    memcpy(tasks[slot].signal_restorers, parent->signal_restorers, sizeof(parent->signal_restorers));
-    memcpy(tasks[slot].signal_flags, parent->signal_flags, sizeof(parent->signal_flags));
+    if (clone_flags & CLONE_SIGHAND) {
+        tasks[slot].signal_handlers = parent->signal_handlers;
+        tasks[slot].signal_restorers = parent->signal_restorers;
+        tasks[slot].signal_flags = parent->signal_flags;
+    } else {
+        tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
+        tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
+        tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+        memcpy(tasks[slot].signal_handlers_internal, parent->signal_handlers, sizeof(parent->signal_handlers_internal));
+        memcpy(tasks[slot].signal_restorers_internal, parent->signal_restorers, sizeof(parent->signal_restorers_internal));
+        memcpy(tasks[slot].signal_flags_internal, parent->signal_flags, sizeof(parent->signal_flags_internal));
+    }
 
     tasks[slot].brk = parent->brk;
 
@@ -1163,7 +1274,7 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     }
 
     /* 6. Setup Child Stack for Return */
-    uint64_t* sp = (uint64_t*)tasks[slot].kernel_stack;
+    uint64_t* sp = (uint64_t*)tasks[slot].kernel_stack_top;
 
     /* Push syscall_regs */
     sp = (uint64_t*)((uint8_t*)sp - sizeof(struct syscall_regs));
@@ -1213,9 +1324,9 @@ int task_waitpid(int pid, int* status, int options) {
              int is_child = (tasks[i].parent_id == current->id);
              int is_thread = (tasks[i].tgid == current->tgid);
 
-             if (is_child || ((options & __WALL) && is_thread)) {
+             if (is_child || ((options & __WALL) && is_thread) || ((options & __WALL) && tasks[i].tgid == current->id)) {
                  /* Is it the one we are looking for? */
-                 if (pid == -1 || (int)tasks[i].id == pid || (pid < -1 && (int)tasks[i].tgid == -pid)) {
+                 if (pid == -1 || (int)tasks[i].id == pid || (int)tasks[i].tgid == pid || (pid < -1 && (int)tasks[i].tgid == -pid)) {
                      found_child = 1;
                      if (tasks[i].state == TASK_DEAD) {
                          found_zombie = 1;
@@ -1231,20 +1342,33 @@ int task_waitpid(int pid, int* status, int options) {
         if (found_zombie) {
              /* Clean up zombie */
              task_t* zombie = &tasks[zombie_slot];
-             for (int j=0; j<MAX_FD; j++) {
-                 if (zombie->fd_table[j].node) {
-                      fs_node_t* node = zombie->fd_table[j].node;
-                      if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
-                          close_fs(node);
-                          kfree(node);
-                      }
-                      zombie->fd_table[j].node = NULL;
+             if (zombie->fd_table == zombie->fd_table_internal) {
+                 for (int j=0; j<MAX_FD; j++) {
+                     if (zombie->fd_table[j].node) {
+                          fs_node_t* node = zombie->fd_table[j].node;
+                          if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+                              close_fs(node);
+                              kfree(node);
+                          }
+                          zombie->fd_table[j].node = NULL;
+                     }
                  }
              }
 
-             /* Free CR3 if it's not kernel's */
+             /* Free CR3 if it's not kernel's and no other thread shares it */
              if (zombie->cr3 != tasks[0].cr3) {
-                 vmm_destroy_pml4(zombie->cr3);
+                 int shared_cr3 = 0;
+                 for (int k = 0; k < MAX_TASKS; k++) {
+                     if (k != zombie_slot && tasks[k].id != 0 && tasks[k].state != 0 && tasks[k].state != TASK_DEAD) {
+                         if (tasks[k].cr3 == zombie->cr3) {
+                             shared_cr3 = 1;
+                             break;
+                         }
+                     }
+                 }
+                 if (!shared_cr3) {
+                     vmm_destroy_pml4(zombie->cr3);
+                 }
              }
 
              zombie->id = 0;
@@ -1413,6 +1537,13 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     }
 
     /* Close O_CLOEXEC descriptors on exec */
+    /* Since exec unshares FD table if shared, we should unshare here but for now just clear them locally */
+    if (current->fd_table != current->fd_table_internal) {
+        /* Make a copy to unshare on exec as exec replaces address space and we shouldn't affect other threads */
+        memcpy(current->fd_table_internal, current->fd_table, sizeof(current->fd_table_internal));
+        current->fd_table = current->fd_table_internal;
+    }
+
     for (int i = 0; i < MAX_FD; i++) {
         if (current->fd_table[i].node && (current->fd_table[i].flags & O_CLOEXEC)) {
             if (__atomic_sub_fetch(&current->fd_table[i].node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {

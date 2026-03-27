@@ -75,7 +75,7 @@ void task_exit(int status) {
 
 void task_yield(void) {}
 void schedule(void) {}
-void context_switch(uint64_t* old, uint64_t new, void* fpu1, void* fpu2) {}
+void context_switch(uint64_t* old, uint64_t* new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 
 void serial_write_string(const char* s) {}
@@ -256,6 +256,7 @@ int main() {
     // Setup task
     memset(&current_task_mock, 0, sizeof(task_t));
     current_task_mock.id = 1;
+    current_task_mock.fd_table = current_task_mock.fd_table_internal;
 
     // Setup a directory fd
     fs_node_t* node = (fs_node_t*)malloc(sizeof(fs_node_t));

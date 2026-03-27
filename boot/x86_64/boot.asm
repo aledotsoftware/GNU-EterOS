@@ -33,7 +33,7 @@ STAGE2_LOAD_ADDR    equ 0x7E00          ; Dirección donde se carga Stage 2
 TEMP_KERNEL_ADDR    equ 0x10000         ; Buffer temporal bajo 1MB para BIOS (movido a 64KB)
 TEMP_INITRD_ADDR    equ TEMP_KERNEL_ADDR + (KERNEL_SECTORS * 512)
 FINAL_KERNEL_ADDR   equ 0x100000        ; Dirección final en 1MB (donde BSS tiene espacio)
-STACK_TOP           equ 0x8000000       ; Stack en 128MB (Lejos del heap de 96MB)
+STACK_TOP           equ 0x90000         ; Stack en 0x90000
 
 ; =============================================================================
 ; Punto de entrada - Stage 1
@@ -354,7 +354,7 @@ load_kernel:
 ; -----------------------------------------------------------------------------
 ; load_initrd: Carga el Initrd desde disco
 ; -----------------------------------------------------------------------------
-INITRD_LOAD_ADDR    equ 0x4000000     ; Mover Initrd a 0x4000000 (64 MB)
+INITRD_LOAD_ADDR    equ 0x2000000     ; Mover Initrd a 0x2000000 (32 MB) para soportar 64MB RAM
 %ifndef INITRD_SECTORS
 INITRD_SECTORS      equ 512         ; Keep the increased limit (default)
 %endif
@@ -740,7 +740,7 @@ protected_mode_start:
     ; Indicador visual en VGA: "PM" (Protected Mode) en verde
     mov word [0xB8000], 0x2F50          ; 'P' verde
     mov word [0xB8002], 0x2F4D          ; 'M' verde
-    
+
     ; ---- Relocalizar Kernel a su posición final (1MB+) ----
     ; Esto lo hacemos en Modo Protegido para superar el límite de 1MB de la BIOS
     ; y evitar colisiones de BSS con el stack/EBDA.
@@ -749,7 +749,7 @@ protected_mode_start:
     mov ecx, KERNEL_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores
     rep movsd
 
-    ; ---- Relocalizar Initrd a su posición final (64MB) ----
+    ; ---- Relocalizar Initrd a su posición final (32MB) ----
     mov esi, TEMP_INITRD_ADDR
     mov edi, INITRD_LOAD_ADDR
     mov ecx, INITRD_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores

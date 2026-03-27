@@ -21,7 +21,6 @@
 #include <pmm.h>
 #include <vmm.h>
 #include <fs/initrd.h>
-#include <fs/vfs.h>
 #include <fs/devfs.h>
 #include <fs/shmfs.h>
 #include <fs/procfs.h>
@@ -121,7 +120,11 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 1. Inicializar Hardware Abstraction Layer (HAL) ---- */
     /* Esto configura relojes, interrupciones, consola, timer, etc. */
     extern bool mm_initialized;
+    extern bool pmm_initialized_flag;
+    extern bool vmm_initialized_flag;
     ASSERT(mm_initialized == false && "Heap initialized before HAL!");
+    ASSERT(pmm_initialized_flag == false && "PMM initialized before HAL!");
+    ASSERT(vmm_initialized_flag == false && "VMM initialized before HAL!");
     hal_init();
     
     serial_write_string("[DEBUG] HAL Initialized returned to main.\n");
@@ -150,6 +153,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         #if defined(ARCH_X86_64)
             /* x86 specific PMM init (uses E820) */
             ASSERT(mm_initialized == false && "Heap initialized before PMM!");
+            ASSERT(vmm_initialized_flag == false && "VMM initialized before PMM!");
             pmm_init();
             ASSERT(pmm_get_total_ram() > 0);
 
@@ -166,11 +170,16 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
         #if ETEROS_HAS_MMU
             ASSERT(mm_initialized == false && "Heap initialized before VMM!");
+            ASSERT(pmm_initialized_flag == true && "VMM initialized before PMM!");
             hal_mmu_init(); /* Configura paginación virtual */
             serial_write_string("[DEBUG] VMM Initialized.\n");
         #endif
 
         /* Heap Manager (Generic) */
+        ASSERT(pmm_initialized_flag == true && "Heap initialized before PMM!");
+        #if ETEROS_HAS_MMU
+        ASSERT(vmm_initialized_flag == true && "Heap initialized before VMM!");
+        #endif
         mm_init(boot_info);
         ASSERT(mm_get_total_memory() > 0);
         serial_write_string("[DEBUG] Heap Initialized.\n");
@@ -343,23 +352,26 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 static void kernel_print_banner(void) {
     hal_console_write("\n");
     
-    /* Logo de éterOS en arte ASCII (Austral Aurora theme) */
-    hal_console_write("\033[38;2;142;240;227m      __              \033[38;2;64;224;208m____  ____  \n");
-    hal_console_write("\033[38;2;135;206;235m  ___/ /____ ____ ___ \033[38;2;50;180;180m/ __ \\/ ___|\n");
-    hal_console_write("\033[38;2;100;180;250m / -_) __/ -_) __/ _ \\\033[38;2;40;150;160m /_/ /\\__ \\ \n");
-    hal_console_write("\033[38;2;65;105;225m \\__/\\__/\\__/_/  \\___/\033[38;2;30;120;140m\\____/____/ \033[0m\n");
+    /* Logo de éterOS en arte ASCII (Austral Aurora theme - Premium) */
+    hal_console_write("\033[38;2;85;255;255m   :::::::::: ::::::::::: :::::::::: :::::::::   ::::::::   ::::::::  \033[0m\n");
+    hal_console_write("\033[38;2;75;230;255m  :+:             :+:     :+:        :+:    :+: :+:    :+: :+:    :+: \033[0m\n");
+    hal_console_write("\033[38;2;65;200;255m  +:+             +:+     +:+        +:+    +:+ +:+    +:+ +:+        \033[0m\n");
+    hal_console_write("\033[38;2;55;175;255m  +#++:++#        +#+     +#++:++#   +#++:++#:  +#+    +:+ +#++:++#++ \033[0m\n");
+    hal_console_write("\033[38;2;45;150;255m  +#+             +#+     +#+        +#+    +#+ +#+    +#+        +#+ \033[0m\n");
+    hal_console_write("\033[38;2;35;120;255m  #+#             #+#     #+#        #+#    #+# #+#    #+# #+#    #+# \033[0m\n");
+    hal_console_write("\033[38;2;25;90;255m  ##########      ###     ########## ###    ###  ########   ########  \033[0m\n");
 
     hal_console_write("\n");
-    hal_console_write("\033[38;2;40;180;200m  ========================================\033[0m\n");
+    hal_console_write("\033[38;2;0;200;255m  ====================================================================\033[0m\n");
     
     /* Versión y codename */
-    kprintf("    \033[38;2;255;255;255mVersion %d.%d.%d (\"%s\")\033[0m\n",
+    kprintf("       \033[38;2;255;255;255mVersion %d.%d.%d \033[38;2;150;150;150m// \033[38;2;0;255;200m\"%s\"\033[0m\n",
             ETEROS_VERSION_MAJOR, ETEROS_VERSION_MINOR, ETEROS_VERSION_PATCH, ETEROS_CODENAME);
 
     /* Copyright */
-    hal_console_write("    \033[38;2;150;150;150m(c) 2026 Tudex Networks\033[0m\n");
+    hal_console_write("       \033[38;2;120;120;120m(c) 2026 Tudex Networks \033[38;2;80;80;80m| Premium Edition\033[0m\n");
     
-    hal_console_write("\033[38;2;40;180;200m  ========================================\033[0m\n");
+    hal_console_write("\033[38;2;0;200;255m  ====================================================================\033[0m\n");
     hal_console_write("\n");
 }
 
