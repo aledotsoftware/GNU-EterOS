@@ -931,7 +931,7 @@ static int64_t sys_symlinkat(const char* target, int newdirfd, const char* linkp
     return res < 0 ? res : 0;
 }
 
-static int64_t sys_utimensat(int dirfd, const char* pathname, const struct timespec times[2], int flags) {
+static int64_t sys_utimensat(int dirfd, const char* pathname, const struct timespec times[2], int flags __attribute__((unused))) {
     if (times) {
         if (!vmm_verify_user_access(times, 2 * sizeof(struct timespec), 0)) return -EFAULT;
     }
@@ -1817,7 +1817,7 @@ struct epoll_event {
 };
 #pragma pack(pop)
 
-static int64_t sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event* event) {
+static int64_t sys_epoll_ctl(int epfd, int op __attribute__((unused)), int fd, struct epoll_event* event) {
     task_t* current = task_get_current();
     if (epfd < 0 || epfd >= MAX_FD || fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[epfd].node || !current->fd_table[fd].node) return -EBADF;
