@@ -9,6 +9,18 @@
 /* Global root node for ProcFS */
 static fs_node_t* procfs_root = NULL;
 
+static task_t* proc_node_task(fs_node_t *node) {
+    if (!node || node->impl == 0) {
+        return task_get_current();
+    }
+    return task_get_by_id(node->impl);
+}
+
+static int proc_node_fd(fs_node_t *node) {
+    if (!node || node->inode < 1000) return -1;
+    return (int)(node->inode - 1000);
+}
+
 /* ========================================================================= */
 /* /proc/version Implementation                                              */
 /* ========================================================================= */
@@ -98,9 +110,9 @@ static int proc_self_fd_readdir(fs_node_t *node, uint32_t index, struct dirent *
 
 /* /proc/self/exe */
 static ssize_t proc_self_exe_readlink(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset;
-    task_t* current = task_get_current();
-    if (!current) return 0;
+    (void)offset;
+    task_t* current = proc_node_task(node);
+    if (!current || !buffer) return 0;
 
     int len = strlen(current->executable_path);
     if (len > (int)size) len = size;
@@ -110,9 +122,9 @@ static ssize_t proc_self_exe_readlink(fs_node_t *node, uint32_t offset, uint32_t
 
 /* /proc/self/cmdline */
 static ssize_t proc_self_cmdline_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset;
-    task_t* current = task_get_current();
-    if (!current) return 0;
+    (void)offset;
+    task_t* current = proc_node_task(node);
+    if (!current || !buffer) return 0;
     // Just return name as cmdline for now
     int len = strlen(current->name) + 1; // include null
     if (len > (int)size) len = size;
@@ -122,9 +134,8 @@ static ssize_t proc_self_cmdline_read(fs_node_t *node, uint32_t offset, uint32_t
 
 /* /proc/self/status */
 static ssize_t proc_self_status_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node;
-    task_t* current = task_get_current();
-    if (!current) return 0;
+    task_t* current = proc_node_task(node);
+    if (!current || !buffer) return 0;
 
     char status_str[512];
     char num_buf[32];
@@ -175,9 +186,8 @@ static ssize_t proc_self_status_read(fs_node_t *node, uint32_t offset, uint32_t 
 
 /* /proc/self/maps */
 static ssize_t proc_self_maps_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node;
-    task_t* current = task_get_current();
-    if (!current) return 0;
+    task_t* current = proc_node_task(node);
+    if (!current || !buffer) return 0;
 
     // Very basic mapping for the whole user range
     char maps_str[256];
@@ -196,6 +206,7 @@ static ssize_t proc_self_maps_read(fs_node_t *node, uint32_t offset, uint32_t si
 /* /proc/self/environ */
 static ssize_t proc_self_environ_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
+    if (!buffer) return 0;
     // We don't store environ, just return PATH=/bin:/usr/bin
     const char* env = "PATH=/bin:/usr/bin\0USER=root\0";
     size_t len = 30; // approx
@@ -204,10 +215,24 @@ static ssize_t proc_self_environ_read(fs_node_t *node, uint32_t offset, uint32_t
     return len;
 }
 
+static ssize_t proc_fd_link_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)offset;
+    task_t* target = proc_node_task(node);
+    int fd_num = proc_node_fd(node);
+    if (!target || !buffer || fd_num < 0 || fd_num >= MAX_FD) return 0;
+    if (!target->fd_table[fd_num].node) return 0;
+
+    const char* p = target->fd_table[fd_num].path;
+    if (!p || p[0] == '\0') p = "<anon>";
+    int len = strlen(p);
+    if (len > (int)size) len = (int)size;
+    memcpy(buffer, p, len);
+    return len;
+}
+
 /* /proc/self/fd/ implementation */
 static int proc_self_fd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
-    (void)node;
-    task_t* current = task_get_current();
+    task_t* current = proc_node_task(node);
     if (!current) return -1;
 
     uint32_t valid_idx = 0;
@@ -227,9 +252,8 @@ static int proc_self_fd_readdir(fs_node_t *node, uint32_t index, struct dirent *
 }
 
 static fs_node_t *proc_self_fd_finddir(fs_node_t *node, char *name) {
-    (void)node;
     if (!name) return 0;
-    task_t* current = task_get_current();
+    task_t* current = proc_node_task(node);
     if (!current) return 0;
 
     int fd_num = 0;
@@ -248,7 +272,8 @@ static fs_node_t *proc_self_fd_finddir(fs_node_t *node, char *name) {
     fnode->flags = FS_SYMLINK;
     strlcpy(fnode->name, name, sizeof(fnode->name));
     fnode->inode = 1000 + fd_num;
-    fnode->read = NULL; // We'd need a readlink here or in VFS. For now, it's a symlink node.
+    fnode->impl = current->id;
+    fnode->read = proc_fd_link_read;
     return fnode;
 }
 
@@ -266,13 +291,13 @@ static int proc_self_readdir(fs_node_t *node, uint32_t index, struct dirent *ent
 }
 
 static fs_node_t *proc_self_finddir(fs_node_t *node, char *name) {
-    (void)node;
     if (!name) return 0;
 
     fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!fnode) return 0;
     memset(fnode, 0, sizeof(fs_node_t));
     fnode->ref_count = 1;
+    fnode->impl = node ? node->impl : 0;
 
     if (strcmp(name, "exe") == 0) {
         strlcpy(fnode->name, "exe", sizeof(fnode->name));
@@ -357,17 +382,23 @@ static int procfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry)
         return 0;
     }
 
-    index -= 4; // Shift index for tasks
+    index -= 4; /* Shift index for task entries */
 
-    // We should really read tasks from task manager instead of only current task.
-    // For now we will return current task if index matches, to allow proc/<pid> discovery
-    task_t* current = task_get_current();
-    if (current && index == 0) {
-        char pid_str[32];
-        itoa_s((int64_t)current->id, pid_str, sizeof(pid_str), 10);
-        strlcpy(entry->name, pid_str, sizeof(entry->name));
-        entry->inode = 100 + current->id;
-        return 0;
+    uint32_t seen = 0;
+    int max = task_get_max();
+    for (int i = 0; i < max; i++) {
+        task_t* t = task_get_at(i);
+        if (!t) continue;
+        if (t->state == TASK_DEAD) continue;
+        if (t->id == 0 && t->name[0] == '\0') continue;
+        if (seen == index) {
+            char pid_str[32];
+            itoa_s((int64_t)t->id, pid_str, sizeof(pid_str), 10);
+            strlcpy(entry->name, pid_str, sizeof(entry->name));
+            entry->inode = 100 + t->id;
+            return 0;
+        }
+        seen++;
     }
 
     return 1; /* EOF */
@@ -413,12 +444,18 @@ static fs_node_t *procfs_finddir(fs_node_t *node, char *name) {
             }
         }
 
-        if (is_pid && pid == (int)task_get_current()->id) {
+        if (is_pid) {
+            task_t* target = task_get_by_id((uint32_t)pid);
+            if (!target || target->state == TASK_DEAD) {
+                kfree(fnode);
+                return 0;
+            }
             strlcpy(fnode->name, name, sizeof(fnode->name));
             fnode->flags = FS_DIRECTORY;
-            fnode->readdir = proc_self_readdir; // Reuse self functions for now since we only support current process info effectively
+            fnode->readdir = proc_self_readdir;
             fnode->finddir = proc_self_finddir;
             fnode->inode = 100 + pid;
+            fnode->impl = (uint32_t)pid;
             return fnode;
         }
 

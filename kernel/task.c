@@ -316,13 +316,18 @@ void scheduler_init(void) {
     if (tasks[0].cwd_node) tasks[0].cwd_node->ref_count++;
     tasks[0].signal_mask = 0;
     tasks[0].signal_pending = 0;
+    tasks[0].sigaltstack_sp = 0;
+    tasks[0].sigaltstack_size = 0;
+    tasks[0].sigaltstack_flags = 2; /* SS_DISABLE */
 
     tasks[0].signal_handlers = (void (**)(int))tasks[0].signal_handlers_internal;
     tasks[0].signal_restorers = (void (**)(void))tasks[0].signal_restorers_internal;
     tasks[0].signal_flags = tasks[0].signal_flags_internal;
+    tasks[0].signal_action_masks = tasks[0].signal_action_masks_internal;
     memset(tasks[0].signal_handlers_internal, 0, sizeof(tasks[0].signal_handlers_internal));
     memset(tasks[0].signal_restorers_internal, 0, sizeof(tasks[0].signal_restorers_internal));
     memset(tasks[0].signal_flags_internal, 0, sizeof(tasks[0].signal_flags_internal));
+    memset(tasks[0].signal_action_masks_internal, 0, sizeof(tasks[0].signal_action_masks_internal));
 
     /* Linux Init */
     tasks[0].brk = 0;
@@ -418,9 +423,14 @@ void task_init_ap(void) {
     tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
     tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
     tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    tasks[slot].signal_action_masks = tasks[slot].signal_action_masks_internal;
+    tasks[slot].sigaltstack_sp = 0;
+    tasks[slot].sigaltstack_size = 0;
+    tasks[slot].sigaltstack_flags = 2; /* SS_DISABLE */
     memset(tasks[slot].signal_handlers_internal, 0, sizeof(tasks[slot].signal_handlers_internal));
     memset(tasks[slot].signal_restorers_internal, 0, sizeof(tasks[slot].signal_restorers_internal));
     memset(tasks[slot].signal_flags_internal, 0, sizeof(tasks[slot].signal_flags_internal));
+    memset(tasks[slot].signal_action_masks_internal, 0, sizeof(tasks[slot].signal_action_masks_internal));
 
     if (slot >= task_count) {
         task_count = slot + 1;
@@ -503,13 +513,18 @@ int task_create(const char* name, void (*entry)(void)) {
     if (tasks[slot].cwd_node) tasks[slot].cwd_node->ref_count++;
     tasks[slot].signal_mask = 0;
     tasks[slot].signal_pending = 0;
+    tasks[slot].sigaltstack_sp = 0;
+    tasks[slot].sigaltstack_size = 0;
+    tasks[slot].sigaltstack_flags = 2; /* SS_DISABLE */
 
     tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
     tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
     tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    tasks[slot].signal_action_masks = tasks[slot].signal_action_masks_internal;
     memset(tasks[slot].signal_handlers_internal, 0, sizeof(tasks[slot].signal_handlers_internal));
     memset(tasks[slot].signal_restorers_internal, 0, sizeof(tasks[slot].signal_restorers_internal));
     memset(tasks[slot].signal_flags_internal, 0, sizeof(tasks[slot].signal_flags_internal));
+    memset(tasks[slot].signal_action_masks_internal, 0, sizeof(tasks[slot].signal_action_masks_internal));
 
     /* Linux Init */
     tasks[slot].brk = 0;
@@ -1083,12 +1098,18 @@ int task_fork(void* regs_ptr) {
     if (tasks[slot].cwd_node) __atomic_fetch_add(&tasks[slot].cwd_node->ref_count, 1, __ATOMIC_SEQ_CST);
 
     tasks[slot].signal_mask = parent->signal_mask;
+    tasks[slot].signal_pending = 0;
+    tasks[slot].sigaltstack_sp = parent->sigaltstack_sp;
+    tasks[slot].sigaltstack_size = parent->sigaltstack_size;
+    tasks[slot].sigaltstack_flags = parent->sigaltstack_flags & ~1U; /* Clear SS_ONSTACK */
     tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
     tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
     tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    tasks[slot].signal_action_masks = tasks[slot].signal_action_masks_internal;
     memcpy(tasks[slot].signal_handlers_internal, parent->signal_handlers, sizeof(parent->signal_handlers_internal));
     memcpy(tasks[slot].signal_restorers_internal, parent->signal_restorers, sizeof(parent->signal_restorers_internal));
     memcpy(tasks[slot].signal_flags_internal, parent->signal_flags, sizeof(parent->signal_flags_internal));
+    memcpy(tasks[slot].signal_action_masks_internal, parent->signal_action_masks, sizeof(parent->signal_action_masks_internal));
     tasks[slot].brk = parent->brk;
     tasks[slot].fs_base = parent->fs_base;
     tasks[slot].gs_base = parent->gs_base;
@@ -1244,17 +1265,31 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     if (tasks[slot].cwd_node) __atomic_fetch_add(&tasks[slot].cwd_node->ref_count, 1, __ATOMIC_SEQ_CST);
 
     tasks[slot].signal_mask = parent->signal_mask;
+    tasks[slot].signal_pending = 0;
     if (clone_flags & CLONE_SIGHAND) {
         tasks[slot].signal_handlers = parent->signal_handlers;
         tasks[slot].signal_restorers = parent->signal_restorers;
         tasks[slot].signal_flags = parent->signal_flags;
+        tasks[slot].signal_action_masks = parent->signal_action_masks;
     } else {
         tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
         tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
         tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+        tasks[slot].signal_action_masks = tasks[slot].signal_action_masks_internal;
         memcpy(tasks[slot].signal_handlers_internal, parent->signal_handlers, sizeof(parent->signal_handlers_internal));
         memcpy(tasks[slot].signal_restorers_internal, parent->signal_restorers, sizeof(parent->signal_restorers_internal));
         memcpy(tasks[slot].signal_flags_internal, parent->signal_flags, sizeof(parent->signal_flags_internal));
+        memcpy(tasks[slot].signal_action_masks_internal, parent->signal_action_masks, sizeof(parent->signal_action_masks_internal));
+    }
+    if (clone_flags & CLONE_VM) {
+        /* Linux compatibility: clear altstack for CLONE_VM (thread-like clone). */
+        tasks[slot].sigaltstack_sp = 0;
+        tasks[slot].sigaltstack_size = 0;
+        tasks[slot].sigaltstack_flags = 2; /* SS_DISABLE */
+    } else {
+        tasks[slot].sigaltstack_sp = parent->sigaltstack_sp;
+        tasks[slot].sigaltstack_size = parent->sigaltstack_size;
+        tasks[slot].sigaltstack_flags = parent->sigaltstack_flags & ~1U; /* Clear SS_ONSTACK */
     }
 
     tasks[slot].brk = parent->brk;

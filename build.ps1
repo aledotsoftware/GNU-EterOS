@@ -549,6 +549,32 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_epoll.elf"; exit 1 }
 
+    # test_sigaltstack.elf
+    $testSigAltSrc = "$userDir\test_sigaltstack.c"
+    $testSigAltObj = "$BUILD_DIR\userspace\test_sigaltstack.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $testSigAltSrc -o $testSigAltObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test_sigaltstack.c"; exit 1 }
+
+    $testSigAltElf = "$initrdRoot\test_sigaltstack.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testSigAltElf $testSigAltObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_sigaltstack.elf"; exit 1 }
+
+    # test_signal_posix.elf
+    $testSignalPosixSrc = "$userDir\test_signal_posix.c"
+    $testSignalPosixObj = "$BUILD_DIR\userspace\test_signal_posix.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $testSignalPosixSrc -o $testSignalPosixObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test_signal_posix.c"; exit 1 }
+
+    $testSignalPosixElf = "$initrdRoot\test_signal_posix.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testSignalPosixElf $testSignalPosixObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_signal_posix.elf"; exit 1 }
+
     # sh.elf
     $shSrc = "$userDir\sh.c"
     $shObj = "$BUILD_DIR\userspace\sh.o"
@@ -614,7 +640,7 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar busybox"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
+    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
 }
 
 function Invoke-InitrdBuild {

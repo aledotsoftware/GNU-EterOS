@@ -95,6 +95,24 @@ int sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
     return 0;
 }
 
+int sigpending(sigset_t *set) {
+    long ret = syscall2(SYS_rt_sigpending, (long)set, 8);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return 0;
+}
+
+int sigsuspend(const sigset_t *mask) {
+    long ret = syscall2(SYS_rt_sigsuspend, (long)mask, 8);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return 0;
+}
+
+int sigaltstack(const stack_t *ss, stack_t *old_ss) {
+    long ret = syscall2(SYS_sigaltstack, (long)ss, (long)old_ss);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return 0;
+}
+
 int raise(int sig) {
     /* Get our own PID */
     long ret_pid;

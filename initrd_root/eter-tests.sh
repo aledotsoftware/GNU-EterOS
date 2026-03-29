@@ -32,5 +32,7 @@ pwd
 # Syscall sprint1 unit suite
 /test_syscalls_s1.elf
 /test_epoll.elf
+/test_sigaltstack.elf
+/test_signal_posix.elf
 
 echo eter-tests: OK

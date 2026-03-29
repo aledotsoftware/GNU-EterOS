@@ -2,6 +2,7 @@
 #define _SIGNAL_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 /* Standard Signals (Linux-compatible) */
 #define SIGHUP      1
@@ -35,10 +36,25 @@
 #define SIG_SETMASK 2
 
 /* Signal flags */
+#define SA_NOCLDSTOP 0x00000001
+#define SA_NOCLDWAIT 0x00000002
+#define SA_SIGINFO   0x00000004
+#define SA_RESETHAND 0x80000000
+#define SA_NODEFER   0x40000000
+#define SA_ONSTACK  0x08000000
 #define SA_RESTORER 0x04000000
 
 typedef uint64_t sigset_t;
 typedef void (*sighandler_t)(int);
+
+typedef struct {
+    void*  ss_sp;
+    int    ss_flags;
+    size_t ss_size;
+} stack_t;
+
+#define SS_ONSTACK  1
+#define SS_DISABLE  2
 
 struct sigaction {
     sighandler_t sa_handler;
@@ -54,6 +70,9 @@ int sigemptyset(sigset_t *set);
 int sigfillset(sigset_t *set);
 int sigaddset(sigset_t *set, int signum);
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+int sigpending(sigset_t *set);
+int sigsuspend(const sigset_t *mask);
+int sigaltstack(const stack_t *ss, stack_t *old_ss);
 int raise(int sig);
 
 #endif /* _SIGNAL_H */

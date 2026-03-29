@@ -1137,6 +1137,25 @@ typedef struct {
     size_t ss_size;
 } stack_t;
 
+#ifndef SA_ONSTACK
+#define SA_ONSTACK  0x08000000
+#endif
+#ifndef SA_NODEFER
+#define SA_NODEFER  0x40000000
+#endif
+#ifndef SA_RESETHAND
+#define SA_RESETHAND 0x80000000
+#endif
+
+#ifndef SS_ONSTACK
+#define SS_ONSTACK  1
+#define SS_DISABLE  2
+#endif
+
+#ifndef MINSIGSTKSZ
+#define MINSIGSTKSZ 2048
+#endif
+
 struct robust_list_head {
     void* list;
     long futex_offset;
@@ -1173,14 +1192,35 @@ static int64_t sys_prlimit64(int pid, int resource, const struct rlimit* new_lim
 }
 
 static int64_t sys_sigaltstack(const stack_t* ss, stack_t* old_ss) {
+    task_t* current = task_get_current();
     if (old_ss) {
         if (!vmm_verify_user_access(old_ss, sizeof(stack_t), 1)) return -EFAULT;
-        memset(old_ss, 0, sizeof(stack_t));
+        old_ss->ss_sp = (void*)current->sigaltstack_sp;
+        old_ss->ss_size = current->sigaltstack_size;
+        old_ss->ss_flags = 0;
+        if (current->sigaltstack_flags & SS_DISABLE) old_ss->ss_flags |= SS_DISABLE;
+        if (current->sigaltstack_flags & SS_ONSTACK) old_ss->ss_flags |= SS_ONSTACK;
     }
     if (ss) {
+        stack_t kss;
         if (!vmm_verify_user_access(ss, sizeof(stack_t), 0)) return -EFAULT;
+        memcpy(&kss, ss, sizeof(stack_t));
+        if (kss.ss_flags & ~(SS_DISABLE)) return -EINVAL;
+        if (current->sigaltstack_flags & SS_ONSTACK) return -EPERM;
+
+        if (kss.ss_flags & SS_DISABLE) {
+            current->sigaltstack_sp = 0;
+            current->sigaltstack_size = 0;
+            current->sigaltstack_flags = SS_DISABLE;
+        } else {
+            if (!kss.ss_sp || kss.ss_size < MINSIGSTKSZ) return -ENOMEM;
+            if (!vmm_verify_user_access(kss.ss_sp, kss.ss_size, 1)) return -EFAULT;
+            current->sigaltstack_sp = (uint64_t)kss.ss_sp;
+            current->sigaltstack_size = kss.ss_size;
+            current->sigaltstack_flags = 0;
+        }
     }
-    return 0; /* Stub */
+    return 0;
 }
 
 static int64_t sys_tgkill(int tgid, int tid, int sig) {
@@ -1262,7 +1302,9 @@ static int64_t sys_kill(int pid, int sig) {
         return -ESRCH;
     }
 
-    target->signal_pending |= (1u << sig);
+    if (sig > 0) {
+        target->signal_pending |= (1u << (sig - 1));
+    }
     if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) task_wakeup(target);
     return 0;
 }
@@ -1320,15 +1362,19 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
         if (!vmm_verify_user_access(arg, sizeof(struct winsize), 1)) return -EFAULT;
     } else if (request == TIOCSWINSZ) {
         if (!vmm_verify_user_access(arg, sizeof(struct winsize), 0)) return -EFAULT;
+    } else if (request == TIOCGPGRP || request == TIOCGPTN || request == FIONREAD) {
+        if (!vmm_verify_user_access(arg, sizeof(int), 1)) return -EFAULT;
+    } else if (request == TIOCSPGRP || request == TIOCSPTLCK || request == FIONBIO) {
+        if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
+    } else if (request == TIOCSCTTY) {
+        /* Accept null arg or int* arg; userspace commonly passes (void*)1 in Linux. */
+        if (arg != NULL && !vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
     } else if (request == FIONBIO) {
         if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
-        } else if (request == 0x8912) { /* SIOCGIFCONF */
+    } else if (request == 0x8912) { /* SIOCGIFCONF */
         if (!vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
         return -ENOSYS; // Network stack stubbed
-    } else if (request == FIONREAD) {
-        if (!vmm_verify_user_access(arg, sizeof(int), 1)) return -EFAULT;
-        // FIONREAD handled by ioctl_fs later
-} else if (request == 0x4600) { /* FBIOGET_VSCREENINFO */
+    } else if (request == 0x4600) { /* FBIOGET_VSCREENINFO */
         if (!vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
     }
 
@@ -1589,14 +1635,14 @@ static int64_t sys_rt_sigaction(int sig, const struct kernel_sigaction* act,
         oldact->handler = current->signal_handlers[sig];
         oldact->flags = current->signal_flags[sig];
         oldact->restorer = current->signal_restorers[sig];
-        oldact->mask = current->signal_mask;
+        oldact->mask = current->signal_action_masks[sig];
     }
     if (act) {
         if (!vmm_verify_user_access(act, sizeof(struct kernel_sigaction), 0)) return -EFAULT;
         current->signal_handlers[sig] = act->handler;
         current->signal_flags[sig] = act->flags;
-        /* The signal_mask will temporarily add act->mask when handler runs, but we only have a global mask currently.
-           For Tier 1, preserving/setting properties is sufficient. */
+        current->signal_action_masks[sig] = act->mask;
+        current->signal_action_masks[sig] &= ~((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)));
         /* Store restorer if provided */
         if (act->flags & SA_RESTORER) {
              current->signal_restorers[sig] = act->restorer;
@@ -1624,9 +1670,45 @@ static int64_t sys_rt_sigprocmask(int how, const uint64_t* set, uint64_t* oldset
         else if (how == SIG_UNBLOCK) current->signal_mask &= ~(uint32_t)*set;
         else if (how == SIG_SETMASK) current->signal_mask = (uint32_t)*set;
         else return -EINVAL;
-        current->signal_mask &= ~((1u << SIGKILL) | (1u << SIGSTOP));
+        current->signal_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
     }
     return 0;
+}
+
+static int64_t sys_rt_sigpending(uint64_t* set, size_t sigsetsize) {
+    task_t* current = task_get_current();
+    if (!current) return -ESRCH;
+    if (sigsetsize != 8) return -EINVAL;
+    if (!set) return -EFAULT;
+    if (!vmm_verify_user_access(set, sizeof(uint64_t), 1)) return -EFAULT;
+
+    *set = (uint64_t)current->signal_pending;
+    return 0;
+}
+
+static int64_t sys_rt_sigsuspend(const uint64_t* mask, size_t sigsetsize) {
+    task_t* current = task_get_current();
+    uint32_t old_mask;
+    uint64_t new_mask_u64;
+
+    if (!current) return -ESRCH;
+    if (sigsetsize != 8) return -EINVAL;
+    if (!mask) return -EFAULT;
+    if (!vmm_verify_user_access(mask, sizeof(uint64_t), 0)) return -EFAULT;
+
+    new_mask_u64 = *mask;
+    old_mask = current->signal_mask;
+
+    current->signal_mask = (uint32_t)new_mask_u64;
+    current->signal_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
+
+    for (;;) {
+        if (current->signal_pending & ~current->signal_mask) {
+            current->signal_mask = old_mask;
+            return -EINTR;
+        }
+        task_yield();
+    }
 }
 
 /* ========================================================================= */
@@ -1659,14 +1741,33 @@ struct sigframe {
     struct syscall_regs regs;
     uint64_t user_rsp;
     uint32_t sigmask;
+    uint32_t ss_flags_prev;
 };
 
-static void setup_sigcontext(struct syscall_regs* regs, int sig, void* restorer) {
+static void setup_sigcontext(struct syscall_regs* regs,
+                             int sig,
+                             void (*handler)(int),
+                             uint32_t sa_flags,
+                             uint64_t sa_mask,
+                             void* restorer) {
     task_t* current = task_get_current();
+    int use_altstack = 0;
+    uint64_t frame_rsp;
+    uint64_t sp;
+
+    frame_rsp = current->user_rsp;
+    if ((sa_flags & SA_ONSTACK) &&
+        !(current->sigaltstack_flags & SS_DISABLE) &&
+        !(current->sigaltstack_flags & SS_ONSTACK) &&
+        current->sigaltstack_sp != 0 &&
+        current->sigaltstack_size >= MINSIGSTKSZ) {
+        frame_rsp = current->sigaltstack_sp + current->sigaltstack_size;
+        use_altstack = 1;
+    }
 
     /* Align stack to 16 bytes (System V ABI) */
     /* We subtract frame size and 128 bytes red zone */
-    uint64_t sp = current->user_rsp - 128;
+    sp = frame_rsp - 128;
     sp = (sp - sizeof(struct sigframe)) & ~0xF;
 
     /* Verify write access */
@@ -1682,8 +1783,9 @@ static void setup_sigcontext(struct syscall_regs* regs, int sig, void* restorer)
     frame.regs = *regs;
     frame.user_rsp = current->user_rsp;
     frame.sigmask = current->signal_mask;
+    frame.ss_flags_prev = current->sigaltstack_flags;
 
-    if (current->signal_flags[sig] & SA_SIGINFO) {
+    if (sa_flags & SA_SIGINFO) {
         frame.info.si_signo = sig;
         frame.uc.uc_mcontext = *regs;
         frame.uc.uc_sigmask = current->signal_mask;
@@ -1694,16 +1796,26 @@ static void setup_sigcontext(struct syscall_regs* regs, int sig, void* restorer)
 
     /* Update Registers for Handler */
     regs->rdi = sig; /* Arg 1 */
-    if (current->signal_flags[sig] & SA_SIGINFO) {
+    if (sa_flags & SA_SIGINFO) {
         regs->rsi = sp + offsetof(struct sigframe, info); /* Arg 2 */
         regs->rdx = sp + offsetof(struct sigframe, uc);   /* Arg 3 */
     } else {
         regs->rsi = 0;
         regs->rdx = 0;
     }
-    regs->rcx = (uint64_t)current->signal_handlers[sig]; /* RIP (handler) */
+    regs->rcx = (uint64_t)handler; /* RIP (handler) */
+
+    /* POSIX: apply handler mask and (unless SA_NODEFER) block current signal. */
+    uint32_t block_mask = (uint32_t)sa_mask;
+    if (!(sa_flags & SA_NODEFER)) {
+        block_mask |= (1u << (sig - 1));
+    }
+    block_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
+    current->signal_mask |= block_mask;
+
     /* Update RSP to point to frame.restorer */
     current->user_rsp = sp;
+    if (use_altstack) current->sigaltstack_flags |= SS_ONSTACK;
 
     /* Update scratch for syscall_entry exit logic */
     cpu_info_t* cpu = get_current_cpu();
@@ -1729,6 +1841,8 @@ static void sys_rt_sigreturn(struct syscall_regs* regs) {
 
     /* Restore Signal Mask */
     current->signal_mask = frame->sigmask;
+    if (frame->ss_flags_prev & SS_ONSTACK) current->sigaltstack_flags |= SS_ONSTACK;
+    else current->sigaltstack_flags &= ~SS_ONSTACK;
 
     /* Restore User RSP */
     current->user_rsp = frame->user_rsp;
@@ -1743,11 +1857,15 @@ static void handle_signal(struct syscall_regs* regs) {
 
     /* Find lowest pending signal */
     for (int sig = 1; sig < 32; sig++) {
-        if ((current->signal_pending & (1u << sig)) && !(current->signal_mask & (1u << sig))) {
+        uint32_t bit = (1u << (sig - 1));
+        if ((current->signal_pending & bit) && !(current->signal_mask & bit)) {
             /* Clear pending */
-            current->signal_pending &= ~(1u << sig);
+            current->signal_pending &= ~bit;
 
             void (*handler)(int) = current->signal_handlers[sig];
+            uint32_t sa_flags = current->signal_flags[sig];
+            void* restorer = current->signal_restorers[sig];
+            uint64_t sa_mask = current->signal_action_masks[sig];
 
             if (handler == SIG_IGN) {
                 continue;
@@ -1758,7 +1876,14 @@ static void handle_signal(struct syscall_regs* regs) {
                 return;
             }
 
-            setup_sigcontext(regs, sig, current->signal_restorers[sig]);
+            if (sa_flags & SA_RESETHAND) {
+                current->signal_handlers[sig] = SIG_DFL;
+                current->signal_flags[sig] = 0;
+                current->signal_restorers[sig] = NULL;
+                current->signal_action_masks[sig] = 0;
+            }
+
+            setup_sigcontext(regs, sig, handler, sa_flags, sa_mask, restorer);
             return;
         }
     }
@@ -2759,6 +2884,8 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [72] = (syscall_ptr_t)sys_fcntl,
     [77] = (syscall_ptr_t)sys_ftruncate,
     [97] = (syscall_ptr_t)sys_getrlimit,
+    [127] = (syscall_ptr_t)sys_rt_sigpending,
+    [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
     [79] = (syscall_ptr_t)sys_getcwd,
     [80] = (syscall_ptr_t)sys_chdir,
@@ -2873,6 +3000,8 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [110] = (syscall_ptr_t)sys_getppid,
     [111] = (syscall_ptr_t)sys_getpgrp,
     [112] = (syscall_ptr_t)sys_setsid,
+    [127] = (syscall_ptr_t)sys_rt_sigpending,
+    [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
     [158] = (syscall_ptr_t)sys_arch_prctl,
     [186] = (syscall_ptr_t)sys_gettid,
@@ -2930,6 +3059,8 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [45] = (syscall_ptr_t)sys_brk,
     [174] = (syscall_ptr_t)sys_rt_sigaction,
     [175] = (syscall_ptr_t)sys_rt_sigprocmask,
+    [176] = (syscall_ptr_t)sys_rt_sigpending,
+    [179] = (syscall_ptr_t)sys_rt_sigsuspend,
     [54] = (syscall_ptr_t)sys_ioctl,
     [145] = (syscall_ptr_t)sys_readv,
     [146] = (syscall_ptr_t)sys_writev,

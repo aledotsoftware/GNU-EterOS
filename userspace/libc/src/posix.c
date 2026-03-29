@@ -341,6 +341,23 @@ int setpgid(pid_t pid, pid_t pgid) {
     return _set_errno(ret);
 }
 
+pid_t getpgrp(void) {
+    long ret = _syscall0(SYS_getpgrp);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return (pid_t)ret;
+}
+
+int tcgetpgrp(int fd) {
+    int pgid = 0;
+    if (ioctl(fd, TIOCGPGRP, &pgid) < 0) return -1;
+    return pgid;
+}
+
+int tcsetpgrp(int fd, pid_t pgrp) {
+    int pg = (int)pgrp;
+    return ioctl(fd, TIOCSPGRP, &pg);
+}
+
 /* Scheduling */
 int sched_yield(void) {
     long ret = _syscall0(SYS_sched_yield);

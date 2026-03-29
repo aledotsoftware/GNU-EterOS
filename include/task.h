@@ -97,6 +97,9 @@ typedef struct task {
     uint32_t       euid;                    /* Effective User ID */
     uint32_t       egid;                    /* Effective Group ID */
     uint32_t       signal_pending;          /* Bitmap of pending signals */
+    uint64_t       sigaltstack_sp;          /* Alternate signal stack base */
+    uint64_t       sigaltstack_size;        /* Alternate signal stack size */
+    uint32_t       sigaltstack_flags;       /* SS_DISABLE / SS_ONSTACK */
 
     void           (**signal_handlers)(int); /* Signal Handlers Pointer (shared in threads) */
     void*          signal_handlers_internal[32];
@@ -104,6 +107,8 @@ typedef struct task {
     void*          signal_restorers_internal[32];
     uint32_t*      signal_flags;            /* Signal Flags Pointer */
     uint32_t       signal_flags_internal[32];
+    uint64_t*      signal_action_masks;     /* Per-signal mask Pointer */
+    uint64_t       signal_action_masks_internal[32];
 
     /* SMP & Threading extensions */
     uint64_t       affinity[4];             /* cpu_set_t inline for simplicity (256 bits max) */
