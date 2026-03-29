@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-29
-**Commit:** d001f206b960d88ed98f80720802e8b22fca6244
+**Commit:** 846a5af918647e4be5b7cb0972b7a82b86a54ca1
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
@@ -33,9 +33,9 @@
 - **Android Subsystem:** Todavía no hay implementaciones ni de driver `/dev/binder` ni puentes IPC de Android.
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `linux-syscall-compliance-bot` — Razón: Prioritario para la meta de "GNU sobre Eter". Aumentar cobertura de syscalls x86_64 para habilitar la compatibilidad progresiva de binarios de escritorio complejos (ej. bash, coreutils).
-2. `aether-linux-subsystem-bot` — Razón: Mejorar la capa de traducción ABI. Relacionado con syscall-compliance, es necesario para soportar las peculiaridades de libc/GNU sin tener que recompilarlas, sentando base para un `init` system más robusto y para las siguientes fases (Desktop y Android).
-3. `network-socket-api-bot` — Razón: Resolver la resolución DNS nativa. Exponer el DNS de lwIP a nivel de sistema habilitará al sistema para descargas de repositorios GNU reales usando hostnames.
+1. `network-socket-api-bot` — Razón: Resolver la resolución DNS nativa (Blocker crítico expuesto en cmds `ota` y `ntp` hardcodeados). Exponer el DNS de lwIP a nivel de sistema y libc (ej: getaddrinfo) habilitará descargas y actualizaciones reales de repositorios usando nombres de dominio completos.
+2. `linux-syscall-compliance-bot` — Razón: Siguiente paso clave para la meta de "GNU sobre Eter". Aumentar cobertura de syscalls x86_64 (como mprotect, rt_sigprocmask) necesarias para habilitar la compatibilidad progresiva de binarios de escritorio GNU (bash, coreutils) interactivos.
+3. `aether-linux-subsystem-bot` — Razón: Para soportar las particularidades de GNU/Linux dinámicamente o el cargador `.so`, complementando las syscalls sin tener que reescribir utilities complejas. Fundamental para Android y Escritorio a largo plazo.
 
 ## Correcciones de Integración Aplicadas
 - Ninguna requerida en este ciclo, el proyecto compila correctamente sin advertencias tratadas como errores, y bootea transicionando a Ring 3 sin Kernel Panics. Todos los subprocesos de las capas subyacentes operan de forma estable.
