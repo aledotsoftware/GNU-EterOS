@@ -19,9 +19,13 @@
 
 #define MAP_FAILED      ((void *)-1)
 
+#define MREMAP_MAYMOVE  1
+#define MREMAP_FIXED    2
+
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, int64_t offset);
 int   munmap(void *addr, size_t length);
 int   mprotect(void *addr, size_t len, int prot);
+void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...);
 
 int   shm_open(const char *name, int oflag, mode_t mode);
 int   shm_unlink(const char *name);

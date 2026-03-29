@@ -14,6 +14,11 @@ static jfs_superblock_t *sb = NULL;
 static uint32_t current_tx_id = 1;
 static uint32_t jfs_next_free_block = 0;
 
+#define JFS_MAX_INODES 4096
+static uint16_t jfs_inode_mode[JFS_MAX_INODES];
+static uint32_t jfs_inode_uid[JFS_MAX_INODES];
+static uint32_t jfs_inode_gid[JFS_MAX_INODES];
+
 static void disk_read(uint32_t block, void *buffer);
 static void disk_write(uint32_t block, const void *buffer);
 static void jfs_journal_write(uint32_t target_block, const void *data);
@@ -24,6 +29,13 @@ static int jfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry);
 static fs_node_t* jfs_finddir(fs_node_t *node, char *name);
 static int jfs_create(fs_node_t *parent, char *name, uint16_t permission);
 static int jfs_mkdir(fs_node_t *parent, char *name, uint16_t permission);
+
+static void jfs_set_inode_metadata(uint32_t inode_idx, uint16_t mode, uint32_t uid, uint32_t gid) {
+    if (inode_idx >= JFS_MAX_INODES) return;
+    jfs_inode_mode[inode_idx] = (uint16_t)(mode & 0777);
+    jfs_inode_uid[inode_idx] = uid;
+    jfs_inode_gid[inode_idx] = gid;
+}
 
 static int jfs_is_directory(uint32_t inode_idx) {
     return (get_inode(inode_idx)->flags & FS_DIRECTORY) == FS_DIRECTORY;
@@ -46,6 +58,7 @@ static int jfs_alloc_inode(uint32_t flags, uint32_t* out_inode) {
     new_node->inode = free_inode;
     new_node->size = 0;
     new_node->flags = flags;
+    jfs_set_inode_metadata(free_inode, (flags & FS_DIRECTORY) ? 0755 : 0644, 0, 0);
     *out_inode = free_inode;
     return 0;
 }
@@ -125,6 +138,9 @@ static fs_node_t* jfs_make_node(uint32_t inode_idx, const char *name) {
     fnode->inode = inode_idx;
     fnode->length = inode->size;
     fnode->flags = inode->flags;
+    fnode->mask = (inode_idx < JFS_MAX_INODES) ? jfs_inode_mode[inode_idx] : ((inode->flags & FS_DIRECTORY) ? 0755 : 0644);
+    fnode->uid = (inode_idx < JFS_MAX_INODES) ? jfs_inode_uid[inode_idx] : 0;
+    fnode->gid = (inode_idx < JFS_MAX_INODES) ? jfs_inode_gid[inode_idx] : 0;
     strlcpy(fnode->name, name, sizeof(fnode->name));
 
     if ((inode->flags & FS_DIRECTORY) == FS_DIRECTORY) {
@@ -319,22 +335,22 @@ static fs_node_t* jfs_finddir(fs_node_t *node, char *name) {
 }
 
 static int jfs_create(fs_node_t *parent, char *name, uint16_t permission) {
-    (void)permission;
     if (!parent || !name || !*name) return -1;
     if (!jfs_is_directory(parent->inode)) return -1;
 
     uint32_t free_inode = 0;
     if (jfs_alloc_inode(FS_FILE, &free_inode) != 0) return -1;
+    jfs_set_inode_metadata(free_inode, permission ? permission : 0644, parent->uid, parent->gid);
     return jfs_add_entry(parent->inode, name, free_inode);
 }
 
 static int jfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
-    (void)permission;
     if (!parent || !name || !*name) return -1;
     if (!jfs_is_directory(parent->inode)) return -1;
 
     uint32_t free_inode = 0;
     if (jfs_alloc_inode(FS_DIRECTORY, &free_inode) != 0) return -1;
+    jfs_set_inode_metadata(free_inode, permission ? permission : 0755, parent->uid, parent->gid);
     if (jfs_ensure_dir_block(get_inode(free_inode), 0) != 0) return -1;
     return jfs_add_entry(parent->inode, name, free_inode);
 }
@@ -360,6 +376,9 @@ fs_node_t* jfs_init(void) {
 
     serial_write_string("[JFS] Clearing buffer...\n");
     memset(jfs_disk_buffer, 0, jfs_disk_size);
+    memset(jfs_inode_mode, 0, sizeof(jfs_inode_mode));
+    memset(jfs_inode_uid, 0, sizeof(jfs_inode_uid));
+    memset(jfs_inode_gid, 0, sizeof(jfs_inode_gid));
     serial_write_string("[JFS] Buffer cleared.\n");
 
     /* Format Disk */
@@ -378,6 +397,7 @@ fs_node_t* jfs_init(void) {
     root->inode = 0;
     root->size = 0;
     root->flags = FS_DIRECTORY;
+    jfs_set_inode_metadata(0, 0777, 0, 0);
     /* Alloc block 0 for root dir entries */
     root->blocks[0] = sb->data_start; /* Block 100 */
     jfs_next_free_block = sb->data_start + 1;
@@ -388,6 +408,9 @@ fs_node_t* jfs_init(void) {
     strlcpy(fs->name, "jfs_root", sizeof(fs->name));
     fs->flags = FS_DIRECTORY;
     fs->inode = 0;
+    fs->mask = 0777;
+    fs->uid = 0;
+    fs->gid = 0;
     fs->readdir = jfs_readdir;
     fs->finddir = jfs_finddir;
     fs->create = jfs_create;

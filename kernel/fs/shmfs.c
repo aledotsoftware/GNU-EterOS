@@ -238,11 +238,11 @@ static int shmfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) 
         strlcpy(entry->name, curr->name, sizeof(entry->name));
         entry->inode = i + 1; /* Dummy inode */
         spin_unlock(&shm_lock);
-        return 1;
+        return 0; /* success */
     }
     
     spin_unlock(&shm_lock);
-    return 0;
+    return 1; /* EOF */
 }
 
 fs_node_t* shmfs_init(void) {

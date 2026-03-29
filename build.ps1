@@ -481,8 +481,11 @@ function Invoke-UserspaceBuild {
     $libcSrc = "$userDir\libc\src"
     $libcObjDir = "$BUILD_DIR\userspace\libc"
     $initrdRoot = "initrd_root"
+    $gnuBinDir = "$initrdRoot\gnu\bin"
     if (!(Test-Path $libcObjDir)) { New-Item -ItemType Directory -Force -Path $libcObjDir | Out-Null }
     if (!(Test-Path $initrdRoot)) { New-Item -ItemType Directory -Force -Path $initrdRoot | Out-Null }
+    if (!(Test-Path $gnuBinDir)) { New-Item -ItemType Directory -Force -Path $gnuBinDir | Out-Null }
+    if (Test-Path "$gnuBinDir\busybox") { Remove-Item -Force "$gnuBinDir\busybox" }
 
 
     # libc objects
@@ -519,6 +522,19 @@ function Invoke-UserspaceBuild {
     $ldExit = $LASTEXITCODE
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test.elf"; exit 1 }
+
+    # test_syscalls_s1.elf
+    $testSyscallsSrc = "$userDir\test_syscalls_s1.c"
+    $testSyscallsObj = "$BUILD_DIR\userspace\test_syscalls_s1.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $testSyscallsSrc -o $testSyscallsObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test_syscalls_s1.c"; exit 1 }
+
+    $testSyscallsElf = "$initrdRoot\test_syscalls_s1.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testSyscallsElf $testSyscallsObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_syscalls_s1.elf"; exit 1 }
 
     # sh.elf
     $shSrc = "$userDir\sh.c"
@@ -572,7 +588,20 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar apt-get.elf"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf"
+    # busybox multicall (base POSIX applets)
+    $busyboxSrc = "$userDir\busybox.c"
+    $busyboxObj = "$BUILD_DIR\userspace\busybox.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $busyboxSrc -o $busyboxObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar busybox.c"; exit 1 }
+
+    $busyboxElf = "$initrdRoot\busybox"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $busyboxElf $busyboxObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar busybox"; exit 1 }
+
+    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
 }
 
 function Invoke-InitrdBuild {

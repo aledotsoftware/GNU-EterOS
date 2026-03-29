@@ -113,7 +113,19 @@
 #define SYS_setgid              106
 #define SYS_geteuid             107
 #define SYS_getegid             108
+#define SYS_setpgid             109
+#define SYS_getppid             110
+#define SYS_getpgrp             111
+#define SYS_setsid              112
 #define SYS_clock_gettime       228
+#define SYS_openat              257
+#define SYS_newfstatat          262
+#define SYS_unlinkat            263
+#define SYS_readlinkat          267
+#define SYS_faccessat           269
+#define SYS_ppoll               271
+#define SYS_dup3                292
+#define SYS_pipe2               293
 
 long syscall(long nr, ...);
 

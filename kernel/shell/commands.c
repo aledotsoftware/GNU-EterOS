@@ -71,6 +71,37 @@ static const app_entry_t apps[] = {
 
 #define NUM_APPS  (sizeof(apps) / sizeof(apps[0]))
 
+static int normalize_eter_prefixed_input(const char* input, char* out, size_t out_sz, int* had_prefix) {
+    const char* p = input;
+    const char* cmd_start;
+    size_t cmd_len = 0;
+    const char* rest;
+
+    if (!input || !out || out_sz == 0) return -1;
+    if (had_prefix) *had_prefix = 0;
+
+    while (*p == ' ') p++;
+    cmd_start = p;
+    while (p[cmd_len] && p[cmd_len] != ' ') cmd_len++;
+    rest = cmd_start + cmd_len;
+    while (*rest == ' ') rest++;
+
+    if (cmd_len > 5 && strncmp(cmd_start, "eter-", 5) == 0) {
+        const char* base = cmd_start + 5;
+        if (had_prefix) *had_prefix = 1;
+        out[0] = '\0';
+        strlcat(out, base, out_sz);
+        if (*rest) {
+            strlcat(out, " ", out_sz);
+            strlcat(out, rest, out_sz);
+        }
+        return 0;
+    }
+
+    strlcpy(out, input, out_sz);
+    return 0;
+}
+
 const char* match_command(const char* input, const char* cmd) {
     while (*cmd) {
         if (*input != *cmd) return (void*)0;
@@ -86,6 +117,16 @@ const char* match_command(const char* input, const char* cmd) {
 
 const char* shell_autocomplete(const char* prefix) {
     if (!prefix || !*prefix) return (void*)0;
+    if (strncmp(prefix, "eter-", 5) == 0) {
+        const char* inner = prefix + 5;
+        const char* match = shell_autocomplete(inner);
+        static char prefixed[64];
+        if (!match) return (void*)0;
+        prefixed[0] = '\0';
+        strlcat(prefixed, "eter-", sizeof(prefixed));
+        strlcat(prefixed, match, sizeof(prefixed));
+        return prefixed;
+    }
     size_t len = strlen(prefix);
     const char* match = (void*)0;
     int matches = 0;
@@ -112,6 +153,9 @@ void cmd_help(const char* args) {
     terminal_write_string("\n");
     terminal_write_colored("  Comandos del sistema:\n\n",
                           VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    terminal_write_string("  Tip: tambien puedes usar el prefijo ");
+    terminal_write_colored("eter-", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_write_string(" (ej: eter-ls, eter-run).\n\n");
 
     static const char spaces[] = "            "; // 12 spaces
 
@@ -161,7 +205,11 @@ void cmd_help(const char* args) {
 #include "../../include/task.h"
 
 int shell_exec(char* input) {
+    char normalized_input[256];
+    int had_eter_prefix = 0;
+
     if (!input || !*input) return 0;
+    normalize_eter_prefixed_input(input, normalized_input, sizeof(normalized_input), &had_eter_prefix);
 
     task_t* current = task_get_current();
     if (current && current->uid != 0) {
@@ -170,7 +218,7 @@ int shell_exec(char* input) {
     }
 
     for (size_t i = 0; i < NUM_COMMANDS; i++) {
-        const char* args = match_command(input, commands[i].name);
+        const char* args = match_command(normalized_input, commands[i].name);
         if (args) {
             commands[i].handler(args);
             return 0;
@@ -178,7 +226,7 @@ int shell_exec(char* input) {
     }
 
     for (size_t i = 0; i < NUM_APPS; i++) {
-        const char* args = match_command(input, apps[i].name);
+        const char* args = match_command(normalized_input, apps[i].name);
         if (args) {
             serial_write_string("[eterOS] Ejecutando app: ");
             serial_write_string(apps[i].name);
@@ -188,8 +236,55 @@ int shell_exec(char* input) {
         }
     }
 
+    /* Fallback: try BusyBox applets from kernel shell.
+       This lets commands like "ls", "cat" or "busybox --list"
+       work even when typed at the kernel prompt. */
+    if (!had_eter_prefix) {
+        char cmd[64];
+        const char* p = normalized_input;
+        size_t cmd_len = 0;
+        while (*p == ' ') p++;
+        while (p[cmd_len] && p[cmd_len] != ' ' && cmd_len < sizeof(cmd) - 1) {
+            cmd[cmd_len] = p[cmd_len];
+            cmd_len++;
+        }
+        cmd[cmd_len] = '\0';
+
+        if (cmd_len > 0 && strchr(cmd, '/') == 0) {
+            char run_line[512];
+            const char* rest = p + cmd_len;
+            while (*rest == ' ') rest++;
+
+            if (strcmp(cmd, "sh") == 0) {
+                if (*rest != '\0') {
+                    strlcpy(run_line, "/sh.elf ", sizeof(run_line));
+                    strlcat(run_line, rest, sizeof(run_line));
+                } else {
+                    strlcpy(run_line, "/sh.elf", sizeof(run_line));
+                }
+                cmd_run(run_line);
+                return 0;
+            }
+
+            if (strcmp(cmd, "busybox") == 0) {
+                if (*rest != '\0') {
+                    strlcpy(run_line, "/busybox ", sizeof(run_line));
+                    strlcat(run_line, rest, sizeof(run_line));
+                } else {
+                    strlcpy(run_line, "/busybox", sizeof(run_line));
+                }
+            } else {
+                strlcpy(run_line, "/busybox ", sizeof(run_line));
+                strlcat(run_line, input, sizeof(run_line));
+            }
+
+            cmd_run(run_line);
+            return 0;
+        }
+    }
+
     terminal_write_colored("  Comando no encontrado: ", VGA_COLOR_RED, VGA_COLOR_BLACK);
-    terminal_write_string(input);
+    terminal_write_string(had_eter_prefix ? normalized_input : input);
     terminal_write_string("\n  Escribe ");
     terminal_write_colored("help", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     terminal_write_string(" para ver comandos disponibles.\n");

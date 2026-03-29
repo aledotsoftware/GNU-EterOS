@@ -69,6 +69,8 @@ typedef struct task {
 
     /* Threading */
     uint32_t       tgid;                    /* Thread Group ID (PID) */
+    uint32_t       pgid;                    /* Process Group ID */
+    uint32_t       sid;                     /* Session ID */
     struct task*   group_leader;            /* Puntero al líder del grupo */
     uint32_t*      clear_child_tid;         /* Dirección para futex_wake al terminar */
 

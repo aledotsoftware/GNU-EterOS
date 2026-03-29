@@ -288,6 +288,8 @@ void scheduler_init(void) {
     tasks[0].id = next_id++;
     tasks[0].parent_id = 0;
     tasks[0].tgid = tasks[0].id;
+    tasks[0].pgid = tasks[0].tgid;
+    tasks[0].sid = tasks[0].tgid;
     tasks[0].group_leader = &tasks[0];
     tasks[0].clear_child_tid = NULL;
     tasks[0].state = TASK_RUNNING;
@@ -373,6 +375,8 @@ void task_init_ap(void) {
     tasks[slot].id = next_id++;
     tasks[slot].parent_id = 0;
     tasks[slot].tgid = tasks[slot].id;
+    tasks[slot].pgid = tasks[slot].tgid;
+    tasks[slot].sid = tasks[slot].tgid;
     tasks[slot].group_leader = &tasks[slot];
     tasks[slot].clear_child_tid = NULL;
     tasks[slot].state = TASK_RUNNING; /* Ya está corriendo */
@@ -473,6 +477,9 @@ int task_create(const char* name, void (*entry)(void)) {
     /* Configurar la tarea */
     tasks[slot].id = next_id++;
     tasks[slot].parent_id = 0;
+    tasks[slot].tgid = tasks[slot].id;
+    tasks[slot].pgid = tasks[slot].tgid;
+    tasks[slot].sid = tasks[slot].tgid;
     tasks[slot].state = TASK_READY;
     tasks[slot].stack_base = stack;
 
@@ -1036,6 +1043,8 @@ int task_fork(void* regs_ptr) {
     tasks[slot].id = next_id++;
     tasks[slot].parent_id = task_get_current()->id;
     tasks[slot].tgid = tasks[slot].id;
+    tasks[slot].pgid = tasks[slot].tgid;
+    tasks[slot].sid = tasks[slot].tgid;
     tasks[slot].group_leader = &tasks[slot];
     tasks[slot].clear_child_tid = NULL;
     tasks[slot].state = TASK_READY;
@@ -1088,6 +1097,8 @@ int task_fork(void* regs_ptr) {
     tasks[slot].gid = parent->gid;
     tasks[slot].euid = parent->euid;
     tasks[slot].egid = parent->egid;
+    tasks[slot].pgid = parent->pgid;
+    tasks[slot].sid = parent->sid;
     tasks[slot].user_rsp = parent->user_rsp; /* Saved from syscall entry */
     tasks[slot].mmap_base = parent->mmap_base;
 
@@ -1180,9 +1191,13 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     if (clone_flags & CLONE_THREAD) {
         tasks[slot].tgid = parent->tgid;
         tasks[slot].group_leader = parent->group_leader;
+        tasks[slot].pgid = parent->pgid;
+        tasks[slot].sid = parent->sid;
     } else {
         tasks[slot].tgid = tasks[slot].id;
         tasks[slot].group_leader = &tasks[slot];
+        tasks[slot].pgid = parent->pgid;
+        tasks[slot].sid = parent->sid;
     }
 
     if (clone_flags & CLONE_CHILD_CLEARTID) {
@@ -1555,13 +1570,29 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     }
 
     /* 5. Setup Stack */
-    /* Start at 128TB - 4KB */
-    uint64_t stack_top = USER_LIMIT - 4096;
-    /* Map 128KB stack */
-    for (uint64_t addr = stack_top - (128*1024); addr < stack_top; addr += PAGE_SIZE) {
-         void* phys = pmm_alloc_page();
-         vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
-         memset((void*)addr, 0, PAGE_SIZE);
+    /* Keep stack page-aligned and fully mapped before writing user args/env. */
+    const uint64_t stack_size = 128 * 1024;
+    uint64_t stack_top = (USER_LIMIT + 1ULL) & ~(PAGE_SIZE - 1ULL); /* Exclusive top */
+    uint64_t stack_base = stack_top - stack_size;
+
+    for (uint64_t addr = stack_base; addr < stack_top; addr += PAGE_SIZE) {
+        void* phys = pmm_alloc_page();
+        if (!phys) {
+            __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+            current->cr3 = old_cr3;
+            vmm_destroy_pml4(new_cr3_phys);
+            res = -ENOMEM;
+            goto cleanup_error;
+        }
+        if (vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE | PAGE_USER) < 0) {
+            pmm_free_page(phys);
+            __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+            current->cr3 = old_cr3;
+            vmm_destroy_pml4(new_cr3_phys);
+            res = -ENOMEM;
+            goto cleanup_error;
+        }
+        memset((void*)addr, 0, PAGE_SIZE);
     }
 
     /* Push strings to top of stack */
@@ -1574,6 +1605,13 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     for (int i = envc - 1; i >= 0; i--) {
         int len = strlen(kenvp[i]) + 1;
         rsp -= len;
+        if (rsp < stack_base) {
+            __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+            current->cr3 = old_cr3;
+            vmm_destroy_pml4(new_cr3_phys);
+            res = -E2BIG;
+            goto cleanup_error;
+        }
         memcpy((void*)rsp, kenvp[i], len);
         uenvp[i] = rsp;
     }
@@ -1583,6 +1621,13 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     for (int i = argc - 1; i >= 0; i--) {
         int len = strlen(kargv[i]) + 1;
         rsp -= len;
+        if (rsp < stack_base) {
+            __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+            current->cr3 = old_cr3;
+            vmm_destroy_pml4(new_cr3_phys);
+            res = -E2BIG;
+            goto cleanup_error;
+        }
         memcpy((void*)rsp, kargv[i], len);
         uargv[i] = rsp;
     }
@@ -1609,6 +1654,13 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
 
     /* Push Argc */
     rsp -= 8;
+    if (rsp < stack_base) {
+        __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+        current->cr3 = old_cr3;
+        vmm_destroy_pml4(new_cr3_phys);
+        res = -E2BIG;
+        goto cleanup_error;
+    }
     *(uint64_t*)rsp = (uint64_t)argc;
 
     /* 6. Cleanup Kernel Buffers */
