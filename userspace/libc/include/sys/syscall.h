@@ -118,6 +118,8 @@
 #define SYS_getpgrp             111
 #define SYS_setsid              112
 #define SYS_clock_gettime       228
+#define SYS_epoll_wait          232
+#define SYS_epoll_ctl           233
 #define SYS_openat              257
 #define SYS_newfstatat          262
 #define SYS_unlinkat            263
@@ -126,6 +128,7 @@
 #define SYS_ppoll               271
 #define SYS_dup3                292
 #define SYS_pipe2               293
+#define SYS_epoll_create1       291
 
 long syscall(long nr, ...);
 

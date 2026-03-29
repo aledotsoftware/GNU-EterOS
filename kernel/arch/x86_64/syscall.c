@@ -1973,11 +1973,74 @@ static int64_t sys_pselect6(int nfds, void* readfds, void* writefds, void* excep
     return sys_select(nfds, readfds, writefds, exceptfds, (struct timespec*)timeout);
 }
 
+typedef struct {
+    int used;
+    int fd;
+    uint32_t events;
+    uint64_t data;
+} epoll_watch_t;
+
+#define EPOLL_MAX_WATCHES MAX_FD
+typedef struct {
+    spinlock_t lock;
+    int watch_count;
+    epoll_watch_t watch[EPOLL_MAX_WATCHES];
+} epoll_instance_t;
+
+#define EPOLLIN   0x001
+#define EPOLLPRI  0x002
+#define EPOLLOUT  0x004
+#define EPOLLERR  0x008
+#define EPOLLHUP  0x010
+#define EPOLLNVAL 0x020
+
+#define EPOLL_CTL_ADD 1
+#define EPOLL_CTL_DEL 2
+#define EPOLL_CTL_MOD 3
+
+static uint32_t epoll_compute_revents(task_t* current, int fd, uint32_t wanted_events) {
+    fs_node_t* node;
+    uint32_t revents = 0;
+
+    if (fd < 0 || fd >= MAX_FD || !current->fd_table[fd].node) {
+        return EPOLLERR | EPOLLHUP;
+    }
+    node = current->fd_table[fd].node;
+
+    if (wanted_events & (EPOLLIN | EPOLLPRI)) {
+        int bytes = 0;
+        if ((node->flags & 0x7) == FS_FILE || (node->flags & 0x7) == FS_DIRECTORY) {
+            revents |= EPOLLIN;
+        } else if (node->ioctl && node->ioctl(node, FIONREAD, &bytes) == 0 && bytes > 0) {
+            revents |= EPOLLIN;
+        }
+    }
+
+    if (wanted_events & EPOLLOUT) {
+        if ((node->flags & 0x7) == FS_FILE ||
+            (node->flags & 0x7) == FS_DIRECTORY ||
+            (node->flags & 0x7) == FS_PIPE) {
+            revents |= EPOLLOUT;
+        }
+    }
+
+    return revents;
+}
+
+static void epoll_close_fs(fs_node_t* node) {
+    if (node && node->ptr) {
+        kfree(node->ptr);
+        node->ptr = NULL;
+    }
+}
+
 static int64_t sys_epoll_create1(int flags) {
-    (void)flags;
-    /* Return a fake FD for now to bypass some musl initializations */
+    epoll_instance_t* inst;
     task_t* current = task_get_current();
     int fd = -1;
+
+    if (flags & ~O_CLOEXEC) return -EINVAL;
+
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
             fd = i;
@@ -1986,58 +2049,128 @@ static int64_t sys_epoll_create1(int flags) {
     }
     if (fd == -1) return -EMFILE;
 
-    fs_node_t* fake_epoll = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    if (!fake_epoll) return -ENOMEM;
-    memset(fake_epoll, 0, sizeof(fs_node_t));
-    fake_epoll->ref_count = 1;
-    strlcpy(fake_epoll->name, "anon_inode:[eventpoll]", 32);
+    inst = (epoll_instance_t*)kmalloc(sizeof(epoll_instance_t));
+    if (!inst) return -ENOMEM;
+    memset(inst, 0, sizeof(epoll_instance_t));
 
-    current->fd_table[fd].node = fake_epoll;
+    fs_node_t* epnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!epnode) { kfree(inst); return -ENOMEM; }
+    memset(epnode, 0, sizeof(fs_node_t));
+    epnode->ref_count = 1;
+    epnode->flags = FS_FILE;
+    epnode->ptr = (struct fs_node*)inst;
+    epnode->close = epoll_close_fs;
+    strlcpy(epnode->name, "anon_inode:[eventpoll]", 32);
+
+    current->fd_table[fd].node = epnode;
     current->fd_table[fd].offset = 0;
-    current->fd_table[fd].flags = 0;
+    current->fd_table[fd].flags = flags;
 
     return fd;
 }
 
-#pragma pack(push, 1)
 struct epoll_event {
     uint32_t events;
     uint64_t data;
 };
-#pragma pack(pop)
 
 static int64_t sys_epoll_ctl(int epfd, int op __attribute__((unused)), int fd, struct epoll_event* event) {
+    epoll_instance_t* inst;
+    int found = -1;
     task_t* current = task_get_current();
     if (epfd < 0 || epfd >= MAX_FD || fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[epfd].node || !current->fd_table[fd].node) return -EBADF;
+    if (epfd == fd) return -EINVAL;
+    inst = (epoll_instance_t*)current->fd_table[epfd].node->ptr;
+    if (!inst) return -EINVAL;
 
+    if ((op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD) && !event) return -EFAULT;
     if (event) {
         if (!vmm_verify_user_access(event, sizeof(struct epoll_event), 0)) return -EFAULT;
     }
 
-    /* We stub it out since there's no actual event polling yet, but basic validation helps apps proceed */
-    return 0;
+    spin_lock(&inst->lock);
+    for (int i = 0; i < EPOLL_MAX_WATCHES; i++) {
+        if (inst->watch[i].used && inst->watch[i].fd == fd) {
+            found = i;
+            break;
+        }
+    }
+
+    if (op == EPOLL_CTL_ADD) {
+        if (found >= 0) { spin_unlock(&inst->lock); return -EEXIST; }
+        for (int i = 0; i < EPOLL_MAX_WATCHES; i++) {
+            if (!inst->watch[i].used) {
+                inst->watch[i].used = 1;
+                inst->watch[i].fd = fd;
+                inst->watch[i].events = event->events;
+                inst->watch[i].data = event->data;
+                inst->watch_count++;
+                spin_unlock(&inst->lock);
+                return 0;
+            }
+        }
+        spin_unlock(&inst->lock);
+        return -ENOSPC;
+    }
+
+    if (op == EPOLL_CTL_MOD) {
+        if (found < 0) { spin_unlock(&inst->lock); return -ENOENT; }
+        inst->watch[found].events = event->events;
+        inst->watch[found].data = event->data;
+        spin_unlock(&inst->lock);
+        return 0;
+    }
+
+    if (op == EPOLL_CTL_DEL) {
+        if (found < 0) { spin_unlock(&inst->lock); return -ENOENT; }
+        inst->watch[found].used = 0;
+        inst->watch_count--;
+        spin_unlock(&inst->lock);
+        return 0;
+    }
+
+    spin_unlock(&inst->lock);
+    return -EINVAL;
 }
 
 static int64_t sys_epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout) {
+    epoll_instance_t* inst;
     task_t* current = task_get_current();
+    uint64_t start_ms;
+
     if (epfd < 0 || epfd >= MAX_FD || !current->fd_table[epfd].node) return -EBADF;
     if (maxevents <= 0) return -EINVAL;
-    if (events && !vmm_verify_user_access(events, maxevents * sizeof(struct epoll_event), 1)) return -EFAULT;
+    if (!events || !vmm_verify_user_access(events, maxevents * sizeof(struct epoll_event), 1)) return -EFAULT;
 
-    if (timeout > 0) {
-        task_sleep(timeout);
-    } else if (timeout < 0) {
-        /* A negative timeout means block indefinitely until an event happens.
-           Since epoll isn't fully event-driven at VFS yet, we sleep for a bit
-           before returning 0 to prevent 100% CPU lockup loops in userspace daemons. */
-        task_sleep(500); // Wait 500ms instead of 0s
+    inst = (epoll_instance_t*)current->fd_table[epfd].node->ptr;
+    if (!inst) return -EINVAL;
+
+    start_ms = (timer_get_uptime_seconds() * 1000ULL) + timer_get_ticks();
+
+    while (1) {
+        int emitted = 0;
+        spin_lock(&inst->lock);
+        for (int i = 0; i < EPOLL_MAX_WATCHES && emitted < maxevents; i++) {
+            uint32_t revents;
+            if (!inst->watch[i].used) continue;
+            revents = epoll_compute_revents(current, inst->watch[i].fd, inst->watch[i].events);
+            revents &= (inst->watch[i].events | EPOLLERR | EPOLLHUP | EPOLLNVAL);
+            if (revents == 0) continue;
+            events[emitted].events = revents;
+            events[emitted].data = inst->watch[i].data;
+            emitted++;
+        }
+        spin_unlock(&inst->lock);
+
+        if (emitted > 0) return emitted;
+        if (timeout == 0) return 0;
+        if (timeout > 0) {
+            uint64_t now_ms = (timer_get_uptime_seconds() * 1000ULL) + timer_get_ticks();
+            if (now_ms - start_ms >= (uint64_t)timeout) return 0;
+        }
+        task_sleep(10);
     }
-
-    /* We don't have events since epoll isn't fully implemented in the fs layer yet.
-       Returning 0 prevents applications like nginx/apache from immediately crashing,
-       allowing them to gracefully retry or switch modes. */
-    return 0;
 }
 
 static int64_t sys_eventfd2(unsigned int initval, int flags) {

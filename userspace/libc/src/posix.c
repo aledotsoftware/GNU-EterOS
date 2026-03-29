@@ -12,6 +12,7 @@
 #include <termios.h>
 #include <sys/mman.h>
 #include <sys/select.h>
+#include <sys/epoll.h>
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
@@ -362,6 +363,24 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
         errno = (int)(-ret);
         return -1;
     }
+    return (int)ret;
+}
+
+int epoll_create1(int flags) {
+    long ret = _syscall1(SYS_epoll_create1, flags);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return (int)ret;
+}
+
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) {
+    long ret = _syscall4(SYS_epoll_ctl, epfd, op, fd, (long)event);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
+    return (int)ret;
+}
+
+int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout) {
+    long ret = _syscall4(SYS_epoll_wait, epfd, (long)events, maxevents, timeout);
+    if (ret < 0) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
