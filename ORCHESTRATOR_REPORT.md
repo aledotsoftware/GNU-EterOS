@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-03-29
-**Commit:** d001f206b960d88ed98f80720802e8b22fca6244
+**Commit:** 846a5af918647e4be5b7cb0972b7a82b86a54ca1
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
@@ -33,9 +33,9 @@
 - **Android Subsystem:** Todavía no hay implementaciones ni de driver `/dev/binder` ni puentes IPC de Android.
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `linux-syscall-compliance-bot` — Razón: Prioritario para la meta de "GNU sobre Eter". Aumentar cobertura de syscalls x86_64 para habilitar la compatibilidad progresiva de binarios de escritorio complejos (ej. bash, coreutils).
-2. `aether-linux-subsystem-bot` — Razón: Mejorar la capa de traducción ABI. Relacionado con syscall-compliance, es necesario para soportar las peculiaridades de libc/GNU sin tener que recompilarlas, sentando base para un `init` system más robusto y para las siguientes fases (Desktop y Android).
-3. `network-socket-api-bot` — Razón: Resolver la resolución DNS nativa. Exponer el DNS de lwIP a nivel de sistema habilitará al sistema para descargas de repositorios GNU reales usando hostnames.
+1. `linux-syscall-compliance-bot` — Razón: Tras auditar el archivo `syscall.c`, se observan deficiencias clave (como la falta de manejo completo en syscalls de protección de memoria y manipulación de procesos) necesarias para lograr el milestone "GNU Desktop sobre Eter". Su pronta ejecución asegurará progreso tangible hacia esta meta fundamental.
+2. `vfs-posix-filesystem-bot` — Razón: Aunque initrd y shmfs funcionan, JFS actualmente carece de persistencia real al disco (`bcache` bridge) y no existe un puente VFS sólido para el socket de DNS. Esto causa que herramientas y pruebas de la etapa GNU choquen contra el VFS.
+3. `aether-linux-subsystem-bot` — Razón: Completar las características ABI como `.so` linker dinámico para elf.c es vital para salir del paradigma de ejecutables estáticos y abrazar un ecosistema GNU moderno (lo cual es vital para el milestone "GNU sobre Eter").
 
 ## Correcciones de Integración Aplicadas
 - Ninguna requerida en este ciclo, el proyecto compila correctamente sin advertencias tratadas como errores, y bootea transicionando a Ring 3 sin Kernel Panics. Todos los subprocesos de las capas subyacentes operan de forma estable.
