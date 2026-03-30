@@ -28,5 +28,6 @@ echo "-- syscall suite --"
 /test_procfs.elf
 /test_pty_jobcontrol.elf
 /test_shebang_exec.elf
+/test_pt_interp_route.elf
 
 echo "== eterOS POSIX validation done =="

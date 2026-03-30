@@ -1774,70 +1774,6 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
         strlcpy(kpath, shebang_interp, 256);
     }
 
-    {
-        char elf_interp[256];
-        int interp_res = elf_get_interp(kpath, elf_interp, sizeof(elf_interp));
-        if (interp_res < 0 && interp_res != -ENOEXEC) {
-            res = interp_res;
-            goto cleanup_error;
-        }
-        if (interp_res > 0) {
-            char exec_abs[256];
-            char* old_argv[33];
-            char* new_argv[33];
-            int old_argc = argc;
-            int new_argc = 0;
-            int required = 2 + ((old_argc > 0) ? (old_argc - 1) : 0);
-            task_t* exec_current = task_get_current();
-
-            if (!exec_current || vfs_normalize_path(exec_abs, sizeof(exec_abs), kpath, exec_current->cwd) != 0) {
-                strlcpy(exec_abs, kpath, sizeof(exec_abs));
-            }
-
-            if (required > 32) {
-                res = -E2BIG;
-                goto cleanup_error;
-            }
-
-            for (int i = 0; i <= old_argc; i++) old_argv[i] = kargv[i];
-            for (int i = 0; i < 33; i++) new_argv[i] = NULL;
-
-            new_argv[new_argc] = (char*)kmalloc(256);
-            if (!new_argv[new_argc]) {
-                res = -ENOMEM;
-                goto cleanup_error;
-            }
-            strlcpy(new_argv[new_argc++], elf_interp, 256);
-
-            new_argv[new_argc] = (char*)kmalloc(256);
-            if (!new_argv[new_argc]) {
-                kfree(new_argv[0]);
-                res = -ENOMEM;
-                goto cleanup_error;
-            }
-            strlcpy(new_argv[new_argc++], exec_abs, 256);
-
-            for (int i = 1; i < old_argc; i++) {
-                new_argv[new_argc++] = old_argv[i];
-            }
-            new_argv[new_argc] = NULL;
-
-            if (old_argc > 0 && old_argv[0]) {
-                kfree(old_argv[0]);
-            }
-
-            for (int i = 0; i <= new_argc; i++) {
-                kargv[i] = new_argv[i];
-            }
-            argc = new_argc;
-            strlcpy(kpath, elf_interp, 256);
-
-            serial_write_string("[ELF] PT_INTERP detected. Delegating to interpreter: ");
-            serial_write_string(kpath);
-            serial_write_string("\n");
-        }
-    }
-
     if (envp) {
         if (!vmm_verify_user_access(envp, sizeof(char*), 0)) {
             res = -EFAULT;
@@ -1865,6 +1801,80 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
         }
     }
     kenvp[envc] = NULL;
+
+    {
+        int skip_pt_interp = 0;
+        for (int i = 0; i < envc; i++) {
+            if (strcmp(kenvp[i], "ETER_SKIP_PT_INTERP=1") == 0) {
+                skip_pt_interp = 1;
+                break;
+            }
+        }
+
+        if (!skip_pt_interp) {
+            char elf_interp[256];
+            int interp_res = elf_get_interp(kpath, elf_interp, sizeof(elf_interp));
+            if (interp_res < 0 && interp_res != -ENOEXEC) {
+                res = interp_res;
+                goto cleanup_error;
+            }
+            if (interp_res > 0) {
+                char exec_abs[256];
+                char* old_argv[33];
+                char* new_argv[33];
+                int old_argc = argc;
+                int new_argc = 0;
+                int required = 2 + ((old_argc > 0) ? (old_argc - 1) : 0);
+                task_t* exec_current = task_get_current();
+
+                if (!exec_current || vfs_normalize_path(exec_abs, sizeof(exec_abs), kpath, exec_current->cwd) != 0) {
+                    strlcpy(exec_abs, kpath, sizeof(exec_abs));
+                }
+
+                if (required > 32) {
+                    res = -E2BIG;
+                    goto cleanup_error;
+                }
+
+                for (int i = 0; i <= old_argc; i++) old_argv[i] = kargv[i];
+                for (int i = 0; i < 33; i++) new_argv[i] = NULL;
+
+                new_argv[new_argc] = (char*)kmalloc(256);
+                if (!new_argv[new_argc]) {
+                    res = -ENOMEM;
+                    goto cleanup_error;
+                }
+                strlcpy(new_argv[new_argc++], elf_interp, 256);
+
+                new_argv[new_argc] = (char*)kmalloc(256);
+                if (!new_argv[new_argc]) {
+                    kfree(new_argv[0]);
+                    res = -ENOMEM;
+                    goto cleanup_error;
+                }
+                strlcpy(new_argv[new_argc++], exec_abs, 256);
+
+                for (int i = 1; i < old_argc; i++) {
+                    new_argv[new_argc++] = old_argv[i];
+                }
+                new_argv[new_argc] = NULL;
+
+                if (old_argc > 0 && old_argv[0]) {
+                    kfree(old_argv[0]);
+                }
+
+                for (int i = 0; i <= new_argc; i++) {
+                    kargv[i] = new_argv[i];
+                }
+                argc = new_argc;
+                strlcpy(kpath, elf_interp, 256);
+
+                serial_write_string("[ELF] PT_INTERP detected. Delegating to interpreter: ");
+                serial_write_string(kpath);
+                serial_write_string("\n");
+            }
+        }
+    }
 
     /* 2. New Address Space */
     task_t* current = task_get_current();

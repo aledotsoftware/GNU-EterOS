@@ -627,6 +627,45 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_shebang_exec.elf"; exit 1 }
 
+    # test_pt_interp_route.elf
+    $testPtInterpRouteSrc = "$userDir\test_pt_interp_route.c"
+    $testPtInterpRouteObj = "$BUILD_DIR\userspace\test_pt_interp_route.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $testPtInterpRouteSrc -o $testPtInterpRouteObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test_pt_interp_route.c"; exit 1 }
+
+    $testPtInterpRouteElf = "$initrdRoot\test_pt_interp_route.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testPtInterpRouteElf $testPtInterpRouteObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_pt_interp_route.elf"; exit 1 }
+
+    # ld-eter.elf (dynamic loader bootstrap stub)
+    $ldEterSrc = "$userDir\ld_eter.c"
+    $ldEterObj = "$BUILD_DIR\userspace\ld_eter.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $ldEterSrc -o $ldEterObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar ld_eter.c"; exit 1 }
+
+    $ldEterElf = "$initrdRoot\ld-eter.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $ldEterElf $ldEterObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar ld-eter.elf"; exit 1 }
+
+    # ptinterp_demo.elf (has PT_INTERP=/ld-eter.elf)
+    $ptInterpDemoSrc = "$userDir\ptinterp_demo.c"
+    $ptInterpDemoObj = "$BUILD_DIR\userspace\ptinterp_demo.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $ptInterpDemoSrc -o $ptInterpDemoObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar ptinterp_demo.c"; exit 1 }
+
+    $ptInterpDemoElf = "$initrdRoot\ptinterp_demo.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $ptInterpDemoElf $ptInterpDemoObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar ptinterp_demo.elf"; exit 1 }
+
     # eter_posix_validate.elf
     $eterPosixValidateSrc = "$userDir\eter_posix_validate.c"
     $eterPosixValidateObj = "$BUILD_DIR\userspace\eter_posix_validate.o"
@@ -705,7 +744,7 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar busybox"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $testWaitidElf, $testProcfsElf, $testPtyJobElf, $testShebangExecElf, $eterPosixValidateElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
+    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $testWaitidElf, $testProcfsElf, $testPtyJobElf, $testShebangExecElf, $testPtInterpRouteElf, $ldEterElf, $ptInterpDemoElf, $eterPosixValidateElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
 }
 
 function Invoke-InitrdBuild {
