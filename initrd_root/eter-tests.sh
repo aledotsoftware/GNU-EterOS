@@ -34,5 +34,6 @@ pwd
 /test_epoll.elf
 /test_sigaltstack.elf
 /test_signal_posix.elf
+/test_waitid.elf
 
 echo eter-tests: OK

@@ -21,6 +21,38 @@ static int proc_node_fd(fs_node_t *node) {
     return (int)(node->inode - 1000);
 }
 
+static char proc_task_state_char(task_t* t) {
+    if (!t) return '?';
+    switch (t->state) {
+        case TASK_RUNNING: return 'R';
+        case TASK_READY: return 'R';
+        case TASK_SLEEPING: return 'S';
+        case TASK_BLOCKED: return 'D';
+        case TASK_STOPPED: return 'T';
+        case TASK_DEAD: return 'Z';
+        default: return '?';
+    }
+}
+
+static const char* proc_task_state_word(task_t* t) {
+    if (!t) return "unknown";
+    switch (t->state) {
+        case TASK_RUNNING: return "running";
+        case TASK_READY: return "running";
+        case TASK_SLEEPING: return "sleeping";
+        case TASK_BLOCKED: return "blocked";
+        case TASK_STOPPED: return "stopped";
+        case TASK_DEAD: return "zombie";
+        default: return "unknown";
+    }
+}
+
+static void proc_append_int(char* out, size_t out_sz, int64_t v) {
+    char b[32];
+    itoa_s(v, b, sizeof(b), 10);
+    strlcat(out, b, out_sz);
+}
+
 /* ========================================================================= */
 /* /proc/version Implementation                                              */
 /* ========================================================================= */

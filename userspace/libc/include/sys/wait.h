@@ -25,6 +25,14 @@ typedef struct siginfo {
 #define WEXITED     4
 #define WCONTINUED  8
 #define WNOWAIT     0x01000000
+#define __WALL      0x40000000
+
+#define CLD_EXITED      1
+#define CLD_KILLED      2
+#define CLD_DUMPED      3
+#define CLD_TRAPPED     4
+#define CLD_STOPPED     5
+#define CLD_CONTINUED   6
 
 pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);

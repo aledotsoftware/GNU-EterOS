@@ -575,6 +575,19 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_signal_posix.elf"; exit 1 }
 
+    # test_waitid.elf
+    $testWaitidSrc = "$userDir\test_waitid.c"
+    $testWaitidObj = "$BUILD_DIR\userspace\test_waitid.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $testWaitidSrc -o $testWaitidObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test_waitid.c"; exit 1 }
+
+    $testWaitidElf = "$initrdRoot\test_waitid.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testWaitidElf $testWaitidObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_waitid.elf"; exit 1 }
+
     # sh.elf
     $shSrc = "$userDir\sh.c"
     $shObj = "$BUILD_DIR\userspace\sh.o"
@@ -640,7 +653,7 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar busybox"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
+    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $testWaitidElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
 }
 
 function Invoke-InitrdBuild {

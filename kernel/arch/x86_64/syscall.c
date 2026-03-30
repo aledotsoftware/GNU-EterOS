@@ -670,7 +670,16 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     }
     if (fd == -1) { kfree(kpath); return -EMFILE; }
 
-    fs_node_t* node = vfs_lookup(fs_root, kpath);
+    fs_node_t* node = vfs_lookup_ext(fs_root, kpath, (flags & O_NOFOLLOW) ? 0 : 1);
+
+    if (node && (flags & O_NOFOLLOW) && ((node->flags & 0x7) == FS_SYMLINK)) {
+        if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+            if (node->close) node->close(node);
+            kfree(node);
+        }
+        kfree(kpath);
+        return -ELOOP;
+    }
 
     int req_mask = 0;
     if ((flags & O_ACCMODE) == O_RDONLY) req_mask = 4;
@@ -1511,7 +1520,10 @@ static int64_t sys_newfstatat(int dirfd, const char* path, struct linux_stat* bu
     } else {
         kpath = (char*)kmalloc(256);
         if (!kpath) return -ENOMEM;
-        if (resolve_path(dirfd, path, kpath, 256) < 0) { kfree(kpath); return -ENOENT; }
+        {
+            int r = resolve_path(dirfd, path, kpath, 256);
+            if (r < 0) { kfree(kpath); return r; }
+        }
         node = vfs_lookup_ext(fs_root, kpath, (flags & AT_SYMLINK_NOFOLLOW) ? 0 : 1);
         kfree(kpath);
     }
@@ -2853,12 +2865,20 @@ static int64_t sys_waitid(int idtype, int id, struct kernel_wait_siginfo* infop,
     if (ret < 0) return ret;
 
     if (infop) {
+        int si_status = st;
+        if (code == CLD_EXITED || code == CLD_STOPPED) {
+            si_status = (st >> 8) & 0xFF;
+        } else if (code == CLD_CONTINUED) {
+            si_status = SIGCONT;
+        } else if (code == CLD_KILLED || code == CLD_DUMPED || code == CLD_TRAPPED) {
+            si_status = st & 0x7F;
+        }
         infop->si_signo = SIGCHLD;
         infop->si_errno = 0;
         infop->si_code = (pid == 0) ? 0 : code;
         infop->si_pid = pid;
         infop->si_uid = 0;
-        infop->si_status = st;
+        infop->si_status = si_status;
     }
     return 0;
 }

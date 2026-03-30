@@ -60,6 +60,13 @@ static void test_openat_fstatat(void) {
     expect(fd < 0 && errno == ENOTDIR, "openat O_DIRECTORY rejects regular file");
     if (fd >= 0) close(fd);
 
+    fd = openat(-1, "s1_file.txt", O_RDONLY, 0);
+    expect(fd < 0 && errno == EBADF, "openat invalid dirfd returns EBADF");
+    if (fd >= 0) close(fd);
+
+    expect(fstatat(AT_FDCWD, "/README", &st, 0x200000) < 0 && errno == EINVAL,
+           "fstatat rejects unsupported flags");
+
     unlink("/data/s1_file.txt");
     close(dirfd);
 }
@@ -80,6 +87,17 @@ static void test_fcntl_flags(void) {
     expect(fl >= 0, "fcntl F_GETFL works");
     expect(fcntl(fd, F_SETFL, fl | O_NONBLOCK) == 0, "fcntl F_SETFL O_NONBLOCK");
     expect((fcntl(fd, F_GETFL) & O_NONBLOCK) != 0, "fcntl F_GETFL reflects O_NONBLOCK");
+
+    {
+        int fd2 = fcntl(fd, F_DUPFD_CLOEXEC, 10);
+        expect(fd2 >= 10, "fcntl F_DUPFD_CLOEXEC duplicates fd");
+        if (fd2 >= 0) {
+            expect((fcntl(fd2, F_GETFD) & FD_CLOEXEC) != 0, "F_DUPFD_CLOEXEC sets close-on-exec");
+            close(fd2);
+        }
+    }
+
+    expect(fcntl(fd, 0x7fffffff, 0) < 0 && errno == EINVAL, "fcntl unknown cmd returns EINVAL");
 
     close(fd);
 }
