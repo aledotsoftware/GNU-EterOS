@@ -36,6 +36,9 @@ static void dev_signal_pgrp(int sid, int pgid, int sig) {
         if ((int)t->sid != sid) continue;
         if ((int)t->pgid != pgid) continue;
         t->signal_pending |= (1u << (sig - 1));
+        if (t->state == TASK_BLOCKED || t->state == TASK_SLEEPING || t->state == TASK_STOPPED) {
+            task_wakeup(t);
+        }
     }
 }
 
@@ -194,10 +197,12 @@ static int dev_tty_ioctl(fs_node_t *node, int request, void *arg) {
             spin_unlock(&dev_tty_lock);
             return 0;
         case TIOCGPGRP:
+            if (!arg) { spin_unlock(&dev_tty_lock); return -EINVAL; }
             *(int*)arg = dev_tty_fg_pgid;
             spin_unlock(&dev_tty_lock);
             return 0;
         case TIOCSPGRP: {
+            if (!arg) { spin_unlock(&dev_tty_lock); return -EINVAL; }
             int pgid = *(int*)arg;
             if (pgid <= 0 || dev_tty_session != (int)current->sid) {
                 spin_unlock(&dev_tty_lock);
@@ -208,6 +213,7 @@ static int dev_tty_ioctl(fs_node_t *node, int request, void *arg) {
             return 0;
         }
         case FIONREAD:
+            if (!arg) { spin_unlock(&dev_tty_lock); return -EINVAL; }
             *(int*)arg = keyboard_has_input() ? 1 : 0;
             spin_unlock(&dev_tty_lock);
             return 0;
@@ -396,9 +402,9 @@ static int dev_pty_ioctl(fs_node_t *node, int request, void *arg) {
     pty_pair_t* p = pty_from_node(node);
     int role = pty_node_role(node);
     task_t* current = task_get_current();
-    if (!p) return -1;
-    if (!arg && request != FIONREAD) return -1;
-    if (!current) return -1;
+    if (!p) return -EINVAL;
+    if (!arg && request != FIONREAD) return -EINVAL;
+    if (!current) return -EINVAL;
 
     switch (request) {
         case TCGETS:
@@ -414,37 +420,39 @@ static int dev_pty_ioctl(fs_node_t *node, int request, void *arg) {
             memcpy(&p->winsz, arg, sizeof(struct winsize));
             return 0;
         case TIOCGPTN:
-            if (role != PTY_ROLE_MASTER) return -1;
+            if (role != PTY_ROLE_MASTER) return -EINVAL;
             *(int*)arg = (int)p->id;
             return 0;
         case TIOCSPTLCK:
-            if (role != PTY_ROLE_MASTER) return -1;
+            if (role != PTY_ROLE_MASTER) return -EINVAL;
             p->locked = (*(int*)arg) ? 1 : 0;
             return 0;
         case TIOCSCTTY:
-            if (role != PTY_ROLE_SLAVE) return -1;
-            if (current->sid == 0) return -1;
-            if (p->session_id != -1 && p->session_id != (int)current->sid) return -1;
+            if (role != PTY_ROLE_SLAVE) return -EINVAL;
+            if (current->sid == 0) return -EPERM;
+            if (p->session_id != -1 && p->session_id != (int)current->sid) return -EPERM;
             p->session_id = (int)current->sid;
             if (p->fg_pgid == 0) p->fg_pgid = (int)current->pgid;
             return 0;
         case TIOCGPGRP:
+            if (!arg) return -EINVAL;
             *(int*)arg = p->fg_pgid;
             return 0;
         case TIOCSPGRP: {
+            if (!arg) return -EINVAL;
             int pgid = *(int*)arg;
-            if (pgid <= 0) return -1;
-            if (p->session_id != (int)current->sid) return -1;
+            if (pgid <= 0) return -EINVAL;
+            if (p->session_id != (int)current->sid) return -EPERM;
             p->fg_pgid = pgid;
             return 0;
         }
         case FIONREAD:
-            if (!arg) return -1;
+            if (!arg) return -EINVAL;
             if (role == PTY_ROLE_MASTER) *(int*)arg = (int)p->s2m.avail;
             else *(int*)arg = (int)p->m2s.avail;
             return 0;
         default:
-            return -1;
+            return -EINVAL;
     }
 }
 

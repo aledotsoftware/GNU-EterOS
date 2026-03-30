@@ -157,10 +157,10 @@ static ssize_t proc_self_cmdline_read(fs_node_t *node, uint32_t offset, uint32_t
     (void)offset;
     task_t* current = proc_node_task(node);
     if (!current || !buffer) return 0;
-    // Just return name as cmdline for now
-    int len = strlen(current->name) + 1; // include null
+    const char* cmd = current->executable_path[0] ? current->executable_path : current->name;
+    int len = strlen(cmd) + 1; /* include trailing NUL */
     if (len > (int)size) len = size;
-    memcpy(buffer, current->name, len);
+    memcpy(buffer, cmd, len);
     return len;
 }
 
@@ -170,42 +170,65 @@ static ssize_t proc_self_status_read(fs_node_t *node, uint32_t offset, uint32_t 
     if (!current || !buffer) return 0;
 
     char status_str[512];
-    char num_buf[32];
+    char state_buf[8];
+    state_buf[0] = proc_task_state_char(current);
+    state_buf[1] = '\0';
 
     strlcpy(status_str, "Name:\t", sizeof(status_str));
     strlcat(status_str, current->name, sizeof(status_str));
-    strlcat(status_str, "\nState:\tR (running)\n", sizeof(status_str));
+    strlcat(status_str, "\nState:\t", sizeof(status_str));
+    strlcat(status_str, state_buf, sizeof(status_str));
+    strlcat(status_str, " (", sizeof(status_str));
+    strlcat(status_str, proc_task_state_word(current), sizeof(status_str));
+    strlcat(status_str, ")\n", sizeof(status_str));
 
     strlcat(status_str, "Pid:\t", sizeof(status_str));
-    itoa_s((int64_t)current->id, num_buf, sizeof(num_buf), 10);
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->id);
     strlcat(status_str, "\n", sizeof(status_str));
 
     strlcat(status_str, "PPid:\t", sizeof(status_str));
-    itoa_s((int64_t)current->parent_id, num_buf, sizeof(num_buf), 10);
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->parent_id);
+    strlcat(status_str, "\n", sizeof(status_str));
+
+    strlcat(status_str, "Tgid:\t", sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->tgid);
+    strlcat(status_str, "\n", sizeof(status_str));
+
+    strlcat(status_str, "Pgid:\t", sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->pgid);
+    strlcat(status_str, "\n", sizeof(status_str));
+
+    strlcat(status_str, "Sid:\t", sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->sid);
     strlcat(status_str, "\n", sizeof(status_str));
 
     strlcat(status_str, "Uid:\t", sizeof(status_str));
-    itoa_s((int64_t)current->uid, num_buf, sizeof(num_buf), 10);
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->uid);
     strlcat(status_str, "\t", sizeof(status_str));
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->euid);
     strlcat(status_str, "\t", sizeof(status_str));
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->uid);
     strlcat(status_str, "\t", sizeof(status_str));
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->euid);
     strlcat(status_str, "\n", sizeof(status_str));
 
     strlcat(status_str, "Gid:\t", sizeof(status_str));
-    itoa_s((int64_t)current->gid, num_buf, sizeof(num_buf), 10);
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->gid);
     strlcat(status_str, "\t", sizeof(status_str));
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->egid);
     strlcat(status_str, "\t", sizeof(status_str));
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->gid);
     strlcat(status_str, "\t", sizeof(status_str));
-    strlcat(status_str, num_buf, sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)current->egid);
+    strlcat(status_str, "\n", sizeof(status_str));
+
+    strlcat(status_str, "Threads:\t1\n", sizeof(status_str));
+    strlcat(status_str, "VmSize:\t", sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), (int64_t)(current->brk / 1024));
+    strlcat(status_str, " kB\n", sizeof(status_str));
+    strlcat(status_str, "VmRSS:\t0 kB\n", sizeof(status_str));
+    strlcat(status_str, "FDSize:\t", sizeof(status_str));
+    proc_append_int(status_str, sizeof(status_str), MAX_FD);
     strlcat(status_str, "\n", sizeof(status_str));
 
     size_t len = strlen(status_str);
@@ -213,6 +236,44 @@ static ssize_t proc_self_status_read(fs_node_t *node, uint32_t offset, uint32_t 
     if (offset + size > len) size = (uint32_t)(len - offset);
 
     memcpy(buffer, status_str + offset, size);
+    return size;
+}
+
+/* /proc/self/stat */
+static ssize_t proc_self_stat_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    task_t* current = proc_node_task(node);
+    if (!current || !buffer) return 0;
+
+    char stat_str[512];
+    char st[2];
+    st[0] = proc_task_state_char(current);
+    st[1] = '\0';
+
+    strlcpy(stat_str, "", sizeof(stat_str));
+    proc_append_int(stat_str, sizeof(stat_str), (int64_t)current->id);
+    strlcat(stat_str, " (", sizeof(stat_str));
+    strlcat(stat_str, current->name, sizeof(stat_str));
+    strlcat(stat_str, ") ", sizeof(stat_str));
+    strlcat(stat_str, st, sizeof(stat_str));
+    strlcat(stat_str, " ", sizeof(stat_str));
+    proc_append_int(stat_str, sizeof(stat_str), (int64_t)current->parent_id); /* ppid */
+    strlcat(stat_str, " ", sizeof(stat_str));
+    proc_append_int(stat_str, sizeof(stat_str), (int64_t)current->pgid); /* pgrp */
+    strlcat(stat_str, " ", sizeof(stat_str));
+    proc_append_int(stat_str, sizeof(stat_str), (int64_t)current->sid); /* session */
+    strlcat(stat_str, " 0 ", sizeof(stat_str)); /* tty_nr */
+    proc_append_int(stat_str, sizeof(stat_str), (int64_t)current->pgid); /* tpgid */
+    strlcat(stat_str, " 0 0 0 0 0 ", sizeof(stat_str)); /* flags/minflt/cminflt/majflt/cmajflt */
+    strlcat(stat_str, "0 0 0 0 ", sizeof(stat_str)); /* utime/stime/cutime/cstime */
+    strlcat(stat_str, "20 0 1 0 ", sizeof(stat_str)); /* priority/nice/threads/itrealvalue */
+    strlcat(stat_str, "0 ", sizeof(stat_str)); /* starttime */
+    proc_append_int(stat_str, sizeof(stat_str), (int64_t)current->brk); /* vsize */
+    strlcat(stat_str, " 0\n", sizeof(stat_str)); /* rss */
+
+    size_t len = strlen(stat_str);
+    if (offset >= len) return 0;
+    if (offset + size > len) size = (uint32_t)(len - offset);
+    memcpy(buffer, stat_str + offset, size);
     return size;
 }
 
@@ -316,9 +377,10 @@ static int proc_self_readdir(fs_node_t *node, uint32_t index, struct dirent *ent
     if (index == 0) { strlcpy(entry->name, "exe", sizeof(entry->name)); entry->inode = 10; return 0; }
     if (index == 1) { strlcpy(entry->name, "cmdline", sizeof(entry->name)); entry->inode = 11; return 0; }
     if (index == 2) { strlcpy(entry->name, "status", sizeof(entry->name)); entry->inode = 12; return 0; }
-    if (index == 3) { strlcpy(entry->name, "maps", sizeof(entry->name)); entry->inode = 13; return 0; }
-    if (index == 4) { strlcpy(entry->name, "environ", sizeof(entry->name)); entry->inode = 14; return 0; }
-    if (index == 5) { strlcpy(entry->name, "fd", sizeof(entry->name)); entry->inode = 15; return 0; }
+    if (index == 3) { strlcpy(entry->name, "stat", sizeof(entry->name)); entry->inode = 13; return 0; }
+    if (index == 4) { strlcpy(entry->name, "maps", sizeof(entry->name)); entry->inode = 14; return 0; }
+    if (index == 5) { strlcpy(entry->name, "environ", sizeof(entry->name)); entry->inode = 15; return 0; }
+    if (index == 6) { strlcpy(entry->name, "fd", sizeof(entry->name)); entry->inode = 16; return 0; }
     return 1;
 }
 
@@ -346,22 +408,27 @@ static fs_node_t *proc_self_finddir(fs_node_t *node, char *name) {
         fnode->flags = FS_FILE;
         fnode->read = proc_self_status_read;
         fnode->inode = 12;
+    } else if (strcmp(name, "stat") == 0) {
+        strlcpy(fnode->name, "stat", sizeof(fnode->name));
+        fnode->flags = FS_FILE;
+        fnode->read = proc_self_stat_read;
+        fnode->inode = 13;
     } else if (strcmp(name, "maps") == 0) {
         strlcpy(fnode->name, "maps", sizeof(fnode->name));
         fnode->flags = FS_FILE;
         fnode->read = proc_self_maps_read;
-        fnode->inode = 13;
+        fnode->inode = 14;
     } else if (strcmp(name, "environ") == 0) {
         strlcpy(fnode->name, "environ", sizeof(fnode->name));
         fnode->flags = FS_FILE;
         fnode->read = proc_self_environ_read;
-        fnode->inode = 14;
+        fnode->inode = 15;
     } else if (strcmp(name, "fd") == 0) {
         strlcpy(fnode->name, "fd", sizeof(fnode->name));
         fnode->flags = FS_DIRECTORY;
         fnode->readdir = proc_self_fd_readdir;
         fnode->finddir = proc_self_fd_finddir;
-        fnode->inode = 15;
+        fnode->inode = 16;
     } else {
         kfree(fnode);
         return 0;

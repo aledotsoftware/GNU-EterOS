@@ -588,6 +588,45 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_waitid.elf"; exit 1 }
 
+    # test_procfs.elf
+    $testProcfsSrc = "$userDir\test_procfs.c"
+    $testProcfsObj = "$BUILD_DIR\userspace\test_procfs.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $testProcfsSrc -o $testProcfsObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test_procfs.c"; exit 1 }
+
+    $testProcfsElf = "$initrdRoot\test_procfs.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testProcfsElf $testProcfsObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_procfs.elf"; exit 1 }
+
+    # test_pty_jobcontrol.elf
+    $testPtyJobSrc = "$userDir\test_pty_jobcontrol.c"
+    $testPtyJobObj = "$BUILD_DIR\userspace\test_pty_jobcontrol.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $testPtyJobSrc -o $testPtyJobObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar test_pty_jobcontrol.c"; exit 1 }
+
+    $testPtyJobElf = "$initrdRoot\test_pty_jobcontrol.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $testPtyJobElf $testPtyJobObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar test_pty_jobcontrol.elf"; exit 1 }
+
+    # eter_posix_validate.elf
+    $eterPosixValidateSrc = "$userDir\eter_posix_validate.c"
+    $eterPosixValidateObj = "$BUILD_DIR\userspace\eter_posix_validate.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $eterPosixValidateSrc -o $eterPosixValidateObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar eter_posix_validate.c"; exit 1 }
+
+    $eterPosixValidateElf = "$initrdRoot\eter_posix_validate.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $eterPosixValidateElf $eterPosixValidateObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar eter_posix_validate.elf"; exit 1 }
+
     # sh.elf
     $shSrc = "$userDir\sh.c"
     $shObj = "$BUILD_DIR\userspace\sh.o"
@@ -653,7 +692,7 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar busybox"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $testWaitidElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
+    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $testWaitidElf, $testProcfsElf, $testPtyJobElf, $eterPosixValidateElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
 }
 
 function Invoke-InitrdBuild {

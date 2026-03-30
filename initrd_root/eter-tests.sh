@@ -35,5 +35,8 @@ pwd
 /test_sigaltstack.elf
 /test_signal_posix.elf
 /test_waitid.elf
+/test_procfs.elf
+/test_pty_jobcontrol.elf
+/eter_posix_validate.elf
 
 echo eter-tests: OK
