@@ -1,0 +1,10 @@
+--- tests/test_elf_read_failure.c
++++ tests/test_elf_read_failure.c
+@@ -25,7 +25,7 @@
+ /* Mock Defines to skip real headers in elf.c */
+ #define __ETEROS_HOST_TEST__ 1
+-#define ELF_H
++#define _ELF_H
+ #define FS_VFS_H
+ #define ETEROS_HAL_H
+ #define ETEROS_PMM_H

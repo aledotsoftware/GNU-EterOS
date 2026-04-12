@@ -59,6 +59,9 @@ task_t* task_get_current(void) {
 /* Include implementation under test */
 /* This will include include/string.h which renames memcpy to eteros_memcpy */
 #include "../kernel/string.c"
+task_t* task_get_by_id(uint32_t id) { (void)id; return NULL; }
+task_t* task_get_at(int index) { (void)index; return NULL; }
+int task_get_max(void) { return 0; }
 #include "../kernel/fs/procfs.c"
 
 /* ========================================================================= */

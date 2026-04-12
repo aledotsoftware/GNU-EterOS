@@ -1,0 +1,13 @@
+--- tests/test_readv_security.c
++++ tests/test_readv_security.c
+@@ -235,2 +235,11 @@
+
++task_t* task_get_at(int index) { (void)index; return NULL; }
++int task_get_count(void) { return 1; }
++void task_exit_signal(int sig) { (void)sig; }
++int task_waitid(int idtype, int id, void* infop, int options) {
++    (void)idtype; (void)id; (void)infop; (void)options;
++    return -1;
++}
++
+ #include "../kernel/arch/x86_64/syscall.c"

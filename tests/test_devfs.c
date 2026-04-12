@@ -59,6 +59,14 @@ int input_mouse_pending(void) {
 }
 
 /* Include DevFS source directly to test static functions */
+#include <stdbool.h>
+#include "task.h"
+struct task* task_get_at(int index) { (void)index; return NULL; }
+int task_get_max(void) { return 0; }
+void task_wakeup(struct task* task) { (void)task; }
+struct task* task_get_current(void) { static struct task t; return &t; }
+bool keyboard_has_input(void) { return false; }
+void task_yield(void) {}
 #include "../kernel/fs/devfs.c"
 
 void test_devfs_finddir() {
