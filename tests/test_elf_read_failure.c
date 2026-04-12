@@ -42,6 +42,17 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 #define PAGE_ALIGN_DOWN(x) ((x) & ~(PAGE_SIZE - 1))
 #define PAGE_ALIGN_UP(x)   (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
 
+#define PT_INTERP 3
+#define PT_PHDR 6
+
+typedef struct {
+    uint64_t entry;
+    uint64_t phdr;
+    uint64_t phent;
+    uint64_t phnum;
+    uint64_t base;
+} elf_auxv_info_t;
+
 /* Mock Types */
 typedef uint64_t uint64_t;
 typedef uint32_t uint32_t;

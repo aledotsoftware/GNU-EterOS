@@ -227,8 +227,21 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
     return NULL;
 }
 
+task_t* task_get_at(int i) { (void)i; return NULL; }
+int task_get_count(void) { return 1; }
+void task_exit_signal(int status) { (void)status; }
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) {
+    (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code;
+    return -ECHILD;
+}
+
 #include "../kernel/arch/x86_64/syscall.c"
 
+#undef MAP_FIXED
+#undef MAP_ANONYMOUS
+#undef MAP_PRIVATE
+#undef PROT_READ
+#undef PROT_WRITE
 #define MAP_FIXED 0x10
 #define MAP_ANONYMOUS 0x20
 #define MAP_PRIVATE 0x02

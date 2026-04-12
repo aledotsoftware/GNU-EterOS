@@ -903,8 +903,11 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
         return -EINVAL;
     }
 
-    if ((node->flags & 0x7) == FS_DIRECTORY && write_mode) {
-        kfree(node);
+    if (node && (node->flags & 0x7) == FS_DIRECTORY && write_mode) {
+        if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+            if (node->close) node->close(node);
+            kfree(node);
+        }
         kfree(kpath);
         return -EISDIR;
     }

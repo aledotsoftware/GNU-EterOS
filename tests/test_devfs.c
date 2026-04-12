@@ -58,6 +58,18 @@ int input_mouse_pending(void) {
     return 1;
 }
 
+int task_get_max(void) { return 1; }
+
+#include "../include/task.h"
+#include "../include/keyboard.h"
+
+task_t* task_get_at(int i) { (void)i; return NULL; }
+void task_wakeup(task_t* t) { (void)t; }
+task_t current_task_mock;
+task_t* task_get_current(void) { return &current_task_mock; }
+bool keyboard_has_input(void) { return 1; }
+void task_yield(void) {}
+
 /* Include DevFS source directly to test static functions */
 #include "../kernel/fs/devfs.c"
 

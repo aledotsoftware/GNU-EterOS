@@ -214,9 +214,22 @@ fs_node_t *finddir_fs(fs_node_t *node, char *name) {
     return NULL;
 }
 
+fs_node_t mock_vfs_node;
 fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) {
     (void)root; (void)path; (void)follow_symlink;
+    if (strcmp(path, "/some/dir") == 0) {
+        mock_vfs_node.flags = FS_DIRECTORY;
+        return &mock_vfs_node;
+    }
     return NULL;
+}
+
+task_t* task_get_at(int i) { (void)i; return NULL; }
+int task_get_count(void) { return 1; }
+void task_exit_signal(int status) { (void)status; }
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) {
+    (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code;
+    return -ECHILD;
 }
 
 #include "../kernel/arch/x86_64/syscall.c"
