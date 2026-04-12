@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
-**Fecha:** 2026-03-29
-**Commit:** d001f206b960d88ed98f80720802e8b22fca6244
+**Fecha:** 2026-04-12
+**Commit:** c6ef789c71a17f405656a49e9a3fe9cf4f8cb92e
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
@@ -38,7 +38,8 @@
 3. `network-socket-api-bot` — Razón: Resolver la resolución DNS nativa. Exponer el DNS de lwIP a nivel de sistema habilitará al sistema para descargas de repositorios GNU reales usando hostnames.
 
 ## Correcciones de Integración Aplicadas
-- Ninguna requerida en este ciclo, el proyecto compila correctamente sin advertencias tratadas como errores, y bootea transicionando a Ring 3 sin Kernel Panics. Todos los subprocesos de las capas subyacentes operan de forma estable.
+- Agregada referencia a `isspace` dentro de `libc/src/ctype.c` e incluida en `userspace/Makefile` para arreglar errores de enlace con `sh.elf`.
+- Agregado el atributo `__attribute__((unused))` a varias funciones en `kernel/arch/x86_64/syscall.c` (`timerfd_write_fs`, `timerfd_ioctl_fs`, `timerfd_close_fs`, `timerfd_from_fd`, `timespec_to_ms`, `ms_to_timespec`) para resolver fallas de compilación al haber funciones sin uso debido a directivas de advertencias agresivas.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |
