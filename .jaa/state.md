@@ -186,9 +186,17 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente (`5283ec00728e845f6a85e698d92a53f8ce981b15`). El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter", "GNU Desktop sobre Eter" y "Android" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
 - Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
 
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-03-29)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make clean && make all` sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
 - `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente (`d001f206b960d88ed98f80720802e8b22fca6244`). El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter", "GNU Desktop sobre Eter" y "Android" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
 - Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
+
+## Orchestrator-Meta-Agent (Current Run)
+**Estado**: Auditado y verificado con éxito.
+- Se resolvió una dependencia de `isspace` en userspace editando `userspace/Makefile` para que incluya `ctype.c` en la compilación de la libc.
+- Se solucionaron advertencias de `-Wunused-function` en `kernel/arch/x86_64/syscall.c` (p. ej. `timerfd_from_fd`, etc) usando el atributo `__attribute__((unused))`.
+- El sistema compila correctamente de manera limpia (`make clean && make all`).
+- El entorno fue validado ejecutando QEMU de forma non-interactiva para confirmar el booteo exitoso y el pasaje a Ring 3 con `login.elf`.
+- `ORCHESTRATOR_REPORT.md` ha sido actualizado para reflejar el estado actual: la fecha, el commit real (`c6ef789c71a17f405656a49e9a3fe9cf4f8cb92e`) y confirmar que no hay errores de compilación ni de booteo.
