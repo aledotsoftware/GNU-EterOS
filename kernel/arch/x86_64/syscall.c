@@ -897,6 +897,12 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
         return -EINVAL;
     }
 
+    if ((node->flags & 0x7) == FS_DIRECTORY && (flags & O_ACCMODE) != O_RDONLY) {
+        kfree(node);
+        kfree(kpath);
+        return -EISDIR;
+    }
+
     if ((node->flags & 0x7) == FS_DIRECTORY && write_mode) {
         kfree(node);
         kfree(kpath);

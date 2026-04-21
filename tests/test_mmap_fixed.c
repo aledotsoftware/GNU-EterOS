@@ -272,3 +272,7 @@ int main() {
 }
 int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) { return -1; }
 uint32_t* framebuffer_get_hw_buffer(void) { return NULL; }
+task_t* task_get_at(int index) { return NULL; }
+int task_get_count(void) { return 0; }
+void task_exit_signal(int signal) {}
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { return -1; }

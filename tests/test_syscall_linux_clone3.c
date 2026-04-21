@@ -180,3 +180,8 @@ size_t eteros_strlcat(char* dst, const char* src, size_t size) { return 0; }
 int eteros_strcmp(const char* s1, const char* s2) { return strcmp(s1, s2); }
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) { return 0; }
 char* eteros_strncpy(char* dest, const char* src, size_t n) { return strncpy(dest, src, n); }
+
+task_t* task_get_at(int index) { return NULL; }
+int task_get_count(void) { return 0; }
+void task_exit_signal(int sig) {}
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { return -1; }

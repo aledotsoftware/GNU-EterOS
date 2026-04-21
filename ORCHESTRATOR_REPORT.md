@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
-**Fecha:** 2026-03-29
-**Commit:** d001f206b960d88ed98f80720802e8b22fca6244
+**Fecha:** 2026-04-21
+**Commit:** 4e474b83744b066e7377133756c64772f938b7b5
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
@@ -38,7 +38,9 @@
 3. `network-socket-api-bot` — Razón: Resolver la resolución DNS nativa. Exponer el DNS de lwIP a nivel de sistema habilitará al sistema para descargas de repositorios GNU reales usando hostnames.
 
 ## Correcciones de Integración Aplicadas
-- Ninguna requerida en este ciclo, el proyecto compila correctamente sin advertencias tratadas como errores, y bootea transicionando a Ring 3 sin Kernel Panics. Todos los subprocesos de las capas subyacentes operan de forma estable.
+- Fix de ELF Loader: Agregado `PT_INTERP` (3) y `PT_PHDR` (6) a los headers de ELF y `elf_auxv_info_t` a `tests/test_elf_read_failure.c` para solventar error de tipo/macro no declarado introducido recientemente en `kernel/fs/elf.c`.
+- Fix de Makefiles de libC de EterOS en userspace para compilar y referenciar un par de `isspace` en tests de shells y comandos de consola (a través de la adición de `ctype.c` faltante).
+- Fix de Syscalls de Linux en VFS (Sys_openat y Sys_mkdir): Se previno que `sys_openat` pudiese abrir un FS_DIRECTORY con flags de O_WRONLY y saltase `EISDIR`. También se agregaron algunos fix de tests que hacían uso de funciones como `task_exit_signal` con argumentos erróneos `(uint32_t)` en lugar de `(int)`.
 
 ## Progreso hacia Milestones
 | Milestone | Progreso | Blocker |

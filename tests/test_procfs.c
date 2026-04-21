@@ -202,3 +202,6 @@ int main() {
     return 0;
 }
 void serial_write_string(const char* s) {}
+task_t* task_get_by_id(uint32_t id) { return NULL; }
+int task_get_max(void) { return 0; }
+task_t* task_get_at(int index) { return NULL; }

@@ -113,3 +113,9 @@ int main() {
     return 0;
 }
 void serial_write_string(const char* s) {}
+int task_get_max(void) { return 0; }
+task_t* task_get_at(int index) { return NULL; }
+void task_wakeup(task_t* task) {}
+task_t* task_get_current(void) { static task_t t; return &t; }
+bool keyboard_has_input(void) { return false; }
+void task_yield(void) {}

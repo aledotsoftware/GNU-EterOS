@@ -62,6 +62,14 @@ typedef struct {
 } task_t;
 
 /* Types from fs/vfs.h */
+typedef struct {
+    uint64_t entry;
+    uint64_t phent;
+    uint64_t phnum;
+    uint64_t base;
+    uint64_t phdr;
+} elf_auxv_info_t;
+
 typedef struct fs_node {
     char name[128];
     uint32_t flags;
@@ -86,6 +94,8 @@ typedef uint64_t Elf64_Xword;
 #define ET_DYN 3
 #define EM_X86_64 62
 #define PT_LOAD 1
+#define PT_INTERP 3
+#define PT_PHDR 6
 #define PF_R 0x4
 #define PF_W 0x2
 #define PF_X 0x1
