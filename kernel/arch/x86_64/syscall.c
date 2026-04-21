@@ -180,6 +180,7 @@ static uint64_t sys_now_ms(void) {
     return timer_get_ticks();
 }
 
+static int timespec_to_ms(const struct timespec* ts, uint64_t* out_ms) __attribute__((unused));
 static int timespec_to_ms(const struct timespec* ts, uint64_t* out_ms) {
     uint64_t sec_ms;
     uint64_t nsec_ms;
@@ -193,6 +194,7 @@ static int timespec_to_ms(const struct timespec* ts, uint64_t* out_ms) {
     return 0;
 }
 
+static void ms_to_timespec(uint64_t ms, struct timespec* ts) __attribute__((unused));
 static void ms_to_timespec(uint64_t ms, struct timespec* ts) {
     if (!ts) return;
     ts->tv_sec = (int64_t)(ms / 1000ULL);
@@ -247,11 +249,13 @@ static ssize_t timerfd_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, 
     }
 }
 
+static uint32_t timerfd_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) __attribute__((unused));
 static uint32_t timerfd_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)node; (void)offset; (void)size; (void)buffer;
     return (uint32_t)-EINVAL;
 }
 
+static int timerfd_ioctl_fs(fs_node_t* node, int request, void* arg) __attribute__((unused));
 static int timerfd_ioctl_fs(fs_node_t* node, int request, void* arg) {
     timerfd_ctx_t* tfd;
 
@@ -268,6 +272,7 @@ static int timerfd_ioctl_fs(fs_node_t* node, int request, void* arg) {
     return 0;
 }
 
+static void timerfd_close_fs(fs_node_t* node) __attribute__((unused));
 static void timerfd_close_fs(fs_node_t* node) {
     timerfd_ctx_t* tfd;
     if (!node) return;
@@ -278,6 +283,7 @@ static void timerfd_close_fs(fs_node_t* node) {
     }
 }
 
+static int timerfd_from_fd(int fd, task_t* current, fs_node_t** out_node, timerfd_ctx_t** out_ctx) __attribute__((unused));
 static int timerfd_from_fd(int fd, task_t* current, fs_node_t** out_node, timerfd_ctx_t** out_ctx) {
     fs_node_t* node;
     timerfd_ctx_t* tfd;
