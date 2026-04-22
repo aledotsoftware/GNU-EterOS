@@ -193,12 +193,21 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente (`d001f206b960d88ed98f80720802e8b22fca6244`). El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter", "GNU Desktop sobre Eter" y "Android" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
 - Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
 
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-04-22 Run 1)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make clean && make all` sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
 - `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente (`0be6777fd6d74bfcb0c893129aa7fb8c56393772`). El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter", "GNU Desktop sobre Eter" y "Android" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
 - Fix de glue / integración: Se aplicaron marcas `__attribute__((unused))` a funciones internas de `timerfd` en `kernel/arch/x86_64/syscall.c` para resolver advertencias tratadas como errores por los flags estrictos. El sistema compila y bootea de forma limpia.
+
+## Orchestrator-Meta-Agent (Current Run)
+**Estado**: Auditado y verificado con éxito.
+- El sistema compila correctamente (`make clean && make all` sin errores).
+- El sistema de arranque (QEMU) arranca y transiciona exitosamente a Ring 3 con `login.elf`.
+- `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con la fecha y el hash de commit más reciente (`0f843db2e6fe0d6ffbcdf2bf56e4dcc06855dbe5`).
+- **Auditoría revelada**: A pesar de que el stack lwIP y E1000 están funcionales y existe `wget_run`, los comandos interactivos de red (`cmd_net`, `cmd_dhcp`, `cmd_wget`) en `kernel/shell/cmd_net.c` están deshabilitados imprimiendo "Network disabled.".
+- Se actualizó el "Orden de Ejecución Recomendado" para priorizar `network-control-panel-bot` y rehabilitar estos comandos interactivos, seguido de `linux-syscall-compliance-bot` y `aether-linux-subsystem-bot`.
+- Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
 
 ## VFS, Initrd, ProcFS y Carga de Binarios (2026-03-29)
 **Estado**: Auditado y verificado con éxito.
