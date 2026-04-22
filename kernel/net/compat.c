@@ -22,6 +22,9 @@
 /* Global network state for legacy compatibility */
 volatile int network_ready = 0;
 uint32_t my_ip = 0;
+uint32_t gateway_ip = 0;
+uint32_t dns_ip = 0;
+uint8_t gateway_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static struct netif main_netif;
 
 void net_init(void) {
@@ -66,6 +69,11 @@ void net_poll(void) {
     /* Update global status */
     if (netif_is_up(&main_netif) && !ip_addr_isany(&main_netif.ip_addr)) {
         my_ip = ip4_addr_get_u32(&main_netif.ip_addr);
+        gateway_ip = ip4_addr_get_u32(&main_netif.gw);
+        const ip_addr_t *dns = dns_getserver(0);
+        if (dns) {
+            dns_ip = ip4_addr_get_u32(dns);
+        }
         network_ready = 1;
     } else {
         network_ready = 0;

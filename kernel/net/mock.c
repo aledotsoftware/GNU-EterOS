@@ -3,6 +3,9 @@
 int net_sem = 0;
 volatile int network_ready = 0;
 uint32_t my_ip = 0;
+uint32_t gateway_ip = 0;
+uint32_t dns_ip = 0;
+uint8_t gateway_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 void* socket_table = 0;
 
 void net_init(void) {}

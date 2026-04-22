@@ -223,9 +223,16 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - Limpieza de redundancias y vinculación de `isspace()` a través de `ctype.c` al userland de forma robusta.
 - El sistema y tests de host compilan satisfactoriamente (`run_tests.sh` && `make all` probados sin errores).
 
-## Linux Syscall Compliance Bot (Current Run)
+## Linux Syscall Compliance Bot (2026-04-22 Run 1)
 **Estado**: Completado con éxito.
 - **sys_sysinfo implementado**: Se implementó la syscall `SYS_sysinfo` (99) en `kernel/arch/x86_64/syscall.c` para mapear de manera precisa y reportar correctamente la cantidad de RAM, free RAM y total_ram basado en el PMM y usando compatibilidad en userspace.
 - **LibC Syscall wrapper agregado**: Se integró `sysinfo` dentro de `userspace/libc/src/syscall.c` y `userspace/libc/include/sys/sysinfo.h` siguiendo el formato estandar POSIX.
 - **Test Host agregado**: Se añadió un archivo de test `test_syscall_sysinfo.c` y se configuró en `run_tests.sh` para mockear dependencias PMM.
 - Fix de glue / integración: Se añadieron dependencias de tests para la función de mockeo `pmm_get_total_ram`, `pmm_get_free_ram` y `pmm_get_used_ram`.
+
+## Network Control Panel Bot (Current Run)
+**Estado**: Completado con éxito.
+- **Comandos interactivos habilitados**: Se implementó correctamente `cmd_net`, `cmd_dhcp`, y `cmd_wget` en `kernel/shell/cmd_net.c`.
+- **Integración global lograda**: Se agregó `gateway_ip`, `dns_ip`, y `gateway_mac` al stack mockeado en `kernel/net/mock.c` y la capa compatibilidad lwIP en `kernel/net/compat.c` para prevenir errores de linkage. Se vincularon variables IP al reporte de red `cmd_net`.
+- Fix de glue / integración: Ninguno requerido extra para pruebas nativas, y los test QEMU arrancaron con la versión nueva limpiamente.
+- `ORCHESTRATOR_REPORT.md` se actualizó para reflejar la resolución del blocker y apuntar el ciclo de vuelta al Bot de Cumplimiento de Linux Syscall.

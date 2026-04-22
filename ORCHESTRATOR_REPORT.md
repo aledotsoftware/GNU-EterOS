@@ -1,6 +1,6 @@
 # éterOS — Orchestrator Report
 **Fecha:** 2026-04-22
-**Commit:** 0f843db2e6fe0d6ffbcdf2bf56e4dcc06855dbe5
+**Commit:** 79659924b7cdf7dc5f3ffa02c4dde3a5a88a7f21
 **Estado de build:** ✅ COMPILA (0 errores)
 **Estado de boot:** ✅ ARRANCA (Transición exitosa a Ring 3 con `login.elf`)
 
@@ -21,12 +21,11 @@
 | Syscall Table | ✅ | x86_64 mechanism enabled. Intercepción de syscalls Linux operativa (~70 implementadas). |
 | ELF Loader | ✅ | Carga `login.elf` correctamente (Linux ABI) ignorando offset base. Salto exitoso a Ring 3. |
 | Userspace | ✅ | Login interactivo arranca con éxito en Ring 3. |
-| Networking | ✅ | Driver E1000 detectado y stack lwIP iniciado. Tarea de red creada y activa. Sockets y DHCP operativos, pero comandos de red (net, dhcp, wget) están inhabilitados. |
+| Networking | ✅ | Driver E1000 detectado y stack lwIP iniciado. Tarea de red creada y activa. Sockets y DHCP operativos, y comandos de red interactivos (net, dhcp, wget) rehabilitados. |
 | Shell y Paneles | ✅ | Comandos base compilados y linkeados. |
 | Tests | ✅ | Compilan correctamente todos los binarios y pipelines en userspace y kernel. Todos pasan (0 failures). |
 
 ## Brechas y Riesgos Observados (Hacia "GNU sobre Eter" y "Android")
-- **Comandos de Red Inhabilitados:** Aunque el stack lwIP y E1000 funcionan y existen implementaciones como `wget_run` en `kernel/apps/wget.c`, los comandos interactivos en `kernel/shell/cmd_net.c` (`cmd_net`, `cmd_dhcp`, `cmd_wget`) están vacíos mostrando "Network disabled.". Esto rompe la usabilidad de red interactiva.
 - **Resolución DNS Nativa:** A pesar del stack lwIP funcional, falta la integración DNS con el VFS (Blocker crónico) para resolver hostnames en vez de IPs harcodeadas (ej. para NTP y OTA).
 - **Cargador ELF (Bibliotecas Compartidas):** Actualmente asume binarios enlazados estáticamente. Para ejecutar utilidades GNU reales (coreutils, busybox) de forma eficiente se requiere soportar `.so` e intérpretes dinámicos.
 - **Syscall Coverage Faltante:** A pesar de haber ~70 syscalls, programas robustos como `bash` o `httpd` requerirán la implementación de llamadas avanzadas como `mprotect`, `rt_sigprocmask`, y mayor robustez en manipulación de descriptores (`fcntl`, `select`/`poll`).
@@ -34,9 +33,8 @@
 - **Android Subsystem:** Todavía no hay implementaciones ni de driver `/dev/binder` ni puentes IPC de Android.
 
 ## Orden de Ejecución Recomendado (Próximo Ciclo)
-1. `network-control-panel-bot` — Razón: Rehabilitar los comandos de red en `kernel/shell/cmd_net.c` (`net`, `dhcp`, `wget`) que actualmente imprimen "Network disabled." para restaurar la capacidad interactiva de red que ya está sustentada por el stack lwIP y las apps existentes (`wget_run`).
-2. `linux-syscall-compliance-bot` — Razón: Prioritario para la meta de "GNU sobre Eter". Aumentar cobertura de syscalls x86_64 para habilitar la compatibilidad progresiva de binarios de escritorio complejos (ej. bash, coreutils).
-3. `aether-linux-subsystem-bot` — Razón: Mejorar la capa de traducción ABI. Relacionado con syscall-compliance, es necesario para soportar las peculiaridades de libc/GNU sin tener que recompilarlas, sentando base para un `init` system más robusto y para las siguientes fases (Desktop y Android).
+1. `linux-syscall-compliance-bot` — Razón: Prioritario para la meta de "GNU sobre Eter". Aumentar cobertura de syscalls x86_64 para habilitar la compatibilidad progresiva de binarios de escritorio complejos (ej. bash, coreutils).
+2. `aether-linux-subsystem-bot` — Razón: Mejorar la capa de traducción ABI. Relacionado con syscall-compliance, es necesario para soportar las peculiaridades de libc/GNU sin tener que recompilarlas, sentando base para un `init` system más robusto y para las siguientes fases (Desktop y Android).
 
 ## Correcciones de Integración Aplicadas
 - Ninguno requerido. El sistema compila y arranca de forma limpia.
