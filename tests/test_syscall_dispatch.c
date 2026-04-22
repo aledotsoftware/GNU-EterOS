@@ -15,6 +15,7 @@ task_t current_task_mock;
 task_t* task_get_current(void) { return &current_task_mock; }
 void task_exit(int status) { printf("task_exit(%d) called\n", status); }
 void task_yield(void) { printf("task_yield called\n"); }
+void schedule(void) {}
 char keyboard_getchar(void) { return 'A'; }
 void terminal_putchar(char c) { putchar(c); }
 void serial_write_string(const char* s) { printf("[SERIAL] %s", s); }
@@ -68,6 +69,14 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
     return NULL;
 }
 
+task_t* task_get_at(int i) { (void)i; return NULL; }
+int task_get_count(void) { return 0; }
+void task_exit_signal(int sig) { (void)sig; }
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code; return -1; }
+#ifndef MOCK_SCHEDULE_DEFINED
+#define MOCK_SCHEDULE_DEFINED
+/* schedule mocked */
+#endif
 #include "../kernel/arch/x86_64/syscall.c"
 
 fs_node_t *fs_root = NULL;

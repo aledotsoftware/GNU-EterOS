@@ -15,6 +15,7 @@
 #include "../include/pmm.h"
 #include "../include/timer.h"
 #include "../include/hal.h"
+#include "../include/task.h"
 
 /* ========================================================================= */
 /* Mocks Implementation                                                      */
@@ -48,6 +49,9 @@ static uint64_t mock_used_ram = 0;
 uint64_t pmm_get_total_ram(void) { return mock_total_ram; }
 uint64_t pmm_get_free_ram(void) { return mock_free_ram; }
 uint64_t pmm_get_used_ram(void) { return mock_used_ram; }
+task_t* task_get_at(int i) { (void)i; return NULL; }
+int task_get_max(void) { return 0; }
+task_t* task_get_by_id(uint32_t id) { (void)id; return NULL; }
 
 /* Task Mocks */
 #include "../include/task.h"

@@ -56,6 +56,7 @@ socket_entry_t socket_table[MAX_SOCKETS];
 sem_t net_sem;
 fs_node_t* fs_root = NULL;
 int total_cpus = 1;
+void schedule(void) {}
 cpu_info_t cpus[MAX_CPUS];
 
 /* Mocks */
@@ -72,7 +73,7 @@ void task_exit(int status) {
 }
 
 void task_yield(void) {}
-void schedule(void) {}
+/* schedule mocked */
 void context_switch(uint64_t* old, uint64_t* new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 
@@ -225,6 +226,14 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
     return NULL;
 }
 
+task_t* task_get_at(int i) { (void)i; return NULL; }
+int task_get_count(void) { return 0; }
+void task_exit_signal(int sig) { (void)sig; }
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code; return -1; }
+#ifndef MOCK_SCHEDULE_DEFINED
+#define MOCK_SCHEDULE_DEFINED
+/* schedule mocked */
+#endif
 #include "../kernel/arch/x86_64/syscall.c"
 
 int main() {

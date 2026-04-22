@@ -192,3 +192,10 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
 - `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente (`d001f206b960d88ed98f80720802e8b22fca6244`). El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter", "GNU Desktop sobre Eter" y "Android" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
 - Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
+
+## VFS, Initrd, ProcFS y Carga de Binarios (Current Run)
+**Estado**: Auditado y verificado con éxito.
+- Corregida lógica faltante y compilación cruzada en el sistema VFS y ELF loader (`PT_INTERP` en tests/mock).
+- Agregada resolución a test rotos por importación global de `syscall.c` (añadiendo y adaptando mocks de scheduler y variables de proceso como `task_get_at`, `task_exit_signal`, etc).
+- Limpieza de redundancias y vinculación de `isspace()` a través de `ctype.c` al userland de forma robusta.
+- El sistema y tests de host compilan satisfactoriamente (`run_tests.sh` && `make all` probados sin errores).

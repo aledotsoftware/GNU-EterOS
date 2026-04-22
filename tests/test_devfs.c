@@ -10,6 +10,16 @@
 
 /* Include string implementation (provides eteros_strlen, eteros_strlcpy, eteros_strcmp, etc) */
 #include "../kernel/string.c"
+#include "../include/task.h"
+#include "../include/fs/vfs.h"
+
+static task_t mock_task = {0};
+int task_get_max(void) { return 0; }
+task_t* task_get_at(int i) { (void)i; return NULL; }
+void task_wakeup(task_t* t) { (void)t; }
+task_t* task_get_current(void) { return &mock_task; }
+bool keyboard_has_input(void) { return false; }
+void task_yield(void) {}
 
 /* Mock framebuffer */
 uint32_t framebuffer_get_width(void) { return 1024; }

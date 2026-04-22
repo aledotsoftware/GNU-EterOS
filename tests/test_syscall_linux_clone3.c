@@ -35,6 +35,11 @@ task_t current_task_mock;
 socket_entry_t socket_table[MAX_SOCKETS];
 sem_t net_sem;
 fs_node_t* fs_root = NULL;
+task_t* task_get_at(int i) { (void)i; return NULL; }
+int task_get_count(void) { return 0; }
+void task_exit_signal(int sig) { (void)sig; }
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code; return -1; }
+void schedule(void) {}
 int total_cpus = 1;
 cpu_info_t cpus[MAX_CPUS];
 
@@ -52,7 +57,7 @@ int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint3
 
 void task_exit(int status) { exit(status); }
 void task_yield(void) {}
-void schedule(void) {}
+/* schedule mocked */
 void context_switch(uint64_t* old, uint64_t* new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 void serial_write_string(const char* s) {}
