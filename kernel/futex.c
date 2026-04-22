@@ -106,6 +106,8 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) {
 
     if (has_timeout) {
         task_block_with_timeout(target_tick);
+        /* Set state to blocked/sleeping to ensure schedule() removes it from ready queue */
+        current->state = TASK_BLOCKED;
     } else {
         current->wake_tick = 0;
         /* Manually block if no timeout since task_block_with_timeout adds to sleep queue */
@@ -179,14 +181,12 @@ int futex_wake(uint32_t *uaddr, int count, int op) {
                 task_wakeup(curr->task);
             }
 
-            /* Remove from list */
+            /* Remove from list. The node is freed by the waiter in futex_wait(). */
             futex_node_t *to_remove = curr; /* Kept for logic, but we don't free it */
             (void)to_remove;
 
             *pp = curr->next;
             curr = curr->next;
-
-            /* We do NOT free the node here. The waiter does it. */
             woken++;
         } else {
             pp = &curr->next;

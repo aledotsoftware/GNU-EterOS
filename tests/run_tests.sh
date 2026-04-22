@@ -176,6 +176,13 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sem_logic.c -o tests/test_sem_lo
 ./tests/test_sem_logic
 rm tests/test_sem_logic
 
+# Test Futex
+echo "---------------------------------------------------"
+echo "Running test_futex..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_futex.c -o tests/test_futex_bin
+./tests/test_futex_bin
+rm tests/test_futex_bin
+
 # Test Sys Open (Security Fix)
 echo "---------------------------------------------------"
 echo "Running test_sys_open..."

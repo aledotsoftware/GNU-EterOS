@@ -24,13 +24,14 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 
 /* Mock Defines to skip real headers in elf.c */
 #define __ETEROS_HOST_TEST__ 1
-#define ELF_H
 #define FS_VFS_H
 #define ETEROS_HAL_H
 #define ETEROS_PMM_H
 #define ETEROS_TASK_H
 #define ETEROS_SERIAL_H
 /* ETEROS_STRING_H and ETEROS_STDIO_H are already defined by includes above */
+
+#include "../include/elf.h"
 
 /* Mock Macros usually in headers */
 #define PAGE_SIZE 4096
@@ -92,34 +93,6 @@ typedef uint64_t Elf64_Xword;
 #define EI_OSABI 7
 #define ELFOSABI_NONE 0
 #define ELFOSABI_LINUX 3
-
-typedef struct {
-    unsigned char e_ident[EI_NIDENT];
-    Elf64_Half    e_type;
-    Elf64_Half    e_machine;
-    Elf64_Word    e_version;
-    Elf64_Addr    e_entry;
-    Elf64_Off     e_phoff;
-    Elf64_Off     e_shoff;
-    Elf64_Word    e_flags;
-    Elf64_Half    e_ehsize;
-    Elf64_Half    e_phentsize;
-    Elf64_Half    e_phnum;
-    Elf64_Half    e_shentsize;
-    Elf64_Half    e_shnum;
-    Elf64_Half    e_shstrndx;
-} Elf64_Ehdr;
-
-typedef struct {
-    Elf64_Word    p_type;
-    Elf64_Word    p_flags;
-    Elf64_Off     p_offset;
-    Elf64_Addr    p_vaddr;
-    Elf64_Addr    p_paddr;
-    Elf64_Xword   p_filesz;
-    Elf64_Xword   p_memsz;
-    Elf64_Xword   p_align;
-} Elf64_Phdr;
 
 /* Globals for testing */
 static task_t mock_task;

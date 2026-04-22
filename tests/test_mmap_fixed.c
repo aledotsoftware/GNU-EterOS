@@ -188,6 +188,10 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
 int task_waitpid(int pid, int* status, int options) { return 0; }
 task_t* task_get_by_id(uint32_t id) { return NULL; }
 int task_kill(uint32_t pid) { return 0; }
+task_t* task_get_at(int i) { return NULL; }
+int task_get_count() { return 0; }
+void task_exit_signal(int sig) {}
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { return -1; }
 void task_wakeup(task_t* t) {}
 
 /* Stub syscall entry */
