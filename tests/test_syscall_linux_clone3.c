@@ -185,3 +185,10 @@ size_t eteros_strlcat(char* dst, const char* src, size_t size) { return 0; }
 int eteros_strcmp(const char* s1, const char* s2) { return strcmp(s1, s2); }
 int vmm_map_page(uint64_t phys_addr, uint64_t virt_addr, uint64_t flags) { return 0; }
 char* eteros_strncpy(char* dest, const char* src, size_t n) { return strncpy(dest, src, n); }
+
+#ifndef PMM_MOCKS_INJECTED
+#define PMM_MOCKS_INJECTED
+__attribute__((weak)) uint64_t pmm_get_total_ram(void) { return 1024 * 1024 * 1024; }
+__attribute__((weak)) uint64_t pmm_get_free_ram(void) { return 512 * 1024 * 1024; }
+__attribute__((weak)) uint64_t pmm_get_used_ram(void) { return 512 * 1024 * 1024; }
+#endif

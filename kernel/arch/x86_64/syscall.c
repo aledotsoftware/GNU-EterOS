@@ -22,6 +22,7 @@
 #include <timer.h>
 #include <vmm.h>
 #include <futex.h>
+#include <sys/sysinfo.h>
 #include <net/socket.h>
 #include <net/defs.h>
 #include <fcntl.h>
@@ -1312,6 +1313,31 @@ static int64_t sys_set_robust_list(struct robust_list_head* head, size_t len) {
     if (len != sizeof(struct robust_list_head)) return -EINVAL;
     if (head && !vmm_verify_user_access(head, sizeof(struct robust_list_head), 0)) return -EFAULT;
     /* Basic stub - robust futex list is not fully managed yet */
+    return 0;
+}
+
+static int64_t sys_sysinfo(struct sysinfo* info) {
+    if (!vmm_verify_user_access(info, sizeof(struct sysinfo), 1)) return -EFAULT;
+
+    memset(info, 0, sizeof(struct sysinfo));
+    info->uptime = timer_get_uptime_seconds();
+
+    uint64_t total_ram = pmm_get_total_ram();
+    uint64_t free_ram = pmm_get_free_ram();
+    uint64_t used_ram = pmm_get_used_ram();
+    (void)used_ram; /* Unused but valid stat */
+
+    info->totalram = total_ram;
+    info->freeram = free_ram;
+    info->sharedram = 0; /* Not implemented */
+    info->bufferram = 0; /* Not implemented */
+    info->totalswap = 0; /* No swap support yet */
+    info->freeswap = 0;
+    info->procs = task_get_count();
+    info->totalhigh = 0;
+    info->freehigh = 0;
+    info->mem_unit = 1; /* Reported in bytes */
+
     return 0;
 }
 
@@ -3093,6 +3119,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [72] = (syscall_ptr_t)sys_fcntl,
     [77] = (syscall_ptr_t)sys_ftruncate,
     [97] = (syscall_ptr_t)sys_getrlimit,
+    [99] = (syscall_ptr_t)sys_sysinfo,
     [127] = (syscall_ptr_t)sys_rt_sigpending,
     [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,

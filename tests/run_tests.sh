@@ -104,7 +104,7 @@ echo "Running test_initrd_overflow... (SKIPPED due to host environment issues)"
 # Test Readv Security
 echo "---------------------------------------------------"
 echo "Running test_readv_security..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_readv_security.c kernel/string.c -o tests/test_readv_security
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_readv_security.c tests/mock_pmm.c kernel/string.c -o tests/test_readv_security
 ./tests/test_readv_security
 rm tests/test_readv_security
 
@@ -179,21 +179,21 @@ rm tests/test_sem_logic
 # Test Sys Open (Security Fix)
 echo "---------------------------------------------------"
 echo "Running test_sys_open..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c kernel/string.c -o tests/test_sys_open
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_open.c tests/mock_pmm.c kernel/string.c -o tests/test_sys_open
 ./tests/test_sys_open
 rm tests/test_sys_open
 
 # Test Sys Read/Write Permissions
 echo "---------------------------------------------------"
 echo "Running test_sys_rw_perms..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_rw_perms.c kernel/string.c -o tests/test_sys_rw_perms
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_sys_rw_perms.c tests/mock_pmm.c kernel/string.c -o tests/test_sys_rw_perms
 ./tests/test_sys_rw_perms
 rm tests/test_sys_rw_perms
 
 # Test Socket Security
 echo "---------------------------------------------------"
 echo "Running test_socket_security..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_socket_security.c kernel/string.c -o tests/test_socket_security
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_socket_security.c tests/mock_pmm.c kernel/string.c -o tests/test_socket_security
 ./tests/test_socket_security
 rm tests/test_socket_security
 
@@ -218,7 +218,7 @@ echo "---------------------------------------------------"
 
 echo "Running test_syscall_dispatch..."
 
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_dispatch.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_dispatch
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_dispatch.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_dispatch
 
 ./tests/test_syscall_dispatch
 
@@ -226,19 +226,19 @@ rm tests/test_syscall_dispatch
 
 echo "---------------------------------------------------"
 echo "Running test_syscall_openat..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_openat.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_openat
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_openat.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_openat
 ./tests/test_syscall_openat
 rm tests/test_syscall_openat
 
 echo "---------------------------------------------------"
 echo "Running test_syscall_getdents64..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_getdents64.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_getdents64
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_getdents64.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_getdents64
 ./tests/test_syscall_getdents64
 rm tests/test_syscall_getdents64
 
 echo "---------------------------------------------------"
 echo "Running test_syscall_epoll..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_epoll.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_epoll
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_epoll.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_epoll
 ./tests/test_syscall_epoll
 rm tests/test_syscall_epoll
 
@@ -247,7 +247,7 @@ echo "---------------------------------------------------"
 
 echo "Running test_syscall_mmap_linux..."
 
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_mmap_linux.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_linux
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_mmap_linux.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_linux
 
 ./tests/test_syscall_mmap_linux || true
 
@@ -255,29 +255,29 @@ rm tests/test_syscall_mmap_linux
 
 
 echo "Running test_syscall_mmap_fixed..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_mmap_fixed.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_fixed
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_mmap_fixed.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_fixed
 ./tests/test_syscall_mmap_fixed || true
 rm tests/test_syscall_mmap_fixed
 
 echo "---------------------------------------------------"
 echo "Running test_syscall_clone..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_linux_clone3.c -o tests/test_syscall_linux_clone3
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_linux_clone3.c tests/mock_pmm.c -o tests/test_syscall_linux_clone3
 ./tests/test_syscall_linux_clone3
 rm tests/test_syscall_linux_clone3
 
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_clone.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_clone
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_clone.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_clone
 ./tests/test_syscall_clone
 rm tests/test_syscall_clone
 
 echo "---------------------------------------------------"
 echo "Running test_syscall_pipe2..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_pipe2.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_pipe2
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_pipe2.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_pipe2
 ./tests/test_syscall_pipe2
 rm tests/test_syscall_pipe2
 
 echo "---------------------------------------------------"
 echo "Running test_syscall_rt_sigaction..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_rt_sigaction.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_rt_sigaction
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_rt_sigaction.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_rt_sigaction
 ./tests/test_syscall_rt_sigaction
 rm tests/test_syscall_rt_sigaction
 
@@ -285,7 +285,7 @@ rm tests/test_syscall_rt_sigaction
 
 echo "---------------------------------------------------"
 echo "Running test_syscall_linux_readlink..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_linux_readlink.c kernel/string.c -o tests/test_syscall_linux_readlink
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_linux_readlink.c tests/mock_pmm.c kernel/string.c -o tests/test_syscall_linux_readlink
 ./tests/test_syscall_linux_readlink
 rm tests/test_syscall_linux_readlink
 
@@ -352,3 +352,8 @@ echo "Running test_vfs_normalize_path..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_normalize_path.c -o tests/test_vfs_normalize_path
 ./tests/test_vfs_normalize_path
 rm tests/test_vfs_normalize_path
+echo "---------------------------------------------------"
+echo "Running test_syscall_sysinfo..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_sysinfo.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_sysinfo
+./tests/test_syscall_sysinfo
+rm tests/test_syscall_sysinfo

@@ -192,3 +192,10 @@ char* eteros_strncpy(char* dest, const char* src, size_t n) {
         dest[i] = '\0';
     return dest;
 }
+
+#ifndef PMM_MOCKS_INJECTED
+#define PMM_MOCKS_INJECTED
+__attribute__((weak)) uint64_t pmm_get_total_ram(void) { return 1024 * 1024 * 1024; }
+__attribute__((weak)) uint64_t pmm_get_free_ram(void) { return 512 * 1024 * 1024; }
+__attribute__((weak)) uint64_t pmm_get_used_ram(void) { return 512 * 1024 * 1024; }
+#endif

@@ -199,3 +199,10 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - Agregada resolución a test rotos por importación global de `syscall.c` (añadiendo y adaptando mocks de scheduler y variables de proceso como `task_get_at`, `task_exit_signal`, etc).
 - Limpieza de redundancias y vinculación de `isspace()` a través de `ctype.c` al userland de forma robusta.
 - El sistema y tests de host compilan satisfactoriamente (`run_tests.sh` && `make all` probados sin errores).
+
+## Linux Syscall Compliance Bot (Current Run)
+**Estado**: Completado con éxito.
+- **sys_sysinfo implementado**: Se implementó la syscall `SYS_sysinfo` (99) en `kernel/arch/x86_64/syscall.c` para mapear de manera precisa y reportar correctamente la cantidad de RAM, free RAM y total_ram basado en el PMM y usando compatibilidad en userspace.
+- **LibC Syscall wrapper agregado**: Se integró `sysinfo` dentro de `userspace/libc/src/syscall.c` y `userspace/libc/include/sys/sysinfo.h` siguiendo el formato estandar POSIX.
+- **Test Host agregado**: Se añadió un archivo de test `test_syscall_sysinfo.c` y se configuró en `run_tests.sh` para mockear dependencias PMM.
+- Fix de glue / integración: Se añadieron dependencias de tests para la función de mockeo `pmm_get_total_ram`, `pmm_get_free_ram` y `pmm_get_used_ram`.
