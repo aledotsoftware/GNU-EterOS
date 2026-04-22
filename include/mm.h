@@ -62,4 +62,10 @@ size_t mm_get_total_memory(void);
  */
 size_t mm_get_used_memory(void);
 
+/**
+ * Recorre y verifica la integridad del heap interno, paniqueando en caso
+ * de detectar corrupción (double frees, desbordamientos, headers mágicos corruptos).
+ */
+void mm_verify_heap(void);
+
 #endif /* ETEROS_MM_H */

@@ -344,7 +344,8 @@ static void _kfree_impl(void* ptr) {
     
     /* Validación dinámica de rango */
     if ((void*)block < (void*)heap_start || (void*)block >= (void*)((uintptr_t)heap_start + memory_total)) {
-        serial_write_string("[MM] Error: kfree of invalid address\n");
+        serial_write_string("[MM] Error: kfree of invalid address (out of bounds)\n");
+        ASSERT(0 && "Heap corruption detected: Invalid kfree address out of bounds");
         return;
     }
 
@@ -357,7 +358,7 @@ static void _kfree_impl(void* ptr) {
 
     if (block->is_free) {
         serial_write_string("[MM] Warning: Double free detected\n");
-        ASSERT(0 && "Double free detected");
+        ASSERT(0 && "Heap corruption detected: Double free");
         return;
     }
 
@@ -485,3 +486,41 @@ void* krealloc(void* ptr, size_t size) {
 
 size_t mm_get_total_memory(void) { return memory_total; }
 size_t mm_get_used_memory(void) { return memory_used; }
+
+void mm_verify_heap(void) {
+    if (!heap_start || !mm_initialized) return;
+
+    uint64_t flags = irq_save();
+    spin_lock(&heap_lock);
+
+    block_header_t* curr = heap_start;
+    size_t calculated_used = 0;
+
+    while (curr) {
+        if (curr->magic != HEAP_MAGIC) {
+            serial_write_string("[MM] HEAP VERIFICATION FAILED: Bad magic number.\n");
+            ASSERT(0 && "Heap corruption: Bad magic number in block");
+        }
+
+        uint32_t* footer = (uint32_t*)((uintptr_t)curr + sizeof(block_header_t) + curr->size - sizeof(uint32_t));
+        if (*footer != HEAP_FOOTER_MAGIC) {
+            serial_write_string("[MM] HEAP VERIFICATION FAILED: Bad footer magic number.\n");
+            ASSERT(0 && "Heap corruption: Bad footer magic number in block");
+        }
+
+        if (!curr->is_free) {
+            calculated_used += curr->size + sizeof(block_header_t);
+        }
+
+        if (curr->next) {
+            if (curr->next->prev != curr) {
+                 serial_write_string("[MM] HEAP VERIFICATION FAILED: Linked list corruption (next->prev != curr).\n");
+                 ASSERT(0 && "Heap corruption: Linked list structure broken");
+            }
+        }
+        curr = curr->next;
+    }
+
+    spin_unlock(&heap_lock);
+    irq_restore(flags);
+}

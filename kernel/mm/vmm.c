@@ -622,12 +622,24 @@ static void free_pt_recursive(pt_entry_t* table, int level) {
         /* Level 3 (PDPT inside PML4[0]): Index < 8 -> Kernel Identity Map (0-8GB) */
         if (level == 3 && i < 8) continue;
 
+        /* Skip HUGE pages (already handled or kernel mapped) */
+        if ((level == 3 || level == 2) && (table[i] & PAGE_HUGE)) {
+            /* If it's a huge page, we don't traverse down.
+               We only unref if it's explicitly a user huge page (which we don't currently create, but for safety). */
+            if (table[i] & PAGE_USER) {
+                uint64_t phys = table[i] & PAGE_ADDR_MASK;
+                pmm_unref_page((void*)phys);
+            }
+            continue;
+        }
+
         if (level > 1) {
             /* Recurse */
             pt_entry_t* child = (pt_entry_t*)(table[i] & PAGE_ADDR_MASK);
             free_pt_recursive(child, level - 1);
 
-            /* Free the table page itself */
+            /* Free the table page itself (only if it was a user table, but the tables themselves are kernel-owned,
+               however, since they are exclusively for the user process, we must free them) */
             pmm_free_page(child);
         } else {
             /* Level 1 (PT): Free the page */

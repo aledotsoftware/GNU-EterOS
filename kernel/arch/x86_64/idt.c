@@ -114,6 +114,9 @@ struct int_regs {
  * Handler genérico de excepción: muestra el error y detiene la CPU.
  */
 static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint64_t error_code, struct int_regs* regs) {
+    /* Format helper function for panic prints */
+    char buf[32];
+
     /* Check if Page Fault (14) */
     if (vector == 14) {
         uint64_t cr2;
@@ -131,9 +134,11 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
 
             task_t* current = task_get_current();
             if (current) {
-                char buf[32];
                 serial_write_string("    Terminating PID: ");
                 itoa_s(current->id, buf, sizeof(buf), 10);
+                serial_write_string(buf);
+                serial_write_string(" CR2: 0x");
+                utoa_hex_s(cr2, buf, sizeof(buf));
                 serial_write_string(buf);
                 serial_write_string("\n");
 
@@ -197,7 +202,6 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     }
 
     terminal_write_string(" (INT ");
-    char buf[32];
     itoa_s(vector, buf, sizeof(buf), 10);
     terminal_write_string(buf);
     terminal_write_string(")\n");
@@ -261,11 +265,13 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     if (vector == 14) {
         uint64_t cr2;
         __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        serial_write_string("\n--- Page Fault Context ---\n");
         serial_write_string(" CR2: 0x"); utoa_hex_s(cr2, buf, sizeof(buf)); serial_write_string(buf);
         serial_write_string(" [");
         serial_write_string((error_code & 1) ? "Present" : "Not Present");
         serial_write_string((error_code & 2) ? ", Write" : ", Read");
         serial_write_string((error_code & 4) ? ", User]" : ", Supervisor]");
+        serial_write_string("\n--------------------------\n");
     } else if (vector == 13) {
         serial_write_string("\nGeneral Protection Fault (GPF) detected. Check segment limits or privilege levels.\n");
     } else if (vector == 8) {

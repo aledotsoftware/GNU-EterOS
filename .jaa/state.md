@@ -1,5 +1,13 @@
 # JAA State
 
+## Kernel Stability & Boot Hardening (2026-04-22)
+**Estado**: Completado.
+Se han implementado mejoras significativas en la gestión de memoria y el manejo de excepciones para robustecer la estabilidad base:
+- **VMM Hardening**: Corrección en `free_pt_recursive` (`kernel/mm/vmm.c`) para evitar la desasignación errónea de páginas HUGE (2MB/1GB), protegiendo los mapas de identidad del kernel y framebuffers.
+- **Heap Allocator**: Incorporación de verificaciones de rango y detección de "double frees" en `kfree` (`kernel/mm/heap.c`), además de la nueva función `mm_verify_heap` (declarada en `include/mm.h`) para auditar la integridad del montículo y prevenir corrupciones silentes.
+- **Exception Trace Formatting**: Refinamiento en `handle_exception` (`kernel/arch/x86_64/idt.c`) para ofrecer volcados de diagnóstico precisos frente a Page Faults (#PF), reportando explícitamente el registro CR2 y las condiciones del fallo en vez de delegar en un panic opaco.
+- Todos los tests de host y pruebas en QEMU pasaron de forma inmaculada sin regresiones de arranque.
+
 ## Scheduler SMP-Aware, Threading y IPC Avanzado
 **Estado**: Completado.
 Todos los objetivos relacionados con el soporte de multithreading, SMP y `clone()` se implementaron con éxito.
