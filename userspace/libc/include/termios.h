@@ -12,6 +12,10 @@ typedef unsigned char cc_t;
 #define ICANON 00000002
 #define ECHO   00000010
 
+#define TCSANOW   0
+#define TCSADRAIN 1
+#define TCSAFLUSH 2
+
 struct termios {
     tcflag_t c_iflag;
     tcflag_t c_oflag;
@@ -22,5 +26,8 @@ struct termios {
     unsigned int c_ispeed;
     unsigned int c_ospeed;
 };
+
+int tcgetattr(int fd, struct termios *termios_p);
+int tcsetattr(int fd, int optional_actions, const struct termios *termios_p);
 
 #endif

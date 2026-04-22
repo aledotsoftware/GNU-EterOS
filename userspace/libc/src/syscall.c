@@ -203,6 +203,17 @@ int unlink(const char *pathname) {
     return 0;
 }
 
+#include <sys/sysinfo.h>
+
+int sysinfo(struct sysinfo *info) {
+    long ret = syscall1(SYS_sysinfo, (long)info);
+    if (ret < 0) {
+        errno = -ret;
+        return -1;
+    }
+    return 0;
+}
+
 int rmdir(const char *pathname) {
     long ret = syscall1(SYS_rmdir, (long)pathname);
     if (ret < 0) { errno = -ret; return -1; }

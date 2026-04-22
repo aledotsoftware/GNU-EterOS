@@ -7,6 +7,149 @@
 #include <string.h>
 #include <serial.h>
 #include <task.h>
+#include <errno.h>
+
+int elf_get_interp(const char* path, char* out_interp, uint32_t out_interp_size) {
+    fs_node_t* node;
+    Elf64_Ehdr header;
+
+    if (!path || !out_interp || out_interp_size < 2) return -EINVAL;
+    out_interp[0] = '\0';
+
+    node = vfs_lookup(fs_root, path);
+    if (!node) return -ENOENT;
+
+    if (read_fs(node, 0, sizeof(Elf64_Ehdr), (uint8_t*)&header) != sizeof(Elf64_Ehdr)) {
+        kfree(node);
+        return -ENOEXEC;
+    }
+
+    if (header.e_ident[0] != 0x7F ||
+        header.e_ident[1] != 'E' ||
+        header.e_ident[2] != 'L' ||
+        header.e_ident[3] != 'F') {
+        kfree(node);
+        return -ENOEXEC;
+    }
+
+    if (header.e_phentsize < sizeof(Elf64_Phdr) || header.e_phnum == 0) {
+        kfree(node);
+        return 0;
+    }
+
+    for (uint16_t i = 0; i < header.e_phnum; i++) {
+        Elf64_Phdr phdr;
+        uint64_t phoff = header.e_phoff + ((uint64_t)i * header.e_phentsize);
+
+        if (read_fs(node, (uint32_t)phoff, sizeof(Elf64_Phdr), (uint8_t*)&phdr) != sizeof(Elf64_Phdr)) {
+            kfree(node);
+            return -ENOEXEC;
+        }
+
+        if (phdr.p_type != PT_INTERP) continue;
+
+        if (phdr.p_filesz < 2 || phdr.p_filesz > out_interp_size) {
+            kfree(node);
+            return -E2BIG;
+        }
+        if (phdr.p_offset > UINT32_MAX) {
+            kfree(node);
+            return -ENOEXEC;
+        }
+
+        if (read_fs(node, (uint32_t)phdr.p_offset, (uint32_t)phdr.p_filesz, (uint8_t*)out_interp) != (ssize_t)phdr.p_filesz) {
+            kfree(node);
+            return -ENOEXEC;
+        }
+
+        out_interp[out_interp_size - 1] = '\0';
+        for (uint32_t j = 0; j < phdr.p_filesz; j++) {
+            if (out_interp[j] == '\0') {
+                kfree(node);
+                return 1;
+            }
+        }
+
+        /* Ensure NUL termination even if malformed payload omitted it. */
+        out_interp[phdr.p_filesz - 1] = '\0';
+        kfree(node);
+        return 1;
+    }
+
+    kfree(node);
+    return 0;
+}
+
+int elf_get_auxv_info(const char* path, uint64_t base_vaddr, elf_auxv_info_t* out_info) {
+    fs_node_t* node;
+    Elf64_Ehdr header;
+    uint64_t load_offset = 0;
+    uint64_t first_load_vaddr = 0;
+    uint64_t first_load_off = 0;
+    int have_first_load = 0;
+
+    if (!path || !out_info) return -EINVAL;
+    memset(out_info, 0, sizeof(*out_info));
+
+    node = vfs_lookup(fs_root, path);
+    if (!node) return -ENOENT;
+
+    if (read_fs(node, 0, sizeof(Elf64_Ehdr), (uint8_t*)&header) != sizeof(Elf64_Ehdr)) {
+        kfree(node);
+        return -ENOEXEC;
+    }
+
+    if (header.e_ident[0] != 0x7F ||
+        header.e_ident[1] != 'E' ||
+        header.e_ident[2] != 'L' ||
+        header.e_ident[3] != 'F') {
+        kfree(node);
+        return -ENOEXEC;
+    }
+
+    if (header.e_type == ET_DYN) {
+        load_offset = base_vaddr;
+    }
+
+    out_info->entry = header.e_entry + load_offset;
+    out_info->phent = header.e_phentsize;
+    out_info->phnum = header.e_phnum;
+    out_info->base = load_offset;
+
+    if (header.e_phentsize < sizeof(Elf64_Phdr) || header.e_phnum == 0) {
+        kfree(node);
+        return 0;
+    }
+
+    for (uint16_t i = 0; i < header.e_phnum; i++) {
+        Elf64_Phdr phdr;
+        uint64_t phoff = header.e_phoff + ((uint64_t)i * header.e_phentsize);
+
+        if (read_fs(node, (uint32_t)phoff, sizeof(Elf64_Phdr), (uint8_t*)&phdr) != sizeof(Elf64_Phdr)) {
+            kfree(node);
+            return -ENOEXEC;
+        }
+
+        if (phdr.p_type == PT_PHDR) {
+            out_info->phdr = phdr.p_vaddr + load_offset;
+        }
+
+        if (!have_first_load && phdr.p_type == PT_LOAD) {
+            first_load_vaddr = phdr.p_vaddr + load_offset;
+            first_load_off = phdr.p_offset;
+            have_first_load = 1;
+        }
+    }
+
+    if (out_info->phdr == 0 && have_first_load) {
+        if (header.e_phoff >= first_load_off) {
+            out_info->phdr = first_load_vaddr + (header.e_phoff - first_load_off);
+        }
+    }
+
+    kfree(node);
+    return 0;
+}
 
 uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
     serial_write_string("[ELF] Loading file: ");

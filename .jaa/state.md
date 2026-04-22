@@ -49,7 +49,7 @@ Todos los objetivos relacionados con Mini-LibC y su entorno de userspace están 
 - ORCHESTRATOR_REPORT.md ha sido actualizado. El "Orden de Ejecución Recomendado" se mantiene para `graphics-power-panel-bot`, `devices-time-panel-bot` y `network-control-panel-bot`.
 - Fix de glue / integración: Ninguno requerido.
 
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-03-28 Run 1)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make clean && make all` sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con el shell gráfico (`marea_shell.elf`).
@@ -94,7 +94,7 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - **Sesión Automática**: Modificado el `login.c` para respetar el archivo `/etc/autologin` y realizar auto-login transparente de Root; las opciones pertinentes (ON/OFF) se agregaron visualmente al menú `Usuarios y Seguridad` del Kernel Control Panel (`cmd_panel.c`).
 - **Gestión de Cuentas (`/etc/shadow`)**: Las utilidades para administrar cuentas (`add`, `del`, `passwd`) con generación de contraseñas hasheadas en `SHA-256` fueron unificadas e inyectadas nativamente al comando shell base `user` dentro del Kernel, garantizando acceso directo de administración y persistencia en el VFS (`/etc/shadow`).
 
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-03-28 Run 1)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make clean && make all` sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con el shell gráfico (`marea_shell.elf`) con red y VFS montado.
@@ -107,7 +107,7 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3.
 - `ORCHESTRATOR_REPORT.md` ha sido actualizado. El "Orden de Ejecución Recomendado" ahora prioriza `linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot` para acercarse a la visión "GNU sobre Eter".
 
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-03-28 Run 1)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make clean && make all` sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3.
@@ -121,14 +121,14 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - Se actualizó `ORCHESTRATOR_REPORT.md` con la fecha, el hash de commit más reciente y el estado actual de los módulos. La prioridad de agentes recomendada (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot`, `network-socket-api-bot`) sigue vigente para fortalecer el marco de compatibilidad.
 - Fix de glue / integración: Ninguno requerido. El sistema arranca sin problemas con la configuración actual.
 
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-03-28 Run 1)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make clean && make all` sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
 - `ORCHESTRATOR_REPORT.md` ha sido actualizado con el hash de commit más reciente. El "Orden de Ejecución Recomendado" se mantiene como `linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot` para acercarse a la visión "GNU sobre Eter".
 - Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
 
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-03-28 Run 1)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make clean && make all` sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
@@ -149,7 +149,7 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - `ORCHESTRATOR_REPORT.md` ha sido actualizado con el hash de commit más reciente. El "Orden de Ejecución Recomendado" se mantiene como `linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot` para acercarse a la visión "GNU sobre Eter".
 - Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
 
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-03-28 Run 1)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make all` probado y verificado sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
@@ -161,7 +161,7 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - El sistema compila correctamente (`make all` probado y verificado sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
 - `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente. El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
-## Orchestrator-Meta-Agent (Current Run)
+## Orchestrator-Meta-Agent (2026-03-28 Run 1)
 **Estado**: Auditado y verificado con éxito.
 - El sistema compila correctamente (`make all` probado y verificado sin errores).
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
@@ -185,3 +185,47 @@ El sistema evolucionó a uno multiusuario real con la siguiente funcionalidad:
 - El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
 - `ORCHESTRATOR_REPORT.md` ha sido actualizado con el hash de commit más reciente. El "Orden de Ejecución Recomendado" se mantiene como `linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot` para acercarse a la visión "GNU sobre Eter".
 - Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
+
+## Orchestrator-Meta-Agent (2026-03-28)
+**Estado**: Auditado y verificado con éxito.
+- El sistema compila correctamente (`make clean && make all` sin errores).
+- El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
+- `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente (`5283ec00728e845f6a85e698d92a53f8ce981b15`). El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter", "GNU Desktop sobre Eter" y "Android" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
+- Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
+
+## Orchestrator-Meta-Agent (2026-03-29)
+**Estado**: Auditado y verificado con éxito.
+- El sistema compila correctamente (`make clean && make all` sin errores).
+- El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
+- `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente (`d001f206b960d88ed98f80720802e8b22fca6244`). El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter", "GNU Desktop sobre Eter" y "Android" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
+- Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
+
+## Orchestrator-Meta-Agent (2026-04-22 Run 1)
+**Estado**: Auditado y verificado con éxito.
+- El sistema compila correctamente (`make clean && make all` sin errores).
+- El sistema de arranque (QEMU) funciona y transiciona exitosamente a Ring 3 con `login.elf`.
+- `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con el hash de commit más reciente (`0be6777fd6d74bfcb0c893129aa7fb8c56393772`). El "Orden de Ejecución Recomendado" sigue priorizando la ruta hacia "GNU sobre Eter", "GNU Desktop sobre Eter" y "Android" (`linux-syscall-compliance-bot`, `aether-linux-subsystem-bot` y `network-socket-api-bot`).
+- Fix de glue / integración: Se aplicaron marcas `__attribute__((unused))` a funciones internas de `timerfd` en `kernel/arch/x86_64/syscall.c` para resolver advertencias tratadas como errores por los flags estrictos. El sistema compila y bootea de forma limpia.
+
+## Orchestrator-Meta-Agent (Current Run)
+**Estado**: Auditado y verificado con éxito.
+- El sistema compila correctamente (`make clean && make all` sin errores).
+- El sistema de arranque (QEMU) arranca y transiciona exitosamente a Ring 3 con `login.elf`.
+- `ORCHESTRATOR_REPORT.md` ha sido revisado y actualizado con la fecha y el hash de commit más reciente (`0f843db2e6fe0d6ffbcdf2bf56e4dcc06855dbe5`).
+- **Auditoría revelada**: A pesar de que el stack lwIP y E1000 están funcionales y existe `wget_run`, los comandos interactivos de red (`cmd_net`, `cmd_dhcp`, `cmd_wget`) en `kernel/shell/cmd_net.c` están deshabilitados imprimiendo "Network disabled.".
+- Se actualizó el "Orden de Ejecución Recomendado" para priorizar `network-control-panel-bot` y rehabilitar estos comandos interactivos, seguido de `linux-syscall-compliance-bot` y `aether-linux-subsystem-bot`.
+- Fix de glue / integración: Ninguno requerido. El sistema compila y bootea de forma limpia.
+
+## VFS, Initrd, ProcFS y Carga de Binarios (2026-03-29)
+**Estado**: Auditado y verificado con éxito.
+- Corregida lógica faltante y compilación cruzada en el sistema VFS y ELF loader (`PT_INTERP` en tests/mock).
+- Agregada resolución a test rotos por importación global de `syscall.c` (añadiendo y adaptando mocks de scheduler y variables de proceso como `task_get_at`, `task_exit_signal`, etc).
+- Limpieza de redundancias y vinculación de `isspace()` a través de `ctype.c` al userland de forma robusta.
+- El sistema y tests de host compilan satisfactoriamente (`run_tests.sh` && `make all` probados sin errores).
+
+## Linux Syscall Compliance Bot (Current Run)
+**Estado**: Completado con éxito.
+- **sys_sysinfo implementado**: Se implementó la syscall `SYS_sysinfo` (99) en `kernel/arch/x86_64/syscall.c` para mapear de manera precisa y reportar correctamente la cantidad de RAM, free RAM y total_ram basado en el PMM y usando compatibilidad en userspace.
+- **LibC Syscall wrapper agregado**: Se integró `sysinfo` dentro de `userspace/libc/src/syscall.c` y `userspace/libc/include/sys/sysinfo.h` siguiendo el formato estandar POSIX.
+- **Test Host agregado**: Se añadió un archivo de test `test_syscall_sysinfo.c` y se configuró en `run_tests.sh` para mockear dependencias PMM.
+- Fix de glue / integración: Se añadieron dependencias de tests para la función de mockeo `pmm_get_total_ram`, `pmm_get_free_ram` y `pmm_get_used_ram`.

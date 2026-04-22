@@ -11,6 +11,9 @@ typedef uint64_t size_t;
 typedef int pid_t;
 typedef int64_t off_t;
 typedef int mode_t;
+typedef unsigned int uid_t;
+typedef unsigned int gid_t;
+typedef unsigned long nlink_t;
 #endif
 
 #endif /* _ETEROS_SYS_TYPES_H */

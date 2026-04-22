@@ -402,6 +402,34 @@ void cmd_run(const char* args) {
     }
 
     fs_node_t* node = vfs_lookup(fs_root, path);
+    if (!node && path[0] == '/') {
+        /* initrd can expose entries like "gnu/bin/busybox" as flat names.
+           Fallback to that representation when hierarchical lookup fails. */
+        fs_node_t* flat = vfs_lookup(fs_root, path + 1);
+        if (flat) {
+            node = flat;
+            strlcpy(path, path + 1, sizeof(path));
+        }
+    }
+    if (!node) {
+        const char* base = raw_path;
+        const char* it = raw_path;
+        while (*it) {
+            if (*it == '/') base = it + 1;
+            it++;
+        }
+        if (*base) {
+            char base_path[256];
+            base_path[0] = '/';
+            base_path[1] = '\0';
+            strlcat(base_path, base, sizeof(base_path));
+            fs_node_t* by_base = vfs_lookup(fs_root, base_path);
+            if (by_base) {
+                node = by_base;
+                strlcpy(path, base_path, sizeof(path));
+            }
+        }
+    }
     if (!node) {
         terminal_write_string("  Error: No se encontro el archivo ELF: ");
         terminal_write_string(path);
@@ -482,6 +510,7 @@ void cmd_ls(const char* args) {
     struct dirent entry;
     int i = 0;
     while (readdir_fs(node, i++, &entry) == 0) {
+        if (entry.name[0] == '\0') continue;
         /* Lookup to get type */
         fs_node_t* item = finddir_fs(node, entry.name);
         if (item) {

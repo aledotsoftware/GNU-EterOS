@@ -16,9 +16,25 @@
 /* sys_wait4 options */
 #define WNOHANG     1
 #define WUNTRACED   2
+#define WSTOPPED    WUNTRACED
+#define WEXITED     4
 #define WCONTINUED  8
+#define WNOWAIT     0x01000000
 #define __WNOTHREAD 0x20000000
 #define __WALL      0x40000000
 #define __WCLONE    0x80000000
+
+/* waitid idtypes */
+#define P_ALL       0
+#define P_PID       1
+#define P_PGID      2
+
+/* waitid si_code values for SIGCHLD */
+#define CLD_EXITED      1
+#define CLD_KILLED      2
+#define CLD_DUMPED      3
+#define CLD_TRAPPED     4
+#define CLD_STOPPED     5
+#define CLD_CONTINUED   6
 
 #endif /* ETEROS_SCHED_H */

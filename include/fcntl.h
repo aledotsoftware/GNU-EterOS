@@ -11,9 +11,13 @@
 #define O_TRUNC     00001000
 #define O_APPEND    00002000
 #define O_NONBLOCK  00004000 /* 2048 */
+#define O_DIRECTORY 00200000
+#define O_NOFOLLOW  00400000
 #define O_CLOEXEC   02000000 /* 0x80000 */
 
 #define AT_FDCWD    -100
+#define AT_SYMLINK_NOFOLLOW 0x100
+#define AT_EMPTY_PATH 0x1000
 
 #define F_DUPFD         0
 #define F_GETFD         1

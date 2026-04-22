@@ -6,9 +6,12 @@
 #define RTLD_GLOBAL 256
 #define RTLD_LOCAL  0
 
-static inline void *dlopen(const char *filename, int flag) { return (void*)0; }
-static inline char *dlerror(void) { return "Dynamic linking not supported"; }
-static inline void *dlsym(void *handle, const char *symbol) { return (void*)0; }
-static inline int dlclose(void *handle) { return -1; }
+#define RTLD_DEFAULT ((void*)0)
+#define RTLD_SELF    ((void*)-1)
+
+void *dlopen(const char *filename, int flag);
+char *dlerror(void);
+void *dlsym(void *handle, const char *symbol);
+int dlclose(void *handle);
 
 #endif /* _DLFCN_H */

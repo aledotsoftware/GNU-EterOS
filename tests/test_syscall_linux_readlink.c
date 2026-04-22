@@ -23,6 +23,7 @@ typedef struct fs_node {
 } fs_node_t;
 
 fs_node_t* fs_root = NULL;
+void schedule(void) {}
 
 int vmm_verify_user_access(const void* ptr, size_t size, int is_write) {
     if (!ptr || size == 0) return 0;

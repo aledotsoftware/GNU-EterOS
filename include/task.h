@@ -51,6 +51,7 @@ typedef enum {
     TASK_RUNNING,
     TASK_BLOCKED,
     TASK_SLEEPING,
+    TASK_STOPPED,
     TASK_DEAD
 } task_state_t;
 
@@ -69,6 +70,8 @@ typedef struct task {
 
     /* Threading */
     uint32_t       tgid;                    /* Thread Group ID (PID) */
+    uint32_t       pgid;                    /* Process Group ID */
+    uint32_t       sid;                     /* Session ID */
     struct task*   group_leader;            /* Puntero al líder del grupo */
     uint32_t*      clear_child_tid;         /* Dirección para futex_wake al terminar */
 
@@ -95,6 +98,9 @@ typedef struct task {
     uint32_t       euid;                    /* Effective User ID */
     uint32_t       egid;                    /* Effective Group ID */
     uint32_t       signal_pending;          /* Bitmap of pending signals */
+    uint64_t       sigaltstack_sp;          /* Alternate signal stack base */
+    uint64_t       sigaltstack_size;        /* Alternate signal stack size */
+    uint32_t       sigaltstack_flags;       /* SS_DISABLE / SS_ONSTACK */
 
     void           (**signal_handlers)(int); /* Signal Handlers Pointer (shared in threads) */
     void*          signal_handlers_internal[32];
@@ -102,6 +108,8 @@ typedef struct task {
     void*          signal_restorers_internal[32];
     uint32_t*      signal_flags;            /* Signal Flags Pointer */
     uint32_t       signal_flags_internal[32];
+    uint64_t*      signal_action_masks;     /* Per-signal mask Pointer */
+    uint64_t       signal_action_masks_internal[32];
 
     /* SMP & Threading extensions */
     uint64_t       affinity[4];             /* cpu_set_t inline for simplicity (256 bits max) */
@@ -121,6 +129,9 @@ typedef struct task {
 
     void           (*entry)(void);          /* Entry point for task_entry_wrapper */
     int            exit_code;               /* Exit status code */
+    int            wait_status;             /* Raw wait status encoding */
+    int            wait_code;               /* CLD_* event code */
+    uint8_t        wait_pending;            /* Parent-visible wait event pending */
 } task_t;
 
 /* ========================================================================= */
@@ -180,6 +191,7 @@ void task_wakeup(task_t* t);
  * Termina la tarea actual.
  */
 void task_exit(int status);
+void task_exit_signal(int sig);
 
 /**
  * Obtiene la tarea actual.
@@ -246,6 +258,7 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
  * @return PID del hijo recolectado, o -1/0.
  */
 int task_waitpid(int pid, int* status, int options);
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code);
 
 /**
  * Busca una tarea por su ID único.

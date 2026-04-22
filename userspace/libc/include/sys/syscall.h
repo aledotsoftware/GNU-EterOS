@@ -21,6 +21,9 @@
 #define SYS_rt_sigaction        13
 #define SYS_rt_sigprocmask      14
 #define SYS_rt_sigreturn        15
+#define SYS_rt_sigpending       127
+#define SYS_rt_sigsuspend       130
+#define SYS_sigaltstack         131
 #define SYS_ioctl               16
 #define SYS_pread64             17
 #define SYS_pwrite64            18
@@ -113,7 +116,23 @@
 #define SYS_setgid              106
 #define SYS_geteuid             107
 #define SYS_getegid             108
+#define SYS_setpgid             109
+#define SYS_getppid             110
+#define SYS_getpgrp             111
+#define SYS_setsid              112
 #define SYS_clock_gettime       228
+#define SYS_epoll_wait          232
+#define SYS_epoll_ctl           233
+#define SYS_waitid              247
+#define SYS_openat              257
+#define SYS_newfstatat          262
+#define SYS_unlinkat            263
+#define SYS_readlinkat          267
+#define SYS_faccessat           269
+#define SYS_ppoll               271
+#define SYS_dup3                292
+#define SYS_pipe2               293
+#define SYS_epoll_create1       291
 
 long syscall(long nr, ...);
 

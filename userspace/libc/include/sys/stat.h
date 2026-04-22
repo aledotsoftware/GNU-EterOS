@@ -34,5 +34,8 @@ struct stat {
 
 int stat(const char *pathname, struct stat *buf);
 int fstat(int fd, struct stat *buf);
+int lstat(const char *pathname, struct stat *buf);
+int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
+mode_t umask(mode_t mask);
 
 #endif /* _SYS_STAT_H */

@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <fcntl.h>
 
 #ifndef SEEK_SET
 #define SEEK_SET 0
@@ -16,15 +17,6 @@
 #define STDIN_FILENO  0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
-
-/* Flags for open() */
-#define O_RDONLY    0x0000
-#define O_WRONLY    0x0001
-#define O_RDWR      0x0002
-#define O_CREAT     0x0040
-#define O_EXCL      0x0080
-#define O_TRUNC     0x0200
-#define O_APPEND    0x0400
 
 /* access() mode flags */
 #define F_OK    0
@@ -47,18 +39,38 @@ int ftruncate(int fd, int64_t length);
 /* Process */
 int getpid(void);
 int getppid(void);
+uid_t getuid(void);
+gid_t getgid(void);
+uid_t geteuid(void);
+gid_t getegid(void);
+pid_t setsid(void);
+int setpgid(pid_t pid, pid_t pgid);
+pid_t getpgrp(void);
+int tcgetpgrp(int fd);
+int tcsetpgrp(int fd, pid_t pgrp);
 int setuid(int uid);
 int setgid(int gid);
 int kill(int pid, int sig);
 int fork(void);
 int execve(const char *pathname, char *const argv[], char *const envp[]);
+int execv(const char *pathname, char *const argv[]);
+int execvp(const char *file, char *const argv[]);
+int execvpe(const char *file, char *const argv[], char *const envp[]);
 void exit(int status);
 
 /* File Descriptors */
 int pipe(int pipefd[2]);
+int pipe2(int pipefd[2], int flags);
+int dup(int oldfd);
 int dup2(int oldfd, int newfd);
+int dup3(int oldfd, int newfd, int flags);
 int access(const char *pathname, int mode);
+int chmod(const char *pathname, mode_t mode);
+int faccessat(int dirfd, const char *pathname, int mode, int flags);
 int chdir(const char *pathname);
+ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
+ssize_t readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
+int isatty(int fd);
 
 /* Memory */
 void *brk(void *addr);

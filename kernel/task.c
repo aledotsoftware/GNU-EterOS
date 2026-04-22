@@ -29,8 +29,22 @@
 #include "../include/errno.h"
 #include "../include/fcntl.h"
 #include "../include/sched.h"
+#include "../include/sys/signal.h"
 #include "../include/futex.h"
 #include "../include/apic.h"
+
+#define AT_NULL   0
+#define AT_PHDR   3
+#define AT_PAGESZ 6
+#define AT_ENTRY  9
+#define AT_UID    11
+#define AT_EUID   12
+#define AT_GID    13
+#define AT_EGID   14
+#define AT_SECURE 23
+#define AT_BASE   7
+#define AT_PHENT  4
+#define AT_PHNUM  5
 
 extern void fork_return(void);
 
@@ -288,6 +302,8 @@ void scheduler_init(void) {
     tasks[0].id = next_id++;
     tasks[0].parent_id = 0;
     tasks[0].tgid = tasks[0].id;
+    tasks[0].pgid = tasks[0].tgid;
+    tasks[0].sid = tasks[0].tgid;
     tasks[0].group_leader = &tasks[0];
     tasks[0].clear_child_tid = NULL;
     tasks[0].state = TASK_RUNNING;
@@ -314,13 +330,18 @@ void scheduler_init(void) {
     if (tasks[0].cwd_node) tasks[0].cwd_node->ref_count++;
     tasks[0].signal_mask = 0;
     tasks[0].signal_pending = 0;
+    tasks[0].sigaltstack_sp = 0;
+    tasks[0].sigaltstack_size = 0;
+    tasks[0].sigaltstack_flags = 2; /* SS_DISABLE */
 
     tasks[0].signal_handlers = (void (**)(int))tasks[0].signal_handlers_internal;
     tasks[0].signal_restorers = (void (**)(void))tasks[0].signal_restorers_internal;
     tasks[0].signal_flags = tasks[0].signal_flags_internal;
+    tasks[0].signal_action_masks = tasks[0].signal_action_masks_internal;
     memset(tasks[0].signal_handlers_internal, 0, sizeof(tasks[0].signal_handlers_internal));
     memset(tasks[0].signal_restorers_internal, 0, sizeof(tasks[0].signal_restorers_internal));
     memset(tasks[0].signal_flags_internal, 0, sizeof(tasks[0].signal_flags_internal));
+    memset(tasks[0].signal_action_masks_internal, 0, sizeof(tasks[0].signal_action_masks_internal));
 
     /* Linux Init */
     tasks[0].brk = 0;
@@ -331,6 +352,9 @@ void scheduler_init(void) {
     tasks[0].euid = 0;
     tasks[0].egid = 0;
     tasks[0].mmap_base = 0x700000000000ULL;
+    tasks[0].wait_status = 0;
+    tasks[0].wait_code = 0;
+    tasks[0].wait_pending = 0;
 
     task_count = 1;
     /* current_task = 0; removed */
@@ -373,6 +397,8 @@ void task_init_ap(void) {
     tasks[slot].id = next_id++;
     tasks[slot].parent_id = 0;
     tasks[slot].tgid = tasks[slot].id;
+    tasks[slot].pgid = tasks[slot].tgid;
+    tasks[slot].sid = tasks[slot].tgid;
     tasks[slot].group_leader = &tasks[slot];
     tasks[slot].clear_child_tid = NULL;
     tasks[slot].state = TASK_RUNNING; /* Ya está corriendo */
@@ -414,9 +440,14 @@ void task_init_ap(void) {
     tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
     tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
     tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    tasks[slot].signal_action_masks = tasks[slot].signal_action_masks_internal;
+    tasks[slot].sigaltstack_sp = 0;
+    tasks[slot].sigaltstack_size = 0;
+    tasks[slot].sigaltstack_flags = 2; /* SS_DISABLE */
     memset(tasks[slot].signal_handlers_internal, 0, sizeof(tasks[slot].signal_handlers_internal));
     memset(tasks[slot].signal_restorers_internal, 0, sizeof(tasks[slot].signal_restorers_internal));
     memset(tasks[slot].signal_flags_internal, 0, sizeof(tasks[slot].signal_flags_internal));
+    memset(tasks[slot].signal_action_masks_internal, 0, sizeof(tasks[slot].signal_action_masks_internal));
 
     if (slot >= task_count) {
         task_count = slot + 1;
@@ -473,6 +504,9 @@ int task_create(const char* name, void (*entry)(void)) {
     /* Configurar la tarea */
     tasks[slot].id = next_id++;
     tasks[slot].parent_id = 0;
+    tasks[slot].tgid = tasks[slot].id;
+    tasks[slot].pgid = tasks[slot].tgid;
+    tasks[slot].sid = tasks[slot].tgid;
     tasks[slot].state = TASK_READY;
     tasks[slot].stack_base = stack;
 
@@ -496,13 +530,18 @@ int task_create(const char* name, void (*entry)(void)) {
     if (tasks[slot].cwd_node) tasks[slot].cwd_node->ref_count++;
     tasks[slot].signal_mask = 0;
     tasks[slot].signal_pending = 0;
+    tasks[slot].sigaltstack_sp = 0;
+    tasks[slot].sigaltstack_size = 0;
+    tasks[slot].sigaltstack_flags = 2; /* SS_DISABLE */
 
     tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
     tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
     tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    tasks[slot].signal_action_masks = tasks[slot].signal_action_masks_internal;
     memset(tasks[slot].signal_handlers_internal, 0, sizeof(tasks[slot].signal_handlers_internal));
     memset(tasks[slot].signal_restorers_internal, 0, sizeof(tasks[slot].signal_restorers_internal));
     memset(tasks[slot].signal_flags_internal, 0, sizeof(tasks[slot].signal_flags_internal));
+    memset(tasks[slot].signal_action_masks_internal, 0, sizeof(tasks[slot].signal_action_masks_internal));
 
     /* Linux Init */
     tasks[slot].brk = 0;
@@ -513,6 +552,9 @@ int task_create(const char* name, void (*entry)(void)) {
     tasks[slot].euid = 0;
     tasks[slot].egid = 0;
     tasks[slot].mmap_base = 0x700000000000ULL;
+    tasks[slot].wait_status = 0;
+    tasks[slot].wait_code = 0;
+    tasks[slot].wait_pending = 0;
 
     /*
      * Preparar el stack para que context_switch pueda "entrar" por primera vez.
@@ -822,6 +864,10 @@ void task_wakeup(task_t* t) {
             lapic_send_ipi(cpus[t->target_cpu].apic_id, 0x20); /* 0x20 is timer vector, forces schedule() */
         }
     }
+    if (t->state == TASK_STOPPED) {
+        t->state = TASK_READY;
+        enqueue_ready(t);
+    }
     spin_unlock(&sched_lock);
 
     /* Restore interrupts if they were enabled */
@@ -830,7 +876,30 @@ void task_wakeup(task_t* t) {
     }
 }
 
-void task_exit(int status) {
+static void task_mark_parent_wait_event(task_t* current, int wait_status, int wait_code) {
+    current->wait_status = wait_status;
+    current->wait_code = wait_code;
+    current->wait_pending = 1;
+}
+
+static void task_wake_parent_waiter(task_t* current) {
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (tasks[i].id == current->parent_id &&
+            (tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_BLOCKED)) {
+            tasks[i].state = TASK_READY;
+            dequeue_sleep(&tasks[i]);
+            enqueue_ready(&tasks[i]);
+
+            cpu_info_t* target_cpu = &cpus[tasks[i].target_cpu];
+            cpu_info_t* current_cpu = get_current_cpu();
+            if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index && target_cpu->state == CPU_STATE_ONLINE) {
+                lapic_send_ipi(target_cpu->apic_id, 0x20);
+            }
+        }
+    }
+}
+
+static void task_exit_internal(int status, int wait_status, int wait_code) {
     task_t* current = task_get_current();
 
     if (current->clear_child_tid != NULL) {
@@ -849,6 +918,7 @@ void task_exit(int status) {
 
     current->state = TASK_DEAD;
     current->exit_code = status;
+    task_mark_parent_wait_event(current, wait_status, wait_code);
 
     int slot = (int)(current - tasks);
     if (slot >= 0 && slot < MAX_TASKS) {
@@ -859,24 +929,7 @@ void task_exit(int status) {
     /* Wake up any tasks waiting for this process */
     __asm__ volatile("cli");
     spin_lock(&sched_lock);
-    for (int i = 0; i < MAX_TASKS; i++) {
-        if (tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_BLOCKED) {
-            /* Since waitpid loops over all tasks polling, the actual wakeup is handled by waking up any
-               potentially waiting tasks, or simply by the polling. The poll uses task_sleep. We can wake up
-               the parent. */
-            if (tasks[i].id == current->parent_id) {
-                tasks[i].state = TASK_READY;
-                dequeue_sleep(&tasks[i]);
-                enqueue_ready(&tasks[i]);
-
-                cpu_info_t* target_cpu = &cpus[tasks[i].target_cpu];
-                cpu_info_t* current_cpu = get_current_cpu();
-                if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index && target_cpu->state == CPU_STATE_ONLINE) {
-                    lapic_send_ipi(target_cpu->apic_id, 0x20);
-                }
-            }
-        }
-    }
+    task_wake_parent_waiter(current);
     spin_unlock(&sched_lock);
     __asm__ volatile("sti");
 
@@ -885,6 +938,14 @@ void task_exit(int status) {
     
     __asm__ volatile("sti");
     for (;;) { __asm__ volatile("hlt"); }
+}
+
+void task_exit(int status) {
+    task_exit_internal(status, ((status & 0xFF) << 8), CLD_EXITED);
+}
+
+void task_exit_signal(int sig) {
+    task_exit_internal(128 + (sig & 0x7F), (sig & 0x7F), CLD_KILLED);
 }
 
 task_t* task_get_current(void) {
@@ -923,6 +984,8 @@ int task_kill(uint32_t pid) {
             }
 
             tasks[i].state = TASK_DEAD;
+            tasks[i].exit_code = 128 + SIGKILL;
+            task_mark_parent_wait_event(&tasks[i], SIGKILL & 0x7F, CLD_KILLED);
             task_bitmap &= ~(1ULL << i);
 
             /* Clean up TID pointer if requested by clone */
@@ -939,14 +1002,7 @@ int task_kill(uint32_t pid) {
             if (&tasks[i] == current) {
                 killed_self = 1;
             } else {
-                /* Wake up its parent if parent is sleeping */
-                for (int j = 0; j < MAX_TASKS; j++) {
-                    if (tasks[j].id == tasks[i].parent_id && (tasks[j].state == TASK_SLEEPING || tasks[j].state == TASK_BLOCKED)) {
-                        tasks[j].state = TASK_READY;
-                        dequeue_sleep(&tasks[j]);
-                        enqueue_ready(&tasks[j]);
-                    }
-                }
+                task_wake_parent_waiter(&tasks[i]);
             }
             found = 1;
         }
@@ -1036,6 +1092,8 @@ int task_fork(void* regs_ptr) {
     tasks[slot].id = next_id++;
     tasks[slot].parent_id = task_get_current()->id;
     tasks[slot].tgid = tasks[slot].id;
+    tasks[slot].pgid = tasks[slot].tgid;
+    tasks[slot].sid = tasks[slot].tgid;
     tasks[slot].group_leader = &tasks[slot];
     tasks[slot].clear_child_tid = NULL;
     tasks[slot].state = TASK_READY;
@@ -1074,12 +1132,18 @@ int task_fork(void* regs_ptr) {
     if (tasks[slot].cwd_node) __atomic_fetch_add(&tasks[slot].cwd_node->ref_count, 1, __ATOMIC_SEQ_CST);
 
     tasks[slot].signal_mask = parent->signal_mask;
+    tasks[slot].signal_pending = 0;
+    tasks[slot].sigaltstack_sp = parent->sigaltstack_sp;
+    tasks[slot].sigaltstack_size = parent->sigaltstack_size;
+    tasks[slot].sigaltstack_flags = parent->sigaltstack_flags & ~1U; /* Clear SS_ONSTACK */
     tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
     tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
     tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+    tasks[slot].signal_action_masks = tasks[slot].signal_action_masks_internal;
     memcpy(tasks[slot].signal_handlers_internal, parent->signal_handlers, sizeof(parent->signal_handlers_internal));
     memcpy(tasks[slot].signal_restorers_internal, parent->signal_restorers, sizeof(parent->signal_restorers_internal));
     memcpy(tasks[slot].signal_flags_internal, parent->signal_flags, sizeof(parent->signal_flags_internal));
+    memcpy(tasks[slot].signal_action_masks_internal, parent->signal_action_masks, sizeof(parent->signal_action_masks_internal));
     tasks[slot].brk = parent->brk;
     tasks[slot].fs_base = parent->fs_base;
     tasks[slot].gs_base = parent->gs_base;
@@ -1088,8 +1152,13 @@ int task_fork(void* regs_ptr) {
     tasks[slot].gid = parent->gid;
     tasks[slot].euid = parent->euid;
     tasks[slot].egid = parent->egid;
+    tasks[slot].pgid = parent->pgid;
+    tasks[slot].sid = parent->sid;
     tasks[slot].user_rsp = parent->user_rsp; /* Saved from syscall entry */
     tasks[slot].mmap_base = parent->mmap_base;
+    tasks[slot].wait_status = 0;
+    tasks[slot].wait_code = 0;
+    tasks[slot].wait_pending = 0;
 
     /* 6. Setup Child Stack for Return */
     /* We need to copy `regs` to child stack top */
@@ -1180,9 +1249,13 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     if (clone_flags & CLONE_THREAD) {
         tasks[slot].tgid = parent->tgid;
         tasks[slot].group_leader = parent->group_leader;
+        tasks[slot].pgid = parent->pgid;
+        tasks[slot].sid = parent->sid;
     } else {
         tasks[slot].tgid = tasks[slot].id;
         tasks[slot].group_leader = &tasks[slot];
+        tasks[slot].pgid = parent->pgid;
+        tasks[slot].sid = parent->sid;
     }
 
     if (clone_flags & CLONE_CHILD_CLEARTID) {
@@ -1229,17 +1302,31 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     if (tasks[slot].cwd_node) __atomic_fetch_add(&tasks[slot].cwd_node->ref_count, 1, __ATOMIC_SEQ_CST);
 
     tasks[slot].signal_mask = parent->signal_mask;
+    tasks[slot].signal_pending = 0;
     if (clone_flags & CLONE_SIGHAND) {
         tasks[slot].signal_handlers = parent->signal_handlers;
         tasks[slot].signal_restorers = parent->signal_restorers;
         tasks[slot].signal_flags = parent->signal_flags;
+        tasks[slot].signal_action_masks = parent->signal_action_masks;
     } else {
         tasks[slot].signal_handlers = (void (**)(int))tasks[slot].signal_handlers_internal;
         tasks[slot].signal_restorers = (void (**)(void))tasks[slot].signal_restorers_internal;
         tasks[slot].signal_flags = tasks[slot].signal_flags_internal;
+        tasks[slot].signal_action_masks = tasks[slot].signal_action_masks_internal;
         memcpy(tasks[slot].signal_handlers_internal, parent->signal_handlers, sizeof(parent->signal_handlers_internal));
         memcpy(tasks[slot].signal_restorers_internal, parent->signal_restorers, sizeof(parent->signal_restorers_internal));
         memcpy(tasks[slot].signal_flags_internal, parent->signal_flags, sizeof(parent->signal_flags_internal));
+        memcpy(tasks[slot].signal_action_masks_internal, parent->signal_action_masks, sizeof(parent->signal_action_masks_internal));
+    }
+    if (clone_flags & CLONE_VM) {
+        /* Linux compatibility: clear altstack for CLONE_VM (thread-like clone). */
+        tasks[slot].sigaltstack_sp = 0;
+        tasks[slot].sigaltstack_size = 0;
+        tasks[slot].sigaltstack_flags = 2; /* SS_DISABLE */
+    } else {
+        tasks[slot].sigaltstack_sp = parent->sigaltstack_sp;
+        tasks[slot].sigaltstack_size = parent->sigaltstack_size;
+        tasks[slot].sigaltstack_flags = parent->sigaltstack_flags & ~1U; /* Clear SS_ONSTACK */
     }
 
     tasks[slot].brk = parent->brk;
@@ -1258,6 +1345,9 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     tasks[slot].egid = parent->egid;
     tasks[slot].user_rsp = stack_top ? stack_top : parent->user_rsp;
     tasks[slot].mmap_base = parent->mmap_base;
+    tasks[slot].wait_status = 0;
+    tasks[slot].wait_code = 0;
+    tasks[slot].wait_pending = 0;
 
     /* Apply TID logic securely */
     if (clone_flags & CLONE_PARENT_SETTID) {
@@ -1302,16 +1392,67 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     return tasks[slot].id;
 }
 
+static int task_is_wait_target(task_t* current, task_t* t, int pid, int options) {
+    int is_child = (t->parent_id == current->id);
+    int is_thread = (t->tgid == current->tgid);
+    if (!(is_child || ((options & __WALL) && is_thread) || ((options & __WALL) && t->tgid == current->id))) {
+        return 0;
+    }
+    if (pid == -1) return 1;
+    if ((int)t->id == pid || (int)t->tgid == pid) return 1;
+    if (pid < -1 && (int)t->tgid == -pid) return 1;
+    return 0;
+}
+
+static void task_reap_zombie_locked(int zombie_slot) {
+    task_t* zombie = &tasks[zombie_slot];
+    if (zombie->fd_table == zombie->fd_table_internal) {
+        for (int j=0; j<MAX_FD; j++) {
+            if (zombie->fd_table[j].node) {
+                fs_node_t* node = zombie->fd_table[j].node;
+                if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+                    close_fs(node);
+                    kfree(node);
+                }
+                zombie->fd_table[j].node = NULL;
+            }
+        }
+    }
+
+    /* Free CR3 if it's not kernel's and no other thread shares it */
+    if (zombie->cr3 != tasks[0].cr3) {
+        int shared_cr3 = 0;
+        for (int k = 0; k < MAX_TASKS; k++) {
+            if (k != zombie_slot && tasks[k].id != 0 && tasks[k].state != 0 && tasks[k].state != TASK_DEAD) {
+                if (tasks[k].cr3 == zombie->cr3) {
+                    shared_cr3 = 1;
+                    break;
+                }
+            }
+        }
+        if (!shared_cr3) {
+            vmm_destroy_pml4(zombie->cr3);
+        }
+    }
+
+    zombie->id = 0;
+    zombie->state = 0; /* Unused */
+    zombie->name[0] = 0;
+    zombie->wait_pending = 0;
+    zombie->wait_code = 0;
+    zombie->wait_status = 0;
+}
+
 int task_waitpid(int pid, int* status, int options) {
     task_t* current = task_get_current();
     if (!current) return -1;
 
     while (1) {
         int found_child = 0;
-        int found_zombie = 0;
-        int zombie_pid = 0;
-        int zombie_status = 0;
-        int zombie_slot = -1;
+        int found_event = 0;
+        int event_pid = 0;
+        int event_status = 0;
+        int event_slot = -1;
 
         __asm__ volatile("cli");
         spin_lock(&sched_lock);
@@ -1320,68 +1461,45 @@ int task_waitpid(int pid, int* status, int options) {
              if (tasks[i].id == 0 && tasks[i].state == 0) continue; /* Empty slot */
              if (tasks[i].id == current->id) continue; /* Self */
 
-             /* __WALL allows waiting for threads created with clone as well as regular children */
-             int is_child = (tasks[i].parent_id == current->id);
-             int is_thread = (tasks[i].tgid == current->tgid);
+             if (!task_is_wait_target(current, &tasks[i], pid, options)) continue;
+             found_child = 1;
+             if (!tasks[i].wait_pending) continue;
 
-             if (is_child || ((options & __WALL) && is_thread) || ((options & __WALL) && tasks[i].tgid == current->id)) {
-                 /* Is it the one we are looking for? */
-                 if (pid == -1 || (int)tasks[i].id == pid || (int)tasks[i].tgid == pid || (pid < -1 && (int)tasks[i].tgid == -pid)) {
-                     found_child = 1;
-                     if (tasks[i].state == TASK_DEAD) {
-                         found_zombie = 1;
-                         zombie_pid = tasks[i].id;
-                         zombie_status = tasks[i].exit_code;
-                         zombie_slot = i;
-                         break;
-                     }
-                 }
+             if (tasks[i].state == TASK_DEAD) {
+                 found_event = 1;
+             } else if (tasks[i].wait_code == CLD_STOPPED) {
+                 if (options & WUNTRACED) found_event = 1;
+             } else if (tasks[i].wait_code == CLD_CONTINUED) {
+                 if (options & WCONTINUED) found_event = 1;
+             }
+
+             if (found_event) {
+                 event_pid = tasks[i].id;
+                 event_status = tasks[i].wait_status;
+                 event_slot = i;
+                 break;
              }
         }
 
-        if (found_zombie) {
-             /* Clean up zombie */
-             task_t* zombie = &tasks[zombie_slot];
-             if (zombie->fd_table == zombie->fd_table_internal) {
-                 for (int j=0; j<MAX_FD; j++) {
-                     if (zombie->fd_table[j].node) {
-                          fs_node_t* node = zombie->fd_table[j].node;
-                          if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
-                              close_fs(node);
-                              kfree(node);
-                          }
-                          zombie->fd_table[j].node = NULL;
-                     }
+        if (found_event) {
+             task_t* ev = &tasks[event_slot];
+             int is_zombie = (ev->state == TASK_DEAD);
+             int is_nowait = (options & WNOWAIT);
+             if (!is_nowait) {
+                 if (is_zombie) task_reap_zombie_locked(event_slot);
+                 else {
+                     ev->wait_pending = 0;
+                     ev->wait_code = 0;
                  }
              }
-
-             /* Free CR3 if it's not kernel's and no other thread shares it */
-             if (zombie->cr3 != tasks[0].cr3) {
-                 int shared_cr3 = 0;
-                 for (int k = 0; k < MAX_TASKS; k++) {
-                     if (k != zombie_slot && tasks[k].id != 0 && tasks[k].state != 0 && tasks[k].state != TASK_DEAD) {
-                         if (tasks[k].cr3 == zombie->cr3) {
-                             shared_cr3 = 1;
-                             break;
-                         }
-                     }
-                 }
-                 if (!shared_cr3) {
-                     vmm_destroy_pml4(zombie->cr3);
-                 }
-             }
-
-             zombie->id = 0;
-             zombie->state = 0; /* Unused */
-             zombie->name[0] = 0;
 
              spin_unlock(&sched_lock);
              __asm__ volatile("sti");
 
              if (status) {
-                 *status = (zombie_status & 0xFF) << 8;
+                 *status = event_status;
              }
-             return zombie_pid;
+             return event_pid;
         }
 
         if (!found_child) {
@@ -1391,7 +1509,7 @@ int task_waitpid(int pid, int* status, int options) {
              return -10;
         }
 
-        if (options & 1) { /* WNOHANG */
+        if (options & WNOHANG) {
              spin_unlock(&sched_lock);
              __asm__ volatile("sti");
              return 0;
@@ -1404,12 +1522,171 @@ int task_waitpid(int pid, int* status, int options) {
     }
 }
 
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) {
+    task_t* current = task_get_current();
+    if (!current) return -1;
+
+    if (!(options & (WEXITED | WSTOPPED | WCONTINUED))) return -22; /* -EINVAL */
+
+    while (1) {
+        int found_child = 0;
+        int found_event = 0;
+        int event_slot = -1;
+        int event_pid = 0;
+        int event_status = 0;
+        int event_code = 0;
+
+        __asm__ volatile("cli");
+        spin_lock(&sched_lock);
+
+        for (int i = 0; i < MAX_TASKS; i++) {
+            task_t* t = &tasks[i];
+            if (t->id == 0 && t->state == 0) continue;
+            if (t->id == current->id) continue;
+
+            int is_child = (t->parent_id == current->id);
+            int is_thread = (t->tgid == current->tgid);
+            if (!(is_child || ((options & __WALL) && (is_thread || t->tgid == current->id)))) continue;
+
+            if (idtype == P_PID) {
+                if ((int)t->id != id && (int)t->tgid != id) continue;
+            } else if (idtype == P_PGID) {
+                int wanted = id ? id : (int)current->pgid;
+                if ((int)t->pgid != wanted) continue;
+            } else if (idtype != P_ALL) {
+                spin_unlock(&sched_lock);
+                __asm__ volatile("sti");
+                return -22; /* -EINVAL */
+            }
+
+            found_child = 1;
+            if (!t->wait_pending) continue;
+
+            if (t->state == TASK_DEAD) {
+                if (options & WEXITED) found_event = 1;
+            } else if (t->wait_code == CLD_STOPPED) {
+                if (options & WSTOPPED) found_event = 1;
+            } else if (t->wait_code == CLD_CONTINUED) {
+                if (options & WCONTINUED) found_event = 1;
+            }
+
+            if (found_event) {
+                event_slot = i;
+                event_pid = t->id;
+                event_status = t->wait_status;
+                event_code = t->wait_code;
+                break;
+            }
+        }
+
+        if (found_event) {
+            task_t* ev = &tasks[event_slot];
+            if (!(options & WNOWAIT)) {
+                if (ev->state == TASK_DEAD) task_reap_zombie_locked(event_slot);
+                else {
+                    ev->wait_pending = 0;
+                    ev->wait_code = 0;
+                }
+            }
+            spin_unlock(&sched_lock);
+            __asm__ volatile("sti");
+
+            if (out_pid) *out_pid = event_pid;
+            if (out_status) *out_status = event_status;
+            if (out_code) *out_code = event_code;
+            return 0;
+        }
+
+        if (!found_child) {
+            spin_unlock(&sched_lock);
+            __asm__ volatile("sti");
+            return -10; /* -ECHILD */
+        }
+
+        if (options & WNOHANG) {
+            spin_unlock(&sched_lock);
+            __asm__ volatile("sti");
+            if (out_pid) *out_pid = 0;
+            if (out_status) *out_status = 0;
+            if (out_code) *out_code = 0;
+            return 0;
+        }
+
+        spin_unlock(&sched_lock);
+        __asm__ volatile("sti");
+        task_sleep(100);
+    }
+}
+
+static int read_shebang_line(const char* path, char* interp, size_t interp_sz, char* interp_arg, size_t interp_arg_sz, char* abs_script, size_t abs_script_sz) {
+    task_t* current = task_get_current();
+    fs_node_t* node;
+    char abs_path[256];
+    uint8_t head[256];
+    ssize_t nread;
+    size_t i = 0;
+    size_t j = 0;
+    size_t k = 0;
+
+    if (!path || !interp || !interp_arg || !abs_script || !current) return -EINVAL;
+
+    interp[0] = '\0';
+    interp_arg[0] = '\0';
+    abs_script[0] = '\0';
+
+    if (vfs_normalize_path(abs_path, sizeof(abs_path), path, current->cwd) != 0) {
+        return -ENOENT;
+    }
+    strlcpy(abs_script, abs_path, abs_script_sz);
+
+    node = vfs_lookup(fs_root, abs_path);
+    if (!node) {
+        return -ENOENT;
+    }
+    if ((node->flags & 0x7) != FS_FILE) {
+        if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) kfree(node);
+        return -ENOEXEC;
+    }
+
+    nread = read_fs(node, 0, sizeof(head) - 1, head);
+    if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) kfree(node);
+    if (nread < 2) return 0;
+
+    head[nread] = '\0';
+    if (!(head[0] == '#' && head[1] == '!')) return 0;
+
+    i = 2;
+    while (i < (size_t)nread && (head[i] == ' ' || head[i] == '\t')) i++;
+    if (i >= (size_t)nread || head[i] == '\n' || head[i] == '\r') return -ENOEXEC;
+
+    while (i < (size_t)nread && head[i] != ' ' && head[i] != '\t' && head[i] != '\n' && head[i] != '\r') {
+        if (j + 1 >= interp_sz) return -E2BIG;
+        interp[j++] = (char)head[i++];
+    }
+    interp[j] = '\0';
+    if (j == 0) return -ENOEXEC;
+
+    while (i < (size_t)nread && (head[i] == ' ' || head[i] == '\t')) i++;
+    while (i < (size_t)nread && head[i] != '\n' && head[i] != '\r') {
+        if (k + 1 >= interp_arg_sz) return -E2BIG;
+        interp_arg[k++] = (char)head[i++];
+    }
+    while (k > 0 && (interp_arg[k - 1] == ' ' || interp_arg[k - 1] == '\t')) k--;
+    interp_arg[k] = '\0';
+
+    return 1;
+}
+
 int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) {
     int res = 0;
     int argc = 0;
     int envc = 0;
     char* kargv[33];
     char* kenvp[33];
+    int shebang = 0;
+    char shebang_interp[256];
+    char shebang_interp_arg[128];
+    char shebang_script_abs[256];
 
     /* 1. Validate */
     char* kpath = (char*)kmalloc(256);
@@ -1448,6 +1725,68 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     }
     kargv[argc] = NULL;
 
+    shebang = read_shebang_line(kpath, shebang_interp, sizeof(shebang_interp), shebang_interp_arg, sizeof(shebang_interp_arg), shebang_script_abs, sizeof(shebang_script_abs));
+    if (shebang < 0 && shebang != -ENOEXEC) {
+        res = shebang;
+        goto cleanup_error;
+    }
+    if (shebang > 0) {
+        char* old_argv[33];
+        char* new_argv[33];
+        int old_argc = argc;
+        int new_argc = 0;
+        int extra = (shebang_interp_arg[0] != '\0') ? 1 : 0;
+        int required = 2 + extra + ((old_argc > 0) ? (old_argc - 1) : 0);
+
+        if (required > 32) {
+            res = -E2BIG;
+            goto cleanup_error;
+        }
+
+        for (int i = 0; i <= old_argc; i++) old_argv[i] = kargv[i];
+        for (int i = 0; i < 33; i++) new_argv[i] = NULL;
+
+        new_argv[new_argc] = (char*)kmalloc(256);
+        if (!new_argv[new_argc]) {
+            res = -ENOMEM;
+            goto cleanup_error;
+        }
+        strlcpy(new_argv[new_argc++], shebang_interp, 256);
+
+        if (shebang_interp_arg[0] != '\0') {
+            new_argv[new_argc] = (char*)kmalloc(128);
+            if (!new_argv[new_argc]) {
+                kfree(new_argv[0]);
+                res = -ENOMEM;
+                goto cleanup_error;
+            }
+            strlcpy(new_argv[new_argc++], shebang_interp_arg, 128);
+        }
+
+        new_argv[new_argc] = (char*)kmalloc(256);
+        if (!new_argv[new_argc]) {
+            for (int i = 0; i < new_argc; i++) if (new_argv[i]) kfree(new_argv[i]);
+            res = -ENOMEM;
+            goto cleanup_error;
+        }
+        strlcpy(new_argv[new_argc++], shebang_script_abs, 256);
+
+        for (int i = 1; i < old_argc; i++) {
+            new_argv[new_argc++] = old_argv[i];
+        }
+        new_argv[new_argc] = NULL;
+
+        if (old_argc > 0 && old_argv[0]) {
+            kfree(old_argv[0]);
+        }
+
+        for (int i = 0; i <= new_argc; i++) {
+            kargv[i] = new_argv[i];
+        }
+        argc = new_argc;
+        strlcpy(kpath, shebang_interp, 256);
+    }
+
     if (envp) {
         if (!vmm_verify_user_access(envp, sizeof(char*), 0)) {
             res = -EFAULT;
@@ -1476,9 +1815,93 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     }
     kenvp[envc] = NULL;
 
+    {
+        int skip_pt_interp = 0;
+        for (int i = 0; i < envc; i++) {
+            if (strcmp(kenvp[i], "ETER_SKIP_PT_INTERP=1") == 0) {
+                skip_pt_interp = 1;
+                break;
+            }
+        }
+
+        if (!skip_pt_interp) {
+            char elf_interp[256];
+            int interp_res = elf_get_interp(kpath, elf_interp, sizeof(elf_interp));
+            if (interp_res < 0 && interp_res != -ENOEXEC) {
+                res = interp_res;
+                goto cleanup_error;
+            }
+            if (interp_res > 0) {
+                char exec_abs[256];
+                char* old_argv[33];
+                char* new_argv[33];
+                int old_argc = argc;
+                int new_argc = 0;
+                int required = 2 + ((old_argc > 0) ? (old_argc - 1) : 0);
+                task_t* exec_current = task_get_current();
+
+                if (!exec_current || vfs_normalize_path(exec_abs, sizeof(exec_abs), kpath, exec_current->cwd) != 0) {
+                    strlcpy(exec_abs, kpath, sizeof(exec_abs));
+                }
+
+                if (required > 32) {
+                    res = -E2BIG;
+                    goto cleanup_error;
+                }
+
+                for (int i = 0; i <= old_argc; i++) old_argv[i] = kargv[i];
+                for (int i = 0; i < 33; i++) new_argv[i] = NULL;
+
+                new_argv[new_argc] = (char*)kmalloc(256);
+                if (!new_argv[new_argc]) {
+                    res = -ENOMEM;
+                    goto cleanup_error;
+                }
+                strlcpy(new_argv[new_argc++], elf_interp, 256);
+
+                new_argv[new_argc] = (char*)kmalloc(256);
+                if (!new_argv[new_argc]) {
+                    kfree(new_argv[0]);
+                    res = -ENOMEM;
+                    goto cleanup_error;
+                }
+                strlcpy(new_argv[new_argc++], exec_abs, 256);
+
+                for (int i = 1; i < old_argc; i++) {
+                    new_argv[new_argc++] = old_argv[i];
+                }
+                new_argv[new_argc] = NULL;
+
+                if (old_argc > 0 && old_argv[0]) {
+                    kfree(old_argv[0]);
+                }
+
+                for (int i = 0; i <= new_argc; i++) {
+                    kargv[i] = new_argv[i];
+                }
+                argc = new_argc;
+                strlcpy(kpath, elf_interp, 256);
+
+                serial_write_string("[ELF] PT_INTERP detected. Delegating to interpreter: ");
+                serial_write_string(kpath);
+                serial_write_string("\n");
+            }
+        }
+    }
+
     /* 2. New Address Space */
     task_t* current = task_get_current();
+    elf_auxv_info_t aux_info;
     uint64_t old_cr3 = current->cr3;
+
+    memset(&aux_info, 0, sizeof(aux_info));
+    {
+        int aux_info_rc = elf_get_auxv_info(kpath, 0, &aux_info);
+        if (aux_info_rc < 0) {
+            res = aux_info_rc;
+            goto cleanup_error;
+        }
+    }
 
     uint64_t new_cr3_phys = (uint64_t)pmm_alloc_page();
     if (!new_cr3_phys) {
@@ -1555,13 +1978,29 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     }
 
     /* 5. Setup Stack */
-    /* Start at 128TB - 4KB */
-    uint64_t stack_top = USER_LIMIT - 4096;
-    /* Map 128KB stack */
-    for (uint64_t addr = stack_top - (128*1024); addr < stack_top; addr += PAGE_SIZE) {
-         void* phys = pmm_alloc_page();
-         vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE | PAGE_USER);
-         memset((void*)addr, 0, PAGE_SIZE);
+    /* Keep stack page-aligned and fully mapped before writing user args/env. */
+    const uint64_t stack_size = 128 * 1024;
+    uint64_t stack_top = (USER_LIMIT + 1ULL) & ~(PAGE_SIZE - 1ULL); /* Exclusive top */
+    uint64_t stack_base = stack_top - stack_size;
+
+    for (uint64_t addr = stack_base; addr < stack_top; addr += PAGE_SIZE) {
+        void* phys = pmm_alloc_page();
+        if (!phys) {
+            __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+            current->cr3 = old_cr3;
+            vmm_destroy_pml4(new_cr3_phys);
+            res = -ENOMEM;
+            goto cleanup_error;
+        }
+        if (vmm_map_page((uint64_t)phys, addr, PAGE_PRESENT | PAGE_WRITE | PAGE_USER) < 0) {
+            pmm_free_page(phys);
+            __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+            current->cr3 = old_cr3;
+            vmm_destroy_pml4(new_cr3_phys);
+            res = -ENOMEM;
+            goto cleanup_error;
+        }
+        memset((void*)addr, 0, PAGE_SIZE);
     }
 
     /* Push strings to top of stack */
@@ -1574,6 +2013,13 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     for (int i = envc - 1; i >= 0; i--) {
         int len = strlen(kenvp[i]) + 1;
         rsp -= len;
+        if (rsp < stack_base) {
+            __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+            current->cr3 = old_cr3;
+            vmm_destroy_pml4(new_cr3_phys);
+            res = -E2BIG;
+            goto cleanup_error;
+        }
         memcpy((void*)rsp, kenvp[i], len);
         uenvp[i] = rsp;
     }
@@ -1583,6 +2029,13 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     for (int i = argc - 1; i >= 0; i--) {
         int len = strlen(kargv[i]) + 1;
         rsp -= len;
+        if (rsp < stack_base) {
+            __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+            current->cr3 = old_cr3;
+            vmm_destroy_pml4(new_cr3_phys);
+            res = -E2BIG;
+            goto cleanup_error;
+        }
         memcpy((void*)rsp, kargv[i], len);
         uargv[i] = rsp;
     }
@@ -1591,9 +2044,58 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     /* Align Stack (16 bytes) */
     rsp &= ~0xF;
 
-    /* Push Auxv (NULL) */
-    rsp -= 8;
-    *(uint64_t*)rsp = 0;
+    /* Build and Push AUXV (minimal Linux-compatible set). */
+    struct {
+        uint64_t a_type;
+        uint64_t a_val;
+    } auxv[12];
+    int auxc = 0;
+
+    auxv[auxc].a_type = AT_PAGESZ;
+    auxv[auxc++].a_val = PAGE_SIZE;
+
+    auxv[auxc].a_type = AT_ENTRY;
+    auxv[auxc++].a_val = aux_info.entry ? aux_info.entry : entry_point;
+
+    auxv[auxc].a_type = AT_UID;
+    auxv[auxc++].a_val = current->uid;
+
+    auxv[auxc].a_type = AT_EUID;
+    auxv[auxc++].a_val = current->euid;
+
+    auxv[auxc].a_type = AT_GID;
+    auxv[auxc++].a_val = current->gid;
+
+    auxv[auxc].a_type = AT_EGID;
+    auxv[auxc++].a_val = current->egid;
+
+    auxv[auxc].a_type = AT_SECURE;
+    auxv[auxc++].a_val = 0;
+
+    auxv[auxc].a_type = AT_PHDR;
+    auxv[auxc++].a_val = aux_info.phdr;
+
+    auxv[auxc].a_type = AT_PHENT;
+    auxv[auxc++].a_val = aux_info.phent;
+
+    auxv[auxc].a_type = AT_PHNUM;
+    auxv[auxc++].a_val = aux_info.phnum;
+
+    auxv[auxc].a_type = AT_BASE;
+    auxv[auxc++].a_val = aux_info.base;
+
+    auxv[auxc].a_type = AT_NULL;
+    auxv[auxc++].a_val = 0;
+
+    rsp -= (uint64_t)auxc * 16ULL;
+    if (rsp < stack_base) {
+        __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+        current->cr3 = old_cr3;
+        vmm_destroy_pml4(new_cr3_phys);
+        res = -E2BIG;
+        goto cleanup_error;
+    }
+    memcpy((void*)rsp, auxv, (size_t)auxc * 16U);
 
     /* Push Envp Pointers */
     rsp -= (envc + 1) * 8;
@@ -1609,6 +2111,13 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
 
     /* Push Argc */
     rsp -= 8;
+    if (rsp < stack_base) {
+        __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+        current->cr3 = old_cr3;
+        vmm_destroy_pml4(new_cr3_phys);
+        res = -E2BIG;
+        goto cleanup_error;
+    }
     *(uint64_t*)rsp = (uint64_t)argc;
 
     /* 6. Cleanup Kernel Buffers */

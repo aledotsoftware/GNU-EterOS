@@ -52,6 +52,10 @@ socket_entry_t socket_table[MAX_SOCKETS];
 sem_t net_sem;
 fs_node_t* fs_root = NULL;
 int total_cpus = 1;
+task_t* task_get_at(int i) { (void)i; return NULL; }
+int task_get_count(void) { return 0; }
+void task_exit_signal(int sig) { (void)sig; }
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code; return -1; }
 cpu_info_t cpus[MAX_CPUS];
 
 /* Mocks */
@@ -273,3 +277,10 @@ int main() {
 }
 uint32_t* framebuffer_get_hw_buffer(void) { return NULL; }
 int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) { return -1; }
+
+#ifndef PMM_MOCKS_INJECTED
+#define PMM_MOCKS_INJECTED
+__attribute__((weak)) uint64_t pmm_get_total_ram(void) { return 1024 * 1024 * 1024; }
+__attribute__((weak)) uint64_t pmm_get_free_ram(void) { return 512 * 1024 * 1024; }
+__attribute__((weak)) uint64_t pmm_get_used_ram(void) { return 512 * 1024 * 1024; }
+#endif

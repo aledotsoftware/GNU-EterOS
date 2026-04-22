@@ -53,6 +53,65 @@ static initrd_dir_t* find_virtual_dir(const char* name) {
     return NULL;
 }
 
+static const char* initrd_dir_prefix(fs_node_t *node) {
+    if (!node) return NULL;
+    if ((node->flags & 0x7) != FS_DIRECTORY) return NULL;
+    if (initrd_is_root_handle(node)) return "";
+    if (node->readdir == &initrd_readdir && node->finddir == &initrd_finddir && node->ptr) {
+        return (const char*)node->ptr;
+    }
+    return NULL;
+}
+
+static int initrd_extract_child(const char* full, const char* prefix, char* out, size_t out_sz) {
+    const char* rem = full;
+    const char* slash;
+    size_t plen;
+    size_t len;
+
+    if (!full || !prefix || !out || out_sz == 0) return 0;
+
+    plen = strlen(prefix);
+    if (plen > 0) {
+        if (strncmp(full, prefix, plen) != 0) return 0;
+        if (full[plen] != '/') return 0;
+        rem = full + plen + 1;
+    }
+
+    if (*rem == '\0') return 0;
+    slash = strchr(rem, '/');
+    len = slash ? (size_t)(slash - rem) : strlen(rem);
+    if (len == 0 || len >= out_sz) return 0;
+
+    memcpy(out, rem, len);
+    out[len] = '\0';
+    return 1;
+}
+
+static fs_node_t* initrd_make_dir_node(const char* name, const char* full_path) {
+    fs_node_t* fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!fnode) return 0;
+    memset(fnode, 0, sizeof(fs_node_t));
+    fnode->ref_count = 1;
+    strlcpy(fnode->name, name, sizeof(fnode->name));
+    fnode->mask = 0755;
+    fnode->flags = FS_DIRECTORY;
+    fnode->readdir = &initrd_readdir;
+    fnode->finddir = &initrd_finddir;
+    fnode->mkdir = &initrd_mkdir;
+    if (full_path && full_path[0]) {
+        size_t n = strlen(full_path) + 1;
+        char* p = (char*)kmalloc(n);
+        if (!p) {
+            kfree(fnode);
+            return 0;
+        }
+        memcpy(p, full_path, n);
+        fnode->ptr = (fs_node_t*)p;
+    }
+    return fnode;
+}
+
 ssize_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     initrd_file_header_t header = file_headers[node->inode];
     if (offset > header.size)
@@ -79,36 +138,73 @@ ssize_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *bu
 }
 
 int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
-    if (!initrd_is_root_handle(node))
-        return -1;
+    const char* prefix = initrd_dir_prefix(node);
+    char child[128];
+    uint32_t seen = 0;
+    if (!prefix) return -1;
 
-    /* Virtual entries from dynamic list */
-    if (index < virtual_dirs_count) {
-        initrd_dir_t* current = virtual_dirs;
-        for (uint32_t i = 0; i < index; i++) {
-            if (current) current = current->next;
+    /* Virtual dirs first */
+    for (initrd_dir_t* cur = virtual_dirs; cur; cur = cur->next) {
+        if (!initrd_extract_child(cur->name, prefix, child, sizeof(child))) continue;
+        int duplicate = 0;
+        for (initrd_dir_t* p = virtual_dirs; p != cur; p = p->next) {
+            char prev_child[128];
+            if (initrd_extract_child(p->name, prefix, prev_child, sizeof(prev_child)) &&
+                strcmp(prev_child, child) == 0) {
+                duplicate = 1;
+                break;
+            }
         }
-        if (current) {
-            strlcpy(entry->name, current->name, sizeof(entry->name));
-            entry->inode = current->inode;
+        if (!duplicate) {
+            for (uint32_t i = 0; i < file_count; i++) {
+                char prev_child[128];
+                if (initrd_extract_child(file_headers[i].name, prefix, prev_child, sizeof(prev_child)) &&
+                    strcmp(prev_child, child) == 0) {
+                    duplicate = 1;
+                    break;
+                }
+            }
+        }
+        if (duplicate) continue;
+        if (seen == index) {
+            strlcpy(entry->name, child, sizeof(entry->name));
+            entry->inode = cur->inode;
             return 0;
         }
+        seen++;
     }
 
-    /* Initrd files (offset by virtual_dirs_count) */
-    uint32_t file_index = index - virtual_dirs_count;
+    for (uint32_t i = 0; i < file_count; i++) {
+        if (!initrd_extract_child(file_headers[i].name, prefix, child, sizeof(child))) continue;
+        int duplicate = 0;
+        for (uint32_t j = 0; j < i; j++) {
+            char prev_child[128];
+            if (initrd_extract_child(file_headers[j].name, prefix, prev_child, sizeof(prev_child)) &&
+                strcmp(prev_child, child) == 0) {
+                duplicate = 1;
+                break;
+            }
+        }
+        if (!duplicate) {
+            for (initrd_dir_t* p = virtual_dirs; p; p = p->next) {
+                char prev_child[128];
+                if (initrd_extract_child(p->name, prefix, prev_child, sizeof(prev_child)) &&
+                    strcmp(prev_child, child) == 0) {
+                    duplicate = 1;
+                    break;
+                }
+            }
+        }
+        if (duplicate) continue;
+        if (seen == index) {
+            strlcpy(entry->name, child, sizeof(entry->name));
+            entry->inode = i;
+            return 0;
+        }
+        seen++;
+    }
 
-    if (file_index >= file_count)
-        return 1; /* EOF */
-
-    /* Securely copy name, ensuring we don't read past the fixed 64-byte header field */
-    size_t name_len = strnlen(file_headers[file_index].name, sizeof(file_headers[file_index].name));
-    if (name_len >= sizeof(entry->name)) name_len = sizeof(entry->name) - 1;
-    memcpy(entry->name, file_headers[file_index].name, name_len);
-    entry->name[name_len] = '\0';
-
-    entry->inode = file_index;
-    return 0;
+    return 1; /* EOF */
 }
 
 int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
@@ -136,27 +232,30 @@ int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
 }
 
 fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
-    if (!initrd_is_root_handle(node))
-        return 0;
+    const char* prefix = initrd_dir_prefix(node);
+    char target[256];
+    if (!prefix || !name || !*name) return 0;
+
+    if (prefix[0] == '\0') {
+        strlcpy(target, name, sizeof(target));
+    } else {
+        strlcpy(target, prefix, sizeof(target));
+        strlcat(target, "/", sizeof(target));
+        strlcat(target, name, sizeof(target));
+    }
 
     /* Check for virtual directories */
-    initrd_dir_t* vdir = find_virtual_dir(name);
+    initrd_dir_t* vdir = find_virtual_dir(target);
     if (vdir) {
-        fs_node_t* fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+        fs_node_t* fnode = initrd_make_dir_node(name, target);
         if (!fnode) return 0;
-        memset(fnode, 0, sizeof(fs_node_t));
-        fnode->ref_count = 1;
-        strlcpy(fnode->name, vdir->name, sizeof(fnode->name));
         fnode->inode = vdir->inode;
-        fnode->mask = 0755; /* Directories typically rwxr-xr-x */
-        fnode->flags = FS_DIRECTORY;
-        /* No ops for virtual dir, it's just a placeholder for mounting */
         return fnode;
     }
 
     for (uint32_t i = 0; i < file_count; i++) {
         size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
-        if (strncmp(name, file_headers[i].name, name_len) == 0 && name[name_len] == '\0') {
+        if (strncmp(target, file_headers[i].name, name_len) == 0 && target[name_len] == '\0') {
              fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
              if (!fnode) return 0;
              memset(fnode, 0, sizeof(fs_node_t));
@@ -178,6 +277,20 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
              fnode->finddir = 0;
              fnode->length = file_headers[i].size;
              return fnode;
+        }
+    }
+
+    {
+        size_t tlen = strnlen(target, sizeof(target));
+        for (uint32_t i = 0; i < file_count; i++) {
+            if (strncmp(file_headers[i].name, target, tlen) == 0 && file_headers[i].name[tlen] == '/') {
+                return initrd_make_dir_node(name, target);
+            }
+        }
+        for (initrd_dir_t* p = virtual_dirs; p; p = p->next) {
+            if (strncmp(p->name, target, tlen) == 0 && p->name[tlen] == '/') {
+                return initrd_make_dir_node(name, target);
+            }
         }
     }
     return 0;

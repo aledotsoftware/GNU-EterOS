@@ -1,0 +1,11 @@
+Base POSIX completa y estable
+fork/exec/wait, pipes/dup2, signals, poll/epoll, mmap/mprotect/mremap, fcntl/openat/fstatat, pty/tty, procfs.
+
+Runtime GNU mínimo
+ELF dinámico (ld-linux), libc compatible (musl o glibc target), libpthread, dlopen, entorno /etc, /dev, /proc.
+
+Userland real
+BusyBox full + coreutils + bash + util-linux + package/bootstrap.
+
+Stack gráfico Linux
+DRM/KMS o capa equivalente, input serio, Unix sockets, shared memory, luego X11/Wayland y recién ahí MATE.

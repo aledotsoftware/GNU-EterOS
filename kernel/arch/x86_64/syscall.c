@@ -22,6 +22,7 @@
 #include <timer.h>
 #include <vmm.h>
 #include <futex.h>
+#include <sys/sysinfo.h>
 #include <net/socket.h>
 #include <net/defs.h>
 #include <fcntl.h>
@@ -47,12 +48,34 @@ extern void syscall_entry(void);
 /* External Declarations for Task Functions */
 extern int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs);
 extern int task_waitpid(int pid, int* status, int options);
+extern int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code);
 
 /* Structures used in syscalls */
 struct timespec {
     int64_t tv_sec;
     int64_t tv_nsec;
 };
+
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME 0
+#define CLOCK_MONOTONIC 1
+#define CLOCK_PROCESS_CPUTIME_ID 2
+#define CLOCK_THREAD_CPUTIME_ID 3
+#endif
+
+#ifndef PROT_NONE
+#define PROT_NONE  0x0
+#define PROT_READ  0x1
+#define PROT_WRITE 0x2
+#define PROT_EXEC  0x4
+#endif
+
+#ifndef MAP_SHARED
+#define MAP_SHARED    0x01
+#define MAP_PRIVATE   0x02
+#define MAP_FIXED     0x10
+#define MAP_ANONYMOUS 0x20
+#endif
 
 void syscall_init(void) {
     serial_write_string("[SYSCALL] Initializing MSRs for x86_64...\n");
@@ -135,6 +158,142 @@ typedef struct {
 #define PIPE_SIZE 65536
 #define PIPE_READ_END  1
 #define PIPE_WRITE_END 2
+
+typedef struct {
+    spinlock_t lock;
+    uint64_t interval_ms;
+    uint64_t next_expiry_ms;
+    uint64_t pending_expirations;
+    int clockid;
+} timerfd_ctx_t;
+
+#define TIMERFD_MAGIC 0x54464D44u /* "TFMD" */
+#define TFD_TIMER_ABSTIME 0x1
+#define TFD_CLOEXEC O_CLOEXEC
+#define TFD_NONBLOCK O_NONBLOCK
+
+struct itimerspec_kernel {
+    struct timespec it_interval;
+    struct timespec it_value;
+};
+
+static uint64_t sys_now_ms(void) {
+    return timer_get_ticks();
+}
+
+static int __attribute__((unused)) timespec_to_ms(const struct timespec* ts, uint64_t* out_ms) {
+    uint64_t sec_ms;
+    uint64_t nsec_ms;
+
+    if (!ts || !out_ms) return -EINVAL;
+    if (ts->tv_sec < 0 || ts->tv_nsec < 0 || ts->tv_nsec >= 1000000000LL) return -EINVAL;
+
+    sec_ms = (uint64_t)ts->tv_sec * 1000ULL;
+    nsec_ms = (uint64_t)ts->tv_nsec / 1000000ULL;
+    *out_ms = sec_ms + nsec_ms;
+    return 0;
+}
+
+static void __attribute__((unused)) ms_to_timespec(uint64_t ms, struct timespec* ts) {
+    if (!ts) return;
+    ts->tv_sec = (int64_t)(ms / 1000ULL);
+    ts->tv_nsec = (int64_t)((ms % 1000ULL) * 1000000ULL);
+}
+
+static void timerfd_refresh(timerfd_ctx_t* tfd, uint64_t now_ms) {
+    uint64_t due;
+
+    if (!tfd || tfd->next_expiry_ms == 0 || now_ms < tfd->next_expiry_ms) return;
+
+    due = 1;
+    if (tfd->interval_ms > 0 && now_ms > tfd->next_expiry_ms) {
+        due += (now_ms - tfd->next_expiry_ms) / tfd->interval_ms;
+    }
+
+    tfd->pending_expirations += due;
+
+    if (tfd->interval_ms > 0) {
+        tfd->next_expiry_ms += due * tfd->interval_ms;
+    } else {
+        tfd->next_expiry_ms = 0;
+    }
+}
+
+static ssize_t timerfd_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
+    timerfd_ctx_t* tfd;
+    uint64_t ready;
+
+    (void)offset;
+    if (!node || !buffer) return -EFAULT;
+    if (size < sizeof(uint64_t)) return -EINVAL;
+
+    tfd = (timerfd_ctx_t*)node->ptr;
+    if (!tfd) return -EINVAL;
+
+    while (1) {
+        uint64_t now_ms = sys_now_ms();
+        spin_lock(&tfd->lock);
+        timerfd_refresh(tfd, now_ms);
+        if (tfd->pending_expirations > 0) {
+            ready = tfd->pending_expirations;
+            tfd->pending_expirations = 0;
+            spin_unlock(&tfd->lock);
+            memcpy(buffer, &ready, sizeof(uint64_t));
+            return (ssize_t)sizeof(uint64_t);
+        }
+        spin_unlock(&tfd->lock);
+
+        if (node->flags & O_NONBLOCK) return -EAGAIN;
+        task_sleep(1);
+    }
+}
+
+static uint32_t __attribute__((unused)) timerfd_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
+    (void)node; (void)offset; (void)size; (void)buffer;
+    return (uint32_t)-EINVAL;
+}
+
+static int __attribute__((unused)) timerfd_ioctl_fs(fs_node_t* node, int request, void* arg) {
+    timerfd_ctx_t* tfd;
+
+    if (!node || !arg) return -EINVAL;
+    if (request != FIONREAD) return -ENOTTY;
+
+    tfd = (timerfd_ctx_t*)node->ptr;
+    if (!tfd) return -EINVAL;
+
+    spin_lock(&tfd->lock);
+    timerfd_refresh(tfd, sys_now_ms());
+    *(int*)arg = (tfd->pending_expirations > 0) ? (int)sizeof(uint64_t) : 0;
+    spin_unlock(&tfd->lock);
+    return 0;
+}
+
+static void __attribute__((unused)) timerfd_close_fs(fs_node_t* node) {
+    timerfd_ctx_t* tfd;
+    if (!node) return;
+    tfd = (timerfd_ctx_t*)node->ptr;
+    if (tfd) {
+        kfree(tfd);
+        node->ptr = NULL;
+    }
+}
+
+static int __attribute__((unused)) timerfd_from_fd(int fd, task_t* current, fs_node_t** out_node, timerfd_ctx_t** out_ctx) {
+    fs_node_t* node;
+    timerfd_ctx_t* tfd;
+
+    if (!current) return -ESRCH;
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    node = current->fd_table[fd].node;
+    if (!node) return -EBADF;
+    if (node->impl != TIMERFD_MAGIC || node->read != timerfd_read_fs) return -EINVAL;
+    tfd = (timerfd_ctx_t*)node->ptr;
+    if (!tfd) return -EINVAL;
+    if (out_node) *out_node = node;
+    if (out_ctx) *out_ctx = tfd;
+    return 0;
+}
 
 static int64_t sys_kill(int pid, int sig);
 
@@ -231,8 +390,15 @@ static void pipe_open(fs_node_t* node) {
     (void)node;
 }
 
+#ifndef AT_FDCWD
 #define AT_FDCWD -100
+#endif
+#ifndef AT_SYMLINK_NOFOLLOW
+#define AT_SYMLINK_NOFOLLOW 0x100
+#endif
+#ifndef AT_EMPTY_PATH
 #define AT_EMPTY_PATH 0x1000
+#endif
 
 static int split_path(const char* path, char* parent, char* name) {
     int len = strlen(path);
@@ -629,6 +795,7 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     if (!kpath) return -ENOMEM;
     int res = resolve_path(dirfd, path, kpath, 256);
     if (res < 0) { kfree(kpath); return res; }
+    if ((flags & O_ACCMODE) > O_RDWR) { kfree(kpath); return -EINVAL; }
 
     task_t* current = task_get_current();
     int fd = -1;
@@ -640,13 +807,16 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     }
     if (fd == -1) { kfree(kpath); return -EMFILE; }
 
-    fs_node_t* base_node = (kpath[0] == '/') ? fs_root : current->cwd_node;
-    if (dirfd != AT_FDCWD && kpath[0] != '/') {
-        if (dirfd < 0 || dirfd >= MAX_FD || !current->fd_table[dirfd].node) { kfree(kpath); return -EBADF; }
-        base_node = current->fd_table[dirfd].node;
-    }
+    fs_node_t* node = vfs_lookup_ext(fs_root, kpath, (flags & O_NOFOLLOW) ? 0 : 1);
 
-    fs_node_t* node = vfs_lookup(base_node, kpath);
+    if (node && (flags & O_NOFOLLOW) && ((node->flags & 0x7) == FS_SYMLINK)) {
+        if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+            if (node->close) node->close(node);
+            kfree(node);
+        }
+        kfree(kpath);
+        return -ELOOP;
+    }
 
     int req_mask = 0;
     if ((flags & O_ACCMODE) == O_RDONLY) req_mask = 4;
@@ -655,6 +825,14 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
 
     /* SECURITY FIX: Enforce read/write permissions on existing nodes */
     if (node) {
+        if ((flags & O_CREAT) && (flags & O_EXCL)) {
+            if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+                if (node->close) node->close(node);
+                kfree(node);
+            }
+            kfree(kpath);
+            return -EEXIST;
+        }
         if (!check_node_permission(node, req_mask)) {
             if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
                 if (node->close) node->close(node);
@@ -674,7 +852,7 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
 
             if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
             
-            fs_node_t* parent = vfs_lookup(base_node, parent_path);
+            fs_node_t* parent = vfs_lookup(fs_root, parent_path);
             if (!parent) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
             
             /* SECURITY FIX: Require Write & Execute permission on parent dir for node creation */
@@ -687,9 +865,9 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
                 kfree(filename);
                 kfree(parent_path);
                 kfree(kpath);
-                return -EACCES;
+                return -EIO;
             }
-            node = vfs_lookup(base_node, kpath);
+            node = vfs_lookup(fs_root, kpath);
             kfree(parent);
             kfree(filename);
             kfree(parent_path);
@@ -708,15 +886,35 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
 
     if (flags & O_NONBLOCK) node->flags |= O_NONBLOCK;
 
+    if ((flags & O_DIRECTORY) && ((node->flags & 0x7) != FS_DIRECTORY)) {
+        kfree(node);
+        kfree(kpath);
+        return -ENOTDIR;
+    }
+
+    if ((flags & O_TRUNC) && !write_mode) {
+        kfree(node);
+        kfree(kpath);
+        return -EINVAL;
+    }
+
     if ((node->flags & 0x7) == FS_DIRECTORY && write_mode) {
         kfree(node);
         kfree(kpath);
         return -EISDIR;
     }
 
+    if ((flags & O_TRUNC) && (node->flags & 0x7) == FS_FILE) {
+        if (node->truncate) {
+            node->truncate(node, 0);
+        } else {
+            node->length = 0;
+        }
+    }
+
     open_fs(node, read_mode, write_mode);
     current->fd_table[fd].node = node;
-    current->fd_table[fd].offset = 0;
+    current->fd_table[fd].offset = (flags & O_APPEND) ? node->length : 0;
     current->fd_table[fd].flags = flags;
     strlcpy(current->fd_table[fd].path, kpath, sizeof(current->fd_table[fd].path));
     kfree(kpath);
@@ -790,6 +988,51 @@ static int64_t sys_unlinkat(int dirfd, const char* path, int flags) {
 
 static int64_t sys_unlink(const char* path) {
     return sys_unlinkat(AT_FDCWD, path, 0);
+}
+
+static int64_t sys_chmod(const char* path, int mode) {
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+
+    int res = resolve_path(AT_FDCWD, path, kpath, 256);
+    if (res < 0) {
+        kfree(kpath);
+        return res;
+    }
+
+    fs_node_t* node = vfs_lookup(fs_root, kpath);
+    kfree(kpath);
+    if (!node) return -ENOENT;
+
+    task_t* current = task_get_current();
+    if (current && current->uid != 0 && current->uid != node->uid) {
+        if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+            if (node->close) node->close(node);
+            kfree(node);
+        }
+        return -EPERM;
+    }
+
+    node->mask = (uint32_t)(mode & 07777);
+
+    if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+        if (node->close) node->close(node);
+        kfree(node);
+    }
+    return 0;
+}
+
+static int64_t sys_fchmod(int fd, int mode) {
+    task_t* current = task_get_current();
+    if (!current) return -ESRCH;
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if (current->uid != 0 && current->uid != node->uid) return -EPERM;
+
+    node->mask = (uint32_t)(mode & 07777);
+    return 0;
 }
 
 static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
@@ -1041,6 +1284,25 @@ typedef struct {
     size_t ss_size;
 } stack_t;
 
+#ifndef SA_ONSTACK
+#define SA_ONSTACK  0x08000000
+#endif
+#ifndef SA_NODEFER
+#define SA_NODEFER  0x40000000
+#endif
+#ifndef SA_RESETHAND
+#define SA_RESETHAND 0x80000000
+#endif
+
+#ifndef SS_ONSTACK
+#define SS_ONSTACK  1
+#define SS_DISABLE  2
+#endif
+
+#ifndef MINSIGSTKSZ
+#define MINSIGSTKSZ 2048
+#endif
+
 struct robust_list_head {
     void* list;
     long futex_offset;
@@ -1051,6 +1313,31 @@ static int64_t sys_set_robust_list(struct robust_list_head* head, size_t len) {
     if (len != sizeof(struct robust_list_head)) return -EINVAL;
     if (head && !vmm_verify_user_access(head, sizeof(struct robust_list_head), 0)) return -EFAULT;
     /* Basic stub - robust futex list is not fully managed yet */
+    return 0;
+}
+
+static int64_t sys_sysinfo(struct sysinfo* info) {
+    if (!vmm_verify_user_access(info, sizeof(struct sysinfo), 1)) return -EFAULT;
+
+    memset(info, 0, sizeof(struct sysinfo));
+    info->uptime = timer_get_uptime_seconds();
+
+    uint64_t total_ram = pmm_get_total_ram();
+    uint64_t free_ram = pmm_get_free_ram();
+    uint64_t used_ram = pmm_get_used_ram();
+    (void)used_ram; /* Unused but valid stat */
+
+    info->totalram = total_ram;
+    info->freeram = free_ram;
+    info->sharedram = 0; /* Not implemented */
+    info->bufferram = 0; /* Not implemented */
+    info->totalswap = 0; /* No swap support yet */
+    info->freeswap = 0;
+    info->procs = task_get_count();
+    info->totalhigh = 0;
+    info->freehigh = 0;
+    info->mem_unit = 1; /* Reported in bytes */
+
     return 0;
 }
 
@@ -1077,14 +1364,35 @@ static int64_t sys_prlimit64(int pid, int resource, const struct rlimit* new_lim
 }
 
 static int64_t sys_sigaltstack(const stack_t* ss, stack_t* old_ss) {
+    task_t* current = task_get_current();
     if (old_ss) {
         if (!vmm_verify_user_access(old_ss, sizeof(stack_t), 1)) return -EFAULT;
-        memset(old_ss, 0, sizeof(stack_t));
+        old_ss->ss_sp = (void*)current->sigaltstack_sp;
+        old_ss->ss_size = current->sigaltstack_size;
+        old_ss->ss_flags = 0;
+        if (current->sigaltstack_flags & SS_DISABLE) old_ss->ss_flags |= SS_DISABLE;
+        if (current->sigaltstack_flags & SS_ONSTACK) old_ss->ss_flags |= SS_ONSTACK;
     }
     if (ss) {
+        stack_t kss;
         if (!vmm_verify_user_access(ss, sizeof(stack_t), 0)) return -EFAULT;
+        memcpy(&kss, ss, sizeof(stack_t));
+        if (kss.ss_flags & ~(SS_DISABLE)) return -EINVAL;
+        if (current->sigaltstack_flags & SS_ONSTACK) return -EPERM;
+
+        if (kss.ss_flags & SS_DISABLE) {
+            current->sigaltstack_sp = 0;
+            current->sigaltstack_size = 0;
+            current->sigaltstack_flags = SS_DISABLE;
+        } else {
+            if (!kss.ss_sp || kss.ss_size < MINSIGSTKSZ) return -ENOMEM;
+            if (!vmm_verify_user_access(kss.ss_sp, kss.ss_size, 1)) return -EFAULT;
+            current->sigaltstack_sp = (uint64_t)kss.ss_sp;
+            current->sigaltstack_size = kss.ss_size;
+            current->sigaltstack_flags = 0;
+        }
     }
-    return 0; /* Stub */
+    return 0;
 }
 
 static int64_t sys_tgkill(int tgid, int tid, int sig) {
@@ -1094,6 +1402,55 @@ static int64_t sys_tgkill(int tgid, int tid, int sig) {
 }
 
 static int64_t sys_getpid(void) { return task_get_current()->tgid; }
+
+static int64_t sys_getpgrp(void) {
+    task_t* current = task_get_current();
+    if (!current) return -ESRCH;
+    return current->pgid;
+}
+
+static int64_t sys_setsid(void) {
+    task_t* current = task_get_current();
+    if (!current) return -ESRCH;
+
+    /* Process group leaders cannot create a new session. */
+    if (current->id == current->pgid) return -EPERM;
+
+    current->sid = current->id;
+    current->pgid = current->id;
+    return current->sid;
+}
+
+static int64_t sys_setpgid(int pid, int pgid) {
+    task_t* current = task_get_current();
+    task_t* target = NULL;
+
+    if (!current) return -ESRCH;
+    if (pid < 0 || pgid < 0) return -EINVAL;
+
+    if (pid == 0 || pid == (int)current->id || pid == (int)current->tgid) {
+        target = current;
+    } else {
+        target = task_get_by_id((uint32_t)pid);
+    }
+
+    if (!target || target->state == TASK_DEAD) return -ESRCH;
+
+    /* Minimal permission/session checks for job-control bootstrap. */
+    if (target != current && target->parent_id != current->id) return -ESRCH;
+    if (target->sid != current->sid) return -EPERM;
+
+    if (pgid == 0) pgid = (int)target->id;
+
+    for (int i = 0; i < task_get_count(); i++) {
+        task_t* t = task_get_at(i);
+        if (!t || t->state == TASK_DEAD) continue;
+        if (t->tgid == target->tgid) {
+            t->pgid = (uint32_t)pgid;
+        }
+    }
+    return 0;
+}
 
 static int64_t sys_kill(int pid, int sig) {
     if (pid <= 0) return -EINVAL;
@@ -1117,8 +1474,17 @@ static int64_t sys_kill(int pid, int sig) {
         return -ESRCH;
     }
 
-    target->signal_pending |= (1u << sig);
-    if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING) task_wakeup(target);
+    if (sig > 0) {
+        target->signal_pending |= (1u << (sig - 1));
+    }
+    if (sig == SIGCONT && target->state == TASK_STOPPED) {
+        target->wait_status = 0xFFFF;
+        target->wait_code = CLD_CONTINUED;
+        target->wait_pending = 1;
+        task_t* parent = task_get_by_id(target->parent_id);
+        if (parent) task_wakeup(parent);
+    }
+    if (target->state == TASK_BLOCKED || target->state == TASK_SLEEPING || target->state == TASK_STOPPED) task_wakeup(target);
     return 0;
 }
 
@@ -1175,15 +1541,19 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
         if (!vmm_verify_user_access(arg, sizeof(struct winsize), 1)) return -EFAULT;
     } else if (request == TIOCSWINSZ) {
         if (!vmm_verify_user_access(arg, sizeof(struct winsize), 0)) return -EFAULT;
+    } else if (request == TIOCGPGRP || request == TIOCGPTN || request == FIONREAD) {
+        if (!vmm_verify_user_access(arg, sizeof(int), 1)) return -EFAULT;
+    } else if (request == TIOCSPGRP || request == TIOCSPTLCK || request == FIONBIO) {
+        if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
+    } else if (request == TIOCSCTTY) {
+        /* Accept null arg or int* arg; userspace commonly passes (void*)1 in Linux. */
+        if (arg != NULL && !vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
     } else if (request == FIONBIO) {
         if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
-        } else if (request == 0x8912) { /* SIOCGIFCONF */
+    } else if (request == 0x8912) { /* SIOCGIFCONF */
         if (!vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
         return -ENOSYS; // Network stack stubbed
-    } else if (request == FIONREAD) {
-        if (!vmm_verify_user_access(arg, sizeof(int), 1)) return -EFAULT;
-        // FIONREAD handled by ioctl_fs later
-} else if (request == 0x4600) { /* FBIOGET_VSCREENINFO */
+    } else if (request == 0x4600) { /* FBIOGET_VSCREENINFO */
         if (!vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
     }
 
@@ -1247,38 +1617,85 @@ static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
     return total;
 }
 
+static void fill_linux_stat_from_node(const fs_node_t* node, struct linux_stat* st) {
+    uint32_t type = node->flags & 0x7;
+    uint32_t mode_bits = node->mask & 07777;
+
+    memset(st, 0, sizeof(struct linux_stat));
+    st->st_ino = node->inode;
+    st->st_size = node->length;
+    st->st_uid = node->uid;
+    st->st_gid = node->gid;
+    st->st_blksize = 4096;
+    st->st_blocks = (node->length + 511) / 512;
+    st->st_atime = node->atime;
+    st->st_mtime = node->mtime;
+    st->st_ctime = node->ctime;
+
+    switch (type) {
+        case FS_DIRECTORY: st->st_mode = 0040000 | mode_bits; break;
+        case FS_SYMLINK: st->st_mode = 0120000 | mode_bits; break;
+        case FS_CHARDEVICE: st->st_mode = 0020000 | mode_bits; break;
+        case FS_BLOCKDEVICE: st->st_mode = 0060000 | mode_bits; break;
+        case FS_SOCKET: st->st_mode = 0140000 | mode_bits; break;
+        case FS_PIPE: st->st_mode = 0010000 | mode_bits; break;
+        case FS_FILE:
+        default: st->st_mode = 0100000 | mode_bits; break;
+    }
+}
+
 static int64_t sys_fstat(int fd, struct linux_stat* buf) {
     if (!vmm_verify_user_access(buf, sizeof(struct linux_stat), 1)) return -EFAULT;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    memset(buf, 0, sizeof(struct linux_stat));
-    buf->st_ino = node->inode; buf->st_size = node->length; buf->st_mode = 0100644;
-    buf->st_blksize = 4096; buf->st_blocks = (node->length + 511) / 512;
-    if ((node->flags & 0x7) == FS_DIRECTORY) buf->st_mode = 0040755;
+    fill_linux_stat_from_node(current->fd_table[fd].node, buf);
     return 0;
 }
 
 static int64_t sys_newfstatat(int dirfd, const char* path, struct linux_stat* buf, int flags) {
-    (void)flags;
-    char* kpath = (char*)kmalloc(256);
-    if (!kpath) return -ENOMEM;
-    int res = resolve_path(dirfd, path, kpath, 256);
-    if (res < 0) { kfree(kpath); return res; }
+    const int allowed_flags = AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH;
+    fs_node_t* node = NULL;
+    char* kpath;
+    char user_path[256];
 
-    if (!vmm_verify_user_access(buf, sizeof(struct linux_stat), 1)) { kfree(kpath); return -EFAULT; }
-    fs_node_t* node = vfs_lookup(fs_root, kpath);
-    if (!node) { kfree(kpath); return -ENOENT; }
-    memset(buf, 0, sizeof(struct linux_stat));
-    buf->st_ino = node->inode; buf->st_size = node->length; buf->st_mode = 0100644;
-    buf->st_blksize = 4096; buf->st_blocks = (node->length + 511) / 512;
-    if ((node->flags & 0x7) == FS_DIRECTORY) buf->st_mode = 0040755;
+    if ((flags & ~allowed_flags) != 0) return -EINVAL;
+    if (!vmm_verify_user_access(buf, sizeof(struct linux_stat), 1)) return -EFAULT;
+    if (!path) return -EFAULT;
+
+    if (vmm_strncpy_from_user(user_path, path, sizeof(user_path)) < 0) return -EFAULT;
+
+    if (user_path[0] == '\0') {
+        task_t* current;
+        if (!(flags & AT_EMPTY_PATH)) return -ENOENT;
+        current = task_get_current();
+        if (dirfd == AT_FDCWD) {
+            node = vfs_lookup(fs_root, current->cwd);
+        } else {
+            if (dirfd < 0 || dirfd >= MAX_FD || !current->fd_table[dirfd].node) return -EBADF;
+            node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+            if (!node) return -ENOMEM;
+            memcpy(node, current->fd_table[dirfd].node, sizeof(fs_node_t));
+            node->ref_count = 1;
+            node->lock = 0;
+        }
+    } else {
+        kpath = (char*)kmalloc(256);
+        if (!kpath) return -ENOMEM;
+        {
+            int r = resolve_path(dirfd, path, kpath, 256);
+            if (r < 0) { kfree(kpath); return r; }
+        }
+        node = vfs_lookup_ext(fs_root, kpath, (flags & AT_SYMLINK_NOFOLLOW) ? 0 : 1);
+        kfree(kpath);
+    }
+
+    if (!node) return -ENOENT;
+    fill_linux_stat_from_node(node, buf);
     if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
         if (node->close) node->close(node);
         kfree(node);
     }
-    kfree(kpath);
     return 0;
 }
 
@@ -1400,14 +1817,14 @@ static int64_t sys_rt_sigaction(int sig, const struct kernel_sigaction* act,
         oldact->handler = current->signal_handlers[sig];
         oldact->flags = current->signal_flags[sig];
         oldact->restorer = current->signal_restorers[sig];
-        oldact->mask = current->signal_mask;
+        oldact->mask = current->signal_action_masks[sig];
     }
     if (act) {
         if (!vmm_verify_user_access(act, sizeof(struct kernel_sigaction), 0)) return -EFAULT;
         current->signal_handlers[sig] = act->handler;
         current->signal_flags[sig] = act->flags;
-        /* The signal_mask will temporarily add act->mask when handler runs, but we only have a global mask currently.
-           For Tier 1, preserving/setting properties is sufficient. */
+        current->signal_action_masks[sig] = act->mask;
+        current->signal_action_masks[sig] &= ~((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)));
         /* Store restorer if provided */
         if (act->flags & SA_RESTORER) {
              current->signal_restorers[sig] = act->restorer;
@@ -1435,9 +1852,45 @@ static int64_t sys_rt_sigprocmask(int how, const uint64_t* set, uint64_t* oldset
         else if (how == SIG_UNBLOCK) current->signal_mask &= ~(uint32_t)*set;
         else if (how == SIG_SETMASK) current->signal_mask = (uint32_t)*set;
         else return -EINVAL;
-        current->signal_mask &= ~((1u << SIGKILL) | (1u << SIGSTOP));
+        current->signal_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
     }
     return 0;
+}
+
+static int64_t sys_rt_sigpending(uint64_t* set, size_t sigsetsize) {
+    task_t* current = task_get_current();
+    if (!current) return -ESRCH;
+    if (sigsetsize != 8) return -EINVAL;
+    if (!set) return -EFAULT;
+    if (!vmm_verify_user_access(set, sizeof(uint64_t), 1)) return -EFAULT;
+
+    *set = (uint64_t)current->signal_pending;
+    return 0;
+}
+
+static int64_t sys_rt_sigsuspend(const uint64_t* mask, size_t sigsetsize) {
+    task_t* current = task_get_current();
+    uint32_t old_mask;
+    uint64_t new_mask_u64;
+
+    if (!current) return -ESRCH;
+    if (sigsetsize != 8) return -EINVAL;
+    if (!mask) return -EFAULT;
+    if (!vmm_verify_user_access(mask, sizeof(uint64_t), 0)) return -EFAULT;
+
+    new_mask_u64 = *mask;
+    old_mask = current->signal_mask;
+
+    current->signal_mask = (uint32_t)new_mask_u64;
+    current->signal_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
+
+    for (;;) {
+        if (current->signal_pending & ~current->signal_mask) {
+            current->signal_mask = old_mask;
+            return -EINTR;
+        }
+        task_yield();
+    }
 }
 
 /* ========================================================================= */
@@ -1470,14 +1923,33 @@ struct sigframe {
     struct syscall_regs regs;
     uint64_t user_rsp;
     uint32_t sigmask;
+    uint32_t ss_flags_prev;
 };
 
-static void setup_sigcontext(struct syscall_regs* regs, int sig, void* restorer) {
+static void setup_sigcontext(struct syscall_regs* regs,
+                             int sig,
+                             void (*handler)(int),
+                             uint32_t sa_flags,
+                             uint64_t sa_mask,
+                             void* restorer) {
     task_t* current = task_get_current();
+    int use_altstack = 0;
+    uint64_t frame_rsp;
+    uint64_t sp;
+
+    frame_rsp = current->user_rsp;
+    if ((sa_flags & SA_ONSTACK) &&
+        !(current->sigaltstack_flags & SS_DISABLE) &&
+        !(current->sigaltstack_flags & SS_ONSTACK) &&
+        current->sigaltstack_sp != 0 &&
+        current->sigaltstack_size >= MINSIGSTKSZ) {
+        frame_rsp = current->sigaltstack_sp + current->sigaltstack_size;
+        use_altstack = 1;
+    }
 
     /* Align stack to 16 bytes (System V ABI) */
     /* We subtract frame size and 128 bytes red zone */
-    uint64_t sp = current->user_rsp - 128;
+    sp = frame_rsp - 128;
     sp = (sp - sizeof(struct sigframe)) & ~0xF;
 
     /* Verify write access */
@@ -1493,8 +1965,9 @@ static void setup_sigcontext(struct syscall_regs* regs, int sig, void* restorer)
     frame.regs = *regs;
     frame.user_rsp = current->user_rsp;
     frame.sigmask = current->signal_mask;
+    frame.ss_flags_prev = current->sigaltstack_flags;
 
-    if (current->signal_flags[sig] & SA_SIGINFO) {
+    if (sa_flags & SA_SIGINFO) {
         frame.info.si_signo = sig;
         frame.uc.uc_mcontext = *regs;
         frame.uc.uc_sigmask = current->signal_mask;
@@ -1505,16 +1978,26 @@ static void setup_sigcontext(struct syscall_regs* regs, int sig, void* restorer)
 
     /* Update Registers for Handler */
     regs->rdi = sig; /* Arg 1 */
-    if (current->signal_flags[sig] & SA_SIGINFO) {
+    if (sa_flags & SA_SIGINFO) {
         regs->rsi = sp + offsetof(struct sigframe, info); /* Arg 2 */
         regs->rdx = sp + offsetof(struct sigframe, uc);   /* Arg 3 */
     } else {
         regs->rsi = 0;
         regs->rdx = 0;
     }
-    regs->rcx = (uint64_t)current->signal_handlers[sig]; /* RIP (handler) */
+    regs->rcx = (uint64_t)handler; /* RIP (handler) */
+
+    /* POSIX: apply handler mask and (unless SA_NODEFER) block current signal. */
+    uint32_t block_mask = (uint32_t)sa_mask;
+    if (!(sa_flags & SA_NODEFER)) {
+        block_mask |= (1u << (sig - 1));
+    }
+    block_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
+    current->signal_mask |= block_mask;
+
     /* Update RSP to point to frame.restorer */
     current->user_rsp = sp;
+    if (use_altstack) current->sigaltstack_flags |= SS_ONSTACK;
 
     /* Update scratch for syscall_entry exit logic */
     cpu_info_t* cpu = get_current_cpu();
@@ -1540,6 +2023,8 @@ static void sys_rt_sigreturn(struct syscall_regs* regs) {
 
     /* Restore Signal Mask */
     current->signal_mask = frame->sigmask;
+    if (frame->ss_flags_prev & SS_ONSTACK) current->sigaltstack_flags |= SS_ONSTACK;
+    else current->sigaltstack_flags &= ~SS_ONSTACK;
 
     /* Restore User RSP */
     current->user_rsp = frame->user_rsp;
@@ -1554,22 +2039,46 @@ static void handle_signal(struct syscall_regs* regs) {
 
     /* Find lowest pending signal */
     for (int sig = 1; sig < 32; sig++) {
-        if ((current->signal_pending & (1u << sig)) && !(current->signal_mask & (1u << sig))) {
+        uint32_t bit = (1u << (sig - 1));
+        if ((current->signal_pending & bit) && !(current->signal_mask & bit)) {
             /* Clear pending */
-            current->signal_pending &= ~(1u << sig);
+            current->signal_pending &= ~bit;
 
             void (*handler)(int) = current->signal_handlers[sig];
+            uint32_t sa_flags = current->signal_flags[sig];
+            void* restorer = current->signal_restorers[sig];
+            uint64_t sa_mask = current->signal_action_masks[sig];
 
             if (handler == SIG_IGN) {
                 continue;
             }
             if (handler == SIG_DFL) {
+                if (sig == SIGCHLD || sig == SIGCONT || sig == SIGURG || sig == SIGWINCH) {
+                    continue;
+                }
+                if (sig == SIGSTOP || sig == SIGTSTP || sig == SIGTTIN || sig == SIGTTOU) {
+                    current->wait_status = ((sig & 0xFF) << 8) | 0x7F;
+                    current->wait_code = CLD_STOPPED;
+                    current->wait_pending = 1;
+                    current->state = TASK_STOPPED;
+                    task_t* parent = task_get_by_id(current->parent_id);
+                    if (parent) task_wakeup(parent);
+                    schedule();
+                    return;
+                }
                 serial_write_string("[SIGNAL] Terminating process due to signal\n");
-                task_exit(128 + sig);
+                task_exit_signal(sig);
                 return;
             }
 
-            setup_sigcontext(regs, sig, current->signal_restorers[sig]);
+            if (sa_flags & SA_RESETHAND) {
+                current->signal_handlers[sig] = SIG_DFL;
+                current->signal_flags[sig] = 0;
+                current->signal_restorers[sig] = NULL;
+                current->signal_action_masks[sig] = 0;
+            }
+
+            setup_sigcontext(regs, sig, handler, sa_flags, sa_mask, restorer);
             return;
         }
     }
@@ -1784,11 +2293,74 @@ static int64_t sys_pselect6(int nfds, void* readfds, void* writefds, void* excep
     return sys_select(nfds, readfds, writefds, exceptfds, (struct timespec*)timeout);
 }
 
+typedef struct {
+    int used;
+    int fd;
+    uint32_t events;
+    uint64_t data;
+} epoll_watch_t;
+
+#define EPOLL_MAX_WATCHES MAX_FD
+typedef struct {
+    spinlock_t lock;
+    int watch_count;
+    epoll_watch_t watch[EPOLL_MAX_WATCHES];
+} epoll_instance_t;
+
+#define EPOLLIN   0x001
+#define EPOLLPRI  0x002
+#define EPOLLOUT  0x004
+#define EPOLLERR  0x008
+#define EPOLLHUP  0x010
+#define EPOLLNVAL 0x020
+
+#define EPOLL_CTL_ADD 1
+#define EPOLL_CTL_DEL 2
+#define EPOLL_CTL_MOD 3
+
+static uint32_t epoll_compute_revents(task_t* current, int fd, uint32_t wanted_events) {
+    fs_node_t* node;
+    uint32_t revents = 0;
+
+    if (fd < 0 || fd >= MAX_FD || !current->fd_table[fd].node) {
+        return EPOLLERR | EPOLLHUP;
+    }
+    node = current->fd_table[fd].node;
+
+    if (wanted_events & (EPOLLIN | EPOLLPRI)) {
+        int bytes = 0;
+        if ((node->flags & 0x7) == FS_FILE || (node->flags & 0x7) == FS_DIRECTORY) {
+            revents |= EPOLLIN;
+        } else if (node->ioctl && node->ioctl(node, FIONREAD, &bytes) == 0 && bytes > 0) {
+            revents |= EPOLLIN;
+        }
+    }
+
+    if (wanted_events & EPOLLOUT) {
+        if ((node->flags & 0x7) == FS_FILE ||
+            (node->flags & 0x7) == FS_DIRECTORY ||
+            (node->flags & 0x7) == FS_PIPE) {
+            revents |= EPOLLOUT;
+        }
+    }
+
+    return revents;
+}
+
+static void epoll_close_fs(fs_node_t* node) {
+    if (node && node->ptr) {
+        kfree(node->ptr);
+        node->ptr = NULL;
+    }
+}
+
 static int64_t sys_epoll_create1(int flags) {
-    (void)flags;
-    /* Return a fake FD for now to bypass some musl initializations */
+    epoll_instance_t* inst;
     task_t* current = task_get_current();
     int fd = -1;
+
+    if (flags & ~O_CLOEXEC) return -EINVAL;
+
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
             fd = i;
@@ -1797,58 +2369,128 @@ static int64_t sys_epoll_create1(int flags) {
     }
     if (fd == -1) return -EMFILE;
 
-    fs_node_t* fake_epoll = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    if (!fake_epoll) return -ENOMEM;
-    memset(fake_epoll, 0, sizeof(fs_node_t));
-    fake_epoll->ref_count = 1;
-    strlcpy(fake_epoll->name, "anon_inode:[eventpoll]", 32);
+    inst = (epoll_instance_t*)kmalloc(sizeof(epoll_instance_t));
+    if (!inst) return -ENOMEM;
+    memset(inst, 0, sizeof(epoll_instance_t));
 
-    current->fd_table[fd].node = fake_epoll;
+    fs_node_t* epnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!epnode) { kfree(inst); return -ENOMEM; }
+    memset(epnode, 0, sizeof(fs_node_t));
+    epnode->ref_count = 1;
+    epnode->flags = FS_FILE;
+    epnode->ptr = (struct fs_node*)inst;
+    epnode->close = epoll_close_fs;
+    strlcpy(epnode->name, "anon_inode:[eventpoll]", 32);
+
+    current->fd_table[fd].node = epnode;
     current->fd_table[fd].offset = 0;
-    current->fd_table[fd].flags = 0;
+    current->fd_table[fd].flags = flags;
 
     return fd;
 }
 
-#pragma pack(push, 1)
 struct epoll_event {
     uint32_t events;
     uint64_t data;
 };
-#pragma pack(pop)
 
 static int64_t sys_epoll_ctl(int epfd, int op __attribute__((unused)), int fd, struct epoll_event* event) {
+    epoll_instance_t* inst;
+    int found = -1;
     task_t* current = task_get_current();
     if (epfd < 0 || epfd >= MAX_FD || fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[epfd].node || !current->fd_table[fd].node) return -EBADF;
+    if (epfd == fd) return -EINVAL;
+    inst = (epoll_instance_t*)current->fd_table[epfd].node->ptr;
+    if (!inst) return -EINVAL;
 
+    if ((op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD) && !event) return -EFAULT;
     if (event) {
         if (!vmm_verify_user_access(event, sizeof(struct epoll_event), 0)) return -EFAULT;
     }
 
-    /* We stub it out since there's no actual event polling yet, but basic validation helps apps proceed */
-    return 0;
+    spin_lock(&inst->lock);
+    for (int i = 0; i < EPOLL_MAX_WATCHES; i++) {
+        if (inst->watch[i].used && inst->watch[i].fd == fd) {
+            found = i;
+            break;
+        }
+    }
+
+    if (op == EPOLL_CTL_ADD) {
+        if (found >= 0) { spin_unlock(&inst->lock); return -EEXIST; }
+        for (int i = 0; i < EPOLL_MAX_WATCHES; i++) {
+            if (!inst->watch[i].used) {
+                inst->watch[i].used = 1;
+                inst->watch[i].fd = fd;
+                inst->watch[i].events = event->events;
+                inst->watch[i].data = event->data;
+                inst->watch_count++;
+                spin_unlock(&inst->lock);
+                return 0;
+            }
+        }
+        spin_unlock(&inst->lock);
+        return -ENOSPC;
+    }
+
+    if (op == EPOLL_CTL_MOD) {
+        if (found < 0) { spin_unlock(&inst->lock); return -ENOENT; }
+        inst->watch[found].events = event->events;
+        inst->watch[found].data = event->data;
+        spin_unlock(&inst->lock);
+        return 0;
+    }
+
+    if (op == EPOLL_CTL_DEL) {
+        if (found < 0) { spin_unlock(&inst->lock); return -ENOENT; }
+        inst->watch[found].used = 0;
+        inst->watch_count--;
+        spin_unlock(&inst->lock);
+        return 0;
+    }
+
+    spin_unlock(&inst->lock);
+    return -EINVAL;
 }
 
 static int64_t sys_epoll_wait(int epfd, struct epoll_event* events, int maxevents, int timeout) {
+    epoll_instance_t* inst;
     task_t* current = task_get_current();
+    uint64_t start_ms;
+
     if (epfd < 0 || epfd >= MAX_FD || !current->fd_table[epfd].node) return -EBADF;
     if (maxevents <= 0) return -EINVAL;
-    if (events && !vmm_verify_user_access(events, maxevents * sizeof(struct epoll_event), 1)) return -EFAULT;
+    if (!events || !vmm_verify_user_access(events, maxevents * sizeof(struct epoll_event), 1)) return -EFAULT;
 
-    if (timeout > 0) {
-        task_sleep(timeout);
-    } else if (timeout < 0) {
-        /* A negative timeout means block indefinitely until an event happens.
-           Since epoll isn't fully event-driven at VFS yet, we sleep for a bit
-           before returning 0 to prevent 100% CPU lockup loops in userspace daemons. */
-        task_sleep(500); // Wait 500ms instead of 0s
+    inst = (epoll_instance_t*)current->fd_table[epfd].node->ptr;
+    if (!inst) return -EINVAL;
+
+    start_ms = (timer_get_uptime_seconds() * 1000ULL) + timer_get_ticks();
+
+    while (1) {
+        int emitted = 0;
+        spin_lock(&inst->lock);
+        for (int i = 0; i < EPOLL_MAX_WATCHES && emitted < maxevents; i++) {
+            uint32_t revents;
+            if (!inst->watch[i].used) continue;
+            revents = epoll_compute_revents(current, inst->watch[i].fd, inst->watch[i].events);
+            revents &= (inst->watch[i].events | EPOLLERR | EPOLLHUP | EPOLLNVAL);
+            if (revents == 0) continue;
+            events[emitted].events = revents;
+            events[emitted].data = inst->watch[i].data;
+            emitted++;
+        }
+        spin_unlock(&inst->lock);
+
+        if (emitted > 0) return emitted;
+        if (timeout == 0) return 0;
+        if (timeout > 0) {
+            uint64_t now_ms = (timer_get_uptime_seconds() * 1000ULL) + timer_get_ticks();
+            if (now_ms - start_ms >= (uint64_t)timeout) return 0;
+        }
+        task_sleep(10);
     }
-
-    /* We don't have events since epoll isn't fully implemented in the fs layer yet.
-       Returning 0 prevents applications like nginx/apache from immediately crashing,
-       allowing them to gracefully retry or switch modes. */
-    return 0;
 }
 
 static int64_t sys_eventfd2(unsigned int initval, int flags) {
@@ -1877,11 +2519,21 @@ static int64_t sys_eventfd2(unsigned int initval, int flags) {
 }
 
 static int64_t sys_clock_gettime(int clock_id, struct timespec* tp) {
-    (void)clock_id;
     if (!vmm_verify_user_access(tp, sizeof(struct timespec), 1)) return -EFAULT;
-    uint32_t uptime = timer_get_uptime_seconds();
-    tp->tv_sec = uptime;
-    tp->tv_nsec = (timer_get_ticks() % 100) * 10000000;
+    if (clock_id != CLOCK_REALTIME &&
+        clock_id != CLOCK_MONOTONIC &&
+        clock_id != CLOCK_PROCESS_CPUTIME_ID &&
+        clock_id != CLOCK_THREAD_CPUTIME_ID) {
+        return -EINVAL;
+    }
+
+    {
+        uint64_t ticks = timer_get_ticks();
+        uint64_t sec = timer_get_uptime_seconds();
+        const uint64_t hz = 100; /* PIT configured to 100Hz */
+        tp->tv_sec = sec;
+        tp->tv_nsec = (ticks % hz) * (1000000000ULL / hz);
+    }
     return 0;
 }
 
@@ -1910,7 +2562,12 @@ static int64_t sys_getrandom(void* buf, size_t buflen, unsigned int flags) {
     return buflen;
 }
 
-static int64_t sys_getppid(void) { return 1; }
+static int64_t sys_getppid(void) {
+    task_t* current = task_get_current();
+    if (!current) return 1;
+    if (current->parent_id == 0) return 1;
+    return current->parent_id;
+}
 static int64_t sys_gettid(void) { return task_get_current()->id; }
 static int64_t sys_set_tid_address(int* tidptr) {
     task_t* current = task_get_current();
@@ -1948,7 +2605,9 @@ static int64_t sys_munmap(void* addr, size_t len) {
     return 0;
 }
 static int64_t sys_mprotect(void* addr, size_t len, int prot) {
+    const int prot_mask = PROT_READ | PROT_WRITE | PROT_EXEC | PROT_NONE;
     if ((uint64_t)addr % PAGE_SIZE != 0) return -EINVAL;
+    if (prot & ~prot_mask) return -EINVAL;
     if (len == 0) return 0;
 
     uint64_t start = (uint64_t)addr;
@@ -1968,12 +2627,71 @@ static int64_t sys_mprotect(void* addr, size_t len, int prot) {
             /* Keep existing physical mapping, update flags */
             vmm_map_page(phys, v, new_flags);
         } else {
-            return -ENOMEM; // Page not mapped
+            return -ENOMEM;
         }
     }
 
     return 0;
 }
+
+#define MREMAP_MAYMOVE 1
+#define MREMAP_FIXED   2
+
+static int64_t sys_mremap(void* old_addr, size_t old_size, size_t new_size, int flags, void* new_addr) {
+    uint64_t old_start = (uint64_t)old_addr;
+    uint64_t old_len = PAGE_ALIGN_UP(old_size);
+    uint64_t new_len = PAGE_ALIGN_UP(new_size);
+    uint64_t old_end;
+
+    if (old_start % PAGE_SIZE != 0) return -EINVAL;
+    if (old_size == 0 || new_size == 0) return -EINVAL;
+    if ((flags & MREMAP_FIXED) && !(flags & MREMAP_MAYMOVE)) return -EINVAL;
+    if ((flags & ~(MREMAP_MAYMOVE | MREMAP_FIXED)) != 0) return -EINVAL;
+
+    old_end = old_start + old_len;
+    if (old_end < old_start) return -EINVAL;
+
+    if (new_len == old_len) return (int64_t)old_start;
+
+    if (new_len < old_len) {
+        return (sys_munmap((void*)(old_start + new_len), old_len - new_len) < 0) ? -ENOMEM : (int64_t)old_start;
+    }
+
+    /* Try in-place expansion first when possible */
+    if (!(flags & MREMAP_MAYMOVE)) {
+        for (uint64_t v = old_end; v < old_start + new_len; v += PAGE_SIZE) {
+            if (hal_mem_get_phys(v) != 0) return -ENOMEM;
+        }
+        for (uint64_t v = old_end; v < old_start + new_len; v += PAGE_SIZE) {
+            void* phys = pmm_alloc_page();
+            if (!phys) return -ENOMEM;
+            hal_mem_map((uint64_t)phys, v, HAL_MEM_USER | HAL_MEM_READ | HAL_MEM_WRITE);
+            memset((void*)v, 0, PAGE_SIZE);
+        }
+        return (int64_t)old_start;
+    }
+
+    {
+        uint64_t new_start;
+        int64_t mapped;
+
+        if (flags & MREMAP_FIXED) {
+            if ((uint64_t)new_addr % PAGE_SIZE != 0) return -EINVAL;
+            if ((uint64_t)new_addr < USER_BASE || (uint64_t)new_addr + new_len > USER_LIMIT + 1) return -EINVAL;
+            if (sys_munmap(new_addr, new_len) < 0) return -EINVAL;
+            mapped = sys_mmap(new_addr, new_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+        } else {
+            mapped = sys_mmap(NULL, new_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        }
+        if (mapped < 0) return mapped;
+        new_start = (uint64_t)mapped;
+
+        memcpy((void*)new_start, (void*)old_start, (old_len < new_len) ? old_len : new_len);
+        sys_munmap((void*)old_start, old_len);
+        return (int64_t)new_start;
+    }
+}
+
 static int64_t sys_madvise(void* addr, size_t len, int advice) { (void)addr; (void)len; (void)advice; return 0; }
 static int64_t sys_getuid(void)  { return task_get_current()->uid; }
 static int64_t sys_getgid(void)  { return task_get_current()->gid; }
@@ -2287,6 +3005,46 @@ static int64_t sys_wait4(int pid, int* status, int options, void* rusage) {
     return task_waitpid(pid, status, options);
 }
 
+struct kernel_wait_siginfo {
+    int si_signo;
+    int si_errno;
+    int si_code;
+    int si_pid;
+    int si_uid;
+    int si_status;
+};
+
+static int64_t sys_waitid(int idtype, int id, struct kernel_wait_siginfo* infop, int options, void* rusage) {
+    int pid = 0;
+    int st = 0;
+    int code = 0;
+    int ret;
+
+    if (infop && !vmm_verify_user_access(infop, sizeof(struct kernel_wait_siginfo), 1)) return -EFAULT;
+    if (rusage && !vmm_verify_user_access(rusage, 144, 1)) return -EFAULT;
+
+    ret = task_waitid(idtype, id, options, &pid, &st, &code);
+    if (ret < 0) return ret;
+
+    if (infop) {
+        int si_status = st;
+        if (code == CLD_EXITED || code == CLD_STOPPED) {
+            si_status = (st >> 8) & 0xFF;
+        } else if (code == CLD_CONTINUED) {
+            si_status = SIGCONT;
+        } else if (code == CLD_KILLED || code == CLD_DUMPED || code == CLD_TRAPPED) {
+            si_status = st & 0x7F;
+        }
+        infop->si_signo = SIGCHLD;
+        infop->si_errno = 0;
+        infop->si_code = (pid == 0) ? 0 : code;
+        infop->si_pid = pid;
+        infop->si_uid = 0;
+        infop->si_status = si_status;
+    }
+    return 0;
+}
+
 
 static int64_t sys_sched_yield_wrapper(void) {
     task_yield();
@@ -2335,6 +3093,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [21] = (syscall_ptr_t)sys_access,
     [22] = (syscall_ptr_t)sys_pipe,
     [23] = (syscall_ptr_t)sys_select,
+    [25] = (syscall_ptr_t)sys_mremap,
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
     [33] = (syscall_ptr_t)sys_dup2,
@@ -2360,6 +3119,9 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [72] = (syscall_ptr_t)sys_fcntl,
     [77] = (syscall_ptr_t)sys_ftruncate,
     [97] = (syscall_ptr_t)sys_getrlimit,
+    [99] = (syscall_ptr_t)sys_sysinfo,
+    [127] = (syscall_ptr_t)sys_rt_sigpending,
+    [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
     [79] = (syscall_ptr_t)sys_getcwd,
     [80] = (syscall_ptr_t)sys_chdir,
@@ -2371,7 +3133,10 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [104] = (syscall_ptr_t)sys_getgid,
     [107] = (syscall_ptr_t)sys_geteuid,
     [108] = (syscall_ptr_t)sys_getegid,
+    [109] = (syscall_ptr_t)sys_setpgid,
     [110] = (syscall_ptr_t)sys_getppid,
+    [111] = (syscall_ptr_t)sys_getpgrp,
+    [112] = (syscall_ptr_t)sys_setsid,
     [158] = (syscall_ptr_t)sys_arch_prctl,
     [186] = (syscall_ptr_t)sys_gettid,
     [202] = (syscall_ptr_t)sys_futex,
@@ -2383,6 +3148,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [232] = (syscall_ptr_t)sys_epoll_wait,
     [233] = (syscall_ptr_t)sys_epoll_ctl,
     [234] = (syscall_ptr_t)sys_tgkill,
+    [247] = (syscall_ptr_t)sys_waitid,
     [257] = (syscall_ptr_t)sys_openat,
     [258] = (syscall_ptr_t)sys_mkdirat,
     [262] = (syscall_ptr_t)sys_newfstatat,
@@ -2406,6 +3172,8 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [82] = (syscall_ptr_t)sys_rename,
     [88] = (syscall_ptr_t)sys_symlink,
     [89] = (syscall_ptr_t)sys_readlink,
+    [90] = (syscall_ptr_t)sys_chmod,
+    [91] = (syscall_ptr_t)sys_fchmod,
     [267] = (syscall_ptr_t)sys_readlinkat,
 };
 
@@ -2429,6 +3197,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [20] = (syscall_ptr_t)sys_writev,
     [21] = (syscall_ptr_t)sys_access,
     [22] = (syscall_ptr_t)sys_pipe,
+    [25] = (syscall_ptr_t)sys_mremap,
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
     [33] = (syscall_ptr_t)sys_dup2,
@@ -2464,7 +3233,12 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [104] = (syscall_ptr_t)sys_getgid,
     [107] = (syscall_ptr_t)sys_geteuid,
     [108] = (syscall_ptr_t)sys_getegid,
+    [109] = (syscall_ptr_t)sys_setpgid,
     [110] = (syscall_ptr_t)sys_getppid,
+    [111] = (syscall_ptr_t)sys_getpgrp,
+    [112] = (syscall_ptr_t)sys_setsid,
+    [127] = (syscall_ptr_t)sys_rt_sigpending,
+    [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
     [158] = (syscall_ptr_t)sys_arch_prctl,
     [186] = (syscall_ptr_t)sys_gettid,
@@ -2477,6 +3251,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [232] = (syscall_ptr_t)sys_epoll_wait,
     [233] = (syscall_ptr_t)sys_epoll_ctl,
     [234] = (syscall_ptr_t)sys_tgkill,
+    [247] = (syscall_ptr_t)sys_waitid,
     [257] = (syscall_ptr_t)sys_openat,
     [258] = (syscall_ptr_t)sys_mkdirat,
     [262] = (syscall_ptr_t)sys_newfstatat,
@@ -2500,6 +3275,8 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [82] = (syscall_ptr_t)sys_rename,
     [88] = (syscall_ptr_t)sys_symlink,
     [89] = (syscall_ptr_t)sys_readlink,
+    [90] = (syscall_ptr_t)sys_chmod,
+    [91] = (syscall_ptr_t)sys_fchmod,
     [267] = (syscall_ptr_t)sys_readlinkat,
 };
 
@@ -2520,6 +3297,8 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [45] = (syscall_ptr_t)sys_brk,
     [174] = (syscall_ptr_t)sys_rt_sigaction,
     [175] = (syscall_ptr_t)sys_rt_sigprocmask,
+    [176] = (syscall_ptr_t)sys_rt_sigpending,
+    [179] = (syscall_ptr_t)sys_rt_sigsuspend,
     [54] = (syscall_ptr_t)sys_ioctl,
     [145] = (syscall_ptr_t)sys_readv,
     [146] = (syscall_ptr_t)sys_writev,
@@ -2528,6 +3307,8 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [82] = (syscall_ptr_t)sys_select,
     [41] = (syscall_ptr_t)sys_dup,
     [63] = (syscall_ptr_t)sys_dup2,
+    [15] = (syscall_ptr_t)sys_chmod,
+    [94] = (syscall_ptr_t)sys_fchmod,
     [162] = (syscall_ptr_t)sys_nanosleep,
     [20] = (syscall_ptr_t)sys_getpid,
     [114] = (syscall_ptr_t)sys_wait4,

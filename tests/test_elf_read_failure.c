@@ -86,12 +86,22 @@ typedef uint64_t Elf64_Xword;
 #define ET_DYN 3
 #define EM_X86_64 62
 #define PT_LOAD 1
+#define PT_INTERP 3
+#define PT_PHDR 6
 #define PF_R 0x4
 #define PF_W 0x2
 #define PF_X 0x1
 #define EI_OSABI 7
 #define ELFOSABI_NONE 0
 #define ELFOSABI_LINUX 3
+
+typedef struct {
+    uint64_t entry;
+    uint64_t phdr;
+    uint64_t phent;
+    uint64_t phnum;
+    uint64_t base;
+} elf_auxv_info_t;
 
 typedef struct {
     unsigned char e_ident[EI_NIDENT];
