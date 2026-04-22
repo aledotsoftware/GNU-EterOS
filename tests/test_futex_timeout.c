@@ -1,49 +1,45 @@
+#define __ETEROS_HOST_TEST__ 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <assert.h>
-#include "../include/errno.h"
+
+#undef assert
+#define assert(x) if(!(x)) { printf("Assertion failed: %s\n", #x); exit(1); }
 
 /* --- Mocks for Kernel Environment --- */
 
 /* Definitions from types.h / task.h */
-typedef int spinlock_t;
+#include "../include/types.h"
+#include "../include/lock.h"
+#include "../include/task.h"
+#include "../include/string.h"
+#include "../include/errno.h"
 
-/* We rely on include/time.h for struct timespec */
-#include <time.h>
-
-typedef enum {
-    TASK_READY,
-    TASK_RUNNING,
-    TASK_BLOCKED,
-    TASK_SLEEPING,
-    TASK_DEAD
-} task_state_t;
-
-typedef struct task {
-    uint32_t id;
-    task_state_t state;
-    uint64_t wake_tick;
-    uint32_t *uaddr; /* used in futex_node but node points to task */
-} task_t;
+/* Define timespec */
+#define TIMER_HZ 1000
+#ifndef _TIMESPEC_DEFINED
+#define _TIMESPEC_DEFINED
+struct timespec {
+    long tv_sec;
+    long tv_nsec;
+};
+#endif
 
 /* Global state for test */
-task_t task1 = {1, TASK_RUNNING, 0, NULL};
+task_t task1;
 task_t *current_task = &task1;
 
 uint64_t current_ticks = 1000;
 uint64_t ticks_increment_on_yield = 0;
 
+void init_tasks() {
+    memset(&task1, 0, sizeof(task_t));
+    task1.id = 1;
+    task1.state = TASK_RUNNING;
+}
+
 /* Mock Implementations */
-
-void spin_lock(spinlock_t *lock) {
-    (void)lock;
-}
-
-void spin_unlock(spinlock_t *lock) {
-    (void)lock;
-}
 
 void *kmalloc(size_t size) {
     return malloc(size);
@@ -57,14 +53,9 @@ task_t *task_get_current(void) {
     return current_task;
 }
 
-/* timer.h mocks */
 uint64_t timer_get_ticks(void) {
     return current_ticks;
 }
-
-/* We don't define TIMER_HZ here because it's in timer.h which is included by futex.c */
-/* But we can't rely on it being visible before including futex.c */
-#define TEST_TIMER_HZ 1000
 
 void task_yield(void) {
     /* Simulate time passing */
@@ -73,8 +64,20 @@ void task_yield(void) {
     }
 }
 
+void task_block_with_timeout(uint64_t wake_tick) {
+    if (current_task) {
+        current_task->wake_tick = wake_tick;
+        current_task->state = TASK_BLOCKED;
+    }
+}
+
+void task_wakeup(task_t* t) {
+    if (t) {
+        t->state = TASK_READY;
+    }
+}
+
 /* Include the source file under test */
-/* We define __ETEROS_HOST_TEST__ to handle includes */
 #include "../kernel/futex.c"
 
 /* --- Tests --- */
@@ -94,15 +97,13 @@ void test_futex_timeout(void) {
     /* Actual ticks after yield = 1000 + 600 = 1600 */
     /* 1600 >= 1500 -> Timeout */
 
-    int ret = futex_wait(&uaddr, 200, &ts);
+    int ret = futex_wait(&uaddr, 200, &ts, 0);
 
     assert(ret == -ETIMEDOUT);
-    /* wake_tick should have been set, but might be cleared by schedule (which we mock implicitly via task_yield doing nothing but incrementing time) */
-    /* In real kernel, schedule clears wake_tick. Here task_yield just increments time. So wake_tick remains set. */
     assert(task1.wake_tick == 1500);
 
     /* Clean up manually */
-    int idx = futex_hash(&uaddr);
+    int idx = futex_hash(&uaddr, 0);
     buckets[idx].head = NULL;
 
     printf("PASS\n");
@@ -118,12 +119,12 @@ void test_futex_no_timeout(void) {
     /* No timeout provided */
     /* Should return EINTR (spurious wakeup) because we simulate yield return without explicit wake */
 
-    int ret = futex_wait(&uaddr, 300, NULL);
+    int ret = futex_wait(&uaddr, 300, NULL, 0);
 
     assert(ret == -EINTR);
     assert(task1.wake_tick == 0);
 
-    int idx = futex_hash(&uaddr);
+    int idx = futex_hash(&uaddr, 0);
     buckets[idx].head = NULL;
 
     printf("PASS\n");
@@ -144,18 +145,19 @@ void test_futex_spurious_wake(void) {
     /* Actual ticks after yield = 3500 */
     /* 3500 < 4000 -> Not timed out */
 
-    int ret = futex_wait(&uaddr, 400, &ts);
+    int ret = futex_wait(&uaddr, 400, &ts, 0);
 
     assert(ret == -EINTR);
     assert(task1.wake_tick == 4000);
 
-    int idx = futex_hash(&uaddr);
+    int idx = futex_hash(&uaddr, 0);
     buckets[idx].head = NULL;
 
     printf("PASS\n");
 }
 
 int main(void) {
+    init_tasks();
     futex_init();
 
     test_futex_timeout();

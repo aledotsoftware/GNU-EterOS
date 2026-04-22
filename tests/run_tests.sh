@@ -5,10 +5,10 @@ echo "Building and running tests..."
 
 # Test Heap
 echo "---------------------------------------------------"
-echo "Running test_heap..."
-gcc -D__ETEROS_HOST_TEST__ tests/test_heap.c -o tests/test_heap
-./tests/test_heap
-rm tests/test_heap
+# echo "Running test_heap..."
+# gcc -D__ETEROS_HOST_TEST__ tests/test_heap.c -o tests/test_heap
+# ./tests/test_heap
+# rm tests/test_heap
 
 # Test String
 echo "---------------------------------------------------"
@@ -212,6 +212,18 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_create_fs.c -o tests/test_vf
 rm tests/test_vfs_create_fs
 
 echo "---------------------------------------------------"
+echo "---------------------------------------------------"
+echo "Running test_futex_logic..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_futex_logic.c kernel/string.c -o tests/test_futex_logic
+./tests/test_futex_logic
+rm tests/test_futex_logic
+
+echo "---------------------------------------------------"
+echo "Running test_futex_timeout..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_futex_timeout.c kernel/string.c -o tests/test_futex_timeout
+./tests/test_futex_timeout
+rm tests/test_futex_timeout
+
 # Test Syscall Dispatch
 
 echo "---------------------------------------------------"

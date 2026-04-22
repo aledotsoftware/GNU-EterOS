@@ -1,42 +1,44 @@
+#define __ETEROS_HOST_TEST__ 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <assert.h>
 
-/* --- Mocks --- */
+#undef assert
+#define assert(x) if(!(x)) { printf("Assertion failed: %s\n", #x); exit(1); }
 
-/* Types needed by futex.c */
-typedef int spinlock_t;
+/* Use kernel headers instead of mocking to avoid conflicts */
+#include "../include/types.h"
+#include "../include/lock.h"
+#include "../include/task.h"
+#include "../include/string.h"
 
-typedef enum {
-    TASK_READY,
-    TASK_RUNNING,
-    TASK_BLOCKED,
-    TASK_SLEEPING,
-    TASK_DEAD
-} task_state_t;
-
-typedef struct task {
-    uint32_t id;
-    task_state_t state;
-    uint64_t wake_tick;
-} task_t;
+/* Define timespec because the host <time.h> might conflict or missing fields in our context. */
+#define TIMER_HZ 1000
+#ifndef _TIMESPEC_DEFINED
+#define _TIMESPEC_DEFINED
+struct timespec {
+    long tv_sec;
+    long tv_nsec;
+};
+#endif
 
 /* Global state for test */
-task_t task1 = {1, TASK_RUNNING, 0};
-task_t task2 = {2, TASK_RUNNING, 0};
+task_t task1;
+task_t task2;
 task_t *current_task = &task1;
 
+void init_tasks() {
+    memset(&task1, 0, sizeof(task_t));
+    task1.id = 1;
+    task1.state = TASK_RUNNING;
+
+    memset(&task2, 0, sizeof(task_t));
+    task2.id = 2;
+    task2.state = TASK_RUNNING;
+}
+
 /* Mock Implementations */
-
-void spin_lock(spinlock_t *lock) {
-    *lock = 1;
-}
-
-void spin_unlock(spinlock_t *lock) {
-    *lock = 0;
-}
 
 void *kmalloc(size_t size) {
     return malloc(size);
@@ -54,10 +56,21 @@ uint64_t timer_get_ticks(void) {
     return 0;
 }
 
-#define TIMER_HZ 1000
-
 void task_yield(void) {
     /* No-op in single-threaded test */
+}
+
+void task_block_with_timeout(uint64_t wake_tick) {
+    (void)wake_tick;
+    if (current_task) {
+        current_task->state = TASK_BLOCKED;
+    }
+}
+
+void task_wakeup(task_t* t) {
+    if (t) {
+        t->state = TASK_READY;
+    }
 }
 
 /* Constants */
@@ -69,7 +82,6 @@ void task_yield(void) {
 #define ETIMEDOUT 110
 
 /* Include the source file under test */
-/* We rely on -Itests/mocks to provide empty headers for the includes in futex.c */
 #include "../kernel/futex.c"
 
 /* --- Tests --- */
@@ -77,7 +89,7 @@ void task_yield(void) {
 void test_futex_wait_mismatch(void) {
     printf("Test: futex_wait mismatch...\n");
     uint32_t uaddr = 100;
-    int ret = futex_wait(&uaddr, 101, NULL); /* Expected 101, but is 100 */
+    int ret = futex_wait(&uaddr, 101, NULL, 0); /* Expected 101, but is 100 */
     assert(ret == -EAGAIN);
     printf("PASS\n");
 }
@@ -87,15 +99,11 @@ void test_futex_wait_success(void) {
 
     uint32_t uaddr = 200;
 
-    /* Simulate wait. Since task_yield returns immediately,
-       we check if we are still in queue (EINTR). */
-
-    int ret = futex_wait(&uaddr, 200, NULL);
+    int ret = futex_wait(&uaddr, 200, NULL, 0);
     assert(ret == -EINTR); /* Because not woken */
     assert(task1.state == TASK_BLOCKED);
 
-    /* Clean up: manually remove from bucket to avoid mem leak in test */
-    int idx = futex_hash(&uaddr);
+    int idx = futex_hash(&uaddr, 0);
     buckets[idx].head = NULL;
 
     printf("PASS\n");
@@ -106,8 +114,7 @@ void test_futex_wake_logic(void) {
 
     uint32_t uaddr = 300;
 
-    /* Manually insert node */
-    int idx = futex_hash(&uaddr);
+    int idx = futex_hash(&uaddr, 0);
 
     futex_node_t *node = malloc(sizeof(futex_node_t));
     node->task = &task2;
@@ -117,18 +124,18 @@ void test_futex_wake_logic(void) {
     buckets[idx].head = node;
     task2.state = TASK_BLOCKED;
 
-    /* Wake */
-    int count = futex_wake(&uaddr, 1);
+    int count = futex_wake(&uaddr, 1, 0);
 
     assert(count == 1);
     assert(task2.state == TASK_READY);
     assert(buckets[idx].head == NULL);
 
-    free(node); /* In real code, waiter frees it. Here we do it. */
+    free(node); /* Waiter frees it */
     printf("PASS\n");
 }
 
 int main(void) {
+    init_tasks();
     futex_init();
 
     test_futex_wait_mismatch();
