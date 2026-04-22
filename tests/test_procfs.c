@@ -29,6 +29,10 @@ void kfree(void* ptr) {
     free(ptr);
 }
 
+int task_get_max() { return 0; }
+struct task* task_get_by_id(uint32_t id) { return NULL; }
+struct task* task_get_at(int i) { return NULL; }
+
 /* HAL Console Mock */
 void hal_console_write(const char* str) {
     // printf("%s", str); // Optional logging

@@ -26,6 +26,13 @@ void kfree(void* ptr) {
     free(ptr);
 }
 
+int task_get_max() { return 0; }
+struct task* task_get_at(int i) { return NULL; }
+void task_wakeup(struct task* t) {}
+struct task* task_get_current() { return NULL; }
+bool keyboard_has_input(void) { return false; }
+void task_yield() {}
+
 /* Mock keyboard and input dependencies */
 
 char keyboard_getchar(void) {

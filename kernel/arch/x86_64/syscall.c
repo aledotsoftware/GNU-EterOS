@@ -796,6 +796,18 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     if (res < 0) { kfree(kpath); return res; }
     if ((flags & O_ACCMODE) > O_RDWR) { kfree(kpath); return -EINVAL; }
 
+    fs_node_t* node_check = vfs_lookup_ext(fs_root, kpath, (flags & O_NOFOLLOW) ? 0 : 1);
+    if (node_check && (node_check->flags & 0x7) == FS_DIRECTORY && (flags & O_ACCMODE) != O_RDONLY && (flags & O_ACCMODE) != 0) {
+        if (node_check->close) node_check->close(node_check);
+        kfree(node_check);
+        kfree(kpath);
+        return -EISDIR;
+    }
+    if (node_check) {
+        if (node_check->close) node_check->close(node_check);
+        kfree(node_check);
+    }
+
     task_t* current = task_get_current();
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) {

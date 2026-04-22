@@ -107,6 +107,11 @@ __attribute__((weak)) void task_sleep(uint64_t ms) {}
 __attribute__((weak)) int task_fork(void* regs) { return -1; }
 __attribute__((weak)) int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) { return -1; }
 __attribute__((weak)) int task_waitpid(int pid, int* status, int options) { return -1; }
+__attribute__((weak)) task_t* task_get_at(int i) { return NULL; }
+__attribute__((weak)) int task_get_count() { return 0; }
+__attribute__((weak)) void task_exit_signal(int sig) {}
+__attribute__((weak)) int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { return -1; }
+__attribute__((weak)) void schedule(void) {}
 
 __attribute__((weak)) int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) { return -1; }
 __attribute__((weak)) int futex_wake(uint32_t *uaddr, int count, int op) { return -1; }

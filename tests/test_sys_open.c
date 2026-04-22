@@ -110,6 +110,10 @@ fs_node_t* vfs_lookup(fs_node_t* root, const char* path) {
     return NULL;
 }
 
+fs_node_t* vfs_lookup_ext(fs_node_t* root, const char* path, int nofollow) {
+    return vfs_lookup(root, path);
+}
+
 int create_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {}
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
@@ -181,6 +185,10 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
 int task_waitpid(int pid, int* status, int options) { return 0; }
 task_t* task_get_by_id(uint32_t id) { return NULL; }
 int task_kill(uint32_t pid) { return 0; }
+task_t* task_get_at(int i) { return NULL; }
+int task_get_count() { return 0; }
+void task_exit_signal(int sig) {}
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { return -1; }
 
 /* Stub syscall entry */
 void syscall_entry(void) {}
@@ -214,7 +222,7 @@ fs_node_t *finddir_fs(fs_node_t *node, char *name) {
     return NULL;
 }
 
-fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) {
+fs_node_t *vfs_lookup_ext2(fs_node_t *root, const char *path, int follow_symlink) {
     (void)root; (void)path; (void)follow_symlink;
     return NULL;
 }
