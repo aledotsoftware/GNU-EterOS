@@ -14,6 +14,27 @@
 task_t current_task_mock;
 task_t* task_get_current(void) { return &current_task_mock; }
 void task_exit(int status) { printf("task_exit(%d) called\n", status); }
+
+task_t* task_get_at(int index) {
+    (void)index;
+    return NULL;
+}
+
+int task_get_count(void) {
+    return 1;
+}
+
+void task_exit_signal(int sig) {
+    (void)sig;
+}
+
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) {
+    (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code;
+    return -10; // -ECHILD
+}
+
+void schedule(void) {
+}
 void task_yield(void) { printf("task_yield called\n"); }
 char keyboard_getchar(void) { return 'A'; }
 void terminal_putchar(char c) { putchar(c); }

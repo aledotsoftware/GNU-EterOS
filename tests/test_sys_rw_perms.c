@@ -49,6 +49,25 @@ int kfree_count = 0;
 
 /* Globals for linking */
 socket_entry_t socket_table[MAX_SOCKETS];
+
+task_t* task_get_at(int index) {
+    (void)index;
+    return NULL;
+}
+
+int task_get_count(void) {
+    return 1;
+}
+
+void task_exit_signal(int sig) {
+    (void)sig;
+}
+
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) {
+    (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code;
+    return -10; // -ECHILD
+}
+
 sem_t net_sem;
 fs_node_t* fs_root = NULL;
 int total_cpus = 1;
@@ -243,13 +262,13 @@ int main() {
         printf("FAILED: sys_read on O_RDONLY failed\n");
         return 1;
     }
-    if (sys_write(0, buf, 10) != -EBADF) {
+    if (sys_write(0, buf, 10) != -9) { // EBADF = 9
         printf("FAILED: sys_write on O_RDONLY should return -EBADF\n");
         return 1;
     }
 
     // O_WRONLY tests
-    if (sys_read(1, buf, 10) != -EBADF) {
+    if (sys_read(1, buf, 10) != -9) {
         printf("FAILED: sys_read on O_WRONLY should return -EBADF\n");
         return 1;
     }

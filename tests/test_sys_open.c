@@ -46,6 +46,25 @@ int kfree_count = 0;
 
 /* Globals for linking */
 socket_entry_t socket_table[MAX_SOCKETS];
+
+task_t* task_get_at(int index) {
+    (void)index;
+    return NULL;
+}
+
+int task_get_count(void) {
+    return 1;
+}
+
+void task_exit_signal(int sig) {
+    (void)sig;
+}
+
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) {
+    (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code;
+    return -10; // -ECHILD
+}
+
 sem_t net_sem;
 fs_node_t* fs_root = NULL;
 int total_cpus = 1;
@@ -215,8 +234,8 @@ fs_node_t *finddir_fs(fs_node_t *node, char *name) {
 }
 
 fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) {
-    (void)root; (void)path; (void)follow_symlink;
-    return NULL;
+    (void)follow_symlink;
+    return vfs_lookup(root, path);
 }
 
 #include "../kernel/arch/x86_64/syscall.c"
@@ -233,7 +252,7 @@ int main() {
     printf("Attempting to open directory '/some/dir' with O_WRONLY...\n");
     int64_t fd = sys_open("/some/dir", O_WRONLY, 0);
 
-    if (fd == -EISDIR) {
+    if (fd == -21) {
         printf("PASSED: sys_open returned -EISDIR\n");
         return 0;
     } else if (fd >= 0) {

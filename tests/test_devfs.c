@@ -37,6 +37,34 @@ void terminal_putchar(char c) {
     (void)c;
 }
 
+#include "../include/task.h"
+
+int task_get_max(void) {
+    return 1;
+}
+
+task_t* task_get_at(int index) {
+    (void)index;
+    return NULL;
+}
+
+void task_wakeup(task_t* task) {
+    (void)task;
+}
+
+task_t mock_current_task;
+
+task_t* task_get_current(void) {
+    return &mock_current_task;
+}
+
+void task_yield(void) {
+}
+
+bool keyboard_has_input(void) {
+    return false;
+}
+
 /* Mock input events */
 #include "../include/input/event.h"
 

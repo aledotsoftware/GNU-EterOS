@@ -61,6 +61,25 @@ uint64_t pmm_unref_addr = 0;
 
 /* Globals for linking */
 socket_entry_t socket_table[MAX_SOCKETS];
+
+task_t* task_get_at(int index) {
+    (void)index;
+    return NULL;
+}
+
+int task_get_count(void) {
+    return 1;
+}
+
+void task_exit_signal(int sig) {
+    (void)sig;
+}
+
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) {
+    (void)idtype; (void)id; (void)options; (void)out_pid; (void)out_status; (void)out_code;
+    return -10; // -ECHILD
+}
+
 sem_t net_sem;
 fs_node_t* fs_root = NULL;
 int total_cpus = 1;
