@@ -1760,10 +1760,21 @@ static int64_t sys_listen(int fd, int backlog) {
 }
 
 static int64_t sys_accept(int fd, struct sockaddr* addr, int* addrlen) {
-    (void)fd;
+
     if (addr && !vmm_verify_user_access(addr, sizeof(struct sockaddr), 1)) return -EFAULT;
     if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
-    return -ENOSYS;
+
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
+
+    socket_entry_t* s = get_socket((int)node->inode);
+    if (!s) return -EBADF;
+
+    return -EOPNOTSUPP;
 }
 
 static int64_t sys_accept4(int fd, struct sockaddr* addr, int* addrlen, int flags) {
@@ -1794,8 +1805,17 @@ static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct soc
     fs_node_t* node = current->fd_table[fd].node;
     if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
     int res = net_recv((int)node->inode, buf, len, flags);
-    if (res < 0) return -EIO;
-    if (res == 0) return 0;
+    if (res < 0) return res;
+    if (src_addr && addrlen) {
+        struct sockaddr_in* sin = (struct sockaddr_in*)src_addr;
+        socket_entry_t* s = get_socket((int)node->inode);
+        if (s && *addrlen >= (int)sizeof(struct sockaddr_in)) {
+            sin->sin_family = AF_INET;
+            sin->sin_port = htons(s->remote_port);
+            sin->sin_addr = s->remote_ip;
+            *addrlen = sizeof(struct sockaddr_in);
+        }
+    }
     return res;
 }
 
@@ -2107,38 +2127,46 @@ struct msghdr {
 };
 
 static int64_t sys_sendmsg(int fd, const struct msghdr* msg, int flags) {
-    (void)fd; (void)msg; (void)flags;
-    return -ENOSYS; /* Stub */
+    (void)fd; (void)flags;
+    if (!vmm_verify_user_access(msg, sizeof(struct msghdr), 0)) return -EFAULT;
+    return -EOPNOTSUPP;
 }
 
 static int64_t sys_recvmsg(int fd, struct msghdr* msg, int flags) {
-    (void)fd; (void)msg; (void)flags;
-    return -ENOSYS; /* Stub */
+    (void)fd; (void)flags;
+    if (!vmm_verify_user_access(msg, sizeof(struct msghdr), 1)) return -EFAULT;
+    return -EOPNOTSUPP;
 }
 
 static int64_t sys_setsockopt(int fd, int level, int optname, const void* optval, int optlen) {
     (void)fd; (void)level; (void)optname; (void)optval; (void)optlen;
-    return 0; /* Stub */
+    return 0; // Pretend success for compatibility
 }
 
 static int64_t sys_getsockopt(int fd, int level, int optname, void* optval, int* optlen) {
     (void)fd; (void)level; (void)optname; (void)optval; (void)optlen;
-    return -ENOSYS; /* Stub */
+    return -EOPNOTSUPP;
 }
 
 static int64_t sys_getpeername(int fd, struct sockaddr* addr, int* addrlen) {
     (void)fd; (void)addr; (void)addrlen;
-    return -ENOSYS; /* Stub */
+    return -EOPNOTSUPP;
 }
 
 static int64_t sys_getsockname(int fd, struct sockaddr* addr, int* addrlen) {
     (void)fd; (void)addr; (void)addrlen;
-    return -ENOSYS; /* Stub */
+    return -EOPNOTSUPP;
 }
 
 static int64_t sys_shutdown(int fd, int how) {
-    (void)fd; (void)how;
-    return 0; /* Stub */
+    (void)how;
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
+    net_close((int)node->inode);
+    return 0;
 }
 
 
