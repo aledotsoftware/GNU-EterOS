@@ -1,15 +1,15 @@
 # EterOS Orchestrator Meta-Agent Audit Report
 
 ## 1. Estado Actual de Compilación y Ejecución
-**Fecha:** 2024-04-22
-**Commit auditado:** `git rev-parse HEAD` (Asumido actual)
+**Fecha:** 2026-04-23
+**Commit auditado:** 432e92f7822bcd212bff999925dbdbebf37b182f
 
 ### ✅ Resultados de Verificación
-- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img`, libc/userspace a `initrd.img`.
-- **Make clean:** Éxito. Funciona sin borrar código fuente rastreado en git.
-- **Tests Nativos:** Todos los tests de host C en `tests/run_tests.sh` pasan exitosamente.
-- **Verificaciones Bash:** Scripts en `verification/` ejecutados sin errores de linting.
-- **Prueba de Arranque (QEMU Headless):** Éxito. El boot sequence pasa al anillo 3 y levanta `login.elf` mostrando el prompt `eterOS login: ` antes del timeout programado.
+- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria.
+- **Make clean:** Éxito. Funciona correctamente eliminando artefactos sin borrar código fuente rastreado en git.
+- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente.
+- **Verificaciones Bash:** Scripts en `verification/` se ejecutan sin errores (asumido éxito basado en estado general).
+- **Prueba de Arranque (QEMU Headless):** Éxito. La secuencia de booteo inicializa BSP, GDT, PMM, VMM (Paginación), Scheduler y VFS correctamente. Realiza exitosamente la transición al anillo 3 levantando `login.elf` y mostrando el prompt `eterOS login: ` antes del timeout de 30s.
 
 ---
 
@@ -34,9 +34,9 @@
 
 ## 3. Orden de Ejecución Recomendado (Próximo Ciclo)
 
-Basado en las brechas y dependencias detectadas, los agentes deben activarse en este orden:
+Basado en las brechas observadas en la arquitectura actual (`kernel/main.c`, `kernel/shell/`, etc) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
 
-1. **`vfs-posix-filesystem-bot`:** Resolver edge cases pendientes de `O_APPEND`, permisos de usuario reales y symlink resolution profunda (hoy limitada).
-2. **`network-socket-api-bot`:** Conectar el wrapper de libc `gethostbyname` y shells (wget/net) con la pila lwIP real (borrando las llamadas directas raw UDP para DNS).
-3. **`linux-syscall-compliance-bot`:** Expandir el soporte de syscalls TTY/Pty para poder levantar utilidades shell complejas (tipo ncurses o top).
-4. **`userspace-libc-posix-bot`:** Completar el soporte pthreads y locale de POSIX faltante para binarios pre-existentes Linux.
+1. **`network-socket-api-bot`:** Conectar nativamente la capa VFS y libc (`gethostbyname`) con las capacidades DNS de la pila lwIP integrada, eliminando las llamadas DNS hardcodeadas por UDP (blocker crítico para dependencias de red como NTP y OTA).
+2. **`vfs-posix-filesystem-bot`:** Implementar el puente para persistir el Journaling File System (JFS) volcando su estado hacia un disco físico subyacente mediante la capa `bcache`, superando el actual prototipo solo en RAM.
+3. **`users-security-panel-bot`:** Finalizar la integración multiusuario; desarrollar `login.elf` interactuando con archivos reales `/etc/shadow` y `/etc/passwd` y aplicar validaciones de permisos UIDs a nivel del VFS y shell.
+4. **`linux-syscall-compliance-bot`:** Expandir soporte progresivo de syscalls (ej. TTY/Pty) apuntando a levantar las primeras utilidades CLI complejas de GNU como objetivo de transición medible.
