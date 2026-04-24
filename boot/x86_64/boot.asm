@@ -25,7 +25,7 @@
 %ifndef STAGE2_SECTORS
 STAGE2_SECTORS      equ 16             ; Sectores de Stage 2 (8 KB default)
 %endif
-%define KERNEL_LOAD_ADDR TEMP_KERNEL_ADDR
+%define KERNEL_LOAD_ADDR FINAL_KERNEL_ADDR
 %ifndef KERNEL_SECTORS
 KERNEL_SECTORS      equ 512            ; Sectores del kernel (256 KB default)
 %endif
@@ -208,6 +208,10 @@ dw 0xAA55
 ; #############################################################################
 
 stage2_start:
+    cld                                 ; Asegurar que DF=0 para lods/stos
+    ; ---- Entrar en Modo Unreal para soportar carga > 1MB ----
+    call enter_unreal
+
     mov si, s2_msg_start
     call print_16
 
@@ -370,7 +374,7 @@ load_initrd:
     ; Leer sectores del Initrd
     mov eax, INITRD_START_LBA       ; LBA Inicio
     mov ecx, INITRD_SECTORS         ; Cantidad de sectores
-    mov edi, TEMP_INITRD_ADDR       ; Destino temporal (bajo 1MB)
+    mov edi, INITRD_LOAD_ADDR       ; Destino final (32 MB) vía Unreal Mode
 
     call read_sectors_lba
     ret
@@ -391,27 +395,23 @@ dap_struct:
 ; read_sectors_lba: Lee sectores usando int 0x13 Extensiones LBA
 ;   EAX = Start LBA
 ;   CX  = Count
-;   EDI = Destination Linear Address (Debe ser < 1MB para BIOS real mode)
+;   EDI = Destination Linear Address (Ahora soporta > 1MB vía Unreal Mode)
 ; -----------------------------------------------------------------------------
+TEMP_READ_BUFFER equ 0x1000             ; Buffer seguro en memoria baja
+
 read_sectors_lba:
 .loop:
     push eax
     push cx
     push edi
 
-    ; Preparar DAP
+    ; Preparar DAP para leer 1 sector al buffer temporal
     mov dword [dap_struct + 8], eax     ; LBA Low
     mov dword [dap_struct + 12], 0      ; LBA High
-    mov word [dap_struct + 2], 1        ; Leer 1 sector a la vez para máxima compatibilidad
+    mov word [dap_struct + 2], 1        ; Leer 1 sector
+    mov word [dap_struct + 4], TEMP_READ_BUFFER ; Offset
+    mov word [dap_struct + 6], 0        ; Segmento 0
     
-    ; Convertir Linear Address a Segment:Offset
-    mov ebx, edi
-    mov eax, ebx
-    shr eax, 4
-    mov word [dap_struct + 6], ax       ; Segmento
-    and ebx, 0x0F
-    mov word [dap_struct + 4], bx       ; Offset
-
     ; Reintentos (3 veces)
     mov byte [read_retries], 3
 .retry:
@@ -422,11 +422,9 @@ read_sectors_lba:
     jnc .success
 
     ; Si falla, resetear disco e intentar de nuevo
-    push ax
     xor ah, ah
     mov dl, [boot_drive]
     int 0x13
-    pop ax
     
     dec byte [read_retries]
     jnz .retry
@@ -435,6 +433,26 @@ read_sectors_lba:
     jmp .disk_error
 
 .success:
+    ; Copiar del buffer temporal a la dirección final (usando FS con límite 4GB)
+    pop edi
+    push edi
+    
+    xor esi, esi                        ; Limpiar ESI
+    mov si, TEMP_READ_BUFFER            ; Source: Buffer temporal
+    mov ecx, 128                        ; 512 bytes / 4 = 128 dwords
+    
+    ; En modo Unreal, FS tiene límite de 4GB y base 0.
+.copy:
+    lodsd                               ; EAX = [DS:SI], SI += 4
+    mov [fs:edi], eax                   ; [FS:EDI] = EAX
+    add edi, 4                          ; EDI += 4
+    loop .copy
+
+    ; Mostrar progreso
+    mov ah, 0x0E
+    mov al, '.'
+    int 0x10
+
     pop edi
     pop cx
     pop eax
@@ -453,6 +471,40 @@ read_sectors_lba:
     hlt
 
 read_retries: db 0
+
+; -----------------------------------------------------------------------------
+; enter_unreal: Habilita el modo "Unreal" (Big Real Mode)
+;   Permite acceder a los 4GB de RAM desde Modo Real usando registros de 32 bits.
+; -----------------------------------------------------------------------------
+enter_unreal:
+    push eax
+    push bx
+    cli
+
+    lgdt [gdt32_descriptor]             ; Cargar GDT de 32 bits
+
+    mov eax, cr0
+    or al, 1                            ; Activar PE (Protected Mode)
+    mov cr0, eax
+    jmp .pm                             ; Flush pipeline
+
+.pm:
+    mov bx, DATA32_SEG                  ; Selector de datos con límite 4GB
+    mov fs, bx                          ; Cargar descriptor de 4GB en FS
+    mov gs, bx                          ; Cargar descriptor de 4GB en GS
+
+    and al, 0xFE                        ; Desactivar PE
+    mov cr0, eax
+    jmp .rm                             ; Flush pipeline
+
+.rm:
+    ; NO restauramos FS/GS aquí, los dejaremos con el valor 0x10 pero
+    ; con los "hidden caches" manteniendo el límite de 4GB y base 0.
+    
+    sti
+    pop bx
+    pop eax
+    ret
 
 ; -----------------------------------------------------------------------------
 ; setup_vbe: Configura el modo de video VESA (1024x768x32)
@@ -741,19 +793,8 @@ protected_mode_start:
     mov word [0xB8000], 0x2F50          ; 'P' verde
     mov word [0xB8002], 0x2F4D          ; 'M' verde
 
-    ; ---- Relocalizar Kernel a su posición final (1MB+) ----
-    ; Esto lo hacemos en Modo Protegido para superar el límite de 1MB de la BIOS
-    ; y evitar colisiones de BSS con el stack/EBDA.
-    mov esi, TEMP_KERNEL_ADDR
-    mov edi, FINAL_KERNEL_ADDR
-    mov ecx, KERNEL_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores
-    rep movsd
-
-    ; ---- Relocalizar Initrd a su posición final (32MB) ----
-    mov esi, TEMP_INITRD_ADDR
-    mov edi, INITRD_LOAD_ADDR
-    mov ecx, INITRD_SECTORS * 128       ; (512 bytes / 4 bytes por dword) * setores
-    rep movsd
+    ; El kernel y el initrd ya fueron cargados en sus direcciones finales
+    ; por el bootloader en modo real (usando Unreal Mode).
 
     ; ---- Configurar tablas de paginación ----
     call setup_page_tables
