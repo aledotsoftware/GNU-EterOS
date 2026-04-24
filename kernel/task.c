@@ -687,6 +687,10 @@ void schedule(void) {
     }
 
     if (next_task == current) {
+        if (current->state == TASK_READY) {
+            dequeue_ready(current);
+            current->state = TASK_RUNNING;
+        }
         /* Clear any pending timeout if we are resuming a blocked task */
         dequeue_sleep(current);
         current->wake_tick = 0;
@@ -795,6 +799,16 @@ void task_block_with_timeout(uint64_t wake_tick) {
     spin_unlock(&sched_lock);
 }
 
+void task_block(void) {
+    if (!scheduler_active) return;
+
+    spin_lock(&sched_lock);
+    task_t* current = task_get_current();
+    current->wake_tick = 0;
+    current->state = TASK_BLOCKED;
+    spin_unlock(&sched_lock);
+}
+
 void task_sleep(uint64_t ms) {
     if (!scheduler_active) {
         timer_wait((uint32_t)ms);
@@ -814,12 +828,6 @@ void task_sleep(uint64_t ms) {
 
     /* Ceder CPU */
     task_yield();
-
-    while (current->state == TASK_SLEEPING) {
-        __asm__ volatile("hlt");
-    }
-
-    current->state = TASK_RUNNING;
 }
 
 void task_wake_expired(uint64_t current_tick) {

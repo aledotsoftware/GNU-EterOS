@@ -176,6 +176,11 @@ void task_sleep(uint64_t ms);
 void task_block_with_timeout(uint64_t wake_tick);
 
 /**
+ * Bloquea la tarea actual sin timeout, debe ser despertada manualmente.
+ */
+void task_block(void);
+
+/**
  * Verifica si hay tareas dormidas que deban despertar.
  * Llamado desde el timer interrupt.
  */

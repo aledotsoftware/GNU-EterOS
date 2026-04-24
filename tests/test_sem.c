@@ -74,6 +74,12 @@ void task_wakeup(task_t* t) {
     }
 }
 
+void task_block(void) {
+    if (current_task) {
+        current_task->state = TASK_BLOCKED;
+    }
+}
+
 int schedule_call_count = 0;
 sem_t* current_sem = NULL;
 

@@ -67,6 +67,12 @@ void task_block_with_timeout(uint64_t wake_tick) {
     }
 }
 
+void task_block(void) {
+    if (current_task) {
+        current_task->state = TASK_BLOCKED;
+    }
+}
+
 void task_wakeup(task_t* t) {
     if (t) {
         t->state = TASK_READY;
