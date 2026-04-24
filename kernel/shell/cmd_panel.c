@@ -42,14 +42,15 @@ static void draw_panel_menu(void) {
     terminal_write_colored("          Panel de Control - eterOS       \n", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     terminal_write_colored("  ========================================\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
-    // Items are roughly at lines 4, 5, 6, 7, 8, 9
+    // Items are roughly at lines 4, 5, 6, 7, 8, 9, 10
     terminal_write_string("    1. Configurar Teclado (Layout & Typematic)\n"); // Y=4
     terminal_write_string("    2. Configurar Mouse (Sensibilidad & Zurdo/Diestro)\n"); // Y=5
     terminal_write_string("    3. Estado de Almacenamiento (A/B Slots & Initrd)\n"); // Y=6
     terminal_write_string("    4. Configurar Tiempo (Zona Horaria & NTP)\n"); // Y=7
     terminal_write_string("    5. Usuarios y Seguridad (Auto-login)\n"); // Y=8
-    terminal_write_string("    6. Salir del Panel\n"); // Y=9
-    terminal_write_string("\n  Use teclas [1-6] o click para seleccionar.\n");
+    terminal_write_string("    6. Configurar Red (Estado & DHCP)\n"); // Y=9
+    terminal_write_string("    7. Salir del Panel\n"); // Y=10
+    terminal_write_string("\n  Use teclas [1-7] o click para seleccionar.\n");
 
     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
 }
@@ -211,6 +212,30 @@ static void panel_storage(void) {
     wait_for_enter();
 }
 
+static void panel_net(void) {
+    cmd_clear("");
+    terminal_write_string("\n  -- Red y Conectividad --\n");
+    cmd_net("");
+
+    terminal_write_string("\n  1. Renovar DHCP\n");
+    terminal_write_string("  Elija [1] o ESC para volver.\n");
+    char c = 0;
+    while (1) {
+        if (keyboard_has_input()) {
+            c = keyboard_getchar();
+            if (c == '1' || c == KB_KEY_ESCAPE) break;
+        }
+        __asm__ volatile("cli");
+        if (!keyboard_has_input()) __asm__ volatile("sti; hlt");
+        else __asm__ volatile("sti");
+    }
+    terminal_write_string("\n");
+    if (c == '1') {
+        cmd_dhcp("");
+        wait_for_enter();
+    }
+}
+
 static void panel_time(void) {
     cmd_clear("");
     terminal_write_string("\n  -- Tiempo --\n");
@@ -363,7 +388,7 @@ void cmd_panel(const char* args) {
         if (keyboard_has_input()) {
             opt = keyboard_getchar();
             if (opt == KB_KEY_ESCAPE || opt == 'q') {
-                opt = '6'; // Exit
+                opt = '7'; // Exit
             }
         }
 
@@ -375,6 +400,7 @@ void cmd_panel(const char* args) {
             else if (panel_mouse_y == 7) opt = '4';
             else if (panel_mouse_y == 8) opt = '5';
             else if (panel_mouse_y == 9) opt = '6';
+            else if (panel_mouse_y == 10) opt = '7';
         }
 
         if (panel_mouse_moved) {
@@ -429,6 +455,9 @@ void cmd_panel(const char* args) {
                 if (c != KB_KEY_ESCAPE) wait_for_enter();
                 draw_panel_menu();
             } else if (opt == '6') {
+                panel_net();
+                draw_panel_menu();
+            } else if (opt == '7') {
                 terminal_write_string("\nSaliendo del Panel de Control...\n");
                 panel_running = false;
                 break;
