@@ -87,7 +87,10 @@ void test_initrd_readdir_leak() {
 
     // Initialize
     fs_node_t* root = initialise_initrd((uint64_t)image, sizeof(image));
-    assert(root != NULL);
+    if (!root) {
+        printf("initrd failed\n");
+        exit(1);
+    }
 
     // Call readdir for File 1 (index 0, since virtual dirs are now dynamic and start empty)
     // index 0 -> file_headers[0] -> file1

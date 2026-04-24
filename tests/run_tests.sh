@@ -96,10 +96,10 @@ rm tests/test_stack_security
 
 # Test Initrd Overflow
 echo "---------------------------------------------------"
-echo "Running test_initrd_overflow... (SKIPPED due to host environment issues)"
-# gcc -D__ETEROS_HOST_TEST__ -Iinclude -I. tests/test_initrd_overflow.c -o tests/test_initrd_overflow
-# ./tests/test_initrd_overflow
-# rm tests/test_initrd_overflow
+echo "Running test_initrd_overflow..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude -I. tests/test_initrd_overflow.c -o tests/test_initrd_overflow
+./tests/test_initrd_overflow
+rm tests/test_initrd_overflow
 
 # Test Readv Security
 echo "---------------------------------------------------"

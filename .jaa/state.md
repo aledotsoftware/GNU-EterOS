@@ -1,6 +1,13 @@
+## EterOS VFS Update (Current Run)
+- Addressed multiple POSIX and security gaps in `kernel/fs/initrd.c` and `kernel/fs/vfs.c`.
+- Fixed buffer overflows in `initrd_readdir` and `initrd_finddir` by properly capping `file_headers[i].name` string copies to 64 chars and ensuring null-termination.
+- Implemented robust nested path handling in `initrd_mkdir` by capturing and resolving the parent's directory prefix, preventing incorrect sub-directory indexing and `/etc/test` creation failures.
+- Enabled test suite execution with fixes for `test_initrd_overflow` which explicitly verifies the length limits and leak prevention.
+- All host tests, including newly enabled initrd bounds checks, are passing successfully.
+
 # JAA Context State
 
-## EterOS Scheduler & IPC Update (Current Run)
+## EterOS Scheduler & IPC Update (2024-04-24)
 - Resolved a critical bug in `kernel/task.c:schedule()` where tasks selected to run again without switching context were not removed from the ready queue if they had been previously enqueued, corrupting the ready list.
 - Addressed thread-safety issues in state transitions within `kernel/futex.c:futex_wait()` and `kernel/sem.c:sem_wait()` by introducing and utilizing a new locked `task_block()` API.
 - Fixed `task_sleep()` by removing an arbitrary uninterruptible `hlt` busy wait.

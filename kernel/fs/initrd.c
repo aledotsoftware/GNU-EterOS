@@ -158,7 +158,12 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
         if (!duplicate) {
             for (uint32_t i = 0; i < file_count; i++) {
                 char prev_child[128];
-                if (initrd_extract_child(file_headers[i].name, prefix, prev_child, sizeof(prev_child)) &&
+                size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
+                char safe_name[65];
+                if (name_len > 64) name_len = 64;
+                memcpy(safe_name, file_headers[i].name, name_len);
+                safe_name[name_len] = '\0';
+                if (initrd_extract_child(safe_name, prefix, prev_child, sizeof(prev_child)) &&
                     strcmp(prev_child, child) == 0) {
                     duplicate = 1;
                     break;
@@ -175,11 +180,23 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     }
 
     for (uint32_t i = 0; i < file_count; i++) {
-        if (!initrd_extract_child(file_headers[i].name, prefix, child, sizeof(child))) continue;
+        size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
+        char safe_name[65];
+        if (name_len > 64) name_len = 64;
+        memcpy(safe_name, file_headers[i].name, name_len);
+        safe_name[name_len] = '\0';
+
+        if (!initrd_extract_child(safe_name, prefix, child, sizeof(child))) continue;
         int duplicate = 0;
         for (uint32_t j = 0; j < i; j++) {
             char prev_child[128];
-            if (initrd_extract_child(file_headers[j].name, prefix, prev_child, sizeof(prev_child)) &&
+            size_t prev_name_len = strnlen(file_headers[j].name, sizeof(file_headers[j].name));
+            char prev_safe_name[65];
+            if (prev_name_len > 64) prev_name_len = 64;
+            memcpy(prev_safe_name, file_headers[j].name, prev_name_len);
+            prev_safe_name[prev_name_len] = '\0';
+
+            if (initrd_extract_child(prev_safe_name, prefix, prev_child, sizeof(prev_child)) &&
                 strcmp(prev_child, child) == 0) {
                 duplicate = 1;
                 break;
@@ -208,20 +225,31 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
 }
 
 int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
-    (void)parent; (void)permission;
+    (void)permission;
 
-    if (find_virtual_dir(name)) return -1; /* Already exists */
+    char target[256];
+    const char* prefix = initrd_dir_prefix(parent);
+
+    if (prefix && prefix[0] != '\0') {
+        strlcpy(target, prefix, sizeof(target));
+        strlcat(target, "/", sizeof(target));
+        strlcat(target, name, sizeof(target));
+    } else {
+        strlcpy(target, name, sizeof(target));
+    }
+
+    if (find_virtual_dir(target)) return -1; /* Already exists */
 
     /* Check conflicts with real files */
     for (uint32_t i = 0; i < file_count; i++) {
         size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
-        if (strncmp(name, file_headers[i].name, name_len) == 0 && name[name_len] == '\0') return -1;
+        if (strncmp(target, file_headers[i].name, name_len) == 0 && target[name_len] == '\0') return -1;
     }
 
     initrd_dir_t *new_dir = (initrd_dir_t*)kmalloc(sizeof(initrd_dir_t));
     if (!new_dir) return -2;
 
-    strlcpy(new_dir->name, name, sizeof(new_dir->name));
+    strlcpy(new_dir->name, target, sizeof(new_dir->name));
     /* Assign generic inode high up to avoid collision with file indices */
     new_dir->inode = 0xF0000000 + virtual_dirs_count;
     new_dir->next = virtual_dirs;
@@ -255,7 +283,13 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
 
     for (uint32_t i = 0; i < file_count; i++) {
         size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
-        if (strncmp(target, file_headers[i].name, name_len) == 0 && target[name_len] == '\0') {
+        if (name_len > 64) name_len = 64; /* Cap name length for security */
+
+        char safe_name[65];
+        memcpy(safe_name, file_headers[i].name, name_len);
+        safe_name[name_len] = '\0';
+
+        if (strncmp(target, safe_name, name_len) == 0 && target[name_len] == '\0') {
              fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
              if (!fnode) return 0;
              memset(fnode, 0, sizeof(fs_node_t));
@@ -263,7 +297,7 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
 
              /* Securely copy name */
              if (name_len >= sizeof(fnode->name)) name_len = sizeof(fnode->name) - 1;
-             memcpy(fnode->name, file_headers[i].name, name_len);
+             memcpy(fnode->name, safe_name, name_len);
              fnode->name[name_len] = '\0';
 
              fnode->inode = i;
@@ -283,7 +317,12 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
     {
         size_t tlen = strnlen(target, sizeof(target));
         for (uint32_t i = 0; i < file_count; i++) {
-            if (strncmp(file_headers[i].name, target, tlen) == 0 && file_headers[i].name[tlen] == '/') {
+            size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
+            if (name_len > 64) name_len = 64;
+            char safe_name[65];
+            memcpy(safe_name, file_headers[i].name, name_len);
+            safe_name[name_len] = '\0';
+            if (strncmp(safe_name, target, tlen) == 0 && safe_name[tlen] == '/') {
                 return initrd_make_dir_node(name, target);
             }
         }
