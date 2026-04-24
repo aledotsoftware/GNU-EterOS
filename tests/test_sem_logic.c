@@ -59,6 +59,12 @@ void task_wakeup(task_t* t) {
     }
 }
 
+void task_block(void) {
+    if (current_task) {
+        current_task->state = TASK_BLOCKED;
+    }
+}
+
 /* Include source under test */
 #include "../kernel/sem.c"
 

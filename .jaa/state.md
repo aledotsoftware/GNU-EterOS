@@ -1,5 +1,11 @@
 # JAA Context State
 
+## EterOS Scheduler & IPC Update (Current Run)
+- Resolved a critical bug in `kernel/task.c:schedule()` where tasks selected to run again without switching context were not removed from the ready queue if they had been previously enqueued, corrupting the ready list.
+- Addressed thread-safety issues in state transitions within `kernel/futex.c:futex_wait()` and `kernel/sem.c:sem_wait()` by introducing and utilizing a new locked `task_block()` API.
+- Fixed `task_sleep()` by removing an arbitrary uninterruptible `hlt` busy wait.
+- Tested and verified fixes via host-based unit tests (`test_sem`, `test_futex_logic`, `test_futex_timeout`) and a QEMU headless boot, ensuring Ring 3 interactions (`login.elf`) execute robustly under corrected load.
+
 ## EterOS Orchestrator Audit (2026-04-23)
 - Executed `make clean` and `make all`. Verified `build/kernel.img` and `build/initrd.img` build successfully.
 - Executed `bash tests/run_tests.sh`. Verified all host C tests passed with success.

@@ -30,7 +30,7 @@ void sem_wait(sem_t* sem) {
 
         /* Block current task */
         current->waiting_sem = (struct semaphore*)sem;
-        current->state = TASK_BLOCKED;
+        task_block();
 
         spin_unlock(&sem->lock);
 
