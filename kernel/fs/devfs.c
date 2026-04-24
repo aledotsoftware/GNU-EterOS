@@ -84,6 +84,37 @@ static uint32_t dev_null_write(fs_node_t *node, uint32_t offset, uint32_t size, 
 }
 
 /* ========================================================================= */
+/* /dev/binder Implementation (Stub for Android Compatibility)               */
+/* ========================================================================= */
+
+#define BINDER_VERSION_IOWR 0xc0046209 /* Linux ioctl code for BINDER_VERSION */
+
+struct binder_version {
+    int32_t protocol_version;
+};
+
+static ssize_t dev_binder_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset; (void)size; (void)buffer;
+    return 0;
+}
+
+static uint32_t dev_binder_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset; (void)buffer;
+    return size;
+}
+
+static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
+    (void)node;
+    if (request == BINDER_VERSION_IOWR) {
+        if (!arg) return -1;
+        struct binder_version *ver = (struct binder_version*)arg;
+        ver->protocol_version = 8; /* Current Binder protocol version */
+        return 0;
+    }
+    return -1; /* ENOTTY */
+}
+
+/* ========================================================================= */
 /* /dev/zero Implementation                                                  */
 /* ========================================================================= */
 static ssize_t dev_zero_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
@@ -830,6 +861,13 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->flags = FS_CHARDEVICE;
         fnode->ioctl = dev_fb0_ioctl;
         fnode->inode = 6;
+    } else if (strcmp(name, "binder") == 0) {
+        strlcpy(fnode->name, "binder", sizeof(fnode->name));
+        fnode->flags = FS_CHARDEVICE;
+        fnode->read = dev_binder_read;
+        fnode->write = dev_binder_write;
+        fnode->ioctl = dev_binder_ioctl;
+        fnode->inode = 7;
     } else if (strcmp(name, "shm") == 0) {
         strlcpy(fnode->name, "shm", sizeof(fnode->name));
         fnode->flags = FS_DIRECTORY;

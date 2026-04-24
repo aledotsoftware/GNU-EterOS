@@ -17,4 +17,7 @@ typedef struct shm_object {
 
 struct fs_node* shmfs_init(void);
 
+/* Creates an anonymous shared memory node (for memfd_create) */
+struct fs_node* shmfs_create_memfd(const char* name);
+
 #endif /* FS_SHMFS_H */

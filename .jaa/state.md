@@ -28,3 +28,10 @@
 - Implemented core VFS stub tests for POSIX capabilities (`test_vfs_mkdir`, `test_sys_openat`, `test_sys_rw_perms`) to validate basic OS mechanics like node type constraints.
 - Analyzed `kernel/fs/elf.c` to confirm `PT_INTERP` boundary validation and execution mapping.
 - Current build is QEMU-tested successfully loading Ring 3 `login.elf`.
+
+## Android Subsystem Compatibility Update (Current Run)
+- Conducted gap analysis between EterOS Linux compatibility and Android (Bionic/Linker) expectations.
+- Implemented `/dev/binder` stub in `kernel/fs/devfs.c` supporting the `BINDER_VERSION_IOWR` ioctl response.
+- Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
+- Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
+- Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.

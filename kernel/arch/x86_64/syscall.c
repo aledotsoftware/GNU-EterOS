@@ -462,6 +462,37 @@ static int resolve_path(int dirfd, const char* user_path, char* out_path, int si
     return ret_val;
 }
 
+#include <fs/shmfs.h>
+
+static int64_t sys_memfd_create(const char *name, unsigned int flags) {
+    (void)flags; /* We currently ignore MFD_CLOEXEC, MFD_ALLOW_SEALING, etc. */
+    if (!vmm_verify_user_access(name, 1, 0)) return -EFAULT;
+
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+
+    int fd = -1;
+    for (int i = 3; i < MAX_FD; i++) {
+        if (current->fd_table[i].node == NULL) {
+            fd = i;
+            break;
+        }
+    }
+    if (fd == -1) return -EMFILE;
+
+    /* Max name size is usually around 250 in Linux */
+    char kname[256];
+    strlcpy(kname, name, sizeof(kname));
+
+    fs_node_t* shm_node = shmfs_create_memfd(kname);
+    if (!shm_node) return -ENOMEM;
+
+    current->fd_table[fd].node = shm_node;
+    current->fd_table[fd].offset = 0;
+    current->fd_table[fd].flags = O_RDWR; /* memfd is always read/write */
+
+    return fd;
+}
 
 static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int64_t offset) {
     if (len == 0) return -EINVAL;
@@ -3242,6 +3273,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [90] = (syscall_ptr_t)sys_chmod,
     [91] = (syscall_ptr_t)sys_fchmod,
     [267] = (syscall_ptr_t)sys_readlinkat,
+    [319] = (syscall_ptr_t)sys_memfd_create,
 };
 
 static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
@@ -3340,6 +3372,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [293] = (syscall_ptr_t)sys_pipe2,
     [302] = (syscall_ptr_t)sys_prlimit64,
     [318] = (syscall_ptr_t)sys_getrandom,
+    [319] = (syscall_ptr_t)sys_memfd_create,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
     [82] = (syscall_ptr_t)sys_rename,
