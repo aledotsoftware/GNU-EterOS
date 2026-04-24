@@ -32,8 +32,13 @@ static shm_object_t* shm_create_object(const char* name) {
     obj->ref_count = 1;
     obj->lock = 0;
     
-    obj->next = shm_objects;
-    shm_objects = obj;
+    /* If name is empty, it's an anonymous memfd object, don't link it to the global list */
+    if (name && name[0] != '\0') {
+        obj->next = shm_objects;
+        shm_objects = obj;
+    } else {
+        obj->next = NULL;
+    }
     return obj;
 }
 
@@ -94,12 +99,53 @@ static void shmfs_close(fs_node_t *node) {
     spin_lock(&shm_lock);
     spin_lock(&obj->lock);
     
-    /* Note: In a full implementation, closing an FD drops a reference.
-       Unlinking removes the name. The object is freed when both reach 0. 
-       Eterland requires shm_unlink to remove it. */
+    obj->ref_count--;
+    int should_free = 0;
+
+    /* If it's an anonymous object (memfd), free it when ref count reaches 0 */
+    if (obj->ref_count == 0 && obj->name[0] == '\0') {
+        should_free = 1;
+    }
     
     spin_unlock(&obj->lock);
+
+    if (should_free) {
+        shm_free_object(obj);
+    }
     spin_unlock(&shm_lock);
+}
+
+int shmfs_truncate(fs_node_t *node, uint32_t length);
+
+fs_node_t* shmfs_create_memfd(const char* name) {
+    shm_object_t* obj = shm_create_object(""); /* Empty name = anonymous */
+    if (!obj) return NULL;
+
+    /* We optionally copy the name just for debugging/display, but keep it out of the global list.
+       Actually, `memfd_create` names are just for debugging in `/proc/self/maps`.
+       For our implementation, empty name means anonymous. We can store the debug name in node->name. */
+
+    fs_node_t *fnode = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+    if (!fnode) {
+        shm_free_object(obj);
+        return NULL;
+    }
+    memset(fnode, 0, sizeof(fs_node_t));
+
+    strlcpy(fnode->name, name ? name : "memfd", sizeof(fnode->name));
+    fnode->flags = FS_FILE;
+    fnode->impl = (uintptr_t)obj;
+    fnode->length = obj->size;
+
+    fnode->read = shmfs_read;
+    fnode->write = shmfs_write;
+    fnode->open = shmfs_open;
+    fnode->close = shmfs_close;
+    fnode->truncate = shmfs_truncate;
+
+    fnode->ref_count = 1;
+
+    return fnode;
 }
 
 int shmfs_truncate(fs_node_t *node, uint32_t length) {

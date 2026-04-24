@@ -257,6 +257,7 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
 #define MOCK_SCHEDULE_DEFINED
 /* schedule mocked */
 #endif
+fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*)malloc(sizeof(fs_node_t)); }
 #include "../kernel/arch/x86_64/syscall.c"
 
 int main() {

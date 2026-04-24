@@ -77,6 +77,8 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
 #define MOCK_SCHEDULE_DEFINED
 /* schedule mocked */
 #endif
+#include <stdlib.h>
+fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*)malloc(sizeof(fs_node_t)); }
 #include "../kernel/arch/x86_64/syscall.c"
 
 fs_node_t *fs_root = NULL;
