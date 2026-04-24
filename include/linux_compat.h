@@ -3,6 +3,12 @@
 
 #include <types.h>
 
+/* arch_prctl codes */
+#define ARCH_SET_GS 0x1001
+#define ARCH_SET_FS 0x1002
+#define ARCH_GET_FS 0x1003
+#define ARCH_GET_GS 0x1004
+
 /* Linux x86_64 stat structure for ABI compatibility */
 struct linux_stat {
     uint64_t st_dev;

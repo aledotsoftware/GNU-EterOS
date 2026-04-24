@@ -471,6 +471,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     if (!(flags & 0x03)) {
         if (current && current->os_abi == ELFOSABI_LINUX && fd != -1) {
             /* Allow file-backed mmap without MAP_ANONYMOUS in Linux ABI */
+            flags |= MAP_PRIVATE;
         } else {
             return -ENODEV;
         }
@@ -715,9 +716,6 @@ static int64_t sys_pipe(int* pipefd) {
     return sys_pipe2(pipefd, 0);
 }
 
-#define ARCH_SET_GS 0x1001
-#define ARCH_SET_FS 0x1002
-
 struct utsname {
     char sysname[65]; char nodename[65]; char release[65]; char version[65]; char machine[65]; char domainname[65];
 };
@@ -791,6 +789,7 @@ static int check_node_permission(fs_node_t* node, uint32_t req_mask) {
 }
 
 static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
+    if (!vmm_verify_user_access(path, 1, 0)) return -EFAULT;
     char* kpath = (char*)kmalloc(256);
     if (!kpath) return -ENOMEM;
     int res = resolve_path(dirfd, path, kpath, 256);
@@ -1053,6 +1052,10 @@ static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t buf
         kfree(node);
         kfree(kpath);
         return -EINVAL; // Not a symlink
+    }
+
+    if (read_bytes >= 0 && read_bytes < (ssize_t)bufsiz) {
+        buf[read_bytes] = '\0';
     }
 
     kfree(node);
@@ -1517,8 +1520,23 @@ static int64_t sys_brk(uint64_t brk) {
 /* TLS support via arch_prctl */
 static int64_t sys_arch_prctl(int code, uint64_t addr) {
     task_t* current = task_get_current();
-    if (code == ARCH_SET_FS) { current->fs_base = addr; wrmsr(MSR_FS_BASE, addr); return 0; }
-    else if (code == ARCH_SET_GS) { current->gs_base = addr; wrmsr(MSR_KERNEL_GS_BASE, addr); return 0; }
+    if (code == ARCH_SET_FS) {
+        current->fs_base = addr;
+        wrmsr(MSR_FS_BASE, addr);
+        return 0;
+    } else if (code == ARCH_SET_GS) {
+        current->gs_base = addr;
+        wrmsr(MSR_KERNEL_GS_BASE, addr);
+        return 0;
+    } else if (code == ARCH_GET_FS) {
+        if (!vmm_verify_user_access((void*)addr, sizeof(uint64_t), 1)) return -EFAULT;
+        *(uint64_t*)addr = current->fs_base;
+        return 0;
+    } else if (code == ARCH_GET_GS) {
+        if (!vmm_verify_user_access((void*)addr, sizeof(uint64_t), 1)) return -EFAULT;
+        *(uint64_t*)addr = current->gs_base;
+        return 0;
+    }
     return -EINVAL;
 }
 
@@ -1834,7 +1852,7 @@ struct kernel_sigaction {
 static int64_t sys_rt_sigaction(int sig, const struct kernel_sigaction* act,
                                 struct kernel_sigaction* oldact, size_t sigsetsize) {
     if (sigsetsize != 8) return -EINVAL;
-    if (sig < 1 || sig > 31) return -EINVAL;
+    if (sig < 1 || sig > 64) return -EINVAL;
     if (sig == SIGKILL || sig == SIGSTOP) return -EINVAL;
     task_t* current = task_get_current();
     if (oldact) {
@@ -1873,11 +1891,11 @@ static int64_t sys_rt_sigprocmask(int how, const uint64_t* set, uint64_t* oldset
     }
     if (set) {
         if (!vmm_verify_user_access(set, sizeof(uint64_t), 0)) return -EFAULT;
-        if (how == SIG_BLOCK) current->signal_mask |= (uint32_t)*set;
-        else if (how == SIG_UNBLOCK) current->signal_mask &= ~(uint32_t)*set;
-        else if (how == SIG_SETMASK) current->signal_mask = (uint32_t)*set;
+        if (how == SIG_BLOCK) current->signal_mask |= *set;
+        else if (how == SIG_UNBLOCK) current->signal_mask &= ~(*set);
+        else if (how == SIG_SETMASK) current->signal_mask = *set;
         else return -EINVAL;
-        current->signal_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
+        current->signal_mask &= ~((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)));
     }
     return 0;
 }

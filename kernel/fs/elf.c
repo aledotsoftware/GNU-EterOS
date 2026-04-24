@@ -71,7 +71,11 @@ int elf_get_interp(const char* path, char* out_interp, uint32_t out_interp_size)
         }
 
         /* Ensure NUL termination even if malformed payload omitted it. */
-        out_interp[phdr.p_filesz - 1] = '\0';
+        if (phdr.p_filesz < out_interp_size) {
+            out_interp[phdr.p_filesz] = '\0';
+        } else {
+            out_interp[out_interp_size - 1] = '\0';
+        }
         kfree(node);
         return 1;
     }

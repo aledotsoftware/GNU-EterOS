@@ -1,9 +1,11 @@
-## EterOS VFS Update (Current Run)
-- Addressed multiple POSIX and security gaps in `kernel/fs/initrd.c` and `kernel/fs/vfs.c`.
-- Fixed buffer overflows in `initrd_readdir` and `initrd_finddir` by properly capping `file_headers[i].name` string copies to 64 chars and ensuring null-termination.
-- Implemented robust nested path handling in `initrd_mkdir` by capturing and resolving the parent's directory prefix, preventing incorrect sub-directory indexing and `/etc/test` creation failures.
-- Enabled test suite execution with fixes for `test_initrd_overflow` which explicitly verifies the length limits and leak prevention.
-- All host tests, including newly enabled initrd bounds checks, are passing successfully.
+## EterOS Aether Linux Subsystem (Current Run)
+- Hardened `kernel/fs/elf.c` to prevent string bounds checking bypasses and buffer overflows during `PT_INTERP` extraction by safely capping `out_interp` size.
+- Hardened `kernel/arch/x86_64/syscall.c` `sys_mmap` to automatically add `MAP_PRIVATE` for ABI compatibility when no mapping flags are provided by Linux binaries.
+- Refactored `sys_arch_prctl` to correctly read `MSR_FS_BASE` and `MSR_KERNEL_GS_BASE` for `ARCH_GET_FS` and `ARCH_GET_GS`, copying safely to userspace using `vmm_verify_user_access`.
+- Extented `sys_rt_sigaction` to support up to 64 signals instead of 31 for full `sigset_t` compliance.
+- Fixed `sys_rt_sigprocmask` to use 64-bit masks by using `1ULL` shifts to avoid undefined behavior overflow.
+- Secured `sys_openat` with explicit `vmm_verify_user_access` boundary checks.
+- Added explicit NUL-termination for `sys_readlinkat` when the read size is strictly smaller than the requested buffer.
 
 # JAA Context State
 
