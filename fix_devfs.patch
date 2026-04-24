@@ -1,0 +1,19 @@
+<<<<<<< SEARCH
+    if (request == BINDER_VERSION_IOWR) {
+        struct binder_version* ver = (struct binder_version*)arg;
+        if (!vmm_verify_user_access(ver, sizeof(struct binder_version), 1)) {
+            return -EFAULT;
+        }
+        ver->protocol_version = 8;
+        return 0;
+    }
+=======
+    if (request == (unsigned int)BINDER_VERSION_IOWR) {
+        struct binder_version* ver = (struct binder_version*)arg;
+        if (!vmm_verify_user_access(ver, sizeof(struct binder_version), 1)) {
+            return -EFAULT;
+        }
+        ver->protocol_version = 8;
+        return 0;
+    }
+>>>>>>> REPLACE

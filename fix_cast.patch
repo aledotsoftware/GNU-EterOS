@@ -1,0 +1,7 @@
+<<<<<<< SEARCH
+static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
+    [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
+=======
+static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
+    [0 ... MAX_SYSCALL_NUM - 1] = (syscall_ptr_t)sys_ni_syscall,
+>>>>>>> REPLACE

@@ -105,7 +105,7 @@ static uint32_t dev_binder_write(fs_node_t *node, uint32_t offset, uint32_t size
 
 static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
     (void)node;
-    if (request == BINDER_VERSION_IOWR) {
+    if ((unsigned int)request == (unsigned int)BINDER_VERSION_IOWR) {
         if (!arg) return -1;
         struct binder_version *ver = (struct binder_version*)arg;
         ver->protocol_version = 8; /* Current Binder protocol version */

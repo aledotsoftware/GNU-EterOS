@@ -630,7 +630,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     return virt;
 }
 
-static int64_t sys_socket(int domain, int type, int protocol) {
+__attribute__((unused)) static int64_t sys_socket(int domain, int type, int protocol) {
     if (domain != AF_INET) return -EAFNOSUPPORT;
     if (type != SOCK_STREAM) return -EPROTOTYPE;
     if (protocol != 0 && protocol != IPPROTO_TCP) return -EPROTONOSUPPORT;
@@ -671,7 +671,7 @@ static int64_t sys_socket(int domain, int type, int protocol) {
     return fd;
 }
 
-static int64_t sys_connect(int fd, const struct sockaddr_old* addr, int addrlen) {
+__attribute__((unused)) static int64_t sys_connect(int fd, const struct sockaddr_old* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
     if (addrlen < (int)sizeof(struct sockaddr_in_old)) return -EINVAL;
 
@@ -1783,7 +1783,7 @@ static int64_t sys_dup2(int oldfd, int newfd) {
     return newfd;
 }
 
-static int64_t sys_bind(int fd, const struct sockaddr_old* addr, int addrlen) {
+__attribute__((unused)) static int64_t sys_bind(int fd, const struct sockaddr_old* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
     if (addrlen < (int)sizeof(struct sockaddr_in_old)) return -EINVAL;
     task_t* current = task_get_current();
@@ -1800,7 +1800,7 @@ static int64_t sys_bind(int fd, const struct sockaddr_old* addr, int addrlen) {
     return 0;
 }
 
-static int64_t sys_listen(int fd, int backlog) {
+__attribute__((unused)) static int64_t sys_listen(int fd, int backlog) {
     (void)backlog;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -1831,12 +1831,12 @@ static int64_t sys_accept(int fd, struct sockaddr_old* addr, int* addrlen) {
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_accept4(int fd, struct sockaddr_old* addr, int* addrlen, int flags) {
+__attribute__((unused)) static int64_t sys_accept4(int fd, struct sockaddr_old* addr, int* addrlen, int flags) {
     (void)flags;
     return sys_accept(fd, addr, addrlen);
 }
 
-static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr_old* dest_addr, int addrlen) {
+__attribute__((unused)) static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr_old* dest_addr, int addrlen) {
     if (!vmm_verify_user_access(buf, len, 0)) return -EFAULT;
     if (dest_addr && !vmm_verify_user_access(dest_addr, addrlen, 0)) return -EFAULT;
     task_t* current = task_get_current();
@@ -1849,7 +1849,7 @@ static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const 
     return res;
 }
 
-static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr_old* src_addr, int* addrlen) {
+__attribute__((unused)) static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr_old* src_addr, int* addrlen) {
     if (!vmm_verify_user_access(buf, len, 1)) return -EFAULT;
     if (src_addr && !vmm_verify_user_access(src_addr, sizeof(struct sockaddr_old), 1)) return -EFAULT;
     if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
@@ -2180,39 +2180,39 @@ struct msghdr {
     int           msg_flags;
 };
 
-static int64_t sys_sendmsg(int fd, const struct msghdr* msg, int flags) {
+__attribute__((unused)) static int64_t sys_sendmsg(int fd, const struct msghdr* msg, int flags) {
     (void)fd; (void)flags;
     if (!vmm_verify_user_access(msg, sizeof(struct msghdr), 0)) return -EFAULT;
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_recvmsg(int fd, struct msghdr* msg, int flags) {
+__attribute__((unused)) static int64_t sys_recvmsg(int fd, struct msghdr* msg, int flags) {
     (void)fd; (void)flags;
     if (!vmm_verify_user_access(msg, sizeof(struct msghdr), 1)) return -EFAULT;
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_setsockopt(int fd, int level, int optname, const void* optval, int optlen) {
+__attribute__((unused)) static int64_t sys_setsockopt(int fd, int level, int optname, const void* optval, int optlen) {
     (void)fd; (void)level; (void)optname; (void)optval; (void)optlen;
     return 0; // Pretend success for compatibility
 }
 
-static int64_t sys_getsockopt(int fd, int level, int optname, void* optval, int* optlen) {
+__attribute__((unused)) static int64_t sys_getsockopt(int fd, int level, int optname, void* optval, int* optlen) {
     (void)fd; (void)level; (void)optname; (void)optval; (void)optlen;
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_getpeername(int fd, struct sockaddr_old* addr, int* addrlen) {
+__attribute__((unused)) static int64_t sys_getpeername(int fd, struct sockaddr_old* addr, int* addrlen) {
     (void)fd; (void)addr; (void)addrlen;
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_getsockname(int fd, struct sockaddr_old* addr, int* addrlen) {
+__attribute__((unused)) static int64_t sys_getsockname(int fd, struct sockaddr_old* addr, int* addrlen) {
     (void)fd; (void)addr; (void)addrlen;
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_shutdown(int fd, int how) {
+__attribute__((unused)) static int64_t sys_shutdown(int fd, int how) {
     (void)how;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -3155,7 +3155,7 @@ static int64_t sys_exit_wrapper(int status) {
 
 typedef int64_t (*syscall_ptr_t)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
-static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
+__attribute__((unused)) static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     (void)a1; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6;
     return -ENOSYS;
 }
@@ -3165,23 +3165,9 @@ static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4
 #pragma GCC diagnostic ignored "-Woverride-init"
 
 
-extern int sys_ni_syscall(int domain, int type, int protocol);
-extern int sys_ni_syscall(int fd, const void *name, int namelen);
-extern int sys_ni_syscall(int fd, int backlog);
-extern int sys_ni_syscall(int fd, void *addr, int *addrlen);
-extern int sys_ni_syscall(int fd, const void *name, int namelen);
-extern int sys_ni_syscall(int fd, const void *data, size_t size, int flags, const void *to, int tolen);
-extern int sys_ni_syscall(int fd, void *mem, size_t len, int flags, void *from, int *fromlen);
-extern int sys_ni_syscall(int fd, const void *msg, int flags);
-extern int sys_ni_syscall(int fd, void *msg, int flags);
-extern int sys_ni_syscall(int fd, int how);
-extern int sys_ni_syscall(int fd, void *name, int *namelen);
-extern int sys_ni_syscall(int fd, void *name, int *namelen);
-extern int sys_ni_syscall(int fd, int level, int optname, const void *optval, int optlen);
-extern int sys_ni_syscall(int fd, int level, int optname, void *optval, int *optlen);
 
 static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
-    [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
+    [0 ... MAX_SYSCALL_NUM - 1] = (syscall_ptr_t)sys_ni_syscall,
     [0] = (syscall_ptr_t)sys_read,
     [1] = (syscall_ptr_t)sys_write,
     [2] = (syscall_ptr_t)sys_open,
@@ -3293,7 +3279,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
 };
 
 static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
-    [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
+    [0 ... MAX_SYSCALL_NUM - 1] = (syscall_ptr_t)sys_ni_syscall,
     [0] = (syscall_ptr_t)sys_read,
     [1] = (syscall_ptr_t)sys_write,
     [2] = (syscall_ptr_t)sys_open,
@@ -3401,7 +3387,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
 
 
 static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
-    [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
+    [0 ... MAX_SYSCALL_NUM - 1] = (syscall_ptr_t)sys_ni_syscall,
     [3] = (syscall_ptr_t)sys_read,
     [4] = (syscall_ptr_t)sys_write,
     [5] = (syscall_ptr_t)sys_open,
