@@ -185,10 +185,24 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/drivers/disk/partition.c \
               $(KERNEL_DIR)/fs/elf.c \
               $(KERNEL_DIR)/drivers/net/e1000.c \
-              $(KERNEL_DIR)/apps/wget.c
+              $(KERNEL_DIR)/apps/wget.c \
+              $(KERNEL_DIR)/net/socket.c \
+              $(KERNEL_DIR)/net/compat.c
 
 NET_CORE_SRCS = $(KERNEL_DIR)/net/core/ip_utils.c \
-                $(KERNEL_DIR)/net/mock.c
+                $(KERNEL_DIR)/net/core/dhcp.c \
+                $(KERNEL_DIR)/net/core/nic.c \
+                $(KERNEL_DIR)/net/mock.c \
+                $(LWIP_SRCS) \
+                $(KERNEL_DIR)/net/lwip/src/api/api_lib.c \
+                $(KERNEL_DIR)/net/lwip/src/api/api_msg.c \
+                $(KERNEL_DIR)/net/lwip/src/api/err.c \
+                $(KERNEL_DIR)/net/lwip/src/api/if_api.c \
+                $(KERNEL_DIR)/net/lwip/src/api/netbuf.c \
+                $(KERNEL_DIR)/net/lwip/src/api/netdb.c \
+                $(KERNEL_DIR)/net/lwip/src/api/netifapi.c \
+                $(KERNEL_DIR)/net/lwip/src/api/sockets.c \
+                $(KERNEL_DIR)/net/lwip/src/api/tcpip.c
 
 NET_CORE_OBJS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(NET_CORE_SRCS))
 
@@ -271,6 +285,7 @@ dirs:
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/core
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/core/ipv4
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/netif
+	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip/src/api
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/net/lwip_port
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/pci
 	@mkdir -p $(BUILD_DIR)/$(KERNEL_DIR)/drivers/disk

@@ -68,7 +68,7 @@ void wget_run(const char* url_in) {
         return;
     }
     
-    struct sockaddr_in addr;
+    struct sockaddr_in_old addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     addr.sin_addr = ip;

@@ -121,7 +121,7 @@ int net_recv(socket_t sock, void* buf, int len, int flags) { return 0; }
 int net_send(socket_t sock, const void* buf, int len, int flags) { return 0; }
 int net_close(socket_t sock) { return 0; }
 socket_t net_socket(int domain, int type, int protocol) { return -1; }
-int net_connect(socket_t sock, const struct sockaddr_in* addr, int addrlen) { return -1; }
+int net_connect(socket_t sock, const struct sockaddr_in_old* addr, int addrlen) { return -1; }
 
 /* Stub Futex */
 int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) { return 0; }
@@ -169,6 +169,22 @@ int eteros_snprintf(char* str, size_t size, const char* format, ...) {
 
 /* Include source */
 fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*)malloc(sizeof(fs_node_t)); }
+
+int sys_lwip_socket(int domain, int type, int protocol) { return -1; }
+int sys_lwip_connect(int fd, const void* addr, int addrlen) { return -1; }
+int sys_lwip_bind(int fd, const void* addr, int addrlen) { return -1; }
+int sys_lwip_accept(int fd, void* addr, int* addrlen) { return -1; }
+int sys_lwip_listen(int fd, int backlog) { return -1; }
+int sys_lwip_sendto(int fd, const void* buf, size_t len, int flags, const void* dest_addr, int addrlen) { return -1; }
+int sys_lwip_recvfrom(int fd, void* buf, size_t len, int flags, void* src_addr, int* addrlen) { return -1; }
+int sys_lwip_sendmsg(int fd, const void* msg, int flags) { return -1; }
+int sys_lwip_recvmsg(int fd, void* msg, int flags) { return -1; }
+int sys_lwip_shutdown(int fd, int how) { return -1; }
+int sys_lwip_getsockname(int fd, void* addr, int* addrlen) { return -1; }
+int sys_lwip_getpeername(int fd, void* addr, int* addrlen) { return -1; }
+int sys_lwip_setsockopt(int fd, int level, int optname, const void* optval, int optlen) { return -1; }
+int sys_lwip_getsockopt(int fd, int level, int optname, void* optval, int* optlen) { return -1; }
+
 #include "../kernel/arch/x86_64/syscall.c"
 
 int main() {

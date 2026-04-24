@@ -16,7 +16,7 @@ uint32_t my_ip = 0;
 uint32_t gateway_ip = 0;
 uint32_t dns_ip = 0;
 uint8_t gateway_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-int network_ready = 0;
+volatile int network_ready = 0;
 
 socket_entry_t socket_table[MAX_SOCKETS];
 
@@ -239,7 +239,7 @@ socket_t net_socket(int domain, int type, int protocol) {
     return -1;
 }
 
-int net_connect(socket_t sock, const struct sockaddr_in* addr, int addrlen) {
+int net_connect(socket_t sock, const struct sockaddr_in_old* addr, int addrlen) {
     (void)addrlen;
     socket_entry_t* s = get_socket(sock);
     if (!s) return -1;

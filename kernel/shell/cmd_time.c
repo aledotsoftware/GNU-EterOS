@@ -71,7 +71,7 @@ void cmd_ntp(const char* args) {
         return;
     }
 
-    struct sockaddr_in addr;
+    struct sockaddr_in_old addr;
     addr.sin_family = AF_INET;
     addr.sin_port = bswap_32(123) >> 16; // Port 123 (Network byte order)
 

@@ -671,9 +671,9 @@ static int64_t sys_socket(int domain, int type, int protocol) {
     return fd;
 }
 
-static int64_t sys_connect(int fd, const struct sockaddr* addr, int addrlen) {
+static int64_t sys_connect(int fd, const struct sockaddr_old* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
-    if (addrlen < (int)sizeof(struct sockaddr_in)) return -EINVAL;
+    if (addrlen < (int)sizeof(struct sockaddr_in_old)) return -EINVAL;
 
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -682,7 +682,7 @@ static int64_t sys_connect(int fd, const struct sockaddr* addr, int addrlen) {
     fs_node_t* node = current->fd_table[fd].node;
     if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
 
-    struct sockaddr_in* sin = (struct sockaddr_in*)addr;
+    struct sockaddr_in_old* sin = (struct sockaddr_in_old*)addr;
     if (sin->sin_family != AF_INET) return -EAFNOSUPPORT;
 
     int res = net_connect((int)node->inode, sin, addrlen);
@@ -1783,15 +1783,15 @@ static int64_t sys_dup2(int oldfd, int newfd) {
     return newfd;
 }
 
-static int64_t sys_bind(int fd, const struct sockaddr* addr, int addrlen) {
+static int64_t sys_bind(int fd, const struct sockaddr_old* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
-    if (addrlen < (int)sizeof(struct sockaddr_in)) return -EINVAL;
+    if (addrlen < (int)sizeof(struct sockaddr_in_old)) return -EINVAL;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
     if (!current->fd_table[fd].node) return -EBADF;
     fs_node_t* node = current->fd_table[fd].node;
     if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    struct sockaddr_in* sin = (struct sockaddr_in*)addr;
+    struct sockaddr_in_old* sin = (struct sockaddr_in_old*)addr;
     if (sin->sin_family != AF_INET) return -EAFNOSUPPORT;
     socket_entry_t* s = get_socket((int)node->inode);
     if (!s) return -EBADF;
@@ -1813,9 +1813,9 @@ static int64_t sys_listen(int fd, int backlog) {
     return 0;
 }
 
-static int64_t sys_accept(int fd, struct sockaddr* addr, int* addrlen) {
+static int64_t sys_accept(int fd, struct sockaddr_old* addr, int* addrlen) {
 
-    if (addr && !vmm_verify_user_access(addr, sizeof(struct sockaddr), 1)) return -EFAULT;
+    if (addr && !vmm_verify_user_access(addr, sizeof(struct sockaddr_old), 1)) return -EFAULT;
     if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
 
     task_t* current = task_get_current();
@@ -1831,12 +1831,12 @@ static int64_t sys_accept(int fd, struct sockaddr* addr, int* addrlen) {
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_accept4(int fd, struct sockaddr* addr, int* addrlen, int flags) {
+static int64_t sys_accept4(int fd, struct sockaddr_old* addr, int* addrlen, int flags) {
     (void)flags;
     return sys_accept(fd, addr, addrlen);
 }
 
-static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr* dest_addr, int addrlen) {
+static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr_old* dest_addr, int addrlen) {
     if (!vmm_verify_user_access(buf, len, 0)) return -EFAULT;
     if (dest_addr && !vmm_verify_user_access(dest_addr, addrlen, 0)) return -EFAULT;
     task_t* current = task_get_current();
@@ -1849,9 +1849,9 @@ static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const 
     return res;
 }
 
-static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr* src_addr, int* addrlen) {
+static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr_old* src_addr, int* addrlen) {
     if (!vmm_verify_user_access(buf, len, 1)) return -EFAULT;
-    if (src_addr && !vmm_verify_user_access(src_addr, sizeof(struct sockaddr), 1)) return -EFAULT;
+    if (src_addr && !vmm_verify_user_access(src_addr, sizeof(struct sockaddr_old), 1)) return -EFAULT;
     if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
     task_t* current = task_get_current();
     if (fd < 0 || fd >= MAX_FD) return -EBADF;
@@ -1861,13 +1861,13 @@ static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct soc
     int res = net_recv((int)node->inode, buf, len, flags);
     if (res < 0) return res;
     if (src_addr && addrlen) {
-        struct sockaddr_in* sin = (struct sockaddr_in*)src_addr;
+        struct sockaddr_in_old* sin = (struct sockaddr_in_old*)src_addr;
         socket_entry_t* s = get_socket((int)node->inode);
-        if (s && *addrlen >= (int)sizeof(struct sockaddr_in)) {
+        if (s && *addrlen >= (int)sizeof(struct sockaddr_in_old)) {
             sin->sin_family = AF_INET;
             sin->sin_port = htons(s->remote_port);
             sin->sin_addr = s->remote_ip;
-            *addrlen = sizeof(struct sockaddr_in);
+            *addrlen = sizeof(struct sockaddr_in_old);
         }
     }
     return res;
@@ -2202,12 +2202,12 @@ static int64_t sys_getsockopt(int fd, int level, int optname, void* optval, int*
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_getpeername(int fd, struct sockaddr* addr, int* addrlen) {
+static int64_t sys_getpeername(int fd, struct sockaddr_old* addr, int* addrlen) {
     (void)fd; (void)addr; (void)addrlen;
     return -EOPNOTSUPP;
 }
 
-static int64_t sys_getsockname(int fd, struct sockaddr* addr, int* addrlen) {
+static int64_t sys_getsockname(int fd, struct sockaddr_old* addr, int* addrlen) {
     (void)fd; (void)addr; (void)addrlen;
     return -EOPNOTSUPP;
 }
@@ -3164,6 +3164,22 @@ static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4
 #pragma GCC diagnostic ignored "-Wcast-function-type"
 #pragma GCC diagnostic ignored "-Woverride-init"
 
+
+extern int sys_lwip_socket(int domain, int type, int protocol);
+extern int sys_lwip_bind(int fd, const void *name, int namelen);
+extern int sys_lwip_listen(int fd, int backlog);
+extern int sys_lwip_accept(int fd, void *addr, int *addrlen);
+extern int sys_lwip_connect(int fd, const void *name, int namelen);
+extern int sys_lwip_sendto(int fd, const void *data, size_t size, int flags, const void *to, int tolen);
+extern int sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, void *from, int *fromlen);
+extern int sys_lwip_sendmsg(int fd, const void *msg, int flags);
+extern int sys_lwip_recvmsg(int fd, void *msg, int flags);
+extern int sys_lwip_shutdown(int fd, int how);
+extern int sys_lwip_getsockname(int fd, void *name, int *namelen);
+extern int sys_lwip_getpeername(int fd, void *name, int *namelen);
+extern int sys_lwip_setsockopt(int fd, int level, int optname, const void *optval, int optlen);
+extern int sys_lwip_getsockopt(int fd, int level, int optname, void *optval, int *optlen);
+
 static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
     [0] = (syscall_ptr_t)sys_read,
@@ -3195,20 +3211,20 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [33] = (syscall_ptr_t)sys_dup2,
     [35] = (syscall_ptr_t)sys_nanosleep,
     [39] = (syscall_ptr_t)sys_getpid,
-    [41] = (syscall_ptr_t)sys_socket,
-    [42] = (syscall_ptr_t)sys_connect,
-    [43] = (syscall_ptr_t)sys_accept,
-    [44] = (syscall_ptr_t)sys_sendto,
-    [45] = (syscall_ptr_t)sys_recvfrom,
-    [46] = (syscall_ptr_t)sys_sendmsg,
-    [47] = (syscall_ptr_t)sys_recvmsg,
-    [48] = (syscall_ptr_t)sys_shutdown,
-    [49] = (syscall_ptr_t)sys_bind,
-    [50] = (syscall_ptr_t)sys_listen,
-    [51] = (syscall_ptr_t)sys_getsockname,
-    [52] = (syscall_ptr_t)sys_getpeername,
-    [54] = (syscall_ptr_t)sys_setsockopt,
-    [55] = (syscall_ptr_t)sys_getsockopt,
+    [41] = (syscall_ptr_t)sys_lwip_socket,
+    [42] = (syscall_ptr_t)sys_lwip_connect,
+    [43] = (syscall_ptr_t)sys_lwip_accept,
+    [44] = (syscall_ptr_t)sys_lwip_sendto,
+    [45] = (syscall_ptr_t)sys_lwip_recvfrom,
+    [46] = (syscall_ptr_t)sys_lwip_sendmsg,
+    [47] = (syscall_ptr_t)sys_lwip_recvmsg,
+    [48] = (syscall_ptr_t)sys_lwip_shutdown,
+    [49] = (syscall_ptr_t)sys_lwip_bind,
+    [50] = (syscall_ptr_t)sys_lwip_listen,
+    [51] = (syscall_ptr_t)sys_lwip_getsockname,
+    [52] = (syscall_ptr_t)sys_lwip_getpeername,
+    [54] = (syscall_ptr_t)sys_lwip_setsockopt,
+    [55] = (syscall_ptr_t)sys_lwip_getsockopt,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
@@ -3258,7 +3274,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [271] = (syscall_ptr_t)sys_ppoll,
     [273] = (syscall_ptr_t)sys_set_robust_list,
     [280] = (syscall_ptr_t)sys_utimensat,
-    [288] = (syscall_ptr_t)sys_accept4,
+    [288] = (syscall_ptr_t)sys_lwip_accept,
     [290] = (syscall_ptr_t)sys_eventfd2,
     [291] = (syscall_ptr_t)sys_epoll_create1,
     [292] = (syscall_ptr_t)sys_dup3,
@@ -3303,20 +3319,20 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [33] = (syscall_ptr_t)sys_dup2,
     [35] = (syscall_ptr_t)sys_nanosleep,
     [39] = (syscall_ptr_t)sys_getpid,
-    [41] = (syscall_ptr_t)sys_socket,
-    [42] = (syscall_ptr_t)sys_connect,
-    [43] = (syscall_ptr_t)sys_accept,
-    [44] = (syscall_ptr_t)sys_sendto,
-    [45] = (syscall_ptr_t)sys_recvfrom,
-    [46] = (syscall_ptr_t)sys_sendmsg,
-    [47] = (syscall_ptr_t)sys_recvmsg,
-    [48] = (syscall_ptr_t)sys_shutdown,
-    [49] = (syscall_ptr_t)sys_bind,
-    [50] = (syscall_ptr_t)sys_listen,
-    [51] = (syscall_ptr_t)sys_getsockname,
-    [52] = (syscall_ptr_t)sys_getpeername,
-    [54] = (syscall_ptr_t)sys_setsockopt,
-    [55] = (syscall_ptr_t)sys_getsockopt,
+    [41] = (syscall_ptr_t)sys_lwip_socket,
+    [42] = (syscall_ptr_t)sys_lwip_connect,
+    [43] = (syscall_ptr_t)sys_lwip_accept,
+    [44] = (syscall_ptr_t)sys_lwip_sendto,
+    [45] = (syscall_ptr_t)sys_lwip_recvfrom,
+    [46] = (syscall_ptr_t)sys_lwip_sendmsg,
+    [47] = (syscall_ptr_t)sys_lwip_recvmsg,
+    [48] = (syscall_ptr_t)sys_lwip_shutdown,
+    [49] = (syscall_ptr_t)sys_lwip_bind,
+    [50] = (syscall_ptr_t)sys_lwip_listen,
+    [51] = (syscall_ptr_t)sys_lwip_getsockname,
+    [52] = (syscall_ptr_t)sys_lwip_getpeername,
+    [54] = (syscall_ptr_t)sys_lwip_setsockopt,
+    [55] = (syscall_ptr_t)sys_lwip_getsockopt,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
@@ -3365,7 +3381,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [271] = (syscall_ptr_t)sys_ppoll,
     [273] = (syscall_ptr_t)sys_set_robust_list,
     [280] = (syscall_ptr_t)sys_utimensat,
-    [288] = (syscall_ptr_t)sys_accept4,
+    [288] = (syscall_ptr_t)sys_lwip_accept,
     [290] = (syscall_ptr_t)sys_eventfd2,
     [291] = (syscall_ptr_t)sys_epoll_create1,
     [292] = (syscall_ptr_t)sys_dup3,

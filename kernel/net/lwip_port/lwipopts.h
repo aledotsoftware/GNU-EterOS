@@ -6,7 +6,7 @@
 #define SYS_LIGHTWEIGHT_PROT    0
 #define LWIP_SOCKET             1
 #define LWIP_COMPAT_SOCKETS     0
-#define LWIP_TIMEVAL_PRIVATE    0
+#define LWIP_TIMEVAL_PRIVATE    1
 #define LWIP_NETCONN            1
 
 /* Memory */
@@ -49,3 +49,5 @@
 #define CHECKSUM_CHECK_TCP      1
 
 #endif /* __LWIP_OPTS_H__ */
+
+#define LWIP_PROVIDE_ERRNO 1
