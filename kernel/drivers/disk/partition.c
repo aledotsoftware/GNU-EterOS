@@ -2,6 +2,7 @@
 #include <mm.h>
 #include <string.h>
 #include <hal.h>
+#include <nvram.h>
 
 #define MBR_SIGNATURE 0xAA55
 #define MBR_OFFSET_PARTITION_TABLE 446
@@ -234,18 +235,19 @@ static fs_node_t *create_partition_node(int index) {
 }
 
 fs_node_t *partition_get_active_root(void) {
-    if (active_partition_index == -1) return NULL;
-    return create_partition_node(active_partition_index);
+    if (partition_count == 0) return NULL;
+    uint8_t boot_part = nvram_get_boot_partition();
+    if (boot_part >= partition_count) boot_part = 0; // Fallback to 0 if NVRAM is corrupt/invalid
+    return create_partition_node(boot_part);
 }
 
 fs_node_t *partition_get_passive_root(void) {
     if (partition_count < 2) return NULL;
 
-    // Simple A/B logic: Flip between 0 and 1
-    // If active is 0, passive is 1. If active is 1, passive is 0.
-    // If active is > 1, this logic fails, but for standard A/B usually it's slot 0 and 1.
-    int passive_index = (active_partition_index == 0) ? 1 : 0;
+    uint8_t boot_part = nvram_get_boot_partition();
+    if (boot_part >= partition_count) boot_part = 0;
 
+    int passive_index = (boot_part == 0) ? 1 : 0;
     if (passive_index >= partition_count) return NULL;
 
     return create_partition_node(passive_index);

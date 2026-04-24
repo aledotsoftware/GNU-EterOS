@@ -367,6 +367,14 @@ echo "Running test_vfs_mkdir..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vfs_mkdir.c -o tests/test_vfs_mkdir
 ./tests/test_vfs_mkdir
 rm tests/test_vfs_mkdir
+
+# Test OTA
+echo "---------------------------------------------------"
+echo "Running test_ota..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_ota.c kernel/string.c -o tests/test_ota_exe
+./tests/test_ota_exe
+rm tests/test_ota_exe
+
 echo "---------------------------------------------------"
 echo "Running test_syscall_sysinfo..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_sysinfo.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_sysinfo

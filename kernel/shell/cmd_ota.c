@@ -75,9 +75,9 @@ void cmd_ota(const char* args) {
         uint8_t boot_part = nvram_get_boot_partition();
         terminal_write_string("\n\n  [Slots de Arranque]:\n");
         terminal_write_string("    Slot Activo: ");
-        terminal_write_string(boot_part == 0 ? "A (0)" : "B (1)");
+        terminal_write_string(boot_part == 0 ? "A (part0)" : "B (part1)");
         terminal_write_string("\n    Slot Pendiente: ");
-        terminal_write_string(boot_part == 0 ? "B (1)" : "A (0)");
+        terminal_write_string(boot_part == 0 ? "B (part1)" : "A (part0)");
         terminal_write_string("\n\n");
     } else if (strcmp(subcmd, "seturl") == 0) {
         if (!*p) {
@@ -177,13 +177,33 @@ receive:
 
         // Leer e ignorar cabeceras HTTP hasta encontrar \r\n\r\n
         int headers_done = 0;
+        int status_code = 0;
 
         while ((len = net_recv(sock, buffer, sizeof(buffer), 0)) > 0) {
             if (!headers_done) {
+                // Parse HTTP Status code from the first line
+                if (status_code == 0 && len >= 12) {
+                    if (strncmp(buffer, "HTTP/1.", 7) == 0) {
+                        status_code = (buffer[9] - '0') * 100 + (buffer[10] - '0') * 10 + (buffer[11] - '0');
+                    }
+                }
+
                 // Busqueda ineficiente pero simple de \r\n\r\n
                 for (int j = 0; j < len - 3; j++) {
                     if (buffer[j] == '\r' && buffer[j+1] == '\n' && buffer[j+2] == '\r' && buffer[j+3] == '\n') {
                         headers_done = 1;
+
+                        if (status_code != 200) {
+                            terminal_write_string("  [OTA] Error: HTTP status code ");
+                            char code_str[16];
+                            itoa_s(status_code, code_str, sizeof(code_str), 10);
+                            terminal_write_string(code_str);
+                            terminal_write_string(" (not 200 OK).\n");
+                            kfree(payload_data);
+                            net_close(sock);
+                            return;
+                        }
+
                         int body_start = j + 4;
                         int body_len = len - body_start;
                         if (payload_size + body_len <= max_payload) {
@@ -276,10 +296,44 @@ receive:
 
         uint32_t written = write_fs(passive_part, write_offset, write_size, payload_data + data_offset);
 
-        kfree(passive_part);
-
         if (written != write_size) {
             terminal_write_string("  [OTA] ERROR: Fallo al escribir la imagen completa en el slot.\n");
+            kfree(passive_part);
+            kfree(payload_data);
+            return;
+        }
+
+        // Verify write by reading it back
+        terminal_write_string("  [OTA] Verificando escritura en disco...\n");
+        unsigned char sha256_hash_read[32];
+        SHA256_CTX ctx_read;
+        sha256_init(&ctx_read);
+
+        uint32_t read_offset = 0;
+        uint32_t remaining = write_size;
+        uint8_t *read_buf = kmalloc(4096);
+        if (!read_buf) {
+            terminal_write_string("  [OTA] ERROR: Memoria insuficiente para validacion de escritura.\n");
+            kfree(passive_part);
+            kfree(payload_data);
+            return;
+        }
+
+        while (remaining > 0) {
+            uint32_t chunk = (remaining > 4096) ? 4096 : remaining;
+            ssize_t bytes_read = read_fs(passive_part, read_offset, chunk, read_buf);
+            if (bytes_read <= 0) break;
+            sha256_update(&ctx_read, read_buf, bytes_read);
+            read_offset += bytes_read;
+            remaining -= bytes_read;
+        }
+        kfree(read_buf);
+        sha256_final(&ctx_read, sha256_hash_read);
+
+        kfree(passive_part);
+
+        if (remaining > 0) {
+            terminal_write_string("  [OTA] ERROR: Fallo lectura de verificacion de disco.\n");
             kfree(payload_data);
             return;
         }
@@ -290,11 +344,17 @@ receive:
         sha256_update(&ctx, payload_data + data_offset, write_size);
         sha256_final(&ctx, sha256_hash);
 
-        terminal_write_string("  [OTA] Bytes escritos: ");
+        if (memcmp(sha256_hash, sha256_hash_read, 32) != 0) {
+            terminal_write_string("  [OTA] ERROR CRITICO: La lectura no coincide con el hash del payload.\n");
+            kfree(payload_data);
+            return;
+        }
+
+        terminal_write_string("  [OTA] Bytes escritos y validados: ");
         char written_buf[16];
         itoa_s((int)written, written_buf, sizeof(written_buf), 10);
         terminal_write_string(written_buf);
-        terminal_write_string("\n  [OTA] SHA-256 del payload: ");
+        terminal_write_string("\n  [OTA] SHA-256 del payload verificado: ");
         for (int j = 0; j < 32; j++) {
             char hex_buf[3];
             hex_buf[0] = "0123456789ABCDEF"[sha256_hash[j] >> 4];

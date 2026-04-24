@@ -3165,20 +3165,6 @@ static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4
 #pragma GCC diagnostic ignored "-Woverride-init"
 
 
-extern int sys_ni_syscall(int domain, int type, int protocol);
-extern int sys_ni_syscall(int fd, const void *name, int namelen);
-extern int sys_ni_syscall(int fd, int backlog);
-extern int sys_ni_syscall(int fd, void *addr, int *addrlen);
-extern int sys_ni_syscall(int fd, const void *name, int namelen);
-extern int sys_ni_syscall(int fd, const void *data, size_t size, int flags, const void *to, int tolen);
-extern int sys_ni_syscall(int fd, void *mem, size_t len, int flags, void *from, int *fromlen);
-extern int sys_ni_syscall(int fd, const void *msg, int flags);
-extern int sys_ni_syscall(int fd, void *msg, int flags);
-extern int sys_ni_syscall(int fd, int how);
-extern int sys_ni_syscall(int fd, void *name, int *namelen);
-extern int sys_ni_syscall(int fd, void *name, int *namelen);
-extern int sys_ni_syscall(int fd, int level, int optname, const void *optval, int optlen);
-extern int sys_ni_syscall(int fd, int level, int optname, void *optval, int *optlen);
 
 static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
