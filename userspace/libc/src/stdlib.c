@@ -51,13 +51,86 @@ char *getenv(const char *name) {
     return NULL;
 }
 
+static int environ_allocated = 0;
+
 int setenv(const char *name, const char *value, int overwrite) {
-    (void)name;
-    (void)value;
-    (void)overwrite;
-    // Simple mock, as proper setenv requires reallocating environ array.
-    // Full implementation requires mallocing and managing memory which is out of scope for stub.
-    return -1;
+    if (!name || name[0] == '\0' || strchr(name, '=') != NULL) return -1;
+    if (!value) value = "";
+
+    size_t name_len = strlen(name);
+    size_t val_len = strlen(value);
+
+    char *new_str = malloc(name_len + val_len + 2);
+    if (!new_str) return -1;
+
+    strcpy(new_str, name);
+    new_str[name_len] = '=';
+    strcpy(new_str + name_len + 1, value);
+
+    int count = 0;
+    int found = -1;
+
+    if (environ) {
+        for (count = 0; environ[count] != NULL; count++) {
+            if (strncmp(environ[count], name, name_len) == 0 && environ[count][name_len] == '=') {
+                found = count;
+            }
+        }
+    }
+
+    if (found != -1) {
+        if (!overwrite) {
+            free(new_str);
+            return 0;
+        }
+        environ[found] = new_str;
+        /* Note: we leak the old string if it wasn't allocated by us, but it's hard to track. */
+        return 0;
+    }
+
+    /* Need to add a new entry */
+    char **new_environ = malloc((count + 2) * sizeof(char *));
+    if (!new_environ) {
+        free(new_str);
+        return -1;
+    }
+
+    if (environ) {
+        for (int i = 0; i < count; i++) {
+            new_environ[i] = environ[i];
+        }
+    }
+
+    new_environ[count] = new_str;
+    new_environ[count + 1] = NULL;
+
+    if (environ_allocated && environ) {
+        free(environ);
+    }
+
+    environ = new_environ;
+    environ_allocated = 1;
+    return 0;
+}
+
+int unsetenv(const char *name) {
+    if (!name || name[0] == '\0' || strchr(name, '=') != NULL) return -1;
+
+    if (!environ) return 0;
+
+    size_t name_len = strlen(name);
+
+    for (int i = 0; environ[i] != NULL; ) {
+        if (strncmp(environ[i], name, name_len) == 0 && environ[i][name_len] == '=') {
+            for (int j = i; environ[j] != NULL; j++) {
+                environ[j] = environ[j + 1];
+            }
+        } else {
+            i++;
+        }
+    }
+
+    return 0;
 }
 
 void abort(void) {
