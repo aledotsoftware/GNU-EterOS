@@ -59,12 +59,12 @@ static void show_splash(void) __attribute__((unused));
 extern void net_poll(void);
 extern uint32_t my_ip;
 
-extern void dhcp_discover(void);
+// extern void dhcp_discover(void);
 static bool desktop_autostart = false;
 
 static void network_task(void) {
     /* Ejecutar DHCP Discover ahora que las interrupciones y el scheduler están activos */
-    dhcp_discover();
+    // dhcp_discover();
 
     /* Process any pending packets before entering loop */
     net_poll();

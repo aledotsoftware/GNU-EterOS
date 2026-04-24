@@ -94,7 +94,7 @@ uint16_t net_checksum(void* vdata, size_t length);
 uint32_t ip_aton(const char* cp);
 
 /* Global Network State (stack.c) */
-extern int network_ready;
+extern volatile int network_ready;
 extern uint32_t my_ip;
 extern uint32_t gateway_ip;
 extern uint32_t dns_ip;

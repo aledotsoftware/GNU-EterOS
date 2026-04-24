@@ -22,12 +22,12 @@
 
 typedef int socket_t;
 
-struct sockaddr {
+struct sockaddr_old {
     uint16_t sa_family;
     char     sa_data[14];
 };
 
-struct sockaddr_in {
+struct sockaddr_in_old {
     uint16_t sin_family;
     uint16_t sin_port;
     uint32_t sin_addr;
@@ -46,7 +46,7 @@ void net_poll(void);
 socket_t net_socket(int domain, int type, int protocol);
 
 /* Connect to a remote address */
-int net_connect(socket_t sock, const struct sockaddr_in* addr, int addrlen);
+int net_connect(socket_t sock, const struct sockaddr_in_old* addr, int addrlen);
 
 /* Send data */
 int net_send(socket_t sock, const void* buf, int len, int flags);

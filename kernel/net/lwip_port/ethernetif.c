@@ -1,3 +1,5 @@
+#include <net/nic.h>
+
 /**
  * éterOS - lwIP Ethernet Interface Glue
  *

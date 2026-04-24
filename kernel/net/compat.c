@@ -1,3 +1,5 @@
+
+#include <net/dhcp.h>
 /**
  * éterOS - lwIP Compatibility Layer
  *

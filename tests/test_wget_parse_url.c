@@ -13,7 +13,7 @@ void terminal_write_string(const char* str) {}
 void terminal_putchar(char c) {}
 void task_yield(void) {}
 
-int net_connect(socket_t sock, const struct sockaddr_in* addr, int addrlen) { return -1; }
+int net_connect(socket_t sock, const struct sockaddr_in_old* addr, int addrlen) { return -1; }
 int net_send(socket_t sock, const void* buf, int len, int flags) { return -1; }
 int net_recv(socket_t sock, void* buf, int len, int flags) { return -1; }
 int net_close(socket_t sock) { return 0; }
