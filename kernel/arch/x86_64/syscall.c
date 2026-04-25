@@ -1758,15 +1758,26 @@ static int64_t sys_lstat(const char* path, struct linux_stat* buf) {
 
 
 static int64_t sys_futex(uint32_t *uaddr, int op, uint32_t val, void *timeout, uint32_t *uaddr2, uint32_t val3) {
-    (void)uaddr2; (void)val3;
+    (void)uaddr2;
     if (!vmm_verify_user_access(uaddr, 4, 1)) return -EFAULT;
 
     int cmd = op & FUTEX_CMD_MASK;
     if (cmd == FUTEX_WAIT) {
         if (timeout && !vmm_verify_user_access(timeout, sizeof(struct timespec), 0)) return -EFAULT;
-        return futex_wait(uaddr, val, timeout, op);
+        return futex_wait(uaddr, val, timeout, op, FUTEX_BITSET_MATCH_ANY);
     }
-    else if (cmd == FUTEX_WAKE) return futex_wake(uaddr, (int)val, op);
+    else if (cmd == FUTEX_WAIT_BITSET) {
+        if (timeout && !vmm_verify_user_access(timeout, sizeof(struct timespec), 0)) return -EFAULT;
+        if (val3 == 0) return -EINVAL;
+        return futex_wait(uaddr, val, timeout, op, val3);
+    }
+    else if (cmd == FUTEX_WAKE) {
+        return futex_wake(uaddr, (int)val, op, FUTEX_BITSET_MATCH_ANY);
+    }
+    else if (cmd == FUTEX_WAKE_BITSET) {
+        if (val3 == 0) return -EINVAL;
+        return futex_wake(uaddr, (int)val, op, val3);
+    }
     return -ENOSYS;
 }
 

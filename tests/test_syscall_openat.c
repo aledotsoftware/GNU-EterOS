@@ -137,8 +137,8 @@ socket_t net_socket(int domain, int type, int protocol) { return -1; }
 int net_connect(socket_t sock, const struct sockaddr_in_old* addr, int addrlen) { return -1; }
 
 /* Stub Futex */
-int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) { return 0; }
-int futex_wake(uint32_t *uaddr, int val, int op) { return 0; }
+int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint32_t bitset) { return 0; }
+int futex_wake(uint32_t *uaddr, int count, int op, uint32_t bitset) { return 0; }
 
 /* Stub PMM */
 void* pmm_alloc_page(void) { return malloc(4096); }

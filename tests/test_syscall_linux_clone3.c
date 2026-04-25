@@ -88,8 +88,8 @@ int net_send(socket_t sock, const void* buf, int len, int flags) { return 0; }
 int net_close(socket_t sock) { return 0; }
 socket_t net_socket(int domain, int type, int protocol) { return -1; }
 int net_connect(socket_t sock, const struct sockaddr_in_old* addr, int addrlen) { return -1; }
-int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) { return 0; }
-int futex_wake(uint32_t *uaddr, int val, int op) { return 0; }
+int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint32_t bitset) { return 0; }
+int futex_wake(uint32_t *uaddr, int count, int op, uint32_t bitset) { return 0; }
 void* pmm_alloc_page(void) { return malloc(4096); }
 void pmm_free_page(void* p) { free(p); }
 uint64_t hal_mem_get_phys(uint64_t virt) { return virt; }

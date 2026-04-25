@@ -35,3 +35,12 @@
 - Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
 - Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
 - Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
+## Android Subsystem Compatibility Update (Current Run)
+- Conducted gap analysis between EterOS Linux compatibility and Android (Bionic/Linker) expectations.
+- Implemented `/dev/binder` stub in `kernel/fs/devfs.c` supporting the `BINDER_VERSION_IOWR` ioctl response.
+- Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
+- Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
+- Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
+- Extended the `futex` subsystem to support `FUTEX_WAIT_BITSET` and `FUTEX_WAKE_BITSET` operations by adding a `bitset` parameter to `futex_wait` and `futex_wake`, allowing precise thread wakeup filtering required by Android's Bionic.
+- Updated `task_clone` to natively handle `CLONE_CHILD_SETTID` by writing the child's Task ID directly to the user-provided pointer using `vmm_verify_user_access`.
+- Updated all host-based tests inside `tests/` folder with new mock signatures of `futex_wait` and `futex_wake` using a bash script to fix build.
