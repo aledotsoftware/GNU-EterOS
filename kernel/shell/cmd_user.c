@@ -183,12 +183,11 @@ static void cmd_userdel(const char* args) {
     kfree(buffer);
 
     if (found) {
-        /* Hackish way to overwrite: we can't easily unlink in simple VFS. Let's overwrite /etc/shadow directly */
-        uint8_t* new_buf = kmalloc(tmp_node->length);
-        read_fs(tmp_node, 0, tmp_node->length, new_buf);
-        shadow_node->length = 0; /* truncate */
-        write_fs(shadow_node, 0, tmp_node->length, new_buf);
-        kfree(new_buf);
+        fs_node_t *etc_node2 = vfs_lookup(fs_root, "/etc");
+        if (etc_node2) unlink_fs(etc_node2, "shadow");
+        /* Note: simplified rename by lookup of parent. The old hack was using absolute paths which rename_fs does not support directly if not implemented to parse. */
+        etc_node2 = vfs_lookup(fs_root, "/etc");
+        if (etc_node2) rename_fs(etc_node2, "shadow.tmp", etc_node2, "shadow");
         terminal_write_string("  Usuario eliminado.\n");
     } else {
         terminal_write_string("  Error: Usuario no encontrado.\n");
@@ -295,11 +294,11 @@ static void cmd_passwd(const char* args) {
     kfree(buffer);
 
     if (found) {
-        uint8_t* new_buf = kmalloc(tmp_node->length);
-        read_fs(tmp_node, 0, tmp_node->length, new_buf);
-        shadow_node->length = 0;
-        write_fs(shadow_node, 0, tmp_node->length, new_buf);
-        kfree(new_buf);
+        fs_node_t *etc_node2 = vfs_lookup(fs_root, "/etc");
+        if (etc_node2) unlink_fs(etc_node2, "shadow");
+        /* Note: simplified rename by lookup of parent. The old hack was using absolute paths which rename_fs does not support directly if not implemented to parse. */
+        etc_node2 = vfs_lookup(fs_root, "/etc");
+        if (etc_node2) rename_fs(etc_node2, "shadow.tmp", etc_node2, "shadow");
         terminal_write_string("  Contrasena actualizada.\n");
     } else {
         terminal_write_string("  Error: Usuario no encontrado.\n");

@@ -250,6 +250,20 @@ static int shmfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     return obj ? 0 : -1;
 }
 
+int shmfs_rename(fs_node_t *parent, char *oldname, fs_node_t *new_parent, char *newname) {
+    (void)new_parent;
+    if (!parent || !oldname || !newname) return -1;
+    spin_lock(&shm_lock);
+    shm_object_t *obj = shm_find_object(oldname);
+    if (!obj) {
+        spin_unlock(&shm_lock);
+        return -1;
+    }
+    strlcpy(obj->name, newname, sizeof(obj->name));
+    spin_unlock(&shm_lock);
+    return 0;
+}
+
 static int shmfs_unlink(fs_node_t *parent, char *name) {
     (void)parent;
     if (!name) return -1;
@@ -305,6 +319,7 @@ fs_node_t* shmfs_init(void) {
     shmfs_root->finddir = shmfs_finddir;
     shmfs_root->create = shmfs_create;
     shmfs_root->unlink = shmfs_unlink;
+    shmfs_root->rename = shmfs_rename;
     shmfs_root->readdir = shmfs_readdir;
     
     return shmfs_root;

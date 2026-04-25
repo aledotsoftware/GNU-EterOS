@@ -92,6 +92,7 @@ int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry);
 fs_node_t *finddir_fs(fs_node_t *node, char *name);
 int create_fs(fs_node_t *parent, char *name, uint16_t permission);
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission);
+int rename_fs(fs_node_t *parent, char *oldname, fs_node_t *new_parent, char *newname);
 int unlink_fs(fs_node_t *parent, char *name);
 int ioctl_fs(fs_node_t *node, int request, void *arg);
 

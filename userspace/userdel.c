@@ -37,7 +37,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int temp_fd = open("/etc/shadow.tmp", O_WRONLY | O_CREAT | O_TRUNC);
+    unlink("/etc/shadow.tmp");
+    int temp_fd = open("/etc/shadow.tmp", O_WRONLY | O_CREAT);
     if (temp_fd < 0) {
         printf("Error: Could not open /etc/shadow.tmp\n");
         close(fd);

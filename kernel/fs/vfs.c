@@ -105,6 +105,17 @@ int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) {
     return -1;
 }
 
+int rename_fs(fs_node_t *parent, char *oldname, fs_node_t *new_parent, char *newname) {
+    if (!parent || !oldname || !new_parent || !newname) return -1;
+    if (parent->rename != 0) {
+        spin_lock(&parent->lock);
+        int ret = parent->rename(parent, oldname, new_parent, newname);
+        spin_unlock(&parent->lock);
+        return ret;
+    }
+    return -1;
+}
+
 int unlink_fs(fs_node_t *parent, char *name) {
     if ((parent->flags & 0x7) == FS_DIRECTORY && parent->unlink != 0)
         return parent->unlink(parent, name);

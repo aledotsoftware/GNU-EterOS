@@ -225,6 +225,24 @@ void __attribute__((section(".text.boot"))) kmain(void) {
                 vfs_mount("/dev", devfs_init());
                 vfs_mkdir("/proc", 0);
                 vfs_mount("/proc", procfs_init());
+                vfs_mkdir("/etc", 0);
+                vfs_mount("/etc", shmfs_init());
+                /* Note: In a real system we would copy existing files from initrd /etc */
+                /* Create shadow and autologin files in ramfs so they are writable */
+                fs_node_t *etc_node = vfs_lookup(fs_root, "/etc");
+                if (etc_node) {
+                    create_fs(etc_node, "shadow", 0600);
+                    fs_node_t *shadow = vfs_lookup(fs_root, "/etc/shadow");
+                    if (shadow) {
+                        write_fs(shadow, 0, 10, (uint8_t*)"root::0:0\n");
+                    }
+                    create_fs(etc_node, "autologin", 0644);
+                    fs_node_t *al = vfs_lookup(fs_root, "/etc/autologin");
+                    if (al) {
+                        write_fs(al, 0, 1, (uint8_t*)"0");
+                    }
+                }
+
                 fs_node_t* writable_fs = jfs_init();
                 vfs_mkdir("/data", 0);
                 vfs_mount("/data", writable_fs);
