@@ -27,6 +27,14 @@
 #undef get_cpu_id
 #include "../include/lock.h"
 
+#define eteros_strcmp strcmp
+#define eteros_memset memset
+#define eteros_memcpy memcpy
+#define eteros_strlen strlen
+#define eteros_strlcpy strncpy
+#define eteros_strncpy strncpy
+#define eteros_strlcat strncat
+
 /* Define missing error codes if needed */
 #ifndef EINVAL
 #define EINVAL 22
@@ -36,6 +44,9 @@
 #endif
 #ifndef EISDIR
 #define EISDIR 21
+#endif
+#ifndef ENOTDIR
+#define ENOTDIR 20
 #endif
 
 /* Globals */
@@ -108,6 +119,14 @@ fs_node_t* vfs_lookup(fs_node_t* root, const char* path) {
         memset(node, 0, sizeof(fs_node_t));
         node->flags = FS_DIRECTORY;
         node->inode = 123;
+        node->ref_count = 1;
+        return node;
+    }
+    if (strcmp(path, "/some/file") == 0) {
+        fs_node_t* node = (fs_node_t*)malloc(sizeof(fs_node_t));
+        memset(node, 0, sizeof(fs_node_t));
+        node->flags = FS_FILE;
+        node->inode = 456;
         node->ref_count = 1;
         return node;
     }
@@ -227,6 +246,14 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
         node->ref_count = 1;
         return node;
     }
+    if (strcmp(path, "/some/file") == 0) {
+        fs_node_t* node = (fs_node_t*)malloc(sizeof(fs_node_t));
+        memset(node, 0, sizeof(fs_node_t));
+        node->flags = FS_FILE;
+        node->inode = 456;
+        node->ref_count = 1;
+        return node;
+    }
     (void)root; (void)path; (void)follow_symlink;
     return NULL;
 }
@@ -265,15 +292,32 @@ int main() {
     // Test case: Open directory for writing
     printf("Attempting to open directory '/some/dir' with O_WRONLY...\n");
     int64_t fd = sys_open("/some/dir", O_WRONLY, 0);
+    int passed_1 = 0;
 
     if (fd == -EISDIR) {
         printf("PASSED: sys_open returned -EISDIR\n");
-        return 0;
+        passed_1 = 1;
     } else if (fd >= 0) {
         printf("FAILED: sys_open returned valid fd %ld\n", fd);
-        return 1;
     } else {
         printf("FAILED: sys_open returned unexpected error %ld\n", fd);
+    }
+
+    // Test case: Open file with O_DIRECTORY
+    printf("Attempting to open file '/some/file' with O_DIRECTORY...\n");
+    fd = sys_open("/some/file", O_DIRECTORY, 0);
+    int passed_2 = 0;
+
+    if (fd == -ENOTDIR) {
+        printf("PASSED: sys_open returned -ENOTDIR\n");
+        passed_2 = 1;
+    } else {
+        printf("FAILED: sys_open with O_DIRECTORY returned %ld\n", fd);
+    }
+
+    if (passed_1 && passed_2) {
+        return 0;
+    } else {
         return 1;
     }
 }

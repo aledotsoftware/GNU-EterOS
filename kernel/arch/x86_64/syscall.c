@@ -916,10 +916,15 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
 
     if (flags & O_NONBLOCK) node->flags |= O_NONBLOCK;
 
-    if ((flags & O_DIRECTORY) && ((node->flags & 0x7) != FS_DIRECTORY)) {
-        kfree(node);
-        kfree(kpath);
-        return -ENOTDIR;
+    if (flags & O_DIRECTORY) {
+        if ((node->flags & 0x7) != FS_DIRECTORY) {
+            if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+                if (node->close) node->close(node);
+                kfree(node);
+            }
+            kfree(kpath);
+            return -ENOTDIR;
+        }
     }
 
     if ((flags & O_TRUNC) && !write_mode) {
