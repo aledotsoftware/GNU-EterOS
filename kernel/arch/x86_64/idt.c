@@ -142,7 +142,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
                 serial_write_string(buf);
                 serial_write_string("\n");
 
-                task_kill(current->id);
+                task_exit_signal(11);
                 schedule();
                 /* Should not return */
             }
@@ -182,7 +182,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
             serial_write_string(buf);
             serial_write_string("\n");
 
-            task_kill(current->id);
+                task_exit_signal(11);
             /* task_kill calls schedule() if killing self, so we shouldn't return here */
         }
 
