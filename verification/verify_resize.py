@@ -40,7 +40,7 @@ def run():
         center_y = resizer_box['y'] + resizer_box['height'] / 2
 
         print("Dragging resizer...")
-        page.mouse.move(center_x, center_y)
+        page.evaluate(f"document.querySelector(\".resizer-r\").dispatchEvent(new MouseEvent(\"mousedown\", {{clientX: {center_x}, clientY: {center_y}}}))")
         page.mouse.down()
         # Drag 100px to the right
         page.mouse.move(center_x + 100, center_y, steps=10)
