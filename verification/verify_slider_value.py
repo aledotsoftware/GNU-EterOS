@@ -63,6 +63,9 @@ def verify_slider_value():
         # Volume
         sliders.nth(1).evaluate("el => { el.value = 25; el.dispatchEvent(new Event('input')); }")
 
+        # Wait a bit for requestAnimationFrame to fire
+        page.wait_for_timeout(100)
+
         # Check new values
         new_val1 = slider_values.nth(0).inner_text()
         new_val2 = slider_values.nth(1).inner_text()

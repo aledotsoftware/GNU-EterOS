@@ -11,6 +11,10 @@ def test_sliders():
         url = f"file://{cwd}/web_ui/index.html"
         page.goto(url)
 
+        # Wait for boot splash to disappear
+        print("Waiting for boot splash...")
+        page.locator("#boot-splash").wait_for(state="detached", timeout=10000)
+
         # Open Control Center
         page.click("#cc-trigger")
 
@@ -24,7 +28,7 @@ def test_sliders():
 
         # Verify initial value
         # The span.slider-value next to it should be 80%
-        value_display = slider.locator("xpath=following-sibling::span[contains(@class, 'slider-value')]")
+        value_display = slider.locator("xpath=../span")
 
         # Wait for JS to initialize (it runs on DOMContentLoaded)
         page.wait_for_timeout(500)

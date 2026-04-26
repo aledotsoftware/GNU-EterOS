@@ -786,8 +786,40 @@ if (typeof module === 'undefined') {
     setupLauncherNav();
 }
 
+function setupSliders() {
+    const sliders = document.querySelectorAll('.cc-slider');
+    sliders.forEach(slider => {
+        const updateSlider = () => {
+            const val = slider.value;
+            slider.setAttribute('aria-valuetext', `${val}%`);
+
+            // Update span text if exists
+            const span = slider.nextElementSibling;
+            if (span && span.classList.contains('slider-value')) {
+                span.textContent = `${val}%`;
+            }
+
+            // Update icon opacity
+            const icon = slider.previousElementSibling;
+            if (icon && icon.tagName === 'IMG') {
+                const opacity = 0.3 + (val / 100) * 0.7;
+                icon.style.opacity = opacity.toFixed(2);
+            }
+        };
+
+        // Init
+        updateSlider();
+
+        // On change
+        slider.addEventListener('input', () => {
+            requestAnimationFrame(updateSlider);
+        });
+    });
+}
+
 // Boot Splash Screen Logic
 document.addEventListener('DOMContentLoaded', () => {
+    setupSliders();
     const splash = document.getElementById('boot-splash');
     if (splash) {
         // Simulate boot time (e.g. 2.5 seconds)
