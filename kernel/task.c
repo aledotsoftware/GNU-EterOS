@@ -909,7 +909,7 @@ static void task_exit_internal(int status, int wait_status, int wait_code) {
     if (current->clear_child_tid != NULL) {
         if (vmm_verify_user_access(current->clear_child_tid, sizeof(uint32_t), 1)) {
             *current->clear_child_tid = 0;
-            futex_wake(current->clear_child_tid, 1, FUTEX_WAKE);
+            futex_wake(current->clear_child_tid, 1, FUTEX_WAKE, FUTEX_BITSET_MATCH_ANY);
         }
     }
 
@@ -996,7 +996,7 @@ int task_kill(uint32_t pid) {
             if (tasks[i].clear_child_tid != NULL) {
                 if (vmm_verify_user_access(tasks[i].clear_child_tid, sizeof(uint32_t), 1)) {
                     *tasks[i].clear_child_tid = 0;
-                    futex_wake(tasks[i].clear_child_tid, 1, FUTEX_WAKE);
+                    futex_wake(tasks[i].clear_child_tid, 1, FUTEX_WAKE, FUTEX_BITSET_MATCH_ANY);
                 }
             }
 

@@ -104,7 +104,7 @@ void test_futex_timeout(void) {
     /* Actual ticks after yield = 1000 + 600 = 1600 */
     /* 1600 >= 1500 -> Timeout */
 
-    int ret = futex_wait(&uaddr, 200, &ts, 0);
+    int ret = futex_wait(&uaddr, 200, &ts, 0, FUTEX_BITSET_MATCH_ANY);
 
     assert(ret == -ETIMEDOUT);
     assert(task1.wake_tick == 1500);
@@ -126,7 +126,7 @@ void test_futex_no_timeout(void) {
     /* No timeout provided */
     /* Should return EINTR (spurious wakeup) because we simulate yield return without explicit wake */
 
-    int ret = futex_wait(&uaddr, 300, NULL, 0);
+    int ret = futex_wait(&uaddr, 300, NULL, 0, FUTEX_BITSET_MATCH_ANY);
 
     assert(ret == -EINTR);
     assert(task1.wake_tick == 0);
@@ -152,7 +152,7 @@ void test_futex_spurious_wake(void) {
     /* Actual ticks after yield = 3500 */
     /* 3500 < 4000 -> Not timed out */
 
-    int ret = futex_wait(&uaddr, 400, &ts, 0);
+    int ret = futex_wait(&uaddr, 400, &ts, 0, FUTEX_BITSET_MATCH_ANY);
 
     assert(ret == -EINTR);
     assert(task1.wake_tick == 4000);

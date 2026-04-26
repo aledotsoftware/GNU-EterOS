@@ -1762,11 +1762,17 @@ static int64_t sys_futex(uint32_t *uaddr, int op, uint32_t val, void *timeout, u
     if (!vmm_verify_user_access(uaddr, 4, 1)) return -EFAULT;
 
     int cmd = op & FUTEX_CMD_MASK;
-    if (cmd == FUTEX_WAIT) {
-        if (timeout && !vmm_verify_user_access(timeout, sizeof(struct timespec), 0)) return -EFAULT;
-        return futex_wait(uaddr, val, timeout, op);
+    uint32_t bitset = FUTEX_BITSET_MATCH_ANY;
+
+    if (cmd == FUTEX_WAIT_BITSET || cmd == FUTEX_WAKE_BITSET) {
+        bitset = val3;
     }
-    else if (cmd == FUTEX_WAKE) return futex_wake(uaddr, (int)val, op);
+
+    if (cmd == FUTEX_WAIT || cmd == FUTEX_WAIT_BITSET) {
+        if (timeout && !vmm_verify_user_access(timeout, sizeof(struct timespec), 0)) return -EFAULT;
+        return futex_wait(uaddr, val, timeout, op, bitset);
+    }
+    else if (cmd == FUTEX_WAKE || cmd == FUTEX_WAKE_BITSET) return futex_wake(uaddr, (int)val, op, bitset);
     return -ENOSYS;
 }
 

@@ -9,6 +9,10 @@
 #define FUTEX_FD        2
 #define FUTEX_REQUEUE   3
 #define FUTEX_CMP_REQUEUE 4
+#define FUTEX_WAIT_BITSET 9
+#define FUTEX_WAKE_BITSET 10
+
+#define FUTEX_BITSET_MATCH_ANY 0xffffffff
 
 #define FUTEX_PRIVATE_FLAG 128
 #define FUTEX_CLOCK_REALTIME 256
@@ -31,7 +35,7 @@ void futex_init(void);
  * @param timeout Pointer to timespec (optional, currently ignored).
  * @return 0 on success, or negative error code.
  */
-int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op);
+int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint32_t bitset);
 
 /**
  * Wake up tasks waiting on a futex variable.
@@ -40,6 +44,6 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op);
  * @param count Maximum number of tasks to wake up.
  * @return Number of tasks woken up.
  */
-int futex_wake(uint32_t *uaddr, int count, int op);
+int futex_wake(uint32_t *uaddr, int count, int op, uint32_t bitset);
 
 #endif /* ETEROS_FUTEX_H */

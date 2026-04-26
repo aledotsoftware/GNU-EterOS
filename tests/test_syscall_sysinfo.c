@@ -114,8 +114,8 @@ void task_sleep(uint64_t ms) {}
 int task_fork(void* regs) { return -1; }
 int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) { return -1; }
 int task_waitpid(int pid, int* status, int options) { return -1; }
-int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) { return -1; }
-int futex_wake(uint32_t *uaddr, int count, int op) { return -1; }
+int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint32_t bitset) { return -1; }
+int futex_wake(uint32_t *uaddr, int count, int op, uint32_t bitset) { return -1; }
 uint64_t timer_get_ticks(void) { return 0; }
 uint32_t* framebuffer_get_hw_buffer(void) { return NULL; }
 int task_clone(uint64_t clone_flags, uint64_t stack, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs) { return -1; }
