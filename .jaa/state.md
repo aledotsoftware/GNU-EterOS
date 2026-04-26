@@ -35,3 +35,5 @@
 - Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
 - Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
 - Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
+
+- Documented concrete gaps: Need to port `/dev/dns`, fully implement standard POSIX networking semantics, and ensure memory mappings cover standard Linux userspace tools properly for GNU over Eter roadmap.

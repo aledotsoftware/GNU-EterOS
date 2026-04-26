@@ -820,7 +820,7 @@ static int check_node_permission(fs_node_t* node, uint32_t req_mask) {
 }
 
 static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
-    if (!vmm_verify_user_access(path, 1, 0)) return -EFAULT;
+    if (!vmm_check_user_string(path, 256)) return -EFAULT;
     char* kpath = (char*)kmalloc(256);
     if (!kpath) return -ENOMEM;
     int res = resolve_path(dirfd, path, kpath, 256);
@@ -1561,11 +1561,11 @@ static int64_t sys_arch_prctl(int code, uint64_t addr) {
         return 0;
     } else if (code == ARCH_GET_FS) {
         if (!vmm_verify_user_access((void*)addr, sizeof(uint64_t), 1)) return -EFAULT;
-        *(uint64_t*)addr = current->fs_base;
+        *(uint64_t*)addr = rdmsr(MSR_FS_BASE);
         return 0;
     } else if (code == ARCH_GET_GS) {
         if (!vmm_verify_user_access((void*)addr, sizeof(uint64_t), 1)) return -EFAULT;
-        *(uint64_t*)addr = current->gs_base;
+        *(uint64_t*)addr = rdmsr(MSR_KERNEL_GS_BASE);
         return 0;
     }
     return -EINVAL;
