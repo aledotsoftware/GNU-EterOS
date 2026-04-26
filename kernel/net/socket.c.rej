@@ -1,0 +1,11 @@
+--- socket.c
++++ socket.c
+@@ -11,7 +11,7 @@
+ #include "fs/jfs.h"
+ #include "net/socket.h"
+ #include "net/lwip_socket.h"
+-#include "lwip/sockets.h"
++#include "lwip/src/include/lwip/sockets.h"
+ #include "sys/socket.h"
+
+ /* Dummy declarations needed by old net stack references if enabled */
