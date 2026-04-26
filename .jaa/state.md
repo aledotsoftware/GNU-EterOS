@@ -1,4 +1,13 @@
-## EterOS Aether Linux Subsystem (Current Run)
+## EterOS Vision CLI Agent (Current Run)
+- Synchronized EterOS version string to "0.2.0" and codename to "Genesis SMP" across all visible surfaces:
+  - Updated `kernel/shell/cmd_system.c` to display accurate version in CLI `system` command.
+  - Updated `kernel/fs/procfs.c` to reflect accurate version when reading `/proc/version`.
+  - Updated `web_ui/app.js` `spawnAbout()` function to display accurate version and codename in the Web UI desktop.
+- Visually verified Web UI changes using Playwright headless automation. All native and Jest tests passed successfully.
+
+# JAA Context State
+
+## EterOS Aether Linux Subsystem (2024-04-25)
 - Hardened `kernel/fs/elf.c` to prevent string bounds checking bypasses and buffer overflows during `PT_INTERP` extraction by safely capping `out_interp` size.
 - Hardened `kernel/arch/x86_64/syscall.c` `sys_mmap` to automatically add `MAP_PRIVATE` for ABI compatibility when no mapping flags are provided by Linux binaries.
 - Refactored `sys_arch_prctl` to correctly read `MSR_FS_BASE` and `MSR_KERNEL_GS_BASE` for `ARCH_GET_FS` and `ARCH_GET_GS`, copying safely to userspace using `vmm_verify_user_access`.
@@ -6,8 +15,6 @@
 - Fixed `sys_rt_sigprocmask` to use 64-bit masks by using `1ULL` shifts to avoid undefined behavior overflow.
 - Secured `sys_openat` with explicit `vmm_verify_user_access` boundary checks.
 - Added explicit NUL-termination for `sys_readlinkat` when the read size is strictly smaller than the requested buffer.
-
-# JAA Context State
 
 ## EterOS Scheduler & IPC Update (2024-04-24)
 - Resolved a critical bug in `kernel/task.c:schedule()` where tasks selected to run again without switching context were not removed from the ready queue if they had been previously enqueued, corrupting the ready list.
@@ -29,7 +36,7 @@
 - Analyzed `kernel/fs/elf.c` to confirm `PT_INTERP` boundary validation and execution mapping.
 - Current build is QEMU-tested successfully loading Ring 3 `login.elf`.
 
-## Android Subsystem Compatibility Update (Current Run)
+## Android Subsystem Compatibility Update (2024-04-21)
 - Conducted gap analysis between EterOS Linux compatibility and Android (Bionic/Linker) expectations.
 - Implemented `/dev/binder` stub in `kernel/fs/devfs.c` supporting the `BINDER_VERSION_IOWR` ioctl response.
 - Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).

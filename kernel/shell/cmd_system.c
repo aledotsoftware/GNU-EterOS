@@ -114,8 +114,8 @@ static void shell_run_user_task(void) {
     enter_user_mode((void*)entry_point, (void*)rsp);
 }
 
-#define ETEROS_VERSION      "0.1.0"
-#define ETEROS_CODENAME     "Genesis"
+#define ETEROS_VERSION      "0.2.0"
+#define ETEROS_CODENAME     "Genesis SMP"
 
 void cmd_version(const char* args) {
     (void)args;
