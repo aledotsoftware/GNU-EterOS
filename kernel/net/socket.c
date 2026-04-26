@@ -13,6 +13,10 @@
 #include <fs/vfs.h>
 #include "lwip/sockets.h"
 
+#ifndef __cplusplus
+struct msghdr;
+#endif
+
 static ssize_t lwip_socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
@@ -83,7 +87,7 @@ static inline int get_lwip_sock(int fd) {
 int sys_lwip_bind(int fd, const void *name, socklen_t namelen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
-    return lwip_bind(sock, name, namelen);
+    return lwip_bind(sock, (const struct sockaddr *)name, namelen);
 }
 
 int sys_lwip_listen(int fd, int backlog) {
@@ -136,13 +140,13 @@ int sys_lwip_accept(int fd, void *addr, socklen_t *addrlen) {
 int sys_lwip_connect(int fd, const void *name, socklen_t namelen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
-    return lwip_connect(sock, name, namelen);
+    return lwip_connect(sock, (const struct sockaddr *)name, namelen);
 }
 
 ssize_t sys_lwip_sendto(int fd, const void *data, size_t size, int flags, const void *to, socklen_t tolen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
-    return lwip_sendto(sock, data, size, flags, to, tolen);
+    return lwip_sendto(sock, data, size, flags, (const struct sockaddr *)to, tolen);
 }
 
 ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, void *from, socklen_t *fromlen) {
@@ -256,13 +260,13 @@ int sys_lwip_shutdown(int fd, int how) {
 ssize_t sys_lwip_sendmsg(int fd, const void *msg, int flags) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
-    return lwip_sendmsg(sock, msg, flags);
+    return lwip_sendmsg(sock, (const struct msghdr *)msg, flags);
 }
 
 ssize_t sys_lwip_recvmsg(int fd, void *msg, int flags) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
-    return lwip_recvmsg(sock, msg, flags);
+    return lwip_recvmsg(sock, (struct msghdr *)msg, flags);
 }
 
 ssize_t sys_lwip_send(int fd, const void *buf, size_t len, int flags) {
