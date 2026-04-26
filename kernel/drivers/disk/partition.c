@@ -2,6 +2,7 @@
 #include <mm.h>
 #include <string.h>
 #include <hal.h>
+#include <nvram.h>
 
 #define MBR_SIGNATURE 0xAA55
 #define MBR_OFFSET_PARTITION_TABLE 446
@@ -176,6 +177,7 @@ void partition_scan(disk_t *disk) {
 
     partition_count = 0;
     active_partition_index = -1;
+    uint8_t boot_part = nvram_get_boot_partition();
 
     for (int i = 0; i < 4; i++) {
         if (entries[i].partition_type != 0) {
@@ -184,19 +186,19 @@ void partition_scan(disk_t *disk) {
             partitions[partition_count].sector_count = entries[i].sector_count;
             partitions[partition_count].type = entries[i].partition_type;
             partitions[partition_count].index = i;
-            partitions[partition_count].is_active = (entries[i].boot_indicator == 0x80);
-
-            if (partitions[partition_count].is_active) {
-                active_partition_index = partition_count;
-            }
+            partitions[partition_count].is_active = 0; // Set later
             partition_count++;
         }
     }
     kfree(buffer);
 
-    // Default to first partition if none marked active
-    if (active_partition_index == -1 && partition_count > 0) {
+    if (boot_part < partition_count) {
+        active_partition_index = boot_part;
+        partitions[boot_part].is_active = 1;
+    } else if (partition_count > 0) {
+        // Fallback: Default to first partition if boot_part is invalid
         active_partition_index = 0;
+        partitions[0].is_active = 1;
     }
 }
 

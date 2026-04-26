@@ -39,6 +39,10 @@ void kfree(void* ptr) {
 /* Include source under test */
 #include "../kernel/drivers/disk/partition.c"
 
+/* Mock NVRAM */
+uint8_t mock_boot_part = 0;
+uint8_t nvram_get_boot_partition(void) { return mock_boot_part; }
+
 /* Mock Disk */
 #define SECTOR_SIZE 512
 #define TOTAL_SECTORS 2048
@@ -60,17 +64,18 @@ int mock_write_sector(disk_t *disk, uint32_t lba, uint8_t *buffer) {
 void setup_disk() {
     memset(disk_image, 0, sizeof(disk_image));
     heap_idx = 0;
+    mock_boot_part = 0;
 
     // Create MBR
     mbr_partition_entry_t *entries = (mbr_partition_entry_t*)&disk_image[446];
 
     // Partition 1
-    entries[0].boot_indicator = 0x00;
+    entries[0].boot_indicator = 0x00; // Not used anymore for active selection
     entries[0].partition_type = 0x83;
     entries[0].start_lba = 1;
     entries[0].sector_count = 100;
 
-    // Partition 2 (Passive)
+    // Partition 2
     entries[1].boot_indicator = 0x00;
     entries[1].partition_type = 0x83;
     entries[1].start_lba = 101;
