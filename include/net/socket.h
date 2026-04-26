@@ -54,6 +54,10 @@ int net_send(socket_t sock, const void* buf, int len, int flags);
 /* Receive data */
 int net_recv(socket_t sock, void* buf, int len, int flags);
 
+
+/* Get host by name synchronously using lwIP */
+int net_gethostbyname(const char* host, uint32_t* out_ip);
+
 /* Close socket */
 int net_close(socket_t sock);
 

@@ -269,7 +269,13 @@ static void panel_time(void) {
             if (keyboard_has_input()) {
                 char k = keyboard_getchar();
                 if (k == '\n' || k == '\r') break;
-                if (k >= '0' && k <= '9') {
+                if (k == KB_KEY_BACKSPACE) {
+                    if (idx > 0) {
+                        idx--;
+                        buf[idx] = 0;
+                        terminal_write_string("\b \b");
+                    }
+                } else if (k >= '0' && k <= '9') {
                     buf[idx++] = k;
                     terminal_putchar(k);
                 }
@@ -296,7 +302,13 @@ static void panel_time(void) {
             if (keyboard_has_input()) {
                 char k = keyboard_getchar();
                 if (k == '\n' || k == '\r') break;
-                if (k >= '0' && k <= '9') {
+                if (k == KB_KEY_BACKSPACE) {
+                    if (idx > 0) {
+                        idx--;
+                        buf[idx] = 0;
+                        terminal_write_string("\b \b");
+                    }
+                } else if (k >= '0' && k <= '9') {
                     buf[idx++] = k;
                     terminal_putchar(k);
                 }
@@ -322,7 +334,13 @@ static void panel_time(void) {
             if (keyboard_has_input()) {
                 char k = keyboard_getchar();
                 if (k == '\n' || k == '\r') break;
-                if (k >= '0' && k <= '9') {
+                if (k == KB_KEY_BACKSPACE) {
+                    if (idx > 0) {
+                        idx--;
+                        buf[idx] = 0;
+                        terminal_write_string("\b \b");
+                    }
+                } else if (k >= '0' && k <= '9') {
                     buf[idx++] = k;
                     terminal_putchar(k);
                 }

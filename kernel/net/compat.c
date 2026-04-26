@@ -159,6 +159,78 @@ static err_t http_connected(void *arg, struct tcp_pcb *pcb, err_t err) {
     return ERR_OK;
 }
 
+
+typedef struct {
+    ip_addr_t res;
+    volatile int completed;
+    volatile int orphaned;
+} dns_req_state_t;
+
+static void dns_req_found(const char *name, const ip_addr_t *ipaddr, void *callback_arg) {
+    (void)name;
+    dns_req_state_t *state = (dns_req_state_t*)callback_arg;
+
+    if (state->orphaned) {
+        kfree(state);
+        return;
+    }
+
+    if (ipaddr) {
+        state->res = *ipaddr;
+    } else {
+        state->res.addr = 0;
+    }
+    state->completed = 1;
+}
+
+int net_gethostbyname(const char* host, uint32_t* out_ip) {
+    if (!host || !out_ip) return -1;
+
+    dns_req_state_t* state = (dns_req_state_t*)kmalloc(sizeof(dns_req_state_t));
+    if (!state) return -1;
+
+    memset(state, 0, sizeof(dns_req_state_t));
+    state->completed = 0;
+    state->orphaned = 0;
+
+    hal_interrupts_disable();
+    err_t err = dns_gethostbyname(host, &state->res, dns_req_found, state);
+
+    if (err == ERR_OK) {
+        *out_ip = ip4_addr_get_u32(&state->res);
+        hal_interrupts_enable();
+        kfree(state);
+        return 0;
+    } else if (err != ERR_INPROGRESS) {
+        hal_interrupts_enable();
+        kfree(state);
+        return -1;
+    }
+    hal_interrupts_enable();
+
+    int timeout_ms = 5000;
+    while (!state->completed && timeout_ms > 0) {
+        task_sleep(1);
+        timeout_ms--;
+    }
+
+    if (!state->completed) {
+        hal_interrupts_disable();
+        state->orphaned = 1;
+        hal_interrupts_enable();
+        return -1;
+    }
+
+    if (state->res.addr == 0) {
+        kfree(state);
+        return -1;
+    }
+
+    *out_ip = ip4_addr_get_u32(&state->res);
+    kfree(state);
+    return 0;
+}
+
 static void dns_found(const char *name, const ip_addr_t *ipaddr, void *callback_arg) {
     (void)name;
     http_req_state_t *state = (http_req_state_t*)callback_arg;

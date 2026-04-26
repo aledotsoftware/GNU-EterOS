@@ -1,3 +1,8 @@
+## EterOS UI and Devices Interaction (Current Run)
+- Implemented dynamic DNS resolution for `cmd_ntp` using `net_gethostbyname` over lwIP to avoid hardcoded IPs.
+- Implemented `sys_lwip_close` and refactored network components in `cmd_time.c` to properly construct and destruct VFS nodes and socket references when resolving and querying NTP.
+- Improved `cmd_panel.c` UI polling loops for manual time synchronization by explicitly adding `` logical backspace support with buffer rewriting.
+
 ## EterOS Aether Linux Subsystem (Current Run)
 - Hardened `kernel/fs/elf.c` to prevent string bounds checking bypasses and buffer overflows during `PT_INTERP` extraction by safely capping `out_interp` size.
 - Hardened `kernel/arch/x86_64/syscall.c` `sys_mmap` to automatically add `MAP_PRIVATE` for ABI compatibility when no mapping flags are provided by Linux binaries.

@@ -247,6 +247,24 @@ int sys_lwip_getsockname(int fd, void *name, socklen_t *namelen) {
     return lwip_getsockname(sock, (struct sockaddr*)name, (socklen_t*)namelen);
 }
 
+
+int sys_lwip_close(int fd) {
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_SOCKET) return -EBADF;
+
+    if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+        if (node->close) {
+            node->close(node);
+        }
+        kfree(node);
+    }
+    current->fd_table[fd].node = NULL;
+    return 0;
+}
+
 int sys_lwip_shutdown(int fd, int how) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
