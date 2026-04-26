@@ -35,3 +35,5 @@
 - Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
 - Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
 - Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
+- Expanded Linux ABI system call coverage by correctly mapping `sys_rt_sigreturn` (15), `sys_pread64` (17), `sys_pwrite64` (18), and `sys_sysinfo` (99) in `syscall_linux_table` within `kernel/arch/x86_64/syscall.c`, increasing compatibility for GNU/Linux executables relying on these POSIX primitives.
+- Ensured functional verification is established via existing `test_syscall_rt_sigaction` and `test_syscall_sysinfo` host-based test harnesses passing successfully.
