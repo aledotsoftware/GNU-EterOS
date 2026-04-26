@@ -297,7 +297,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     uint64_t* rbp;
     __asm__ volatile("mov %%rbp, %0" : "=r"(rbp));
     for (int i=0; i<10 && rbp != NULL; i++) {
-        if (!vmm_verify_user_access(rbp, 16, 0)) break; /* Basic check to avoid #PF in walk */
+        if ((uint64_t)rbp < 0x1000) break; /* Basic check to avoid #PF in walk */
         uint64_t rip_caller = rbp[1];
         serial_write_string("  ["); itoa_s(i, buf, sizeof(buf), 10); serial_write_string(buf);
         serial_write_string("] 0x"); utoa_hex_s(rip_caller, buf, sizeof(buf)); serial_write_string(buf);

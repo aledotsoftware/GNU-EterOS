@@ -304,6 +304,10 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
     /* ---- 7.5 Lanzar Test de Espacio de Usuario ---- */
     hal_console_write("  [INIT] Lanzando User Mode Test...\n");
+
+    /* Verify Heap integrity before jumping to userland */
+    mm_verify_heap();
+
     extern void user_loader_entry(void);
     serial_write_string("[DEBUG] main: creating user loader task\n");
     task_create("UserLoader", user_loader_entry);

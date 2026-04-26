@@ -225,6 +225,10 @@ void mm_init(boot_info_t* boot_info) {
 
     memory_used = 0;
 
+    /* Initialize the footer of the initial block */
+    uint32_t* footer = (uint32_t*)((uintptr_t)heap_start + sizeof(block_header_t) + heap_start->size - sizeof(uint32_t));
+    *footer = HEAP_FOOTER_MAGIC;
+
     /* Important: We must tell PMM that this memory is now USED by the HEAP */
     pmm_mark_region_used((uint64_t)heap_start, memory_total);
     
@@ -365,7 +369,14 @@ static void _kfree_impl(void* ptr) {
     /* Check footer magic */
     uint32_t* footer = (uint32_t*)((uintptr_t)block + sizeof(block_header_t) + block->size - sizeof(uint32_t));
     if (*footer != HEAP_FOOTER_MAGIC) {
-        serial_write_string("[MM] Error: kfree of invalid address (bad footer magic)\n");
+        serial_write_string("[MM] Error: kfree of invalid address (bad footer magic) at block 0x");
+        char buf[32];
+        utoa_hex_s((uint64_t)block, buf, sizeof(buf));
+        serial_write_string(buf);
+        serial_write_string(" size: ");
+        itoa_s(block->size, buf, sizeof(buf), 10);
+        serial_write_string(buf);
+        serial_write_string("\n");
         ASSERT(0 && "Heap corruption detected: Invalid footer magic number");
         return;
     }
@@ -504,7 +515,14 @@ void mm_verify_heap(void) {
 
         uint32_t* footer = (uint32_t*)((uintptr_t)curr + sizeof(block_header_t) + curr->size - sizeof(uint32_t));
         if (*footer != HEAP_FOOTER_MAGIC) {
-            serial_write_string("[MM] HEAP VERIFICATION FAILED: Bad footer magic number.\n");
+            serial_write_string("[MM] HEAP VERIFICATION FAILED: Bad footer magic number at block 0x");
+            char buf[32];
+            utoa_hex_s((uint64_t)curr, buf, sizeof(buf));
+            serial_write_string(buf);
+            serial_write_string(" size: ");
+            itoa_s(curr->size, buf, sizeof(buf), 10);
+            serial_write_string(buf);
+            serial_write_string("\n");
             ASSERT(0 && "Heap corruption: Bad footer magic number in block");
         }
 
@@ -518,6 +536,13 @@ void mm_verify_heap(void) {
                  ASSERT(0 && "Heap corruption: Linked list structure broken");
             }
         }
+
+        /* Ensure we don't go out of bounds if something is wrong */
+        if ((uintptr_t)curr->next > ((uintptr_t)heap_start + memory_total)) {
+            serial_write_string("[MM] HEAP VERIFICATION FAILED: Next pointer out of bounds.\n");
+            ASSERT(0 && "Heap corruption: Next pointer out of bounds");
+        }
+
         curr = curr->next;
     }
 

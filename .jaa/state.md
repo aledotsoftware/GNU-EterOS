@@ -1,4 +1,10 @@
-## EterOS Aether Linux Subsystem (Current Run)
+## EterOS Boot and Kernel Stability Update (Current Run)
+- Fixed the stack trace walker in `kernel/arch/x86_64/idt.c` to prevent silently truncating stack traces during panics when kernel stack pointers failed a strict user-mode pointer validation.
+- Improved User Mode Exception signal mapping in `kernel/arch/x86_64/idt.c` to deliver correct POSIX signals (e.g., SIGFPE, SIGILL) based on the hardware fault vector instead of blindly dispatching SIGSEGV for all faults.
+- Added heap integrity validation `mm_verify_heap()` in `kernel/main.c` just before transitioning to user mode.
+- Fixed a heap initialization issue in `kernel/mm/heap.c` where the initial block's footer magic number was missing, which previously caused the new integrity verification to trigger false positive panics upon startup.
+
+## EterOS Aether Linux Subsystem (Previous Run)
 - Hardened `kernel/fs/elf.c` to prevent string bounds checking bypasses and buffer overflows during `PT_INTERP` extraction by safely capping `out_interp` size.
 - Hardened `kernel/arch/x86_64/syscall.c` `sys_mmap` to automatically add `MAP_PRIVATE` for ABI compatibility when no mapping flags are provided by Linux binaries.
 - Refactored `sys_arch_prctl` to correctly read `MSR_FS_BASE` and `MSR_KERNEL_GS_BASE` for `ARCH_GET_FS` and `ARCH_GET_GS`, copying safely to userspace using `vmm_verify_user_access`.
