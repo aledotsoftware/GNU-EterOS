@@ -257,16 +257,16 @@ int sys_lwip_shutdown(int fd, int how) {
     return lwip_shutdown(sock, how);
 }
 
-ssize_t sys_lwip_sendmsg(int fd, const void *msg, int flags) {
+ssize_t sys_lwip_sendmsg(int fd, const struct msghdr *msg, int flags) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
-    return lwip_sendmsg(sock, (const struct msghdr *)msg, flags);
+    return lwip_sendmsg(sock, msg, flags);
 }
 
-ssize_t sys_lwip_recvmsg(int fd, void *msg, int flags) {
+ssize_t sys_lwip_recvmsg(int fd, struct msghdr *msg, int flags) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
-    return lwip_recvmsg(sock, (struct msghdr *)msg, flags);
+    return lwip_recvmsg(sock, msg, flags);
 }
 
 ssize_t sys_lwip_send(int fd, const void *buf, size_t len, int flags) {
