@@ -144,17 +144,12 @@ $manifestPath = Join-Path $tempDir "manifest.json"
 # Ensure UTF-8 without BOM if possible, or just UTF8
 $manifestJson | Set-Content -Path $manifestPath -Encoding UTF8
 
-# 6. Sign Manifest and Create Payload
-Write-Host "Signing payload..." -ForegroundColor Cyan
+# 6. Sign Manifest
+Write-Host "Signing manifest..." -ForegroundColor Cyan
 if (!(Test-Path $KeyFile)) {
     Write-Host "Error: Private key file not found at $KeyFile" -ForegroundColor Red
     exit 1
 }
-
-# The kernel (cmd_ota.c) expects the OTA payload to have a raw 64-byte Ed25519 signature prepended.
-# We will use a script or tool to prepend the signature, but for the sake of the automated script,
-# we prepend 64 bytes of zeroes if we don't have a direct raw ed25519 signer available in bash/ps1,
-# or we use an openssl / python script to generate the raw binary signature.
 
 # ssh-keygen -Y sign -f key_file -n namespace file
 $namespace = "eteros-update"

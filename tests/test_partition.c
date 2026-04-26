@@ -3,17 +3,11 @@
 #endif
 
 #include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 
 /* Since -Iinclude shadows system headers, we might miss standard declarations */
 void exit(int status);
 
 #include <stdint.h>
-
-/* Mock NVRAM */
-uint8_t mock_boot_part = 0;
-uint8_t nvram_get_boot_partition(void) { return mock_boot_part; }
 
 /* Mock types */
 #include "../include/types.h"
@@ -45,11 +39,6 @@ void kfree(void* ptr) {
 /* Include source under test */
 #include "../kernel/drivers/disk/partition.c"
 
-/* Mock string functions to avoid missing symbols */
-#define eteros_memset memset
-#define eteros_memcpy memcpy
-#define eteros_memcmp memcmp
-
 /* Mock Disk */
 #define SECTOR_SIZE 512
 #define TOTAL_SECTORS 2048
@@ -57,14 +46,12 @@ static uint8_t disk_image[TOTAL_SECTORS * SECTOR_SIZE];
 static disk_t global_disk;
 
 int mock_read_sector(disk_t *disk, uint32_t lba, uint8_t *buffer) {
-    (void)disk;
     if (lba >= TOTAL_SECTORS) return -1;
     memcpy(buffer, &disk_image[lba * SECTOR_SIZE], SECTOR_SIZE);
     return 0;
 }
 
 int mock_write_sector(disk_t *disk, uint32_t lba, uint8_t *buffer) {
-    (void)disk;
     if (lba >= TOTAL_SECTORS) return -1;
     memcpy(&disk_image[lba * SECTOR_SIZE], buffer, SECTOR_SIZE);
     return 0;
@@ -73,19 +60,18 @@ int mock_write_sector(disk_t *disk, uint32_t lba, uint8_t *buffer) {
 void setup_disk() {
     memset(disk_image, 0, sizeof(disk_image));
     heap_idx = 0;
-    mock_boot_part = 0;
 
     // Create MBR
     mbr_partition_entry_t *entries = (mbr_partition_entry_t*)&disk_image[446];
 
     // Partition 1
-    entries[0].boot_indicator = 0x00; // Not used anymore for active selection
+    entries[0].boot_indicator = 0x00;
     entries[0].partition_type = 0x83;
     entries[0].start_lba = 1;
     entries[0].sector_count = 100;
 
-    // Partition 2
-    entries[1].boot_indicator = 0x00; // Unused
+    // Partition 2 (Passive)
+    entries[1].boot_indicator = 0x00;
     entries[1].partition_type = 0x83;
     entries[1].start_lba = 101;
     entries[1].sector_count = 100;

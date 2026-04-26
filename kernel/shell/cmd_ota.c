@@ -223,11 +223,11 @@ receive:
         terminal_write_string(" bytes).\n");
 
         if (ota_require_sig) {
-            terminal_write_string("  [OTA] Verificando firma Ed25519 de alta seguridad...\n");
+            terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
 
             // Assume the first 64 bytes of payload are the signature, rest is actual image.
             if (payload_size <= 64) {
-                terminal_write_string("  [OTA] ERROR CRÍTICO: Payload demasiado pequeno para contener firma.\n");
+                terminal_write_string("  [OTA] ERROR: Payload demasiado pequeno para contener firma.\n");
                 kfree(payload_data);
                 return;
             }
@@ -237,7 +237,6 @@ receive:
 
             // Definir una clave publica real (hardcodeada para este build) en lugar de una de ceros.
             // Esto es una semilla/clave valida en formato binario para propósitos de update signing
-            // Corresponde a la clave en tools/updater/keypair.md
             unsigned char pk[32] = {
                 0x7A, 0x1B, 0x2C, 0x3D, 0x4E, 0x5F, 0x6A, 0x7B,
                 0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3,
@@ -246,13 +245,13 @@ receive:
             };
 
             if (!ed25519_verify(sig, payload_data + 64, payload_size - 64, pk)) {
-                terminal_write_string("  [OTA] ERROR CRÍTICO: Fallo la validacion de la firma Ed25519. Abortando instalación.\n");
+                terminal_write_string("  [OTA] ERROR: Fallo la validacion de la firma Ed25519.\n");
                 kfree(payload_data);
                 return;
             }
-            terminal_write_string("  [OTA] Firma criptográfica verificada correctamente.\n");
+            terminal_write_string("  [OTA] Firma verificada correctamente.\n");
         } else {
-            terminal_write_string("  [OTA] ADVERTENCIA CRÍTICA: Instalando actualizacion SIN verificar firma criptográfica.\n");
+            terminal_write_string("  [OTA] ADVERTENCIA: Instalando actualizacion SIN verificar firma.\n");
         }
 
         fs_node_t *passive_part = partition_get_passive_root();
