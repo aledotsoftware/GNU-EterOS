@@ -1,6 +1,15 @@
 # EterOS Orchestrator Meta-Agent Audit Report
 
 ## 1. Estado Actual de Compilación y Ejecución
+
+### 🔄 Cambios Recientes (Vision CLI / UI)
+- Se actualizaron las referencias visuales de versión (v0.1.0/v1.0 -> v0.2.0 "Genesis SMP") en:
+  - `kernel/shell/cmd_system.c`
+  - `kernel/fs/procfs.c`
+  - `userspace/marea_shell.c`
+  - `web_ui/app.js`
+- Se corrigió el comportamiento de la tecla retroceso (Backspace) en el panel de control (`kernel/shell/cmd_panel.c`) reescribiendo la lógica manual de la tecla retroceso en el bucle de input.
+
 **Fecha:** 2026-04-23
 **Commit auditado:** 432e92f7822bcd212bff999925dbdbebf37b182f
 

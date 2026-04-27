@@ -268,6 +268,13 @@ static void panel_time(void) {
         while (idx < 2) {
             if (keyboard_has_input()) {
                 char k = keyboard_getchar();
+                if (k == '\b') {
+                    if (idx > 0) {
+                        idx--;
+                        terminal_write_string("\b \b");
+                    }
+                    continue;
+                }
                 if (k == '\n' || k == '\r') break;
                 if (k >= '0' && k <= '9') {
                     buf[idx++] = k;
@@ -295,6 +302,13 @@ static void panel_time(void) {
         while (idx < 2) {
             if (keyboard_has_input()) {
                 char k = keyboard_getchar();
+                if (k == '\b') {
+                    if (idx > 0) {
+                        idx--;
+                        terminal_write_string("\b \b");
+                    }
+                    continue;
+                }
                 if (k == '\n' || k == '\r') break;
                 if (k >= '0' && k <= '9') {
                     buf[idx++] = k;
@@ -321,6 +335,13 @@ static void panel_time(void) {
         while (idx < 2) {
             if (keyboard_has_input()) {
                 char k = keyboard_getchar();
+                if (k == '\b') {
+                    if (idx > 0) {
+                        idx--;
+                        terminal_write_string("\b \b");
+                    }
+                    continue;
+                }
                 if (k == '\n' || k == '\r') break;
                 if (k >= '0' && k <= '9') {
                     buf[idx++] = k;

@@ -60,7 +60,7 @@ function spawnAbout() {
                 <span style="font-size: 30px; font-weight: bold;">E</span>
             </div>
             <h2>Eter OS</h2>
-            <p style="opacity: 0.6;">Versión 1.0 "Convergencia"</p>
+            <p style="opacity: 0.6;">Versión 0.2.0 "Genesis SMP"</p>
             <p style="margin-top: 20px; font-size: 14px;">El primer sistema operativo conceptual diseñado para unir la web, Android y Linux en una sola experiencia premium.</p>
         </div>
     `);

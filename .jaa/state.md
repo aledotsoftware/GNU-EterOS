@@ -1,4 +1,18 @@
-## EterOS Aether Linux Subsystem (Current Run)
+## EterOS Vision CLI & UI Polish (Current Run)
+- Updated visual version references globally (from v0.1.0/v1.0 to v0.2.0 "Genesis SMP") across the frontend (`web_ui/app.js`), kernel subsystems (`kernel/shell/cmd_system.c`, `kernel/fs/procfs.c`), and userspace tools (`userspace/marea_shell.c`) to reflect the current architectural state.
+- Fixed a bug in the raw interactive shell (`kernel/shell/cmd_panel.c`) where the backspace key (`\b`) was unhandled during manual RTC configuration, preventing users from correcting input typos. The shell now properly rewrites the terminal buffer `\b \b` and adjusts buffer indices.
+- Validated UI updates via Playwright headless screenshot verification and confirmed OS build and tests natively.
+
+# JAA Context State
+
+## Android Subsystem Compatibility Update (2024-04-25)
+- Conducted gap analysis between EterOS Linux compatibility and Android (Bionic/Linker) expectations.
+- Implemented `/dev/binder` stub in `kernel/fs/devfs.c` supporting the `BINDER_VERSION_IOWR` ioctl response.
+- Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
+- Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
+- Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
+
+## EterOS Aether Linux Subsystem (2024-04-24)
 - Hardened `kernel/fs/elf.c` to prevent string bounds checking bypasses and buffer overflows during `PT_INTERP` extraction by safely capping `out_interp` size.
 - Hardened `kernel/arch/x86_64/syscall.c` `sys_mmap` to automatically add `MAP_PRIVATE` for ABI compatibility when no mapping flags are provided by Linux binaries.
 - Refactored `sys_arch_prctl` to correctly read `MSR_FS_BASE` and `MSR_KERNEL_GS_BASE` for `ARCH_GET_FS` and `ARCH_GET_GS`, copying safely to userspace using `vmm_verify_user_access`.
@@ -7,9 +21,7 @@
 - Secured `sys_openat` with explicit `vmm_verify_user_access` boundary checks.
 - Added explicit NUL-termination for `sys_readlinkat` when the read size is strictly smaller than the requested buffer.
 
-# JAA Context State
-
-## EterOS Scheduler & IPC Update (2024-04-24)
+## EterOS Scheduler & IPC Update (2024-04-23)
 - Resolved a critical bug in `kernel/task.c:schedule()` where tasks selected to run again without switching context were not removed from the ready queue if they had been previously enqueued, corrupting the ready list.
 - Addressed thread-safety issues in state transitions within `kernel/futex.c:futex_wait()` and `kernel/sem.c:sem_wait()` by introducing and utilizing a new locked `task_block()` API.
 - Fixed `task_sleep()` by removing an arbitrary uninterruptible `hlt` busy wait.
@@ -28,10 +40,3 @@
 - Implemented core VFS stub tests for POSIX capabilities (`test_vfs_mkdir`, `test_sys_openat`, `test_sys_rw_perms`) to validate basic OS mechanics like node type constraints.
 - Analyzed `kernel/fs/elf.c` to confirm `PT_INTERP` boundary validation and execution mapping.
 - Current build is QEMU-tested successfully loading Ring 3 `login.elf`.
-
-## Android Subsystem Compatibility Update (Current Run)
-- Conducted gap analysis between EterOS Linux compatibility and Android (Bionic/Linker) expectations.
-- Implemented `/dev/binder` stub in `kernel/fs/devfs.c` supporting the `BINDER_VERSION_IOWR` ioctl response.
-- Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
-- Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
-- Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
