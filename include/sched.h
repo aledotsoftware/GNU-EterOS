@@ -16,7 +16,9 @@
 /* sys_wait4 options */
 #define WNOHANG     1
 #define WUNTRACED   2
+#ifndef WSTOPPED
 #define WSTOPPED    WUNTRACED
+#endif
 #define WEXITED     4
 #define WCONTINUED  8
 #define WNOWAIT     0x01000000

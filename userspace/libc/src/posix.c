@@ -119,13 +119,15 @@ static int _join_path(char *dst, size_t dst_sz, const char *dir, const char *fil
 /* Process */
 int fork(void) {
     long ret = _syscall0(SYS_fork);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
 int execve(const char *pathname, char *const argv[], char *const envp[]) {
     long ret = _syscall3(SYS_execve, (long)pathname, (long)argv, (long)envp);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
@@ -207,41 +209,48 @@ int execvp(const char *file, char *const argv[]) {
 
 pid_t waitpid(pid_t pid, int *status, int options) {
     long ret = _syscall4(SYS_wait4, pid, (long)status, options, 0);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (pid_t)ret;
 }
 
 int waitid(idtype_t idtype, pid_t id, siginfo_t *infop, int options) {
     long ret = _syscall5(SYS_waitid, idtype, id, (long)infop, options, 0);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 /* File descriptors and filesystem */
 int pipe(int pipefd[2]) {
     long ret = _syscall1(SYS_pipe, (long)pipefd);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int pipe2(int pipefd[2], int flags) {
     long ret = _syscall2(SYS_pipe2, (long)pipefd, flags);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int dup(int oldfd) {
     long ret = _syscall1(SYS_dup, oldfd);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
 int dup2(int oldfd, int newfd) {
     long ret = _syscall2(SYS_dup2, oldfd, newfd);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
 int dup3(int oldfd, int newfd, int flags) {
     long ret = _syscall3(SYS_dup3, oldfd, newfd, flags);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
@@ -255,7 +264,8 @@ int openat(int dirfd, const char *pathname, int flags, ...) {
     }
 
     long ret = _syscall4(SYS_openat, dirfd, (long)pathname, flags, mode);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
@@ -267,45 +277,53 @@ int fcntl(int fd, int cmd, ...) {
     va_end(ap);
 
     long ret = _syscall3(SYS_fcntl, fd, cmd, arg);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
 int access(const char *pathname, int mode) {
     long ret = _syscall2(SYS_access, (long)pathname, mode);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int chmod(const char *pathname, mode_t mode) {
     long ret = _syscall2(SYS_chmod, (long)pathname, mode);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int faccessat(int dirfd, const char *pathname, int mode, int flags) {
     long ret = _syscall4(SYS_faccessat, dirfd, (long)pathname, mode, flags);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 ssize_t readlink(const char *pathname, char *buf, size_t bufsiz) {
     long ret = _syscall3(SYS_readlink, (long)pathname, (long)buf, (long)bufsiz);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (ssize_t)ret;
 }
 
 ssize_t readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz) {
     long ret = _syscall4(SYS_readlinkat, dirfd, (long)pathname, (long)buf, (long)bufsiz);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (ssize_t)ret;
 }
 
 int lstat(const char *pathname, struct stat *buf) {
     long ret = _syscall4(SYS_newfstatat, AT_FDCWD, (long)pathname, (long)buf, AT_SYMLINK_NOFOLLOW);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags) {
     long ret = _syscall4(SYS_newfstatat, dirfd, (long)pathname, (long)buf, flags);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 char *getcwd(char *buf, size_t size) {
@@ -337,18 +355,21 @@ gid_t getegid(void) {
 
 pid_t setsid(void) {
     long ret = _syscall0(SYS_setsid);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (pid_t)ret;
 }
 
 int setpgid(pid_t pid, pid_t pgid) {
     long ret = _syscall2(SYS_setpgid, pid, pgid);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 pid_t getpgrp(void) {
     long ret = _syscall0(SYS_getpgrp);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (pid_t)ret;
 }
 
@@ -366,7 +387,8 @@ int tcsetpgrp(int fd, pid_t pgrp) {
 /* Scheduling */
 int sched_yield(void) {
     long ret = _syscall0(SYS_sched_yield);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout) {
@@ -390,19 +412,22 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 
 int epoll_create1(int flags) {
     long ret = _syscall1(SYS_epoll_create1, flags);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) {
     long ret = _syscall4(SYS_epoll_ctl, epfd, op, fd, (long)event);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout) {
     long ret = _syscall4(SYS_epoll_wait, epfd, (long)events, maxevents, timeout);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return (int)ret;
 }
 
@@ -418,12 +443,14 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, int64_t offse
 
 int munmap(void *addr, size_t length) {
     long ret = _syscall2(SYS_munmap, (long)addr, (long)length);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int mprotect(void *addr, size_t len, int prot) {
     long ret = _syscall3(SYS_mprotect, (long)addr, (long)len, prot);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...) {
@@ -476,19 +503,22 @@ int usleep(unsigned int usec) {
     req.sec = usec / 1000000;
     req.nsec = (usec % 1000000) * 1000;
     long ret = _syscall2(SYS_nanosleep, (long)&req, 0);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 /* Terminal */
 int tcgetattr(int fd, struct termios *termios_p) {
     long ret = _syscall3(SYS_ioctl, fd, TCGETS, (long)termios_p);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int tcsetattr(int fd, int optional_actions, const struct termios *termios_p) {
     (void)optional_actions; /* Only TCSANOW is supported by kernel TTY currently. */
     long ret = _syscall3(SYS_ioctl, fd, TCSETS, (long)termios_p);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int isatty(int fd) {
@@ -507,7 +537,8 @@ int isatty(int fd) {
 /* Misc */
 int uname(void *buf) {
     long ret = _syscall1(SYS_uname, (long)buf);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 mode_t umask(mode_t mask) {
@@ -548,7 +579,8 @@ int shm_open(const char *name, int oflag, mode_t mode) {
 
 int ftruncate(int fd, int64_t length) {
     long ret = _syscall2(SYS_ftruncate, fd, length);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
 }
 
 int shm_unlink(const char *name) {

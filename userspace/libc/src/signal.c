@@ -1,4 +1,4 @@
-extern int _set_errno(long ret);
+extern long _set_errno(long ret);
 /**
  * éterOS Mini-LibC - Signal Functions
  * POSIX signal handling wrappers
@@ -59,7 +59,8 @@ int sigaction(int sig, const struct sigaction *act, struct sigaction *oldact) {
     }
 
     long ret = syscall4_sig(SYS_rt_sigaction, sig, (long)pact, (long)oldact, 8);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return 0;
 }
 
@@ -92,25 +93,29 @@ int sigaddset(sigset_t *set, int signum) {
 
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
     long ret = syscall4_sig(SYS_rt_sigprocmask, how, (long)set, (long)oldset, 8);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return 0;
 }
 
 int sigpending(sigset_t *set) {
     long ret = syscall2(SYS_rt_sigpending, (long)set, 8);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return 0;
 }
 
 int sigsuspend(const sigset_t *mask) {
     long ret = syscall2(SYS_rt_sigsuspend, (long)mask, 8);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return 0;
 }
 
 int sigaltstack(const stack_t *ss, stack_t *old_ss) {
     long ret = syscall2(SYS_sigaltstack, (long)ss, (long)old_ss);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return 0;
 }
 
@@ -119,6 +124,7 @@ int raise(int sig) {
     long ret_pid;
     __asm__ volatile ("syscall" : "=a"(ret_pid) : "a"((long)SYS_getpid) : "rcx", "r11", "memory");
     long ret = syscall2(SYS_kill, ret_pid, sig);
-    return _set_errno(ret);
+    if (_set_errno(ret) < 0) return -1;
+    return ret;
     return 0;
 }
