@@ -1,9 +1,6 @@
 #include <hal.h>
 #include <errno.h>
 /* removed net/socket.h */
-#ifndef O_RDWR
-#define O_RDWR 2
-#endif
 #define MAX_FD 256
 
 #include <string.h>
@@ -11,6 +8,8 @@
 #include <vmm.h>
 #include <mm.h>
 #include <fs/vfs.h>
+/* Prevent redefinition of fcntl macros since EterOS provides fcntl.h */
+#include <fcntl.h>
 #include <lwip/sockets.h>
 
 static ssize_t lwip_socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
