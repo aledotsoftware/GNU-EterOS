@@ -17,11 +17,7 @@
 #define WNOHANG     1
 #define WUNTRACED   2
 #ifndef WSTOPPED
-#ifndef WSTOPPED
-#ifndef WSTOPPED\n#ifndef WSTOPPED\n#ifndef WSTOPPED\n#ifndef WSTOPPED
 #define WSTOPPED    WUNTRACED
-#endif\n#endif\n#endif\n#endif
-#endif
 #endif
 #define WEXITED     4
 #define WCONTINUED  8
