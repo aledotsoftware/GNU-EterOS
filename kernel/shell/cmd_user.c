@@ -183,10 +183,10 @@ static void cmd_userdel(const char* args) {
     kfree(buffer);
 
     if (found) {
-        /* Hackish way to overwrite: we can't easily unlink in simple VFS. Let's overwrite /etc/shadow directly */
         uint8_t* new_buf = kmalloc(tmp_node->length);
         read_fs(tmp_node, 0, tmp_node->length, new_buf);
-        shadow_node->length = 0; /* truncate */
+        if (shadow_node->truncate) shadow_node->truncate(shadow_node, 0);
+        else shadow_node->length = 0; /* Fallback */
         write_fs(shadow_node, 0, tmp_node->length, new_buf);
         kfree(new_buf);
         terminal_write_string("  Usuario eliminado.\n");
@@ -297,7 +297,8 @@ static void cmd_passwd(const char* args) {
     if (found) {
         uint8_t* new_buf = kmalloc(tmp_node->length);
         read_fs(tmp_node, 0, tmp_node->length, new_buf);
-        shadow_node->length = 0;
+        if (shadow_node->truncate) shadow_node->truncate(shadow_node, 0);
+        else shadow_node->length = 0;
         write_fs(shadow_node, 0, tmp_node->length, new_buf);
         kfree(new_buf);
         terminal_write_string("  Contrasena actualizada.\n");

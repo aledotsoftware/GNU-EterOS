@@ -232,6 +232,19 @@ void __attribute__((section(".text.boot"))) kmain(void) {
                 vfs_mount("/gnu", writable_fs);
                 vfs_mkdir("/tmp", 0);
                 vfs_mount("/tmp", shmfs_init());
+                vfs_mkdir("/etc", 0);
+                vfs_mount("/etc", shmfs_init());
+
+                /* Create default /etc/autologin to preserve previous behavior */
+                fs_node_t* etc_node = vfs_lookup(fs_root, "/etc");
+                if (etc_node) {
+                    create_fs(etc_node, "autologin", 0644);
+                    fs_node_t* autologin_node = vfs_lookup(fs_root, "/etc/autologin");
+                    if (autologin_node) {
+                        write_fs(autologin_node, 0, 2, (uint8_t*)"1\n");
+                    }
+                }
+
                 mkdir_fs(writable_fs, "bin", 0755);
                 mkdir_fs(writable_fs, "lib", 0755);
                 mkdir_fs(writable_fs, "include", 0755);

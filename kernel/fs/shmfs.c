@@ -269,6 +269,37 @@ static int shmfs_unlink(fs_node_t *parent, char *name) {
     return 0;
 }
 
+static int shmfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    (void)old_parent;
+    (void)new_parent;
+    if (!old_name || !new_name) return -1;
+
+    spin_lock(&shm_lock);
+    shm_object_t* obj = shm_find_object(old_name);
+    if (!obj) {
+        spin_unlock(&shm_lock);
+        return -1;
+    }
+
+    if (shm_find_object(new_name)) {
+        shm_object_t* existing = shm_find_object(new_name);
+        /* Remove the existing one from the list but keep its memory alive until closed */
+        if (shm_objects == existing) {
+            shm_objects = existing->next;
+        } else {
+            shm_object_t* curr = shm_objects;
+            while (curr && curr->next != existing) curr = curr->next;
+            if (curr) curr->next = existing->next;
+        }
+        /* Ideally we would delay free until ref_count == 0, but shm_free_object works for simple RAM FS */
+        if (existing->ref_count <= 0) shm_free_object(existing);
+    }
+
+    strlcpy(obj->name, new_name, sizeof(obj->name));
+    spin_unlock(&shm_lock);
+    return 0;
+}
+
 static int shmfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     (void)node;
     
@@ -306,6 +337,7 @@ fs_node_t* shmfs_init(void) {
     shmfs_root->create = shmfs_create;
     shmfs_root->unlink = shmfs_unlink;
     shmfs_root->readdir = shmfs_readdir;
+    shmfs_root->rename = shmfs_rename;
     
     return shmfs_root;
 }
