@@ -176,7 +176,7 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
 
         if (!(granted & 1)) { /* 1 = Execute */
             serial_write_string("[ELF] Permission denied. Missing execute permission.\n");
-            kfree(node);
+            if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
             return 0;
         }
     }
@@ -184,7 +184,7 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
     Elf64_Ehdr header;
     if (read_fs(node, 0, sizeof(Elf64_Ehdr), (uint8_t*)&header) != sizeof(Elf64_Ehdr)) {
         serial_write_string("[ELF] Failed to read ELF header.\n");
-        kfree(node);
+        if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
         return 0;
     }
 
@@ -194,13 +194,13 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         header.e_ident[2] != 'L' ||
         header.e_ident[3] != 'F') {
         serial_write_string("[ELF] Invalid ELF Magic.\n");
-        kfree(node);
+        if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
         return 0;
     }
 
     if (header.e_type != ET_EXEC && header.e_type != ET_DYN) {
         serial_write_string("[ELF] Unsupported ELF Type (Must be EXEC or DYN).\n");
-        kfree(node);
+        if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
         return 0;
     }
 
@@ -239,7 +239,7 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
 
         if (read_fs(node, offset, sizeof(Elf64_Phdr), (uint8_t*)&phdr) != sizeof(Elf64_Phdr)) {
             serial_write_string("[ELF] Failed to read Program Header.\n");
-            kfree(node);
+            if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
             return 0;
         }
 
@@ -252,21 +252,21 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             /* Check for integer overflow in vaddr + mem_size */
             if (vaddr + mem_size < vaddr) {
                 serial_write_string("[ELF] Error: Segment address wraparound (overflow).\n");
-                kfree(node);
+                if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
                 return 0;
             }
 
             /* SECURITY FIX: Check for file offset/size truncation (since read_fs uses uint32_t) */
             if (file_offset > UINT32_MAX || file_size > UINT32_MAX) {
                 serial_write_string("[ELF] Error: Segment exceeds 32-bit file limits.\n");
-                kfree(node);
+                if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
                 return 0;
             }
 
             /* Check for integer overflow in file_offset + file_size */
             if (file_offset + file_size < file_offset) {
                  serial_write_string("[ELF] Error: File offset wraparound (overflow).\n");
-                 kfree(node);
+                 if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
                  return 0;
             }
 
@@ -277,21 +277,21 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             /* Security Check: Prevent buffer overflow if file size exceeds memory size */
             if (file_size > mem_size) {
                 serial_write_string("[ELF] Error: p_filesz > p_memsz (Buffer Overflow Risk). Load rejected.\n");
-                kfree(node);
+                if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
                 return 0;
             }
 
             /* Security Check: Ensure segment is in User Space */
             if (vaddr >= 0x0000800000000000 || (vaddr + mem_size) >= 0x0000800000000000) {
                 serial_write_string("[ELF] Error: Segment violates User Space boundaries.\n");
-                kfree(node);
+                if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
                 return 0;
             }
 
             /* Error: Identity Map Conflict (< 4GB) */
             if (vaddr < 0x100000000) {
                 serial_write_string("[ELF] Error: Segment address < 4GB conflicts with Kernel Identity Map. Load rejected.\n");
-                kfree(node);
+                if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
                 return 0;
             }
 
@@ -312,7 +312,7 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
                      void* phys = pmm_alloc_page();
                      if (!phys) {
                          serial_write_string("[ELF] OOM during loading.\n");
-                         kfree(node);
+                         if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
                          return 0;
                      }
                      /* Always map as USER | WRITE initially for loading */
@@ -328,7 +328,7 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             if (file_size > 0) {
                 if (read_fs(node, file_offset, file_size, (uint8_t*)vaddr) != (ssize_t)file_size) {
                      serial_write_string("[ELF] Failed to read segment data.\n");
-                     kfree(node);
+                     if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
                      return 0;
                 }
             }
@@ -368,6 +368,6 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         serial_write_string("\n");
     }
 
-    kfree(node);
+    if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (node->close) node->close(node); kfree(node); } else kfree(node);
     return header.e_entry + load_offset;
 }

@@ -70,6 +70,8 @@ typedef struct fs_node {
     uint32_t uid;
     uint32_t gid;
     uint32_t mask;
+    uint32_t ref_count;
+    void (*close)(struct fs_node*);
 } fs_node_t;
 
 fs_node_t* fs_root = NULL;

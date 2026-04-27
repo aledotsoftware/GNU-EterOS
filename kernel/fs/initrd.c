@@ -224,6 +224,11 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     return 1; /* EOF */
 }
 
+static int initrd_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    (void)old_parent; (void)old_name; (void)new_parent; (void)new_name;
+    return -1; /* EROFS */
+}
+
 int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
     (void)permission;
 
@@ -414,6 +419,7 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     initrd_root->readdir = &initrd_readdir;
     initrd_root->finddir = &initrd_finddir;
     initrd_root->mkdir = &initrd_mkdir;
+    initrd_root->rename = &initrd_rename;
     initrd_root->ptr = 0;
     initrd_root->impl = 0;
 

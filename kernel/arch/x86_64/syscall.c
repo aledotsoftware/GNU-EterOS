@@ -783,6 +783,10 @@ static int64_t sys_write(int fd, const void* buf, size_t count) {
 
     if ((current->fd_table[fd].flags & O_ACCMODE) == O_RDONLY) return -EBADF;
 
+    if (current->fd_table[fd].flags & O_APPEND) {
+        current->fd_table[fd].offset = current->fd_table[fd].node->length;
+    }
+
     uint32_t written = write_fs(current->fd_table[fd].node, current->fd_table[fd].offset, count, (uint8_t*)buf);
     current->fd_table[fd].offset += written;
     return written;
@@ -1151,10 +1155,13 @@ static int64_t sys_renameat(int olddirfd, const char* oldpath, int newdirfd, con
 
     fs_node_t* new_parent = vfs_lookup(fs_root, new_parent_path);
     if (!new_parent) {
+         if (__atomic_sub_fetch(&old_parent->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (old_parent->close) old_parent->close(old_parent); kfree(old_parent); }
          kfree(new_filename); kfree(new_parent_path); kfree(old_filename); kfree(old_parent_path); kfree(knewpath); kfree(koldpath); return -ENOENT;
     }
 
     if (!check_node_permission(old_parent, 2 | 1) || !check_node_permission(new_parent, 2 | 1)) {
+         if (__atomic_sub_fetch(&old_parent->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (old_parent->close) old_parent->close(old_parent); kfree(old_parent); }
+         if (__atomic_sub_fetch(&new_parent->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (new_parent->close) new_parent->close(new_parent); kfree(new_parent); }
          kfree(new_filename); kfree(new_parent_path); kfree(old_filename); kfree(old_parent_path); kfree(knewpath); kfree(koldpath); return -EACCES;
     }
 
@@ -1163,7 +1170,10 @@ static int64_t sys_renameat(int olddirfd, const char* oldpath, int newdirfd, con
         ret = old_parent->rename(old_parent, old_filename, new_parent, new_filename);
     }
 
-     kfree(new_filename); kfree(new_parent_path); kfree(old_filename); kfree(old_parent_path); kfree(knewpath); kfree(koldpath);
+    if (__atomic_sub_fetch(&old_parent->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (old_parent->close) old_parent->close(old_parent); kfree(old_parent); }
+    if (__atomic_sub_fetch(&new_parent->ref_count, 1, __ATOMIC_SEQ_CST) == 0) { if (new_parent->close) new_parent->close(new_parent); kfree(new_parent); }
+
+    kfree(new_filename); kfree(new_parent_path); kfree(old_filename); kfree(old_parent_path); kfree(knewpath); kfree(koldpath);
     return ret;
 }
 

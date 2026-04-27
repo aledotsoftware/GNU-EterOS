@@ -71,16 +71,71 @@ static void shm_free_object(shm_object_t* obj) {
 }
 
 static ssize_t shmfs_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset; (void)size; (void)buffer;
-    /* SHM nodes are typically manipulated via mmap, not read/write directly, 
-       but basic support could be added if needed. */
-    return 0;
+    if (!node || !buffer) return -1;
+    shm_object_t* obj = (shm_object_t*)(uintptr_t)node->impl;
+    if (!obj) return -1;
+
+    spin_lock(&obj->lock);
+
+    if (offset >= obj->size) {
+        spin_unlock(&obj->lock);
+        return 0;
+    }
+    if (offset + size > obj->size) {
+        size = obj->size - offset;
+    }
+
+    uint32_t bytes_read = 0;
+    while (bytes_read < size) {
+        uint32_t current_offset = offset + bytes_read;
+        uint32_t page_idx = current_offset / PAGE_SIZE;
+        uint32_t page_offset = current_offset % PAGE_SIZE;
+
+        if (page_idx >= obj->page_count || !obj->pages[page_idx]) break;
+
+        uint32_t chunk = PAGE_SIZE - page_offset;
+        if (chunk > size - bytes_read) chunk = size - bytes_read;
+
+        memcpy(buffer + bytes_read, (void*)(obj->pages[page_idx] + page_offset), chunk);
+        bytes_read += chunk;
+    }
+
+    spin_unlock(&obj->lock);
+    return bytes_read;
 }
 
+int shmfs_truncate(fs_node_t *node, uint32_t length);
+
 static uint32_t shmfs_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset; (void)size; (void)buffer;
-    /* Basic write support not typically needed for SHM. Returns 0 to indicate error or no bytes written. */
-    return 0;
+    if (!node || !buffer) return 0;
+    shm_object_t* obj = (shm_object_t*)(uintptr_t)node->impl;
+    if (!obj) return 0;
+
+    if (offset + size > obj->size) {
+        if (shmfs_truncate(node, offset + size) != 0) {
+            return 0; /* Failed to grow */
+        }
+    }
+
+    spin_lock(&obj->lock);
+
+    uint32_t bytes_written = 0;
+    while (bytes_written < size) {
+        uint32_t current_offset = offset + bytes_written;
+        uint32_t page_idx = current_offset / PAGE_SIZE;
+        uint32_t page_offset = current_offset % PAGE_SIZE;
+
+        if (page_idx >= obj->page_count || !obj->pages[page_idx]) break;
+
+        uint32_t chunk = PAGE_SIZE - page_offset;
+        if (chunk > size - bytes_written) chunk = size - bytes_written;
+
+        memcpy((void*)(obj->pages[page_idx] + page_offset), buffer + bytes_written, chunk);
+        bytes_written += chunk;
+    }
+
+    spin_unlock(&obj->lock);
+    return bytes_written;
 }
 
 static void shmfs_open(fs_node_t *node) {

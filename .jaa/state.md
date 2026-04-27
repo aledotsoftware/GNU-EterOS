@@ -29,9 +29,17 @@
 - Analyzed `kernel/fs/elf.c` to confirm `PT_INTERP` boundary validation and execution mapping.
 - Current build is QEMU-tested successfully loading Ring 3 `login.elf`.
 
-## Android Subsystem Compatibility Update (Current Run)
+## Android Subsystem Compatibility Update
 - Conducted gap analysis between EterOS Linux compatibility and Android (Bionic/Linker) expectations.
 - Implemented `/dev/binder` stub in `kernel/fs/devfs.c` supporting the `BINDER_VERSION_IOWR` ioctl response.
 - Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
 - Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
 - Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
+
+## EterOS VFS & Userspace Integrations Update (Current Run)
+- Implemented `shmfs_read` and `shmfs_write` mechanisms directly mapping physical pages to support standard I/O in the `/etc` (`shmfs`) mount, resolving a critical issue causing `/etc/shadow` creation silently failing for `userspace/login.elf`.
+- Modified `kernel/arch/x86_64/syscall.c` `sys_write` logic to securely synchronize descriptor offsets using `node->length` dynamically mapping standard POSIX `O_APPEND` characteristics required by `useradd.elf`.
+- Evaluated and remediated reference-counting leaks inside `sys_renameat` during intermediate traversal errors mapping VFS objects, and standardized Node cleanup closures using explicit `__atomic_sub_fetch`.
+- Enabled full `sys_renameat` cross-filesystem behaviors introducing `jfs_rename` and read-only blocking structures directly within `kernel/fs/initrd.c` enforcing immutable limitations safely.
+- Corrected VFS Node metadata generation mappings for `procfs` virtual structures directly initializing `mask` values (e.g. `0444` and `0555`) to comply with permission validation mechanisms preventing `sys_openat` arbitrary blockages.
+- Secured native ELF Loader `kernel/fs/elf.c` directly decrementing reference count closures upon execution denial validations (e.g. magic validations, boundary violations) avoiding task zombie structures during erroneous invocations.

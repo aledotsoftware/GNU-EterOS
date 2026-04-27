@@ -29,6 +29,7 @@ static int jfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry);
 static fs_node_t* jfs_finddir(fs_node_t *node, char *name);
 static int jfs_create(fs_node_t *parent, char *name, uint16_t permission);
 static int jfs_mkdir(fs_node_t *parent, char *name, uint16_t permission);
+static int jfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name);
 
 static void jfs_set_inode_metadata(uint32_t inode_idx, uint16_t mode, uint32_t uid, uint32_t gid) {
     if (inode_idx >= JFS_MAX_INODES) return;
@@ -148,6 +149,7 @@ static fs_node_t* jfs_make_node(uint32_t inode_idx, const char *name) {
         fnode->finddir = jfs_finddir;
         fnode->create = jfs_create;
         fnode->mkdir = jfs_mkdir;
+        fnode->rename = jfs_rename;
     } else {
         fnode->read = jfs_read;
         fnode->write = jfs_write;
@@ -344,6 +346,27 @@ static int jfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     return jfs_add_entry(parent->inode, name, free_inode);
 }
 
+static int jfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    if (!old_parent || !old_name || !new_parent || !new_name) return -1;
+    if (!jfs_is_directory(old_parent->inode) || !jfs_is_directory(new_parent->inode)) return -1;
+
+    jfs_dirent_t found;
+    uint32_t out_block, out_index;
+    if (jfs_find_entry(old_parent->inode, old_name, &found, &out_block, &out_index) != 0) return -1;
+
+    /* Add to new parent */
+    if (jfs_add_entry(new_parent->inode, new_name, found.inode) != 0) return -1;
+
+    /* Remove from old parent */
+    uint8_t sector[512];
+    disk_read(out_block, sector);
+    jfs_dirent_t *entries = (jfs_dirent_t*)sector;
+    entries[out_index].inode = 0; /* Mark deleted */
+    jfs_journal_write(out_block, sector);
+
+    return 0;
+}
+
 static int jfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
     if (!parent || !name || !*name) return -1;
     if (!jfs_is_directory(parent->inode)) return -1;
@@ -415,6 +438,7 @@ fs_node_t* jfs_init(void) {
     fs->finddir = jfs_finddir;
     fs->create = jfs_create;
     fs->mkdir = jfs_mkdir;
+    fs->rename = jfs_rename;
 
     hal_console_write("[JFS] Initialized (4MB RAM Disk). Journaling Enabled.\n");
     return fs;
