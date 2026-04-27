@@ -24,5 +24,6 @@ ssize_t sys_lwip_sendmsg(int fd, const struct msghdr *msg, int flags);
 ssize_t sys_lwip_recvmsg(int fd, struct msghdr *msg, int flags);
 ssize_t sys_lwip_send(int fd, const void *buf, size_t len, int flags);
 ssize_t sys_lwip_recv(int fd, void *buf, size_t len, int flags);
+int sys_lwip_close(int fd);
 
 #endif /* _NET_LWIP_SOCKET_H */

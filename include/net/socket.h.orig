@@ -57,9 +57,6 @@ int net_recv(socket_t sock, void* buf, int len, int flags);
 /* Close socket */
 int net_close(socket_t sock);
 
-/* DNS resolution */
-int net_gethostbyname(const char *name, uint32_t *ip_addr);
-
 /* --- Internal Stack Structures (Visible for stack modules like tcp.c) --- */
 
 #define SOCKET_STATE_CLOSED      0
