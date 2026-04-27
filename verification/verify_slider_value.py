@@ -8,8 +8,8 @@ def verify_slider_value():
         page = browser.new_page()
 
         # Load the file
-        file_path = os.path.abspath("web_ui/index.html")
-        page.goto(f"file://{file_path}")
+        file_path = "file:///app/web_ui/index.html"
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for boot splash to disappear
         print("Waiting for boot splash to disappear...")

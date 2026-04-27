@@ -1,0 +1,10 @@
+Fix test regressions across C suite and Playwright scripts
+
+1. Fixed macro redefinitions (WSTOPPED, HAL_MEM_WRITE) causing C test failures.
+2. Updated test_socket_security.c parameter pointers to match syscall ABI.
+3. Completely overhauled all Playwright verification scripts:
+   - Used robust file:///app/web_ui/index.html URLs to fix Playwright net::ERR_FILE_NOT_FOUND issues entirely bypassing brittle relative path math.
+   - Refactored frontend UI tests for new DOM selectors (.os-logo, .status-bar, .window-controls .close, #launcher-trigger).
+   - Re-wrote cc-slider JavaScript requestAnimationFrame transition assertions correctly.
+   - Adjusted debounce script to correctly simulate user input over time.
+   - Removed broken HTML comments, empty H1 elements, and escaped SVG in web_ui/index.html to pass a11y tests and resolve XSS test assertions gracefully.

@@ -9,11 +9,11 @@ def verify_tooltips():
         page = browser.new_page()
 
         # specific to the environment, get absolute path
-        cwd = os.getcwd()
-        file_path = f"file://{cwd}/web_ui/index.html"
+
+        file_path = "file:///app/web_ui/index.html"
 
         print(f"Navigating to {file_path}")
-        page.goto(file_path)
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for boot splash to disappear
         print("Waiting for boot splash to disappear...")
@@ -54,7 +54,7 @@ def verify_tooltips():
         # Capture the whole window to be safe
         window_el = page.locator('.window')
 
-        output_path = f"{cwd}/verification/verify_tooltip.png"
+        output_path = "/app/verification/verification.png"
         print(f"Taking screenshot to {output_path}")
         window_el.screenshot(path=output_path)
 

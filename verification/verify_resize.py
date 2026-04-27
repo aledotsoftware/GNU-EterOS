@@ -11,7 +11,7 @@ def run():
         # Load the local HTML file
         file_path = f"file://{os.getcwd()}/web_ui/index.html"
         print(f"Loading {file_path}")
-        page.goto(file_path)
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for boot splash to be gone (detached)
         print("Waiting for boot splash to finish...")

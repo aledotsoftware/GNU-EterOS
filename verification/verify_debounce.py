@@ -7,8 +7,8 @@ def verify_debounce():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        file_path = os.path.abspath("web_ui/index.html")
-        page.goto(f"file://{file_path}")
+        file_path = "file:///app/web_ui/index.html"
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for splash screen to disappear
         try:
@@ -18,7 +18,7 @@ def verify_debounce():
             return
 
         # Open launcher
-        page.get_by_label("Lanzador de aplicaciones").click()
+        page.locator("#launcher-trigger").click()
         page.wait_for_selector("#launcher.active")
 
         # Inject spy to count calls

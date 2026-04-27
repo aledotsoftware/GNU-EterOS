@@ -8,10 +8,17 @@ def run():
 
         # Load the local HTML file
         file_url = f"file://{os.path.abspath('web_ui/index.html')}"
-        page.goto(file_url)
+        page.goto("file:///app/web_ui/index.html")
+        page.wait_for_selector("#boot-splash", state="hidden")
+        page.evaluate("toggleLauncher()")
+        page.wait_for_selector("#launcher.active")
+
+
+
+
 
         # 1. Click the calculator icon to open a window
-        page.locator(".icon").first.click()
+        page.locator(".launcher-item").first.click()
 
         # 2. Wait for window to appear
         page.wait_for_selector(".window")

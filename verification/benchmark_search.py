@@ -7,8 +7,8 @@ def benchmark_search():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        file_path = os.path.abspath("web_ui/index.html")
-        page.goto(f"file://{file_path}")
+        file_path = "file:///app/web_ui/index.html"
+        page.goto("file:///app/web_ui/index.html")
 
         try:
             page.wait_for_selector("#boot-splash", state="detached", timeout=10000)
@@ -16,7 +16,7 @@ def benchmark_search():
             print("Boot splash timeout")
             return
 
-        page.get_by_label("Lanzador de aplicaciones").click()
+        page.locator("#launcher-trigger").click()
         page.wait_for_selector("#launcher.active")
 
         # Inject benchmark code

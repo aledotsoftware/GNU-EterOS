@@ -223,7 +223,7 @@ int main() {
     current_task_mock.id = 1;
 
     // Fake kernel address
-    struct sockaddr* bad_addr = (struct sockaddr_old*)0xFFFFFFFF80000000ULL;
+    struct sockaddr_old* bad_addr = (struct sockaddr_old*)0xFFFFFFFF80000000ULL;
     int* bad_addrlen = (int*)0xFFFFFFFF80000000ULL;
 
     // Normal address

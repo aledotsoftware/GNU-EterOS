@@ -8,10 +8,10 @@ def run():
         page = browser.new_page()
 
         # Load the local HTML file
-        cwd = os.getcwd()
-        file_path = f"file://{cwd}/web_ui/index.html"
+
+        file_path = "file:///app/web_ui/index.html"
         print(f"Loading: {file_path}")
-        page.goto(file_path)
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for boot splash
         page.wait_for_timeout(3000)

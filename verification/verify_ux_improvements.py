@@ -7,9 +7,9 @@ def run():
         page = browser.new_page()
 
         # Load the local file
-        cwd = os.getcwd()
-        filepath = os.path.join(cwd, 'web_ui/index.html')
-        page.goto(f'file://{filepath}')
+
+        filepath = "file:///app/web_ui/index.html"
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for splash screen to disappear (simulation)
         # The splash screen takes 2.5s + 0.6s fade out.

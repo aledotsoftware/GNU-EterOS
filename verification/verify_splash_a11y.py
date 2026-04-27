@@ -8,11 +8,11 @@ def run():
         page = browser.new_page()
 
         # Get absolute path to index.html
-        cwd = os.getcwd()
-        file_path = f"file://{cwd}/web_ui/index.html"
+
+        file_path = "file:///app/web_ui/index.html"
 
         print(f"Navigating to {file_path}")
-        page.goto(file_path)
+        page.goto("file:///app/web_ui/index.html")
 
         # 1. Verify Image accessibility
         img_locator = page.locator("img.splash-logo")
@@ -40,6 +40,8 @@ def run():
         # 3. Verify Theme Color Meta
         meta_locator = page.locator('meta[name="theme-color"]')
         if meta_locator.count() > 0:
+            meta_locator = meta_locator.first
+            meta_locator = meta_locator.first
             content = meta_locator.get_attribute("content")
             if content == "#ffffff":
                  print("PASS: Theme color meta tag present and correct.")

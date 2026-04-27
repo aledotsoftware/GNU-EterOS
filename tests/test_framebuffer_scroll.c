@@ -42,8 +42,12 @@ void* kcalloc(size_t n, size_t s) { return calloc(n, s); }
 
 /* Mock HAL MM */
 #define HAL_PAGE_SIZE 4096
+#ifndef HAL_MEM_WRITE
 #define HAL_MEM_WRITE 0
+#endif
+#ifndef HAL_MEM_WRITE_COMBINING
 #define HAL_MEM_WRITE_COMBINING 0
+#endif
 int hal_mem_map(uint64_t phys, uint64_t virt, uint32_t flags) {
     (void)phys; (void)virt; (void)flags;
     return 0;
@@ -101,6 +105,7 @@ void framebuffer_init(boot_info_t* info) {
 */
 /* Mock VGA Buffer for vga.c initialization */
 uint16_t* mock_vga_buffer;
+#undef VGA_BUFFER_ADDR
 #define VGA_BUFFER_ADDR ((uintptr_t)mock_vga_buffer)
 
 #include "../kernel/drivers/video/vga.c"

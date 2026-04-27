@@ -42,6 +42,10 @@ function handleMenuKey(e, item) {
         e.preventDefault();
         item.click();
     } else if (e.key === 'Escape') {
+        const activeWindows = document.querySelectorAll('.window');
+        if (activeWindows.length > 0) {
+            closeWindow(activeWindows[activeWindows.length - 1].querySelector('.control.close'));
+        }
         e.preventDefault();
         toggleEterMenu();
     } else if (e.key === 'Tab') {
@@ -164,7 +168,7 @@ function toggleLauncher() {
     } else {
         // Clear search on close
         document.getElementById('launcher-search').value = '';
-        filterApps();
+        filterApps(true);
     }
 
     // Hide CC if opening launcher
@@ -177,15 +181,26 @@ function toggleLauncher() {
 }
 
 function clearSearch() {
+    if (window.debounceTimer) {
+        clearTimeout(window.debounceTimer);
+        window.debounceTimer = null;
+    }
     const input = document.getElementById('launcher-search');
     input.value = '';
     input.focus();
-    filterApps();
+    filterApps(true);
 }
 
 let launcherCache = null;
 
-function filterApps() {
+function filterApps(isDebounced = false) {
+    if (window.debounceTimer && !isDebounced) {
+        clearTimeout(window.debounceTimer);
+    }
+    if (!isDebounced) {
+        window.debounceTimer = setTimeout(() => filterApps(true), 300);
+        return;
+    }
     const query = document.getElementById('launcher-search').value.toLowerCase();
 
     // Toggle clear button
@@ -393,11 +408,11 @@ function spawnApp(name, type, customContent = null) {
 
     win.innerHTML = `
         <div class="window-header">
-            <span class="window-title">${name} ${customContent ? '' : '(' + type.toUpperCase() + ')'}</span>
+            <span class="window-title">${name.replace(/</g, "&lt;").replace(/>/g, "&gt;")} ${customContent ? '' : '(' + type.toUpperCase() + ')'}</span>
             <div class="window-controls">
                 <div class="control focus" title="Modo Focus" role="button" aria-label="Cambiar a modo enfoque" tabindex="0" onclick="toggleFocusMode(this)" onkeydown="if(event.key==='Enter') toggleFocusMode(this)"></div>
-                <div class="control minimize" role="button" aria-label="Minimizar ventana" tabindex="0" onclick="minimizeWindow(this)" onkeydown="if(event.key==='Enter') minimizeWindow(this)"></div>
-                <div class="control maximize" role="button" aria-label="Maximizar ventana" tabindex="0" onclick="maximizeWindow(this)" onkeydown="if(event.key==='Enter') maximizeWindow(this)">
+                <div class="control minimize" title="Minimizar" role="button" aria-label="Minimizar ventana" tabindex="0" onclick="minimizeWindow(this)" onkeydown="if(event.key==='Enter') minimizeWindow(this)"></div>
+                <div class="control maximize" title="Maximizar" role="button" aria-label="Maximizar ventana" tabindex="0" onclick="maximizeWindow(this)" onkeydown="if(event.key==='Enter') maximizeWindow(this)">
                     <div class="snap-menu">
                         <div class="snap-option layout-split" role="button" aria-label="Dividir izquierda 50%" tabindex="0" onclick="snapWindow(this, 'left-50', event)" onkeydown="if(event.key==='Enter') snapWindow(this, 'left-50', event)">
                             <div class="snap-box"></div><div class="snap-box"></div>
@@ -421,7 +436,7 @@ function spawnApp(name, type, customContent = null) {
                         </div>
                     </div>
                 </div>
-                <div class="control close" role="button" aria-label="Cerrar ventana" tabindex="0" onclick="closeWindow(this)" onkeydown="if(event.key==='Enter') closeWindow(this)"></div>
+                <div class="control close" title="Cerrar" role="button" aria-label="Cerrar ventana" tabindex="0" onclick="closeWindow(this)" onkeydown="if(event.key==='Enter') closeWindow(this)"></div>
             </div>
         </div>
         <div class="window-content" style="height: calc(100% - 40px); overflow: hidden;">
@@ -743,6 +758,7 @@ function setupLauncherNav() {
     const search = document.getElementById('launcher-search');
     const getApps = () => Array.from(document.querySelectorAll('.launcher-item')).filter(e => e.style.display !== 'none');
 
+    search.addEventListener('input', filterApps);
     search.addEventListener('keydown', (e) => {
         const apps = getApps();
         if (e.key === 'ArrowDown' && apps.length) {
@@ -754,6 +770,10 @@ function setupLauncherNav() {
             apps[0].click();
         }
         if (e.key === 'Escape') {
+        const activeWindows = document.querySelectorAll('.window');
+        if (activeWindows.length > 0) {
+            closeWindow(activeWindows[activeWindows.length - 1].querySelector('.control.close'));
+        }
             e.preventDefault();
             if (search.value.length > 0) {
                 clearSearch();
@@ -775,6 +795,10 @@ function setupLauncherNav() {
                 if (idx > 0) apps[idx - 1].focus();
                 else search.focus();
             } else if (e.key === 'Escape') {
+        const activeWindows = document.querySelectorAll('.window');
+        if (activeWindows.length > 0) {
+            closeWindow(activeWindows[activeWindows.length - 1].querySelector('.control.close'));
+        }
                 e.preventDefault();
                 toggleLauncher();
             }
@@ -822,3 +846,52 @@ if (typeof module !== 'undefined') {
         snapWindow
     };
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sliders = document.querySelectorAll('.cc-slider');
+    sliders.forEach(slider => {
+        let isUpdating = false;
+        slider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            slider.setAttribute('aria-valuetext', `${val}%`);
+            const valDisplay = slider.nextElementSibling;
+            if (valDisplay && valDisplay.classList.contains('slider-value')) {
+                valDisplay.textContent = `${val}%`;
+            }
+            if (!isUpdating) {
+                isUpdating = true;
+                requestAnimationFrame(() => {
+                    const icon = slider.previousElementSibling;
+                    if (icon && icon.tagName === 'IMG') {
+                        icon.style.opacity = 0.3 + (val / 100) * 0.7;
+                    }
+                    isUpdating = false;
+                });
+            }
+        });
+    });
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const activeWindows = document.querySelectorAll('.window');
+        if (activeWindows.length > 0) {
+            closeWindow(activeWindows[activeWindows.length - 1].querySelector('.control.close'));
+        }
+        const activeWindow = document.activeElement.closest('.window');
+        if (activeWindow) {
+            closeWindow(activeWindow.querySelector('.control.close'));
+        }
+    }
+});
+
+function clearNotifications() {
+    const list = document.getElementById('notif-list');
+    const emptyState = document.getElementById('notif-empty');
+    if (list && emptyState) {
+        list.style.display = 'none';
+        list.innerHTML = '';
+        emptyState.style.display = 'block';
+    }
+}
+window.clearNotifications = clearNotifications;

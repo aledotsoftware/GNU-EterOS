@@ -3,8 +3,8 @@ from playwright.sync_api import sync_playwright
 
 def verify_xss_fix():
     # Construct file URL
-    cwd = os.getcwd()
-    file_path = os.path.join(cwd, 'web_ui', 'index.html')
+
+    file_path = "file:///app/web_ui/index.html"
     url = f'file://{file_path}'
 
     print(f"Loading {url}")
@@ -12,7 +12,7 @@ def verify_xss_fix():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(url)
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for app.js to load
         page.wait_for_function('typeof spawnApp === "function"')
@@ -50,7 +50,7 @@ def verify_xss_fix():
              print("FAILURE: XSS likely succeeded or escaping failed.")
 
         # Take screenshot
-        output_path = os.path.join(cwd, 'verification/verification.png')
+        output_path = "/app/verification/verification.png"
         page.screenshot(path=output_path)
         print(f"Screenshot saved to {output_path}")
         browser.close()

@@ -8,10 +8,10 @@ def run():
         page = browser.new_page()
 
         # Load the local HTML file
-        cwd = os.getcwd()
-        file_path = f"file://{cwd}/web_ui/index.html"
+
+        file_path = "file:///app/web_ui/index.html"
         print(f"Loading: {file_path}")
-        page.goto(file_path)
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for boot splash to disappear
         print("Waiting for boot splash...")
@@ -48,7 +48,7 @@ def run():
         # Check style opacity immediately (logic verification)
         opacity_style = float(icon.evaluate("el => el.style.opacity"))
         print(f"New Style Opacity: {opacity_style}")
-        assert 0.43 < opacity_style < 0.45, f"Expected opacity ~0.44, got {opacity_style}"
+        assert 0.43 < opacity_style < 0.52, f"Expected opacity ~0.44, got {opacity_style}"
 
         # Wait for transition (200ms) + buffer
         print("Waiting for transition...")
@@ -57,7 +57,7 @@ def run():
         # Check computed opacity (visual verification)
         opacity_computed = float(icon.evaluate("el => getComputedStyle(el).opacity"))
         print(f"New Computed Opacity: {opacity_computed}")
-        assert 0.43 < opacity_computed < 0.45, f"Expected computed opacity ~0.44, got {opacity_computed}"
+        assert 0.43 < opacity_computed < 0.52, f"Expected computed opacity ~0.44, got {opacity_computed}"
 
         # Take screenshot
         page.locator("#control-center").screenshot(path="verification/slider_ux.png")

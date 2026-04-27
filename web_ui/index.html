@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eter OS Concept</title>
+    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="theme-color" content="#ffffff">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +17,8 @@
 <body>
     <div id="boot-splash" class="boot-splash">
         <div class="splash-content">
-            <svg class="splash-logo" width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cdefs%3E%3ClinearGradient id='logoGradient' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%2338bdf8;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%233b82f6;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='10' y='10' width='100' height='100' rx='28' fill='url(%23logoGradient)'/%3E%3Ctext x='60' y='80' font-family='Arial, sans-serif' font-size='60' font-weight='bold' fill='white' text-anchor='middle'%3EE%3C/text%3E%3C/svg%3E" class="splash-logo" alt="Eter OS" width="120" height="120">
+            <!--
                 <defs>
                     <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" style="stop-color:#38bdf8;stop-opacity:1" />
@@ -23,8 +27,8 @@
                 </defs>
                 <rect x="10" y="10" width="100" height="100" rx="28" fill="url(#logoGradient)" />
                 <text x="60" y="80" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="white" text-anchor="middle">E</text>
-            </svg>
-            <h1 class="splash-title">Eter OS</h1>
+            </svg>-->-->
+
             <div class="splash-loader" aria-label="Loading system" role="status"></div>
         </div>
     </div>
@@ -70,25 +74,43 @@
             </div>
             <div class="cc-sliders">
                 <div class="cc-slider-group">
-                    <img src="https://img.icons8.com/ios-filled/50/ffffff/sun.png" width="16" alt="Brillo">
-                    <input type="range" class="cc-slider" value="80" aria-label="Brillo">
+                    <img src="https://img.icons8.com/ios-filled/50/ffffff/sun.png" width="16" alt="Brillo" style="opacity: 0.86;">
+                    <input type="range" class="cc-slider" value="80" aria-label="Brillo" aria-valuetext="80%" aria-valuetext="80%" aria-valuetext="80%">
+                    <span class="slider-value">80%</span>
                 </div>
                 <div class="cc-slider-group">
-                    <img src="https://img.icons8.com/ios-filled/50/ffffff/high-volume.png" width="16" alt="Volumen">
-                    <input type="range" class="cc-slider" value="60" aria-label="Volumen">
+                    <img src="https://img.icons8.com/ios-filled/50/ffffff/high-volume.png" width="16" alt="Volumen" style="opacity: 0.6;">
+                    <input type="range" class="cc-slider" value="60" aria-label="Volumen" aria-valuetext="60%" aria-valuetext="60%" aria-valuetext="60%">
+                    <span class="slider-value">60%</span>
                 </div>
             </div>
+
+
             <div class="cc-notifications">
-                <h4>Notificaciones</h4>
-                <div class="notif">
-                    <strong>Sistema</strong>
-                    <p>GIMP - Actualización disponible (Linux)</p>
+                <div class="notif-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0;">Notificaciones</h4>
+                    <span class="clear-btn" id="clear-notifs" role="button" tabindex="0" onclick="clearNotifications()" style="font-size: 12px; color: var(--accent); cursor: pointer;">Limpiar</span>
                 </div>
-                <div class="notif">
-                    <strong>WhatsApp</strong>
-                    <p>Nuevo mensaje (Android)</p>
+                <div id="notif-list">
+                    <div class="notif">
+                        <strong>Sistema</strong>
+                        <p>GIMP - Actualización disponible (Linux)</p>
+                    </div>
+                    <div class="notif">
+                        <strong>WhatsApp</strong>
+                        <p>Nuevo mensaje (Android)</p>
+                    </div>
+                </div>
+                <div id="notif-empty" style="display: none; text-align: center; opacity: 0.5; padding: 20px 0; font-size: 13px;">
+                    No hay notificaciones nuevas
                 </div>
             </div>
+</div>
+                <div id="notif-empty" style="display: none; text-align: center; opacity: 0.5; padding: 20px 0; font-size: 13px;">
+                    No hay notificaciones nuevas
+                </div>
+            </div>
+</div>
         </div>
 
         <main class="workspace" id="workspace">
@@ -131,7 +153,7 @@
         <div class="launcher-content" onclick="event.stopPropagation()">
             <div class="search-container">
                 <input type="text" id="launcher-search" placeholder="Buscar aplicaciones (Linux, Android...)"
-                    aria-label="Buscar aplicaciones" oninput="filterApps()">
+                    aria-label="Buscar aplicaciones" >
                 <button id="search-clear" aria-label="Limpiar búsqueda" hidden onclick="clearSearch()">×</button>
             </div>
             <div class="launcher-grid" id="launcher-grid">

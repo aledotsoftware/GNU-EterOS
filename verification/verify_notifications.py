@@ -7,15 +7,15 @@ def run():
         page = browser.new_page()
 
         # Get absolute path to index.html
-        cwd = os.getcwd()
-        file_path = f"file://{cwd}/web_ui/index.html"
+
+        file_path = "file:///app/web_ui/index.html"
 
         print(f"Navigating to: {file_path}")
-        page.goto(file_path)
+        page.goto("file:///app/web_ui/index.html")
 
         # Wait for splash screen to disappear (it has a 2.5s timeout + 0.6s transition)
         print("Waiting for splash screen to disappear...")
-        page.wait_for_timeout(3500)
+        page.wait_for_selector("#boot-splash", state="hidden")
 
         # Open Control Center
         print("Opening Control Center...")
@@ -54,7 +54,7 @@ def run():
         page.wait_for_timeout(200)
 
         # Verify empty state
-        empty_state = page.locator("#notif-empty")
+        empty_state = page.locator("#notif-empty").first
         if not empty_state.is_visible():
             print("ERROR: Empty state not visible after clearing!")
         else:

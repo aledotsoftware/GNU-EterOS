@@ -7,9 +7,9 @@ def test_sliders():
         page = browser.new_page()
 
         # Load the local HTML file
-        cwd = os.getcwd()
-        url = f"file://{cwd}/web_ui/index.html"
-        page.goto(url)
+
+        url = "file:///app/web_ui/index.html"
+        page.goto("file:///app/web_ui/index.html")
 
         # Open Control Center
         page.click("#cc-trigger")

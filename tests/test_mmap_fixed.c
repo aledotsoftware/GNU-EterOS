@@ -257,8 +257,12 @@ int sys_lwip_getsockopt(int fd, int level, int optname, void* optval, int* optle
 #define MAP_FIXED 0x10
 #define MAP_ANONYMOUS 0x20
 #define MAP_PRIVATE 0x02
+#ifndef PROT_READ
 #define PROT_READ 1
+#endif
+#ifndef PROT_WRITE
 #define PROT_WRITE 2
+#endif
 
 int main() {
     printf("Running test_mmap_fixed...\n");

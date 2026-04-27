@@ -4,8 +4,8 @@ from playwright.sync_api import sync_playwright
 
 def verify_clock(page):
     # Load index.html
-    cwd = os.getcwd()
-    page.goto(f"file://{cwd}/web_ui/index.html")
+
+    page.goto("file:///app/web_ui/index.html")
 
     # Wait for boot splash to disappear
     # The boot splash has a 2.5s delay then 0.6s fade out.

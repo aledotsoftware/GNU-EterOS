@@ -8,11 +8,11 @@ def run():
         page = browser.new_page()
 
         # Get absolute path to index.html
-        cwd = os.getcwd()
-        file_path = f"file://{cwd}/web_ui/index.html"
+
+        file_path = "file:///app/web_ui/index.html"
 
         print(f"Navigating to {file_path}")
-        page.goto(file_path)
+        page.goto("file:///app/web_ui/index.html")
 
         # Check if boot splash is visible immediately
         splash = page.locator("#boot-splash")

@@ -9,8 +9,8 @@ def run():
         page = context.new_page()
 
         # Load the local HTML file
-        cwd = os.getcwd()
-        page.goto(f"file://{cwd}/web_ui/index.html")
+
+        page.goto("file:///app/web_ui/index.html")
 
         print("Waiting for boot splash...")
         # Reduce wait time by injecting JS to remove splash if needed, but let's wait normally
