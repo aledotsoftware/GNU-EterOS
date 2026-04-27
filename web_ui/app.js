@@ -251,6 +251,15 @@ let openWindows = [];
 
 document.addEventListener('keydown', (e) => {
     // Escape standard Alt+Tab by using Alt+Q (Quick Switch)
+    if (e.key === 'Escape') {
+        const topWin = Array.from(document.querySelectorAll('.window')).sort((a, b) => parseInt(b.style.zIndex || 0) - parseInt(a.style.zIndex || 0))[0];
+        if (topWin) {
+            const closeBtn = topWin.querySelector('.control.close');
+            if (closeBtn) closeWindow(closeBtn);
+            return;
+        }
+    }
+
     if (e.altKey && e.key.toLowerCase() === 'q') {
         e.preventDefault();
 
@@ -362,8 +371,16 @@ function spawnApp(name, type, customContent = null) {
             if (win.classList.contains('minimized')) {
                 win.classList.remove('minimized');
                 win.style.zIndex = ++zIndexCounter;
+                win.classList.remove('shake');
+                void win.offsetWidth; // trigger reflow
+                win.classList.add('shake');
+                setTimeout(() => win.classList.remove('shake'), 500);
             } else {
                 win.style.zIndex = ++zIndexCounter;
+                win.classList.remove('shake');
+                void win.offsetWidth; // trigger reflow
+                win.classList.add('shake');
+                setTimeout(() => win.classList.remove('shake'), 500);
             }
             document.getElementById('launcher').classList.remove('active');
             return;
@@ -822,3 +839,33 @@ if (typeof module !== 'undefined') {
         snapWindow
     };
 }
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sliders = document.querySelectorAll('.cc-slider');
+    sliders.forEach(slider => {
+        let rafId = null;
+        const update = () => {
+            const val = slider.value;
+            slider.setAttribute('aria-valuetext', `${val}%`);
+
+            const img = slider.previousElementSibling;
+            if (img && img.tagName === 'IMG') {
+                img.style.opacity = 0.3 + (val / 100) * 0.7;
+            }
+
+            const span = slider.nextElementSibling;
+            if (span && span.classList.contains('slider-value')) {
+                span.textContent = `${val}%`;
+            }
+        };
+
+        slider.addEventListener('input', () => {
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+            }
+            rafId = requestAnimationFrame(update);
+        });
+        update(); // initial call
+    });
+});

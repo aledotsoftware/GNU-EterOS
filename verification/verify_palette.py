@@ -14,24 +14,26 @@ def verify_palette():
 
         # Open Notepad
         print("Opening Notepad...")
-        page.locator(".icon").nth(1).click()
+        page.locator("#launcher-trigger").click()
+        page.wait_for_timeout(500)
+        page.locator(".launcher-item").nth(1).click()
 
         # Wait for window to appear
         page.wait_for_selector('.window')
 
         # Focus Start button to see outline
         print("Focusing Start button...")
-        page.locator("#start-btn").focus()
+        page.locator(".os-logo").focus()
         # Ensure focus-visible is triggered. Programmatic focus might not trigger focus-visible in some cases without key presses.
         page.keyboard.press("Tab")
         page.keyboard.press("Shift+Tab")
 
         # Take screenshot of start button focused
-        page.locator("#taskbar").screenshot(path="verification/start_btn_focus.png")
+        page.locator(".status-bar").screenshot(path="verification/start_btn_focus.png")
 
         # Focus window close button
         print("Focusing window close button...")
-        close_btn = page.locator('.window-controls button')
+        close_btn = page.locator('.window-controls .close')
         close_btn.focus()
         page.keyboard.press("Tab")
         page.keyboard.press("Shift+Tab")

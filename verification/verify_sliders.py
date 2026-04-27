@@ -8,7 +8,7 @@ def test_sliders():
 
         # Load the local HTML file
         cwd = os.getcwd()
-        url = f"file://{cwd}/web_ui/index.html"
+        url = f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '../web_ui/index.html'))}"
         page.goto(url)
 
         # Open Control Center
@@ -37,6 +37,7 @@ def test_sliders():
         slider.fill("50")
         # Dispatch input event manually as fill might not trigger it exactly like a user drag
         slider.dispatch_event("input")
+        page.wait_for_timeout(500)
 
         # Check updated text
         print(f"Updated text: {value_display.text_content()}")

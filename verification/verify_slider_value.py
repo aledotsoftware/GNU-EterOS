@@ -59,9 +59,11 @@ def verify_slider_value():
         # Playwright's fill on range input should work, but let's be safe.
         # Actually, for range input, we might need to use evaluate
         sliders.nth(0).evaluate("el => { el.value = 50; el.dispatchEvent(new Event('input')); }")
+        page.wait_for_timeout(200)
 
         # Volume
         sliders.nth(1).evaluate("el => { el.value = 25; el.dispatchEvent(new Event('input')); }")
+        page.wait_for_timeout(200)
 
         # Check new values
         new_val1 = slider_values.nth(0).inner_text()

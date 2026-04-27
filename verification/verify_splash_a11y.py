@@ -15,9 +15,9 @@ def run():
         page.goto(file_path)
 
         # 1. Verify Image accessibility
-        img_locator = page.locator("img.splash-logo")
+        img_locator = page.locator(".splash-logo")
         if img_locator.count() > 0:
-            alt = img_locator.get_attribute("alt")
+            alt = img_locator.get_attribute("aria-label") or img_locator.get_attribute("alt")
             print(f"Image Alt: {alt}")
 
             if alt == "Eter OS":

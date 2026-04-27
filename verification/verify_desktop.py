@@ -11,7 +11,10 @@ def run():
         page.goto(file_url)
 
         # 1. Click the calculator icon to open a window
-        page.locator(".icon").first.click()
+        page.wait_for_selector("#boot-splash", state="detached")
+        page.locator("#launcher-trigger").click()
+        page.wait_for_timeout(500)
+        page.locator(".launcher-item").first.click()
 
         # 2. Wait for window to appear
         page.wait_for_selector(".window")
