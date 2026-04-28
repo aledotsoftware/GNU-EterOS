@@ -1,3 +1,12 @@
+
+function escapeHTML(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 function toggleEterMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('eter-menu');
@@ -364,6 +373,13 @@ function spawnApp(name, type, customContent = null) {
                 win.style.zIndex = ++zIndexCounter;
             } else {
                 win.style.zIndex = ++zIndexCounter;
+                // Add shake animation
+                win.classList.remove('shake');
+                void win.offsetWidth; // Force reflow
+                win.classList.add('shake');
+                setTimeout(() => {
+                    win.classList.remove('shake');
+                }, 500);
             }
             document.getElementById('launcher').classList.remove('active');
             return;
@@ -393,11 +409,11 @@ function spawnApp(name, type, customContent = null) {
 
     win.innerHTML = `
         <div class="window-header">
-            <span class="window-title">${name} ${customContent ? '' : '(' + type.toUpperCase() + ')'}</span>
+            <span class="window-title">${escapeHTML(name)} ${customContent ? '' : '(' + type.toUpperCase() + ')'}</span>
             <div class="window-controls">
                 <div class="control focus" title="Modo Focus" role="button" aria-label="Cambiar a modo enfoque" tabindex="0" onclick="toggleFocusMode(this)" onkeydown="if(event.key==='Enter') toggleFocusMode(this)"></div>
-                <div class="control minimize" role="button" aria-label="Minimizar ventana" tabindex="0" onclick="minimizeWindow(this)" onkeydown="if(event.key==='Enter') minimizeWindow(this)"></div>
-                <div class="control maximize" role="button" aria-label="Maximizar ventana" tabindex="0" onclick="maximizeWindow(this)" onkeydown="if(event.key==='Enter') maximizeWindow(this)">
+                <div class="control minimize" title="Minimizar" role="button" aria-label="Minimizar ventana" tabindex="0" onclick="minimizeWindow(this)" onkeydown="if(event.key==='Enter') minimizeWindow(this)"></div>
+                <div class="control maximize" title="Maximizar" role="button" aria-label="Maximizar ventana" tabindex="0" onclick="maximizeWindow(this)" onkeydown="if(event.key==='Enter') maximizeWindow(this)">
                     <div class="snap-menu">
                         <div class="snap-option layout-split" role="button" aria-label="Dividir izquierda 50%" tabindex="0" onclick="snapWindow(this, 'left-50', event)" onkeydown="if(event.key==='Enter') snapWindow(this, 'left-50', event)">
                             <div class="snap-box"></div><div class="snap-box"></div>
@@ -421,13 +437,13 @@ function spawnApp(name, type, customContent = null) {
                         </div>
                     </div>
                 </div>
-                <div class="control close" role="button" aria-label="Cerrar ventana" tabindex="0" onclick="closeWindow(this)" onkeydown="if(event.key==='Enter') closeWindow(this)"></div>
+                <div class="control close" title="Cerrar" role="button" aria-label="Cerrar ventana" tabindex="0" onclick="closeWindow(this)" onkeydown="if(event.key==='Enter') closeWindow(this)"></div>
             </div>
         </div>
         <div class="window-content" style="height: calc(100% - 40px); overflow: hidden;">
             ${customContent || `
             <div style="padding: 20px; color: #94a3b8; font-family: monospace;">
-                Initializing ${name} subsystem...<br>
+                Initializing ${escapeHTML(name)} subsystem...<br>
                 > Loading shared libraries for ${type} kernel...<br>
                 > Mounting filesystem...<br>
                 > GUI handoff complete.<br><br>
@@ -822,3 +838,63 @@ if (typeof module !== 'undefined') {
         snapWindow
     };
 }
+let filterTimeout = null;
+function filterAppsDebounced() {
+    if (filterTimeout) clearTimeout(filterTimeout);
+    filterTimeout = setTimeout(() => {
+        if (typeof window.filterApps === 'function') {
+            window.filterApps();
+        } else {
+            filterApps();
+        }
+    }, 200);
+}
+window.filterAppsDebounced = filterAppsDebounced;
+
+document.querySelectorAll('.cc-slider').forEach(slider => {
+    // Set initial aria-valuetext
+    slider.setAttribute('aria-valuetext', slider.value + '%');
+
+    // Add event listener to update span and aria-valuetext and icon opacity
+    slider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        const span = e.target.nextElementSibling;
+        if (span && span.classList.contains('slider-value')) {
+            span.textContent = val + '%';
+        }
+        e.target.setAttribute('aria-valuetext', val + '%');
+
+        const icon = e.target.previousElementSibling;
+        if (icon && icon.tagName === 'IMG') {
+            // Opacity calculation: 0.3 + (val/100) * 0.7
+            const opacity = 0.3 + (val / 100) * 0.7;
+            icon.style.opacity = opacity;
+        }
+    });
+
+    // Trigger input to set initial opacity
+    slider.dispatchEvent(new Event('input'));
+});
+
+function clearNotifications() {
+    const list = document.getElementById('notif-list');
+    const empty = document.getElementById('notif-empty');
+    if (list) list.style.display = 'none';
+    if (empty) empty.style.display = 'block';
+}
+
+if (typeof module !== 'undefined') {
+    module.exports.clearNotifications = clearNotifications;
+} else {
+    window.clearNotifications = clearNotifications;
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const activeWindow = document.querySelector('.window.active-window') || document.querySelector('.window:last-of-type');
+        if (activeWindow) {
+            e.preventDefault();
+            activeWindow.remove();
+        }
+    }
+});

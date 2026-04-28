@@ -15,15 +15,15 @@ def run():
         page.goto(file_path)
 
         # 1. Verify Image accessibility
-        img_locator = page.locator("img.splash-logo")
+        img_locator = page.locator("svg.splash-logo")
         if img_locator.count() > 0:
-            alt = img_locator.get_attribute("alt")
-            print(f"Image Alt: {alt}")
+            alt = img_locator.get_attribute("aria-label")
+            print(f"Image Aria-Label: {alt}")
 
             if alt == "Eter OS":
                 print("PASS: Image has correct a11y attributes.")
             else:
-                print(f"FAIL: Image missing correct alt text. Found: {alt}")
+                print(f"FAIL: Image missing correct aria-label text. Found: {alt}")
                 exit(1)
         else:
             print("FAIL: Image logo not found!")

@@ -14,7 +14,11 @@ def run():
         # Wait for splash screen to disappear (simulation)
         # The splash screen takes 2.5s + 0.6s fade out.
         # We can just hide it manually to speed up.
-        page.evaluate("document.getElementById('boot-splash').remove()")
+
+        try:
+            page.evaluate("document.getElementById('boot-splash')?.remove()")
+        except:
+            pass
 
         # Spawn an app (e.g. Settings)
         # We can click the "Settings" menu item or just call spawnApp via console if exposed.

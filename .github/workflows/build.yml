@@ -17,6 +17,8 @@ jobs:
       - name: "Checkout código"
         uses: actions/checkout@v4
         with:
+          submodules: true
+          fetch-depth: 0
           persist-credentials: false
 
       - name: "Instalar toolchain"
@@ -103,6 +105,8 @@ jobs:
       - name: "Checkout código"
         uses: actions/checkout@v4
         with:
+          submodules: true
+          fetch-depth: 0
           persist-credentials: false
 
       - name: "Instalar toolchain para Release"

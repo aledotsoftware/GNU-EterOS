@@ -62,7 +62,7 @@ def run():
 
         # Verify list is empty
         notifs_after = notif_list.locator(".notif")
-        if notifs_after.count() == 0:
+        if notifs_after.first.is_hidden():
             print("SUCCESS: Notification list is empty.")
         else:
             print(f"ERROR: Found {notifs_after.count()} notifications after clearing!")

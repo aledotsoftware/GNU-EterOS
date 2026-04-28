@@ -12,6 +12,7 @@ def run():
         file_path = f"file://{os.getcwd()}/web_ui/index.html"
         print(f"Loading {file_path}")
         page.goto(file_path)
+        page.locator("#boot-splash").wait_for(state="detached")
 
         # Wait for boot splash to be gone (detached)
         print("Waiting for boot splash to finish...")
