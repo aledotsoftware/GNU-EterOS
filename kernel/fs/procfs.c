@@ -364,6 +364,7 @@ static fs_node_t *proc_self_fd_finddir(fs_node_t *node, char *name) {
     fnode->ref_count = 1;
     fnode->flags = FS_SYMLINK;
     strlcpy(fnode->name, name, sizeof(fnode->name));
+    fnode->mask = 0777;
     fnode->inode = 1000 + fd_num;
     fnode->impl = current->id;
     fnode->read = proc_fd_link_read;
@@ -397,37 +398,44 @@ static fs_node_t *proc_self_finddir(fs_node_t *node, char *name) {
         strlcpy(fnode->name, "exe", sizeof(fnode->name));
         fnode->flags = FS_SYMLINK; // Often a symlink in Linux
         fnode->read = proc_self_exe_readlink; // Will act as readlink target
+        fnode->mask = 0777;
         fnode->inode = 10;
     } else if (strcmp(name, "cmdline") == 0) {
         strlcpy(fnode->name, "cmdline", sizeof(fnode->name));
         fnode->flags = FS_FILE;
         fnode->read = proc_self_cmdline_read;
+        fnode->mask = 0444;
         fnode->inode = 11;
     } else if (strcmp(name, "status") == 0) {
         strlcpy(fnode->name, "status", sizeof(fnode->name));
         fnode->flags = FS_FILE;
         fnode->read = proc_self_status_read;
+        fnode->mask = 0444;
         fnode->inode = 12;
     } else if (strcmp(name, "stat") == 0) {
         strlcpy(fnode->name, "stat", sizeof(fnode->name));
         fnode->flags = FS_FILE;
         fnode->read = proc_self_stat_read;
+        fnode->mask = 0444;
         fnode->inode = 13;
     } else if (strcmp(name, "maps") == 0) {
         strlcpy(fnode->name, "maps", sizeof(fnode->name));
         fnode->flags = FS_FILE;
         fnode->read = proc_self_maps_read;
+        fnode->mask = 0444;
         fnode->inode = 14;
     } else if (strcmp(name, "environ") == 0) {
         strlcpy(fnode->name, "environ", sizeof(fnode->name));
         fnode->flags = FS_FILE;
         fnode->read = proc_self_environ_read;
+        fnode->mask = 0444;
         fnode->inode = 15;
     } else if (strcmp(name, "fd") == 0) {
         strlcpy(fnode->name, "fd", sizeof(fnode->name));
         fnode->flags = FS_DIRECTORY;
         fnode->readdir = proc_self_fd_readdir;
         fnode->finddir = proc_self_fd_finddir;
+        fnode->mask = 0555;
         fnode->inode = 16;
     } else {
         kfree(fnode);
@@ -516,19 +524,23 @@ static fs_node_t *procfs_finddir(fs_node_t *node, char *name) {
     if (strcmp(name, "version") == 0) {
         strlcpy(fnode->name, "version", sizeof(fnode->name));
         fnode->read = proc_version_read;
+        fnode->mask = 0444;
         fnode->inode = 0;
     } else if (strcmp(name, "uptime") == 0) {
         strlcpy(fnode->name, "uptime", sizeof(fnode->name));
         fnode->read = proc_uptime_read;
+        fnode->mask = 0444;
         fnode->inode = 1;
     } else if (strcmp(name, "meminfo") == 0) {
         strlcpy(fnode->name, "meminfo", sizeof(fnode->name));
         fnode->read = proc_meminfo_read;
+        fnode->mask = 0444;
         fnode->inode = 2;
     } else if (strcmp(name, "self") == 0) {
         strlcpy(fnode->name, "self", sizeof(fnode->name));
         fnode->flags = FS_SYMLINK;
         fnode->read = proc_self_symlink_read;
+        fnode->mask = 0777;
         fnode->inode = 3;
     } else {
         // Attempt to parse name as PID
@@ -553,6 +565,7 @@ static fs_node_t *procfs_finddir(fs_node_t *node, char *name) {
             fnode->flags = FS_DIRECTORY;
             fnode->readdir = proc_self_readdir;
             fnode->finddir = proc_self_finddir;
+            fnode->mask = 0555;
             fnode->inode = 100 + pid;
             fnode->impl = (uint32_t)pid;
             return fnode;
@@ -572,6 +585,7 @@ fs_node_t* procfs_init(void) {
     procfs_root->ref_count = 1;
     strlcpy(procfs_root->name, "proc", sizeof(procfs_root->name));
     procfs_root->flags = FS_DIRECTORY;
+    procfs_root->mask = 0555;
     procfs_root->readdir = procfs_readdir;
     procfs_root->finddir = procfs_finddir;
 

@@ -134,6 +134,7 @@ fs_node_t* shmfs_create_memfd(const char* name) {
 
     strlcpy(fnode->name, name ? name : "memfd", sizeof(fnode->name));
     fnode->flags = FS_FILE;
+    fnode->mask = 0666;
     fnode->impl = (uintptr_t)obj;
     fnode->length = obj->size;
 
@@ -219,6 +220,7 @@ static fs_node_t *shmfs_finddir(fs_node_t *node, char *name) {
     
     strlcpy(fnode->name, name, sizeof(fnode->name));
     fnode->flags = FS_FILE;
+    fnode->mask = 0666;
     fnode->impl = (uintptr_t)obj;
     fnode->length = obj->size;
     
@@ -331,6 +333,7 @@ fs_node_t* shmfs_init(void) {
     
     strlcpy(shmfs_root->name, "shm", sizeof(shmfs_root->name));
     shmfs_root->flags = FS_DIRECTORY;
+    shmfs_root->mask = 0777;
     shmfs_root->ref_count = 1;
     
     shmfs_root->finddir = shmfs_finddir;

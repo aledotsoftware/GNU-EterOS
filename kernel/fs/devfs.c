@@ -555,6 +555,7 @@ static fs_node_t *devfs_pts_finddir(fs_node_t *node, char *name) {
     memset(fnode, 0, sizeof(fs_node_t));
     fnode->ref_count = 1;
     fnode->flags = FS_CHARDEVICE;
+    fnode->mask = 0666;
     strlcpy(fnode->name, name, sizeof(fnode->name));
     fnode->inode = PTY_INODE_BASE + (id * 2u) + PTY_ROLE_SLAVE;
     fnode->impl = id;
@@ -653,6 +654,7 @@ static fs_node_t *devfs_input_finddir(fs_node_t *node, char *name) {
     memset(fnode, 0, sizeof(fs_node_t));
     fnode->ref_count = 1;
     fnode->flags = FS_CHARDEVICE;
+    fnode->mask = 0666;
 
     if (strcmp(name, "event0") == 0) {
         strlcpy(fnode->name, "event0", sizeof(fnode->name));
@@ -821,6 +823,7 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
     memset(fnode, 0, sizeof(fs_node_t));
     fnode->ref_count = 1;
     fnode->flags = FS_CHARDEVICE;
+    fnode->mask = 0666;
 
     if (strcmp(name, "null") == 0) {
         strlcpy(fnode->name, "null", sizeof(fnode->name));
@@ -852,6 +855,7 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         strlcpy(fnode->name, "input", sizeof(fnode->name));
         /* Change from FS_CHARDEVICE to FS_DIRECTORY */
         fnode->flags = FS_DIRECTORY;
+        fnode->mask = 0555;
         fnode->readdir = devfs_input_readdir;
         fnode->finddir = devfs_input_finddir;
         fnode->read = NULL;
@@ -859,11 +863,13 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
     } else if (strcmp(name, "fb0") == 0) {
         strlcpy(fnode->name, "fb0", sizeof(fnode->name));
         fnode->flags = FS_CHARDEVICE;
+    fnode->mask = 0666;
         fnode->ioctl = dev_fb0_ioctl;
         fnode->inode = 6;
     } else if (strcmp(name, "binder") == 0) {
         strlcpy(fnode->name, "binder", sizeof(fnode->name));
         fnode->flags = FS_CHARDEVICE;
+    fnode->mask = 0666;
         fnode->read = dev_binder_read;
         fnode->write = dev_binder_write;
         fnode->ioctl = dev_binder_ioctl;
@@ -871,15 +877,18 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
     } else if (strcmp(name, "shm") == 0) {
         strlcpy(fnode->name, "shm", sizeof(fnode->name));
         fnode->flags = FS_DIRECTORY;
+        fnode->mask = 0777;
         fnode->inode = 7;
     } else if (strcmp(name, "ptmx") == 0) {
         strlcpy(fnode->name, "ptmx", sizeof(fnode->name));
         fnode->flags = FS_CHARDEVICE;
+    fnode->mask = 0666;
         fnode->inode = 8;
         fnode->open = dev_ptmx_open;
     } else if (strcmp(name, "pts") == 0) {
         strlcpy(fnode->name, "pts", sizeof(fnode->name));
         fnode->flags = FS_DIRECTORY;
+        fnode->mask = 0555;
         fnode->inode = 9;
         fnode->readdir = devfs_pts_readdir;
         fnode->finddir = devfs_pts_finddir;
@@ -898,6 +907,7 @@ fs_node_t* devfs_init(void) {
     devfs_root->ref_count = 1;
     strlcpy(devfs_root->name, "dev", sizeof(devfs_root->name));
     devfs_root->flags = FS_DIRECTORY;
+    devfs_root->mask = 0555;
     devfs_root->readdir = devfs_readdir;
     devfs_root->finddir = devfs_finddir;
     dev_tty_termios.c_lflag = ECHO | ICANON | ISIG;

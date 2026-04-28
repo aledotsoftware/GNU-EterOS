@@ -45,3 +45,9 @@
 - Set priority cycle for agents: `network-socket-api-bot`, `vfs-posix-filesystem-bot`, `users-security-panel-bot`, and `linux-syscall-compliance-bot`.
 - Updated all EterOS agent `.md` files in `agents/aledotsoftware/EterOS/` to ensure they point to the correct files, emphasize working on current real state over idealized architecture, and guide towards verifiable milestones.
 - Resolved issue in IPC primitives where tasks improperly yielded using `task_yield()` instead of directly calling the scheduler, leading to missed wakeups and timeouts. Replaced `task_yield()` with `schedule()` in `kernel/futex.c`, and `kernel/task.c` and added proper clearing of `wake_tick` in the scheduler.
+
+## EterOS VFS, Initrd, and ProcFS Updates (Current Run)
+- Implemented `sys_rmdir` syscall natively mapped to Linux ABI index 84 (64-bit) and 40 (32-bit), strictly enforcing the `FS_DIRECTORY` constraint before delegating to `unlink_fs`.
+- Updated `sys_unlinkat` to properly handle the `AT_REMOVEDIR` (0x200) flag semantics, rejecting directory unlinks without it (`-EISDIR`) and file unlinks with it (`-ENOTDIR`).
+- Ensured all dynamically created VFS nodes in `procfs.c` (e.g. `/proc/version`, `/proc/self`) are populated with appropriate permissions (`mask` = 0444, 0555, 0777), preventing spurious permission-denied errors by the kernel's `check_node_permission()`.
+- Extended the explicit `mask` validation to `devfs`, `shmfs`, `jfs`, `fat32`, and `initrd` filesystems to guarantee broad compatibility with userspace utilities managing directory access controls (like `login.c` and `passwd.c`).

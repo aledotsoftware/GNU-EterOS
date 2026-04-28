@@ -681,6 +681,7 @@ static fs_node_t *fat32_finddir_fs_impl(fs_node_t *node, char *name) {
 
     if (entry.attr & ATTR_DIRECTORY) {
         child->flags = FS_DIRECTORY;
+        child->mask = 0777;
         child->read = 0;
         child->write = 0;
         child->readdir = fat32_readdir_fs;
@@ -690,6 +691,7 @@ static fs_node_t *fat32_finddir_fs_impl(fs_node_t *node, char *name) {
         child->unlink = fat32_unlink_fs;
     } else {
         child->flags = FS_FILE;
+        child->mask = 0666;
         child->read = fat32_read_fs;
         child->write = fat32_write_fs;
         child->readdir = 0;
@@ -825,6 +827,7 @@ fs_node_t* fat32_mount(fat32_volume_t* vol) {
 
     strlcpy(root->name, "fat32_root", sizeof(root->name));
     root->flags = FS_DIRECTORY;
+    root->mask = 0777;
     root->inode = vol->root_cluster;
     root->ptr = (struct fs_node*)vol;
     root->impl = 0;

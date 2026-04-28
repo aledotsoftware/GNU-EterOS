@@ -1004,8 +1004,27 @@ static int64_t sys_unlinkat(int dirfd, const char* path, int flags) {
     char* filename = (char*)kmalloc(128);
     if (!filename) { kfree(parent_path); kfree(kpath); return -ENOMEM; }
     if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
+
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
     if (!parent) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
+
+    fs_node_t* target = vfs_lookup(fs_root, kpath);
+    if (!target) { kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
+
+    int is_dir = ((target->flags & 0x7) == FS_DIRECTORY);
+    kfree(target);
+
+    /* AT_REMOVEDIR is 0x200 */
+    if (flags & 0x200) {
+        if (!is_dir) {
+            kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -ENOTDIR;
+        }
+    } else {
+        if (is_dir) {
+            kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -EISDIR;
+        }
+    }
+
     /* SECURITY FIX: Require Write & Execute permission on parent dir for unlink */
     if (!check_node_permission(parent, 2 | 1)) { kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -EACCES; }
     int res2 = unlink_fs(parent, filename);
@@ -1016,8 +1035,44 @@ static int64_t sys_unlinkat(int dirfd, const char* path, int flags) {
     return res2;
 }
 
+
 static int64_t sys_unlink(const char* path) {
     return sys_unlinkat(AT_FDCWD, path, 0);
+}
+
+
+static int64_t sys_rmdir(const char* path) {
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+    int res = resolve_path(AT_FDCWD, path, kpath, 256);
+    if (res < 0) { kfree(kpath); return res; }
+
+    char* parent_path = (char*)kmalloc(128);
+    if (!parent_path) { kfree(kpath); return -ENOMEM; }
+    char* filename = (char*)kmalloc(128);
+    if (!filename) { kfree(parent_path); kfree(kpath); return -ENOMEM; }
+    if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
+
+    fs_node_t* parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
+
+    fs_node_t* target = vfs_lookup(fs_root, kpath);
+    if (!target) { kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
+
+    if ((target->flags & 0x7) != FS_DIRECTORY) {
+        kfree(target); kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -ENOTDIR;
+    }
+    kfree(target);
+
+    /* SECURITY FIX: Require Write & Execute permission on parent dir for unlink */
+    if (!check_node_permission(parent, 2 | 1)) { kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -EACCES; }
+
+    int res2 = unlink_fs(parent, filename);
+    kfree(parent);
+    kfree(filename);
+    kfree(parent_path);
+    kfree(kpath);
+    return res2;
 }
 
 static int64_t sys_chmod(const char* path, int mode) {
@@ -3225,6 +3280,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [79] = (syscall_ptr_t)sys_getcwd,
     [80] = (syscall_ptr_t)sys_chdir,
     [83] = (syscall_ptr_t)sys_mkdir,
+    [84] = (syscall_ptr_t)sys_rmdir,
     [87] = (syscall_ptr_t)sys_unlink,
     [96] = (syscall_ptr_t)sys_gettimeofday,
     [102] = (syscall_ptr_t)sys_getuid,
@@ -3328,6 +3384,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [79] = (syscall_ptr_t)sys_getcwd,
     [80] = (syscall_ptr_t)sys_chdir,
     [83] = (syscall_ptr_t)sys_mkdir,
+    [84] = (syscall_ptr_t)sys_rmdir,
     [87] = (syscall_ptr_t)sys_unlink,
     [96] = (syscall_ptr_t)sys_gettimeofday,
     [97] = (syscall_ptr_t)sys_getrlimit,
@@ -3425,6 +3482,7 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [183] = (syscall_ptr_t)sys_getcwd,
     [12] = (syscall_ptr_t)sys_chdir,
     [39] = (syscall_ptr_t)sys_mkdir,
+    [40] = (syscall_ptr_t)sys_rmdir,
     [10] = (syscall_ptr_t)sys_unlink,
     [199] = (syscall_ptr_t)sys_getuid,
     [213] = (syscall_ptr_t)sys_setuid,
