@@ -56,8 +56,11 @@ uint64_t timer_get_ticks(void) {
     return 0;
 }
 
-void task_yield(void) {
+void schedule(void) {
     /* No-op in single-threaded test */
+}
+
+void task_yield(void) {
 }
 
 void task_block_with_timeout(uint64_t wake_tick) {

@@ -827,7 +827,7 @@ void task_sleep(uint64_t ms) {
     spin_unlock(&sched_lock);
 
     /* Ceder CPU */
-    task_yield();
+    schedule();
 }
 
 void task_wake_expired(uint64_t current_tick) {

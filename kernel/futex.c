@@ -111,7 +111,7 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) {
     spin_unlock(&b->lock);
 
     /* 5. Yield CPU */
-    task_yield();
+    schedule();
 
     /* 6. We are back. Check why. */
     int timed_out = 0;
