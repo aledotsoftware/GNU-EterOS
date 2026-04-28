@@ -7,6 +7,7 @@
 #include "../../include/drivers/disk.h"
 #include "../../include/mm.h"
 #include "../../include/net/socket.h"
+#include "../../include/net/lwip_socket.h"
 #include "../../include/net/defs.h"
 #include "../../include/task.h"
 
@@ -137,7 +138,7 @@ void cmd_ota(const char* args) {
         terminal_write_string("  [OTA] Conectando a repositorio...\n");
         if (net_connect(sock, &addr, sizeof(addr)) != 0) {
             terminal_write_string("  [OTA] Conexion fallida.\n");
-            net_close(sock);
+            sys_lwip_close(sock);
             return;
         }
 
@@ -155,7 +156,7 @@ void cmd_ota(const char* args) {
 
 trunc:
         terminal_write_string("  [OTA] Error: Request buffer overflow.\n");
-        net_close(sock);
+        sys_lwip_close(sock);
         return;
 
 receive:
@@ -167,7 +168,7 @@ receive:
         uint8_t *payload_data = kmalloc(max_payload);
         if (!payload_data) {
             terminal_write_string("  [OTA] Error: Sin memoria para alojar la actualizacion.\n");
-            net_close(sock);
+            sys_lwip_close(sock);
             return;
         }
 
@@ -201,17 +202,17 @@ receive:
                 } else {
                     terminal_write_string("  [OTA] Error: Archivo de actualizacion demasiado grande.\n");
                     kfree(payload_data);
-                    net_close(sock);
+                    sys_lwip_close(sock);
                     return;
                 }
             }
             task_yield();
         }
 
-        net_close(sock);
+        sys_lwip_close(sock);
 
-        if (payload_size == 0) {
-             terminal_write_string("  [OTA] Error: El archivo descargado esta vacio o error en red.\n");
+        if (payload_size < 1024) {
+             terminal_write_string("  [OTA] Error: El archivo descargado esta incompleto o es muy pequeno.\n");
              kfree(payload_data);
              return;
         }

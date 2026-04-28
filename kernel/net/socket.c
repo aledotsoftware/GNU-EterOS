@@ -272,3 +272,15 @@ ssize_t sys_lwip_send(int fd, const void *buf, size_t len, int flags) {
 ssize_t sys_lwip_recv(int fd, void *buf, size_t len, int flags) {
     return sys_lwip_recvfrom(fd, buf, len, flags, NULL, NULL);
 }
+int sys_lwip_close(int fd) {
+    task_t* current = task_get_current();
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    if (!current->fd_table[fd].node) return -EBADF;
+    fs_node_t* node = current->fd_table[fd].node;
+    current->fd_table[fd].node = NULL;
+    if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+        if (node->close) node->close(node);
+        kfree(node);
+    }
+    return 0;
+}

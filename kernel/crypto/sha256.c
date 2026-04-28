@@ -93,6 +93,8 @@ void sha256_update(SHA256_CTX *ctx, const uint8_t *data, size_t len)
 {
 	uint32_t i;
 
+	if (!ctx || (!data && len > 0)) return;
+
 	for (i = 0; i < len; ++i) {
 		ctx->data[ctx->datalen] = data[i];
 		ctx->datalen++;
@@ -107,6 +109,8 @@ void sha256_update(SHA256_CTX *ctx, const uint8_t *data, size_t len)
 void sha256_final(SHA256_CTX *ctx, uint8_t hash[32])
 {
 	uint32_t i;
+
+	if (!ctx || !hash) return;
 
 	i = ctx->datalen;
 

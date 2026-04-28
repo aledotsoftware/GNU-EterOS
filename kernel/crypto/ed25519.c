@@ -16,6 +16,10 @@ int ed25519_verify(const unsigned char *signature, const unsigned char *message,
      * This stub ensures the interface is present and the SHA-512 dependency is met.
      */
 
+    if (!signature || (!message && message_len > 0) || !public_key) {
+        return 0; // Fail on invalid pointers
+    }
+
     unsigned char h[64];
     sha512_ctx hash;
 

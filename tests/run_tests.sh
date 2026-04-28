@@ -372,3 +372,10 @@ echo "Running test_syscall_sysinfo..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_syscall_sysinfo.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_sysinfo
 ./tests/test_syscall_sysinfo
 rm tests/test_syscall_sysinfo
+
+# Test OTA Parse URL
+echo "---------------------------------------------------"
+echo "Running test_ota..."
+gcc -D__ETEROS_HOST_TEST__ tests/test_ota.c -o tests/test_ota
+./tests/test_ota
+rm tests/test_ota
