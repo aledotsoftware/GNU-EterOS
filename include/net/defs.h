@@ -100,4 +100,7 @@ extern uint32_t gateway_ip;
 extern uint32_t dns_ip;
 extern uint8_t gateway_mac[6];
 
+/* Start or Renew DHCP using lwIP */
+void net_dhcp_renew(void);
+
 #endif /* ETEROS_NET_DEFS_H */

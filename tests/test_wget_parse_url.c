@@ -13,12 +13,14 @@ void terminal_write_string(const char* str) {}
 void terminal_putchar(char c) {}
 void task_yield(void) {}
 
-int net_connect(socket_t sock, const struct sockaddr_in_old* addr, int addrlen) { return -1; }
-int net_send(socket_t sock, const void* buf, int len, int flags) { return -1; }
-int net_recv(socket_t sock, void* buf, int len, int flags) { return -1; }
-int net_close(socket_t sock) { return 0; }
+
+#include "sys/socket.h"
+int sys_lwip_connect(int fd, const struct sockaddr *name, socklen_t namelen) { return -1; }
+ssize_t sys_lwip_send(int fd, const void *buf, size_t len, int flags) { return -1; }
+ssize_t sys_lwip_recv(int fd, void *buf, size_t len, int flags) { return -1; }
+int sys_lwip_close(int fd) { return 0; }
 uint32_t ip_aton(const char *cp) { return 0; }
-socket_t net_socket(int domain, int type, int protocol) { return -1; }
+int sys_lwip_socket(int domain, int type, int protocol) { return -1; }
 
 #define parse_url __wget_parse_url
 #include "../kernel/apps/wget.c"

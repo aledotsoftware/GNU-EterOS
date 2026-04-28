@@ -35,9 +35,9 @@ void cmd_net(const char* args) {
 
 void cmd_dhcp(const char* args) {
     (void)args;
-    terminal_write_string("Requesting DHCP...\n");
-    dhcp_discover();
-    terminal_write_string("DHCP Discovery sent.\n");
+    terminal_write_string("Requesting DHCP via lwIP...\n");
+    net_dhcp_renew();
+    terminal_write_string("DHCP Renew/Discover sent.\n");
 }
 
 void cmd_wget(const char* args) {

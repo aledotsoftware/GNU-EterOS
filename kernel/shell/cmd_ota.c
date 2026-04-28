@@ -7,6 +7,8 @@
 #include "../../include/drivers/disk.h"
 #include "../../include/mm.h"
 #include "../../include/net/socket.h"
+#include "../../include/net/lwip_socket.h"
+#include "../../include/sys/socket.h"
 #include "../../include/net/defs.h"
 #include "../../include/task.h"
 
@@ -123,21 +125,21 @@ void cmd_ota(const char* args) {
             }
         }
 
-        socket_t sock = net_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        int sock = sys_lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (sock < 0) {
             terminal_write_string("  [OTA] Failed to create socket.\n");
             return;
         }
 
-        struct sockaddr_in_old addr;
+        struct sockaddr_in addr;
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
         addr.sin_addr = ip;
 
         terminal_write_string("  [OTA] Conectando a repositorio...\n");
-        if (net_connect(sock, &addr, sizeof(addr)) != 0) {
+        if (sys_lwip_connect(sock, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
             terminal_write_string("  [OTA] Conexion fallida.\n");
-            net_close(sock);
+            sys_lwip_close(sock);
             return;
         }
 
@@ -150,12 +152,12 @@ void cmd_ota(const char* args) {
         if (strlcat(request, host, req_size) >= req_size) goto trunc;
         if (strlcat(request, "\r\nUser-Agent: eterOS-OTA/0.1\r\nConnection: close\r\n\r\n", req_size) >= req_size) goto trunc;
 
-        net_send(sock, request, strlen(request), 0);
+        sys_lwip_send(sock, request, strlen(request), 0);
         goto receive;
 
 trunc:
         terminal_write_string("  [OTA] Error: Request buffer overflow.\n");
-        net_close(sock);
+        sys_lwip_close(sock);
         return;
 
 receive:
@@ -167,7 +169,7 @@ receive:
         uint8_t *payload_data = kmalloc(max_payload);
         if (!payload_data) {
             terminal_write_string("  [OTA] Error: Sin memoria para alojar la actualizacion.\n");
-            net_close(sock);
+            sys_lwip_close(sock);
             return;
         }
 
@@ -178,7 +180,7 @@ receive:
         // Leer e ignorar cabeceras HTTP hasta encontrar \r\n\r\n
         int headers_done = 0;
 
-        while ((len = net_recv(sock, buffer, sizeof(buffer), 0)) > 0) {
+        while ((len = sys_lwip_recv(sock, buffer, sizeof(buffer), 0)) > 0) {
             if (!headers_done) {
                 // Busqueda ineficiente pero simple de \r\n\r\n
                 for (int j = 0; j < len - 3; j++) {
@@ -201,14 +203,14 @@ receive:
                 } else {
                     terminal_write_string("  [OTA] Error: Archivo de actualizacion demasiado grande.\n");
                     kfree(payload_data);
-                    net_close(sock);
+                    sys_lwip_close(sock);
                     return;
                 }
             }
             task_yield();
         }
 
-        net_close(sock);
+        sys_lwip_close(sock);
 
         if (payload_size == 0) {
              terminal_write_string("  [OTA] Error: El archivo descargado esta vacio o error en red.\n");

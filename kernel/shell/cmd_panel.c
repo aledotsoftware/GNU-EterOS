@@ -48,8 +48,9 @@ static void draw_panel_menu(void) {
     terminal_write_string("    3. Estado de Almacenamiento (A/B Slots & Initrd)\n"); // Y=6
     terminal_write_string("    4. Configurar Tiempo (Zona Horaria & NTP)\n"); // Y=7
     terminal_write_string("    5. Usuarios y Seguridad (Auto-login)\n"); // Y=8
-    terminal_write_string("    6. Salir del Panel\n"); // Y=9
-    terminal_write_string("\n  Use teclas [1-6] o click para seleccionar.\n");
+    terminal_write_string("    6. Red y Conectividad (Estado & DHCP)\n"); // Y=9
+    terminal_write_string("    7. Salir del Panel\n"); // Y=10
+    terminal_write_string("\n  Use teclas [1-7] o click para seleccionar.\n");
 
     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
 }
@@ -363,7 +364,7 @@ void cmd_panel(const char* args) {
         if (keyboard_has_input()) {
             opt = keyboard_getchar();
             if (opt == KB_KEY_ESCAPE || opt == 'q') {
-                opt = '6'; // Exit
+                opt = '7'; // Exit
             }
         }
 
@@ -375,6 +376,7 @@ void cmd_panel(const char* args) {
             else if (panel_mouse_y == 7) opt = '4';
             else if (panel_mouse_y == 8) opt = '5';
             else if (panel_mouse_y == 9) opt = '6';
+            else if (panel_mouse_y == 10) opt = '7';
         }
 
         if (panel_mouse_moved) {
@@ -429,6 +431,28 @@ void cmd_panel(const char* args) {
                 if (c != KB_KEY_ESCAPE) wait_for_enter();
                 draw_panel_menu();
             } else if (opt == '6') {
+                cmd_clear("");
+                terminal_write_string("\n  -- Red y Conectividad --\n");
+                cmd_net(""); // Show network status
+                terminal_write_string("\n  1. Renovar IP (DHCP)\n");
+                terminal_write_string("\n  Elija [1] o ESC para volver.\n");
+                char c = 0;
+                while (1) {
+                    if (keyboard_has_input()) {
+                        c = keyboard_getchar();
+                        if (c == '1' || c == KB_KEY_ESCAPE) break;
+                    }
+                    __asm__ volatile("cli");
+                    if (!keyboard_has_input() && !panel_mouse_clicked) __asm__ volatile("sti; hlt");
+                    else __asm__ volatile("sti");
+                }
+                terminal_write_string("\n");
+                if (c == '1') {
+                    cmd_dhcp("");
+                }
+                if (c != KB_KEY_ESCAPE) wait_for_enter();
+                draw_panel_menu();
+            } else if (opt == '7') {
                 terminal_write_string("\nSaliendo del Panel de Control...\n");
                 panel_running = false;
                 break;

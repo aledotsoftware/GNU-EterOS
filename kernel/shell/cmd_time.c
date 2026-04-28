@@ -2,7 +2,9 @@
 #include "../../include/rtc.h"
 #include "../../include/string.h"
 #include "../../include/net/socket.h"
-#include "../../include/net/dhcp.h" /* For ntohl/htonl if needed, but we can implement basic byte swaps */
+#include "../../include/net/dhcp.h"
+#include "../../include/net/lwip_socket.h"
+#include "../../include/sys/socket.h" /* For ntohl/htonl if needed, but we can implement basic byte swaps */
 
 // Simple byte swap for 32-bit (network to host)
 static uint32_t bswap_32(uint32_t x) {
@@ -65,13 +67,13 @@ void cmd_ntp(const char* args) {
     (void)args;
     terminal_write_string("  [NTP] Sincronizando con pool.ntp.org...\n");
 
-    socket_t sock = net_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    int sock = sys_lwip_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock < 0) {
         terminal_write_string("  [NTP] Error al crear socket UDP.\n");
         return;
     }
 
-    struct sockaddr_in_old addr;
+    struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = bswap_32(123) >> 16; // Port 123 (Network byte order)
 
@@ -79,9 +81,9 @@ void cmd_ntp(const char* args) {
     // 200.89.75.197 (South America pool example) -> C8 59 4B C5
     addr.sin_addr = 0xC8594BC5;
 
-    if (net_connect(sock, &addr, sizeof(addr)) != 0) {
+    if (sys_lwip_connect(sock, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         terminal_write_string("  [NTP] Error al conectar.\n");
-        net_close(sock);
+        sys_lwip_close(sock);
         return;
     }
 
@@ -93,22 +95,22 @@ void cmd_ntp(const char* args) {
     packet[0] = 0x1B;
 
     terminal_write_string("  [NTP] Enviando request...\n");
-    if (net_send(sock, packet, sizeof(packet), 0) < 0) {
+    if (sys_lwip_send(sock, packet, sizeof(packet), 0) < 0) {
         terminal_write_string("  [NTP] Error al enviar.\n");
-        net_close(sock);
+        sys_lwip_close(sock);
         return;
     }
 
     terminal_write_string("  [NTP] Esperando respuesta...\n");
 
-    int len = net_recv(sock, packet, sizeof(packet), 0);
+    int len = sys_lwip_recv(sock, packet, sizeof(packet), 0);
     if (len < 48) {
         terminal_write_string("  [NTP] Respuesta invalida o timeout.\n");
-        net_close(sock);
+        sys_lwip_close(sock);
         return;
     }
 
-    net_close(sock);
+    sys_lwip_close(sock);
 
     // Transmit Timestamp is at offset 40 (seconds) and 44 (fraction)
     uint32_t ntp_secs = ((uint32_t)packet[40] << 24) |

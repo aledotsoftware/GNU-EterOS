@@ -223,7 +223,7 @@ int main() {
     current_task_mock.id = 1;
 
     // Fake kernel address
-    struct sockaddr* bad_addr = (struct sockaddr_old*)0xFFFFFFFF80000000ULL;
+    struct sockaddr_old* bad_addr = (struct sockaddr_old*)0xFFFFFFFF80000000ULL;
     int* bad_addrlen = (int*)0xFFFFFFFF80000000ULL;
 
     // Normal address
@@ -232,7 +232,7 @@ int main() {
     void* good_buf = malloc(100);
 
     printf("Test 1: sys_accept with bad addr\n");
-    int64_t ret = sys_accept(0, bad_addr, &good_addrlen);
+    int64_t ret = sys_accept(0, (struct sockaddr_old*)bad_addr, &good_addrlen);
     if (ret != -EFAULT) {
         printf("FAILED: sys_accept did not return -EFAULT for bad addr\n");
         return 1;
@@ -246,7 +246,7 @@ int main() {
     }
 
     printf("Test 3: sys_recvfrom with bad src_addr\n");
-    ret = sys_recvfrom(0, good_buf, 100, 0, bad_addr, &good_addrlen);
+    ret = sys_recvfrom(0, good_buf, 100, 0, (struct sockaddr_old*)bad_addr, &good_addrlen);
     if (ret != -EFAULT) {
         printf("FAILED: sys_recvfrom did not return -EFAULT for bad src_addr\n");
         return 1;
@@ -260,7 +260,7 @@ int main() {
     }
 
     printf("Test 5: sys_sendto with bad dest_addr\n");
-    ret = sys_sendto(0, good_buf, 100, 0, bad_addr, sizeof(struct sockaddr_old));
+    ret = sys_sendto(0, good_buf, 100, 0, (struct sockaddr_old*)bad_addr, sizeof(struct sockaddr_old));
     if (ret != -EFAULT) {
         printf("FAILED: sys_sendto did not return -EFAULT for bad dest_addr\n");
         return 1;
