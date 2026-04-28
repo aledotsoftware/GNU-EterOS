@@ -7,6 +7,7 @@
 #include <sys/select.h>
 
 int sys_lwip_socket(int domain, int type, int protocol);
+int sys_lwip_close(int fd);
 int sys_lwip_bind(int fd, const struct sockaddr *name, socklen_t namelen);
 int sys_lwip_listen(int fd, int backlog);
 int sys_lwip_accept(int fd, struct sockaddr *addr, socklen_t *addrlen);

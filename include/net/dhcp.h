@@ -29,7 +29,7 @@ struct dhcp_packet {
     uint8_t  options[308]; /* Minimum size */
 } __attribute__((packed));
 
-void dhcp_discover(void);
+void net_dhcp_renew(void);
 
 /**
  * Parses a DHCP offer packet from a raw buffer.

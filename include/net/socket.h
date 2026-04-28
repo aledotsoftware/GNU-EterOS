@@ -71,6 +71,8 @@ int net_close(socket_t sock);
 #define SOCKET_STATE_LAST_ACK    9
 #define SOCKET_STATE_TIME_WAIT   10
 
+uint32_t net_gethostbyname(const char* host);
+
 /* Receive Buffer Size */
 #define RX_BUFFER_SIZE 4096
 

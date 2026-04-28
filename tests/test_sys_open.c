@@ -237,20 +237,22 @@ fs_node_t* shmfs_create_memfd(const char* name) {
 }
 
 
+#include <sys/socket.h>
 int sys_lwip_socket(int domain, int type, int protocol) { return -1; }
-int sys_lwip_connect(int fd, const void* addr, int addrlen) { return -1; }
-int sys_lwip_bind(int fd, const void* addr, int addrlen) { return -1; }
-int sys_lwip_accept(int fd, void* addr, int* addrlen) { return -1; }
+int sys_lwip_close(int fd) { return -1; }
+int sys_lwip_connect(int fd, const struct sockaddr *name, unsigned int namelen) { return -1; }
+int sys_lwip_bind(int fd, const struct sockaddr *name, unsigned int namelen) { return -1; }
+int sys_lwip_accept(int fd, struct sockaddr *addr, unsigned int *addrlen) { return -1; }
 int sys_lwip_listen(int fd, int backlog) { return -1; }
-int sys_lwip_sendto(int fd, const void* buf, size_t len, int flags, const void* dest_addr, int addrlen) { return -1; }
-int sys_lwip_recvfrom(int fd, void* buf, size_t len, int flags, void* src_addr, int* addrlen) { return -1; }
-int sys_lwip_sendmsg(int fd, const void* msg, int flags) { return -1; }
-int sys_lwip_recvmsg(int fd, void* msg, int flags) { return -1; }
+ssize_t sys_lwip_sendto(int fd, const void *data, size_t size, int flags, const struct sockaddr *to, unsigned int tolen) { return -1; }
+ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, struct sockaddr *from, unsigned int *fromlen) { return -1; }
+ssize_t sys_lwip_sendmsg(int fd, const struct msghdr *msg, int flags) { return -1; }
+ssize_t sys_lwip_recvmsg(int fd, struct msghdr *msg, int flags) { return -1; }
 int sys_lwip_shutdown(int fd, int how) { return -1; }
-int sys_lwip_getsockname(int fd, void* addr, int* addrlen) { return -1; }
-int sys_lwip_getpeername(int fd, void* addr, int* addrlen) { return -1; }
-int sys_lwip_setsockopt(int fd, int level, int optname, const void* optval, int optlen) { return -1; }
-int sys_lwip_getsockopt(int fd, int level, int optname, void* optval, int* optlen) { return -1; }
+int sys_lwip_getsockname(int fd, struct sockaddr *name, unsigned int *namelen) { return -1; }
+int sys_lwip_getpeername(int fd, struct sockaddr *name, unsigned int *namelen) { return -1; }
+int sys_lwip_setsockopt(int fd, int level, int optname, const void *optval, unsigned int optlen) { return -1; }
+int sys_lwip_getsockopt(int fd, int level, int optname, void *optval, unsigned int *optlen) { return -1; }
 
 #include "../kernel/arch/x86_64/syscall.c"
 

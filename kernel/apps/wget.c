@@ -5,6 +5,7 @@
 #include <task.h>
 #include <net/socket.h>
 #include <net/defs.h>
+#include <net/lwip_socket.h>
 
 /**
  * éterOS - wget using Native Socket API
@@ -53,30 +54,28 @@ void wget_run(const char* url_in) {
     /* Use safe ip_aton from kernel/net/ip_utils.c (via net/defs.h) */
     uint32_t ip = ip_aton(host);
     if (ip == 0) {
-        /* Simple hardcoded resolution for testing if not an IP */
-        if (strcmp(host, "google.com") == 0) ip = 0x4850fa8e; /* 142.250.80.72 */
-        else if (strcmp(host, "tudexgames.com") == 0) ip = 0x288C43AC; /* 172.67.140.40 */
-        else {
-            terminal_write_string("[WGET] Error: Solo soportamos IP o hosts harcodeados.\n");
+        ip = net_gethostbyname(host);
+        if (ip == 0) {
+            terminal_write_string("[WGET] Error: Could not resolve host.\n");
             return;
         }
     }
     
-    socket_t sock = net_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    int sock = sys_lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock < 0) {
         terminal_write_string("[WGET] Failed to create socket.\n");
         return;
     }
     
-    struct sockaddr_in_old addr;
+    struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     addr.sin_addr = ip;
     
     terminal_write_string("[WGET] Connecting...\n");
-    if (net_connect(sock, &addr, sizeof(addr)) != 0) {
+    if (sys_lwip_connect(sock, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
         terminal_write_string("[WGET] Connection failed.\n");
-        net_close(sock);
+        sys_lwip_close(sock);
         return;
     }
     
@@ -90,12 +89,12 @@ void wget_run(const char* url_in) {
     if (strlcat(request, host, req_size) >= req_size) goto trunc;
     if (strlcat(request, "\r\nUser-Agent: eterOS/0.1\r\nConnection: close\r\n\r\n", req_size) >= req_size) goto trunc;
     
-    net_send(sock, request, strlen(request), 0);
+    sys_lwip_send(sock, request, strlen(request), 0);
     goto receive;
 
 trunc:
     terminal_write_string("[WGET] Error: Request buffer overflow or URL too long.\n");
-    net_close(sock);
+    sys_lwip_close(sock);
     return;
 
 receive:
@@ -104,7 +103,7 @@ receive:
     
     char buffer[1024];
     int len;
-    while ((len = net_recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+    while ((len = sys_lwip_recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
         buffer[len] = '\0';
         for (int i = 0; i < len; i++) {
             terminal_putchar(buffer[i]);
@@ -113,5 +112,5 @@ receive:
     }
     
     terminal_write_string("\n[WGET] Done.\n");
-    net_close(sock);
+    sys_lwip_close(sock);
 }

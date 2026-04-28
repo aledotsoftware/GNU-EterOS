@@ -61,6 +61,12 @@ void net_init(void) {
     serial_write_string("[NET] Init done.\n");
 }
 
+void net_dhcp_renew(void) {
+    if (netif_is_up(&main_netif)) {
+        dhcp_renew(&main_netif);
+    }
+}
+
 void net_poll(void) {
     /* Poll the driver */
     ethernetif_poll(&main_netif);
@@ -93,6 +99,66 @@ typedef struct {
     char req_buf[512]; /* Request buffer inside state for safety */
     volatile int orphaned; /* Set if caller times out and leaves us dangling */
 } http_req_state_t;
+
+typedef struct {
+    uint32_t ip;
+    volatile int completed;
+    volatile int orphaned;
+} dns_req_state_t;
+
+static void dns_gethostbyname_found(const char *name, const ip_addr_t *ipaddr, void *callback_arg) {
+    (void)name;
+    dns_req_state_t *state = (dns_req_state_t*)callback_arg;
+    if (state->orphaned) {
+        kfree(state);
+        return;
+    }
+    if (ipaddr && ipaddr->addr != 0) {
+        state->ip = ip4_addr_get_u32(ipaddr);
+    } else {
+        state->ip = 0;
+    }
+    state->completed = 1;
+}
+
+uint32_t net_gethostbyname(const char* host) {
+    dns_req_state_t *state = (dns_req_state_t*)kmalloc(sizeof(dns_req_state_t));
+    if (!state) return 0;
+
+    state->ip = 0;
+    state->completed = 0;
+    state->orphaned = 0;
+
+    hal_interrupts_disable();
+    ip_addr_t dns_res;
+    err_t err = dns_gethostbyname(host, &dns_res, dns_gethostbyname_found, state);
+
+    if (err == ERR_OK) {
+        dns_gethostbyname_found(host, &dns_res, state);
+    } else if (err != ERR_INPROGRESS) {
+        hal_interrupts_enable();
+        kfree(state);
+        return 0;
+    }
+    hal_interrupts_enable();
+
+    int timeout_ms = 10000;
+    while (!state->completed && timeout_ms > 0) {
+        task_sleep(1);
+        timeout_ms--;
+    }
+
+    uint32_t res_ip = state->ip;
+    if (!state->completed) {
+        hal_interrupts_disable();
+        state->orphaned = 1;
+        hal_interrupts_enable();
+        return 0;
+    }
+
+    kfree(state);
+    return res_ip;
+}
 
 static void http_close(struct tcp_pcb *pcb) {
     tcp_arg(pcb, NULL);

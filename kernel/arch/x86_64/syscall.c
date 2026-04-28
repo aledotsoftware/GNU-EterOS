@@ -120,25 +120,6 @@ struct clone_args {
 
 /* --- Socket VFS Wrappers --- */
 
-static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
-    (void)offset;
-    if ((node->flags & 0x7) != FS_SOCKET) return 0;
-    int res = net_recv((int)node->inode, buffer, size, 0);
-    return (res < 0) ? 0 : (ssize_t)res;
-}
-
-static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
-    (void)offset;
-    if ((node->flags & 0x7) != FS_SOCKET) return 0;
-    int res = net_send((int)node->inode, buffer, size, 0);
-    return (res < 0) ? 0 : (uint32_t)res;
-}
-
-static void socket_close_fs(fs_node_t* node) {
-    if ((node->flags & 0x7) == FS_SOCKET) {
-        net_close((int)node->inode);
-    }
-}
 
 /* --- End Socket VFS Wrappers --- */
 
@@ -630,67 +611,15 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     return virt;
 }
 
+#include <net/lwip_socket.h>
+
 static int64_t sys_socket(int domain, int type, int protocol) {
-    if (domain != AF_INET) return -EAFNOSUPPORT;
-    if (type != SOCK_STREAM) return -EPROTOTYPE;
-    if (protocol != 0 && protocol != IPPROTO_TCP) return -EPROTONOSUPPORT;
-
-    int sock_id = net_socket(domain, type, IPPROTO_TCP);
-    if (sock_id < 0) return -ENOMEM;
-
-    task_t* current = task_get_current();
-    int fd = -1;
-    for (int i = 3; i < MAX_FD; i++) {
-        if (current->fd_table[i].node == NULL) {
-            fd = i;
-            break;
-        }
-    }
-    if (fd == -1) {
-        net_close(sock_id);
-        return -EMFILE;
-    }
-
-    fs_node_t* node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    if (!node) {
-        net_close(sock_id);
-        return -ENOMEM;
-    }
-    memset(node, 0, sizeof(fs_node_t));
-    strlcpy(node->name, "socket", 32);
-    node->flags = FS_SOCKET;
-    node->inode = (uint32_t)sock_id;
-    node->read = socket_read_fs;
-    node->write = socket_write_fs;
-    node->close = socket_close_fs;
-    node->ref_count = 1;
-
-    current->fd_table[fd].node = node;
-    current->fd_table[fd].offset = 0;
-    current->fd_table[fd].flags = O_RDWR;
-    return fd;
+    return sys_lwip_socket(domain, type, protocol);
 }
 
 static int64_t sys_connect(int fd, const struct sockaddr_old* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
-    if (addrlen < (int)sizeof(struct sockaddr_in_old)) return -EINVAL;
-
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-
-    struct sockaddr_in_old* sin = (struct sockaddr_in_old*)addr;
-    if (sin->sin_family != AF_INET) return -EAFNOSUPPORT;
-
-    int res = net_connect((int)node->inode, sin, addrlen);
-    if (res < 0) {
-        if (res == -2) return -ENETUNREACH;
-        return -ECONNREFUSED;
-    }
-    return 0;
+    return sys_lwip_connect(fd, (const struct sockaddr*)addr, addrlen);
 }
 
 static int64_t sys_pipe2(int* pipefd, int flags) {
@@ -750,8 +679,6 @@ static int64_t sys_pipe(int* pipefd) {
 struct utsname {
     char sysname[65]; char nodename[65]; char release[65]; char version[65]; char machine[65]; char domainname[65];
 };
-
-struct iovec { void  *iov_base; size_t iov_len; };
 
 /* Helper to safely copy iovec array from user space */
 static int copy_from_user_iovec(const struct iovec* user_iov, int iovcnt, struct iovec** out_kiov) {
@@ -1785,50 +1712,17 @@ static int64_t sys_dup2(int oldfd, int newfd) {
 
 static int64_t sys_bind(int fd, const struct sockaddr_old* addr, int addrlen) {
     if (!vmm_verify_user_access(addr, addrlen, 0)) return -EFAULT;
-    if (addrlen < (int)sizeof(struct sockaddr_in_old)) return -EINVAL;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    struct sockaddr_in_old* sin = (struct sockaddr_in_old*)addr;
-    if (sin->sin_family != AF_INET) return -EAFNOSUPPORT;
-    socket_entry_t* s = get_socket((int)node->inode);
-    if (!s) return -EBADF;
-    if (s->state != SOCKET_STATE_CLOSED) return -EINVAL;
-    s->local_port = ntohs(sin->sin_port);
-    return 0;
+    return sys_lwip_bind(fd, (const struct sockaddr*)addr, addrlen);
 }
 
 static int64_t sys_listen(int fd, int backlog) {
-    (void)backlog;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    socket_entry_t* s = get_socket((int)node->inode);
-    if (!s) return -EBADF;
-    s->state = SOCKET_STATE_LISTEN;
-    return 0;
+    return sys_lwip_listen(fd, backlog);
 }
 
 static int64_t sys_accept(int fd, struct sockaddr_old* addr, int* addrlen) {
-
     if (addr && !vmm_verify_user_access(addr, sizeof(struct sockaddr_old), 1)) return -EFAULT;
     if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
-
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-
-    socket_entry_t* s = get_socket((int)node->inode);
-    if (!s) return -EBADF;
-
-    return -EOPNOTSUPP;
+    return sys_lwip_accept(fd, (struct sockaddr*)addr, (socklen_t*)addrlen);
 }
 
 static int64_t sys_accept4(int fd, struct sockaddr_old* addr, int* addrlen, int flags) {
@@ -1839,38 +1733,51 @@ static int64_t sys_accept4(int fd, struct sockaddr_old* addr, int* addrlen, int 
 static int64_t sys_sendto(int fd, const void* buf, size_t len, int flags, const struct sockaddr_old* dest_addr, int addrlen) {
     if (!vmm_verify_user_access(buf, len, 0)) return -EFAULT;
     if (dest_addr && !vmm_verify_user_access(dest_addr, addrlen, 0)) return -EFAULT;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    int res = net_send((int)node->inode, buf, len, flags);
-    if (res < 0) return -EIO;
-    return res;
+    return sys_lwip_sendto(fd, buf, len, flags, (const struct sockaddr*)dest_addr, addrlen);
 }
 
 static int64_t sys_recvfrom(int fd, void* buf, size_t len, int flags, struct sockaddr_old* src_addr, int* addrlen) {
     if (!vmm_verify_user_access(buf, len, 1)) return -EFAULT;
     if (src_addr && !vmm_verify_user_access(src_addr, sizeof(struct sockaddr_old), 1)) return -EFAULT;
     if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    int res = net_recv((int)node->inode, buf, len, flags);
-    if (res < 0) return res;
-    if (src_addr && addrlen) {
-        struct sockaddr_in_old* sin = (struct sockaddr_in_old*)src_addr;
-        socket_entry_t* s = get_socket((int)node->inode);
-        if (s && *addrlen >= (int)sizeof(struct sockaddr_in_old)) {
-            sin->sin_family = AF_INET;
-            sin->sin_port = htons(s->remote_port);
-            sin->sin_addr = s->remote_ip;
-            *addrlen = sizeof(struct sockaddr_in_old);
-        }
-    }
-    return res;
+    return sys_lwip_recvfrom(fd, buf, len, flags, (struct sockaddr*)src_addr, (socklen_t*)addrlen);
+}
+
+static int64_t sys_sendmsg(int fd, const struct msghdr* msg, int flags) {
+    if (!vmm_verify_user_access(msg, sizeof(struct msghdr), 0)) return -EFAULT;
+    return sys_lwip_sendmsg(fd, msg, flags);
+}
+
+static int64_t sys_recvmsg(int fd, struct msghdr* msg, int flags) {
+    if (!vmm_verify_user_access(msg, sizeof(struct msghdr), 1)) return -EFAULT;
+    return sys_lwip_recvmsg(fd, msg, flags);
+}
+
+static int64_t sys_shutdown(int fd, int how) {
+    return sys_lwip_shutdown(fd, how);
+}
+
+static int64_t sys_getsockname(int fd, struct sockaddr_old* addr, int* addrlen) {
+    if (addr && !vmm_verify_user_access(addr, sizeof(struct sockaddr_old), 1)) return -EFAULT;
+    if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
+    return sys_lwip_getsockname(fd, (struct sockaddr*)addr, (socklen_t*)addrlen);
+}
+
+static int64_t sys_getpeername(int fd, struct sockaddr_old* addr, int* addrlen) {
+    if (addr && !vmm_verify_user_access(addr, sizeof(struct sockaddr_old), 1)) return -EFAULT;
+    if (addrlen && !vmm_verify_user_access(addrlen, sizeof(int), 1)) return -EFAULT;
+    return sys_lwip_getpeername(fd, (struct sockaddr*)addr, (socklen_t*)addrlen);
+}
+
+static int64_t sys_setsockopt(int fd, int level, int optname, const void* optval, int optlen) {
+    if (optval && !vmm_verify_user_access(optval, optlen, 0)) return -EFAULT;
+    return sys_lwip_setsockopt(fd, level, optname, optval, optlen);
+}
+
+static int64_t sys_getsockopt(int fd, int level, int optname, void* optval, int* optlen) {
+    if (optval && !vmm_verify_user_access(optval, sizeof(int), 1)) return -EFAULT;
+    if (optlen && !vmm_verify_user_access(optlen, sizeof(int), 1)) return -EFAULT;
+    return sys_lwip_getsockopt(fd, level, optname, optval, (socklen_t*)optlen);
 }
 
 struct kernel_sigaction {
@@ -2170,58 +2077,9 @@ static int64_t sys_nanosleep(const struct timespec* req, struct timespec* rem) {
     return 0;
 }
 
-struct msghdr {
-    void*         msg_name;
-    int           msg_namelen;
-    struct iovec* msg_iov;
-    int           msg_iovlen;
-    void*         msg_control;
-    int           msg_controllen;
-    int           msg_flags;
-};
 
-static int64_t sys_sendmsg(int fd, const struct msghdr* msg, int flags) {
-    (void)fd; (void)flags;
-    if (!vmm_verify_user_access(msg, sizeof(struct msghdr), 0)) return -EFAULT;
-    return -EOPNOTSUPP;
-}
 
-static int64_t sys_recvmsg(int fd, struct msghdr* msg, int flags) {
-    (void)fd; (void)flags;
-    if (!vmm_verify_user_access(msg, sizeof(struct msghdr), 1)) return -EFAULT;
-    return -EOPNOTSUPP;
-}
 
-static int64_t sys_setsockopt(int fd, int level, int optname, const void* optval, int optlen) {
-    (void)fd; (void)level; (void)optname; (void)optval; (void)optlen;
-    return 0; // Pretend success for compatibility
-}
-
-static int64_t sys_getsockopt(int fd, int level, int optname, void* optval, int* optlen) {
-    (void)fd; (void)level; (void)optname; (void)optval; (void)optlen;
-    return -EOPNOTSUPP;
-}
-
-static int64_t sys_getpeername(int fd, struct sockaddr_old* addr, int* addrlen) {
-    (void)fd; (void)addr; (void)addrlen;
-    return -EOPNOTSUPP;
-}
-
-static int64_t sys_getsockname(int fd, struct sockaddr_old* addr, int* addrlen) {
-    (void)fd; (void)addr; (void)addrlen;
-    return -EOPNOTSUPP;
-}
-
-static int64_t sys_shutdown(int fd, int how) {
-    (void)how;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    net_close((int)node->inode);
-    return 0;
-}
 
 
 
