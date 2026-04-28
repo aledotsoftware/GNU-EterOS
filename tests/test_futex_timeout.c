@@ -57,11 +57,14 @@ uint64_t timer_get_ticks(void) {
     return current_ticks;
 }
 
-void task_yield(void) {
+void schedule(void) {
     /* Simulate time passing */
     if (ticks_increment_on_yield > 0) {
         current_ticks += ticks_increment_on_yield;
     }
+}
+
+void task_yield(void) {
 }
 
 void task_block_with_timeout(uint64_t wake_tick) {

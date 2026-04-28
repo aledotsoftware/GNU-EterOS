@@ -32,6 +32,8 @@ void schedule(void) {
     /* No-op for testing */
 }
 
+void task_yield(void) {}
+
 void hal_interrupts_disable(void) {
     interrupts_enabled = 0;
 }
