@@ -264,3 +264,69 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
     kfree(state);
     return (result_status == 1) ? (int)result_len : result_status;
 }
+#include <net/dhcp.h>
+#include <lwip/dns.h>
+#include <task.h>
+#include <mm.h>
+
+typedef struct {
+    ip_addr_t resolved_ip;
+    int completed;
+    volatile int orphaned;
+} dns_sync_state_t;
+
+static void dns_sync_found(const char *name, const ip_addr_t *ipaddr, void *callback_arg) {
+    (void)name;
+    dns_sync_state_t *state = (dns_sync_state_t*)callback_arg;
+
+    if (state->orphaned) {
+        kfree(state);
+        return;
+    }
+
+    if (ipaddr) {
+        state->resolved_ip = *ipaddr;
+    } else {
+        state->resolved_ip.addr = 0;
+    }
+    state->completed = 1;
+}
+
+uint32_t net_gethostbyname(const char* hostname) {
+    dns_sync_state_t* state = (dns_sync_state_t*)kmalloc(sizeof(dns_sync_state_t));
+    if (!state) return 0;
+
+    state->resolved_ip.addr = 0;
+    state->completed = 0;
+    state->orphaned = 0;
+
+    hal_interrupts_disable();
+    ip_addr_t dns_res;
+    err_t err = dns_gethostbyname(hostname, &dns_res, dns_sync_found, state);
+
+    if (err == ERR_OK) {
+        dns_sync_found(hostname, &dns_res, state);
+    } else if (err != ERR_INPROGRESS) {
+        hal_interrupts_enable();
+        kfree(state);
+        return 0;
+    }
+    hal_interrupts_enable();
+
+    int timeout = 5000;
+    while (!state->completed && timeout > 0) {
+        task_sleep(1);
+        timeout--;
+    }
+
+    if (!state->completed) {
+        hal_interrupts_disable();
+        state->orphaned = 1;
+        hal_interrupts_enable();
+        return 0;
+    }
+
+    uint32_t result = state->resolved_ip.addr;
+    kfree(state);
+    return result;
+}

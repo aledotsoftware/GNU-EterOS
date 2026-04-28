@@ -95,9 +95,9 @@ static void panel_keyboard(void) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            if (panel_mouse_y == 2) c = '1';
-            else if (panel_mouse_y == 3) c = '2';
-            else if (panel_mouse_y == 4) c = '3';
+            if (panel_mouse_y == 2 && panel_mouse_x < 30) c = '1';
+            else if (panel_mouse_y == 3 && panel_mouse_x < 30) c = '2';
+            else if (panel_mouse_y == 4 && panel_mouse_x < 30) c = '3';
             else c = KB_KEY_ESCAPE; // Click outside returns
             if (c) break;
         }
@@ -147,7 +147,7 @@ static void panel_mouse_cfg(void) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            if (panel_mouse_y >= 2 && panel_mouse_y <= 6) {
+            if (panel_mouse_y >= 2 && panel_mouse_y <= 6 && panel_mouse_x < 50) {
                 c = '1' + (panel_mouse_y - 2);
                 break;
             }
@@ -369,12 +369,12 @@ void cmd_panel(const char* args) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            if (panel_mouse_y == 4) opt = '1';
-            else if (panel_mouse_y == 5) opt = '2';
-            else if (panel_mouse_y == 6) opt = '3';
-            else if (panel_mouse_y == 7) opt = '4';
-            else if (panel_mouse_y == 8) opt = '5';
-            else if (panel_mouse_y == 9) opt = '6';
+            if (panel_mouse_y == 4 && panel_mouse_x < 50) opt = '1';
+            else if (panel_mouse_y == 5 && panel_mouse_x < 50) opt = '2';
+            else if (panel_mouse_y == 6 && panel_mouse_x < 50) opt = '3';
+            else if (panel_mouse_y == 7 && panel_mouse_x < 50) opt = '4';
+            else if (panel_mouse_y == 8 && panel_mouse_x < 50) opt = '5';
+            else if (panel_mouse_y == 9 && panel_mouse_x < 50) opt = '6';
         }
 
         if (panel_mouse_moved) {

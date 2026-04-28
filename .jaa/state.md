@@ -35,3 +35,8 @@
 - Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
 - Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
 - Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
+- **Panel y Dispositivos**:
+  - Se corrigió la detección de clicks en `cmd_panel.c` validando el límite horizontal (`panel_mouse_x < 50`) para prevenir selecciones erróneas fuera del menú.
+  - Se modificó `cmd_time.c` para resolver DNS dinámicamente (`pool.ntp.org`) usando un wrapper sincrónico para lwIP (`net_gethostbyname`) implementado en `kernel/net/compat.c`.
+  - Se migró el cliente NTP en `cmd_time.c` para utilizar la interfaz `sys_lwip_*` (socket, connect, send, recv), alineándolo con la pila de red moderna.
+  - Se implementó `sys_lwip_close` en `kernel/net/socket.c` para cerrar correctamente los File Descriptors asociados a sockets lwIP.
