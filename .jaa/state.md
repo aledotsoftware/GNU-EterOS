@@ -73,3 +73,4 @@
 - Implemented a new network status dialog in the kernel Control Panel (`cmd_panel.c`).
 - Users can now select the `Estado de Red (IP & DHCP)` option in the panel to view network state, renew DHCP, and perform basic connectivity checks (e.g., `wget tudexgames.com`), tying graphical actions directly to the `cmd_net` subsystems.
 - All code successfully compiles and native tests (`run_tests.sh`) pass.
+- [USER-SECURITY] Consolidada gestión multiusuario: Se arregló el manejo de O_APPEND en sys_write para permitir escrituras seguras a /etc/shadow sin sobreescribir datos, y se añadió modo explícito (0600) en todos los open() con O_CREAT dentro de login, passwd, useradd y userdel para asegurar la correcta protección de las contraseñas.

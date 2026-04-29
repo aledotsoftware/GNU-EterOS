@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Append to /etc/shadow */
-    fd = open("/etc/shadow", O_WRONLY | O_APPEND | O_CREAT);
+    fd = open("/etc/shadow", O_WRONLY | O_APPEND | O_CREAT, 0600);
     if (fd < 0) {
         printf("Error: Could not open /etc/shadow for writing\n");
         return 1;
