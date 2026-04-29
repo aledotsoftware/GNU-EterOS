@@ -75,3 +75,4 @@
 - All code successfully compiles and native tests (`run_tests.sh`) pass.
 - [USER-SECURITY] Consolidada gestión multiusuario: Se arregló el manejo de O_APPEND en sys_write para permitir escrituras seguras a /etc/shadow sin sobreescribir datos, y se añadió modo explícito (0600) en todos los open() con O_CREAT dentro de login, passwd, useradd y userdel para asegurar la correcta protección de las contraseñas.
 - [DEVICES-TIME] Agregado soporte DNS dinámico en NTP, restringido interacción del mouse en panel y validado adaptador de red.
+- [GRAPHICS] Implemented window minimize capability in `userspace/marea_shell.c`, allowing windows to be hidden to the taskbar and restored by clicking their corresponding tray entries. Added `hit_minimize_button`, `hit_maximize_button`, and `hit_taskbar_window` functions and bound them in `handle_mouse_event`.

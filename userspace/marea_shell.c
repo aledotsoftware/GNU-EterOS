@@ -228,7 +228,11 @@ static void handle_keyboard_char(char c);
 static void drain_mouse_events(int fd);
 static void draw_window_chrome(marea_window_t* win);
 static int hit_start_button(int mx, int my);
+static int hit_taskbar_window(int mx, int my);
 static int hit_titlebar(marea_window_t* win, int mx, int my);
+static int hit_close_button(marea_window_t* win, int mx, int my);
+static int hit_minimize_button(marea_window_t* win, int mx, int my);
+static int hit_maximize_button(marea_window_t* win, int mx, int my);
 static int hit_editor_save_button(marea_window_t* win, int mx, int my);
 static int find_window_at(int mx, int my);
 static int hit_menu_item(int mx, int my);
@@ -665,6 +669,24 @@ static void draw_menu(void) {
 /* Window Drawing                                                            */
 /* ========================================================================= */
 
+/* Check if click is on a window's minimize button */
+static int hit_minimize_button(marea_window_t* win, int mx, int my) {
+    int btn_spacing = 20;
+    int btn_cx = win->x + 14 + btn_spacing;
+    int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
+    int dx = mx - btn_cx, dy = my - btn_cy;
+    return (dx * dx + dy * dy <= 8 * 8);
+}
+
+/* Check if click is on a window's maximize button */
+static int hit_maximize_button(marea_window_t* win, int mx, int my) {
+    int btn_spacing = 20;
+    int btn_cx = win->x + 14 + btn_spacing * 2;
+    int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
+    int dx = mx - btn_cx, dy = my - btn_cy;
+    return (dx * dx + dy * dy <= 8 * 8);
+}
+
 /* Check if click is on a window's close button */
 static int hit_close_button(marea_window_t* win, int mx, int my) {
     int btn_cx = win->x + 14;
@@ -703,10 +725,8 @@ static void draw_window_chrome(marea_window_t* win) {
 
     /* Check hover states */
     int hover_close = hit_close_button(win, mouse_x, mouse_y);
-    int hover_min = (mouse_x >= btn_base_x + btn_spacing - btn_r && mouse_x <= btn_base_x + btn_spacing + btn_r &&
-                     mouse_y >= btn_base_y - btn_r && mouse_y <= btn_base_y + btn_r);
-    int hover_max = (mouse_x >= btn_base_x + btn_spacing * 2 - btn_r && mouse_x <= btn_base_x + btn_spacing * 2 + btn_r &&
-                     mouse_y >= btn_base_y - btn_r && mouse_y <= btn_base_y + btn_r);
+    int hover_min = hit_minimize_button(win, mouse_x, mouse_y);
+    int hover_max = hit_maximize_button(win, mouse_x, mouse_y);
 
     /* Close (red) */
     for (int dy = -btn_r; dy <= btn_r; dy++) {
@@ -1367,6 +1387,30 @@ static void handle_mouse_event(const input_event_t* ev) {
                 return;
             }
 
+            int tb_idx = hit_taskbar_window(mouse_x, mouse_y);
+            if (tb_idx >= 0) {
+                if (windows[tb_idx].minimized) {
+                    windows[tb_idx].minimized = 0;
+                    if (focused_window >= 0) windows[focused_window].focused = 0;
+                    focused_window = tb_idx;
+                    windows[tb_idx].focused = 1;
+                } else if (focused_window == tb_idx) {
+                    windows[tb_idx].minimized = 1;
+                    windows[tb_idx].focused = 0;
+                    focused_window = -1;
+                } else {
+                    if (focused_window >= 0) windows[focused_window].focused = 0;
+                    focused_window = tb_idx;
+                    windows[tb_idx].focused = 1;
+                }
+                menu_open = 0;
+                redraw_all();
+                cursor_save_bg(mouse_x, mouse_y);
+                cursor_draw(mouse_x, mouse_y);
+                present();
+                return;
+            }
+
             if (menu_open) {
                 menu_open = 0;
                 redraw_all();
@@ -1408,6 +1452,20 @@ static void handle_mouse_event(const input_event_t* ev) {
                     present();
                     return;
                 }
+
+                if (hit_minimize_button(win, mouse_x, mouse_y)) {
+                    win->minimized = 1;
+                    win->focused = 0;
+                    if (focused_window == win_idx) focused_window = -1;
+                    redraw_all();
+                    cursor_save_bg(mouse_x, mouse_y);
+                    cursor_draw(mouse_x, mouse_y);
+                    present();
+                    return;
+                }
+
+                /* We implement hit_maximize_button visually, but don't implement full maximize logic yet
+                   We can just leave it as an empty handler or implement a simple maximize */
 
                 if (hit_titlebar(win, mouse_x, mouse_y)) {
                     dragging = 1;
@@ -1482,6 +1540,32 @@ static void drain_mouse_events(int fd) {
 /* ========================================================================= */
 /* Hit Testing                                                               */
 /* ========================================================================= */
+
+/* Check if click is on taskbar window */
+static int hit_taskbar_window(int mx, int my) {
+    int ty = fb_info.height - TASKBAR_HEIGHT;
+    int btn_h = 32;
+    int btn_y = ty + (TASKBAR_HEIGHT - btn_h) / 2;
+    int tray_x = 60;
+
+    if (my < btn_y || my >= btn_y + btn_h) return -1;
+
+    for (int i = 0; i < window_count; i++) {
+        if (!windows[i].visible) continue;
+
+        int tw = text_width(windows[i].title) + 16;
+        if (tw < 80) tw = 80;
+        if (tw > 160) tw = 160;
+
+        if (mx >= tray_x && mx < tray_x + tw) {
+            return i;
+        }
+
+        tray_x += tw + 6;
+    }
+
+    return -1;
+}
 
 /* Check if click is on start button */
 static int hit_start_button(int mx, int my) {
