@@ -3,6 +3,7 @@
 #include "../../include/mouse.h"
 #include "../../include/rtc.h"
 #include "../../include/nvram.h"
+#include "../../include/net/e1000.h"
 #include "../../include/fs/initrd.h"
 #include "../../include/vga.h"
 
@@ -96,10 +97,14 @@ static void panel_keyboard(void) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            if (panel_mouse_y == 2) c = '1';
-            else if (panel_mouse_y == 3) c = '2';
-            else if (panel_mouse_y == 4) c = '3';
-            else c = KB_KEY_ESCAPE; // Click outside returns
+            if (panel_mouse_x >= 2 && panel_mouse_x <= 40) {
+                if (panel_mouse_y == 2) c = '1';
+                else if (panel_mouse_y == 3) c = '2';
+                else if (panel_mouse_y == 4) c = '3';
+                else c = KB_KEY_ESCAPE; // Click outside returns
+            } else {
+                c = KB_KEY_ESCAPE;
+            }
             if (c) break;
         }
         __asm__ volatile("cli");
@@ -148,8 +153,16 @@ static void panel_mouse_cfg(void) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            if (panel_mouse_y >= 2 && panel_mouse_y <= 6) {
-                c = '1' + (panel_mouse_y - 2);
+            if (panel_mouse_x >= 2 && panel_mouse_x <= 40) {
+                if (panel_mouse_y >= 2 && panel_mouse_y <= 6) {
+                    c = '1' + (panel_mouse_y - 2);
+                    break;
+                } else {
+                    c = KB_KEY_ESCAPE;
+                    break;
+                }
+            } else {
+                c = KB_KEY_ESCAPE;
                 break;
             }
         }
@@ -370,13 +383,15 @@ void cmd_panel(const char* args) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            if (panel_mouse_y == 4) opt = '1';
-            else if (panel_mouse_y == 5) opt = '2';
-            else if (panel_mouse_y == 6) opt = '3';
-            else if (panel_mouse_y == 7) opt = '4';
-            else if (panel_mouse_y == 8) opt = '5';
-            else if (panel_mouse_y == 9) opt = '6';
-            else if (panel_mouse_y == 10) opt = '7';
+            if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
+                if (panel_mouse_y == 4) opt = '1';
+                else if (panel_mouse_y == 5) opt = '2';
+                else if (panel_mouse_y == 6) opt = '3';
+                else if (panel_mouse_y == 7) opt = '4';
+                else if (panel_mouse_y == 8) opt = '5';
+                else if (panel_mouse_y == 9) opt = '6';
+                else if (panel_mouse_y == 10) opt = '7';
+            }
         }
 
         if (panel_mouse_moved) {
@@ -431,6 +446,14 @@ void cmd_panel(const char* args) {
                 if (c != KB_KEY_ESCAPE) wait_for_enter();
                 draw_panel_menu();
             } else if (opt == '6') {
+                if (!e1000_is_active()) {
+                    cmd_clear("");
+                    terminal_write_string("\n  -- Red y Conectividad --\n");
+                    terminal_write_string("  Error: Adaptador de red no activo o no detectado.\n");
+                    wait_for_enter();
+                    draw_panel_menu();
+                    continue;
+                }
                 cmd_clear("");
                 terminal_write_string("\n  -- Red y Conectividad --\n");
                 cmd_net("");
