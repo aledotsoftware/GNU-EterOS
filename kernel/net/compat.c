@@ -269,3 +269,76 @@ void net_dhcp_renew(void) {
     if (!netif_is_up(&main_netif)) return;
     dhcp_renew(&main_netif);
 }
+
+typedef struct {
+    ip_addr_t resolved_ip;
+    volatile int completed;
+    volatile int status;
+    volatile int orphaned;
+} net_dns_state_t;
+
+static void net_dns_found(const char *name, const ip_addr_t *ipaddr, void *callback_arg) {
+    (void)name;
+    net_dns_state_t *state = (net_dns_state_t*)callback_arg;
+
+    if (state->orphaned) {
+        kfree(state);
+        return;
+    }
+
+    if (ipaddr && ipaddr->addr != 0) {
+        state->resolved_ip = *ipaddr;
+        state->status = 1;
+    } else {
+        state->status = -1;
+    }
+    state->completed = 1;
+}
+
+int net_gethostbyname(const char* hostname, uint32_t* out_ip) {
+    if (!hostname || !out_ip) return -1;
+
+    net_dns_state_t* state = (net_dns_state_t*)kmalloc(sizeof(net_dns_state_t));
+    if (!state) return -1;
+    memset(state, 0, sizeof(*state));
+
+    hal_interrupts_disable();
+    ip_addr_t dns_res;
+    err_t err = dns_gethostbyname(hostname, &dns_res, net_dns_found, state);
+
+    if (err == ERR_OK) {
+        net_dns_found(hostname, &dns_res, state);
+    } else if (err != ERR_INPROGRESS) {
+        hal_interrupts_enable();
+        kfree(state);
+        return -1;
+    }
+    hal_interrupts_enable();
+
+    int timeout_ms = 5000; /* 5 seconds */
+    while (!state->completed && timeout_ms > 0) {
+        task_sleep(1);
+        timeout_ms--;
+    }
+
+    if (!state->completed) {
+        hal_interrupts_disable();
+        if (state->completed) {
+            /* Completed just before disable */
+        } else {
+            state->orphaned = 1;
+            hal_interrupts_enable();
+            return -1;
+        }
+        hal_interrupts_enable();
+    }
+
+    int res = -1;
+    if (state->status == 1) {
+        *out_ip = ip4_addr_get_u32(&state->resolved_ip);
+        res = 0;
+    }
+
+    kfree(state);
+    return res;
+}

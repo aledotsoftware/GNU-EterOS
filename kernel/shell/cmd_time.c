@@ -61,8 +61,16 @@ static void unix_to_rtc(time_t timestamp, rtc_time_t* t) {
     t->day = d;
 }
 
+#include "../../include/net/e1000.h"
+
 void cmd_ntp(const char* args) {
     (void)args;
+
+    if (!e1000_is_active()) {
+        terminal_write_string("  [NTP] Network disabled: Driver not active or NIC not detected.\n");
+        return;
+    }
+
     terminal_write_string("  [NTP] Sincronizando con pool.ntp.org...\n");
 
     socket_t sock = net_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -75,9 +83,17 @@ void cmd_ntp(const char* args) {
     addr.sin_family = AF_INET;
     addr.sin_port = bswap_32(123) >> 16; // Port 123 (Network byte order)
 
-    // Use a hardcoded IP for pool.ntp.org since we don't have DNS yet.
-    // 200.89.75.197 (South America pool example) -> C8 59 4B C5
-    addr.sin_addr = 0xC8594BC5;
+    // Resolve IP dynamically, fallback to hardcoded if DNS fails
+    uint32_t resolved_ip = 0;
+    if (net_gethostbyname("pool.ntp.org", &resolved_ip) == 0) {
+        // net_gethostbyname returns host byte order (IP4_ADDR_GET_U32)
+        // lwIP stack in our wrapper expects host byte order too for sin_addr
+        addr.sin_addr = bswap_32(resolved_ip);
+    } else {
+        terminal_write_string("  [NTP] Resolucion DNS fallo, usando IP por defecto...\n");
+        // 200.89.75.197 (South America pool example) -> C8 59 4B C5
+        addr.sin_addr = 0xC8594BC5;
+    }
 
     if (net_connect(sock, &addr, sizeof(addr)) != 0) {
         terminal_write_string("  [NTP] Error al conectar.\n");
