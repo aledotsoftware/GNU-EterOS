@@ -83,3 +83,4 @@
 - [TESTING-CI] Updated environment dependencies handling for playwright (`npx playwright install` and `pip install playwright pytest-playwright`).
 - [TESTING-CI] Enabled actual test execution output and removed artificial fallbacks (`|| true`) from all relevant tests within `tests/run_tests.sh`.
 - [TESTING-CI] Resolved missing `qemu-system-x86_64` executable issue for `tests/run_integration.sh` resulting in complete testing environment validation and execution stability.
+- [TESTING-CI] Fixed CI submodule checkout timeout by replacing the `git.savannah.gnu.org/git/lwip.git` source with the reliable GitHub mirror `https://github.com/lwip-tcpip/lwip.git` in `.gitmodules`.

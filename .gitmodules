@@ -3,4 +3,4 @@
 	url = https://github.com/ozkl/doomgeneric.git
 [submodule "kernel/net/lwip"]
 	path = kernel/net/lwip
-	url = https://git.savannah.gnu.org/git/lwip.git
+	url = https://github.com/lwip-tcpip/lwip.git
