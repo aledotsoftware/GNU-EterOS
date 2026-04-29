@@ -730,6 +730,10 @@ static int64_t sys_write(int fd, const void* buf, size_t count) {
 
     if ((current->fd_table[fd].flags & O_ACCMODE) == O_RDONLY) return -EBADF;
 
+    if (current->fd_table[fd].flags & O_APPEND) {
+        current->fd_table[fd].offset = current->fd_table[fd].node->length;
+    }
+
     uint32_t written = write_fs(current->fd_table[fd].node, current->fd_table[fd].offset, count, (uint8_t*)buf);
     current->fd_table[fd].offset += written;
     return written;

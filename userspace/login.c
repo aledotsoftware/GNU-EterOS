@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     /* Initialize /etc/shadow if missing */
     int shadow_fd = open("/etc/shadow", O_RDONLY);
     if (shadow_fd < 0) {
-        shadow_fd = open("/etc/shadow", O_WRONLY | O_CREAT);
+        shadow_fd = open("/etc/shadow", O_WRONLY | O_CREAT, 0600);
         if (shadow_fd >= 0) {
             const char* root_entry = "root::0:0\n";
             write(shadow_fd, root_entry, strlen(root_entry));
