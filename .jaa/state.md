@@ -77,3 +77,9 @@
 - [DEVICES-TIME] Agregado soporte DNS dinámico en NTP, restringido interacción del mouse en panel y validado adaptador de red.
 - [GRAPHICS] Implemented window minimize capability in `userspace/marea_shell.c`, allowing windows to be hidden to the taskbar and restored by clicking their corresponding tray entries. Added `hit_minimize_button`, `hit_maximize_button`, and `hit_taskbar_window` functions and bound them in `handle_mouse_event`.
 - [OTA-UPDATE] Hardened `kernel/drivers/disk/partition.c` A/B slot logic to securely prioritize `nvram_get_boot_partition` while keeping MBR partition indices as fallback to prevent boot regressions. Added explicit null-pointer and bounds validation across cryptographic functions (`sha256`, `ed25519_sign`, `ed25519_publickey`) preventing kernel panics on malformed data. Improved `cmd_ota.c` diagnostic flow, moving passive slot verification before downloading updates, avoiding corrupted states.
+- [TESTING-CI] Ejecutado exitosamente el pipeline completo de validación.
+- Verificado y arreglado dependencias y entornos para `qemu-system-x86`, `pytest-playwright` y `jest` en CI.
+- Todos los tests C (`tests/run_tests.sh`), scripts de Python (`verification/`) e integraciones en QEMU pasan.
+- [TESTING-CI] Updated environment dependencies handling for playwright (`npx playwright install` and `pip install playwright pytest-playwright`).
+- [TESTING-CI] Enabled actual test execution output and removed artificial fallbacks (`|| true`) from all relevant tests within `tests/run_tests.sh`.
+- [TESTING-CI] Resolved missing `qemu-system-x86_64` executable issue for `tests/run_integration.sh` resulting in complete testing environment validation and execution stability.

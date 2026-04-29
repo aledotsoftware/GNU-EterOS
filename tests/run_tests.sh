@@ -112,7 +112,7 @@ rm tests/test_readv_security
 echo "---------------------------------------------------"
 echo "Running test_mmap_fixed..."
 gcc -O0 -g -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_mmap_fixed.c kernel/string.c -o tests/test_mmap_fixed
-./tests/test_mmap_fixed || true
+./tests/test_mmap_fixed
 rm tests/test_mmap_fixed
 
 # Test VMM Unmap Page
@@ -257,14 +257,14 @@ echo "Running test_syscall_mmap_linux..."
 
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_syscall_mmap_linux.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_linux
 
-./tests/test_syscall_mmap_linux || true
+./tests/test_syscall_mmap_linux
 
 rm tests/test_syscall_mmap_linux
 
 
 echo "Running test_syscall_mmap_fixed..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_syscall_mmap_fixed.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_mmap_fixed
-./tests/test_syscall_mmap_fixed || true
+./tests/test_syscall_mmap_fixed
 rm tests/test_syscall_mmap_fixed
 
 echo "---------------------------------------------------"
