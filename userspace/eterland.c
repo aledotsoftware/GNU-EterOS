@@ -258,7 +258,7 @@ void execute_command() {
         term_print("\n", term_fg);
     }
     input_len = 0;
-    term_print("user@eteros", 0x2ECC71);
+    term_print("root@eteros", 0x2ECC71);
     term_print(" ~ $ ", 0x3498DB);
 }
 
@@ -365,9 +365,9 @@ int main(int argc, char* argv[]) {
     draw_desktop();
     draw_window();
 
-    term_print("EterOS Marea UI (Demo)\n", 0x3498DB);
+    term_print("EterOS Marea UI v0.2.0\n", 0x3498DB);
     term_print("Type 'help' for commands.\n\n", 0x95A5A6);
-    term_print("user@eteros", 0x2ECC71);
+    term_print("root@eteros", 0x2ECC71);
     term_print(" ~ $ ", 0x3498DB);
 
     int tfd = open("/dev/tty", O_RDWR);

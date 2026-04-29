@@ -1,4 +1,4 @@
-# 🌌 éterOS: El Sistema Operativo Universal (v0.2.0 "Genesis SMP")
+# 🌌 éterOS: El Sistema Operativo Universal (vv0.2.0 "Genesis SMP")
 
 éterOS es un sistema operativo de **Nueva Era**, desarrollado desde el **"cero absoluto" (Bare-Metal)** en C y ensamblador. Diseñado con una arquitectura de **Kernel Híbrido** y una **HAL (Hardware Abstraction Layer)** universal, su objetivo es ser el tejido conectivo entre microcontroladores IoT, dispositivos móviles ARM64 y potentes servidores x86_64.
 
@@ -119,7 +119,7 @@ La memoria se gestiona en tres niveles estrictos:
 |--------------------|-----------|
 | `0x0000000000000000` | Inicio (Identity mapped los primeros 4GB por el bootloader) |
 | `0x0000000000100000` | Kernel Heap Start |
-| `0x0000000200000000` | User Code (Ring 3 ELF Load Address) |
+| `0x00000v0.2.0000000` | User Code (Ring 3 ELF Load Address) |
 | `0x0000000300000000` | User Stack (Ring 3) |
 | `0xFFFF800000000000` | Kernel High-Half (Reservado para diseño futuro) |
 
@@ -253,7 +253,7 @@ make iso      # Genera un ISO booteable para grabar en USB
 
 ## 13. Hoja de Ruta y Faltantes Críticos
 
-Aunque éterOS v0.2.0 es altamente funcional, las siguientes áreas son la prioridad actual de desarrollo:
+Aunque éterOS vv0.2.0 es altamente funcional, las siguientes áreas son la prioridad actual de desarrollo:
 
 🔴 **Críticos (Blockers):**
 1.  **Resolución DNS Nativa:** lwIP la soporta, pero falta exponerla a la capa VFS para que comandos como `ntp` y `ota` no dependan de IPs hardcodeadas.
