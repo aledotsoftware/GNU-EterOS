@@ -129,11 +129,11 @@ int pthread_detach(pthread_t thread) {
 #define FUTEX_PRIVATE_FLAG 128
 
 static inline int futex_wait(int *uaddr, int val) {
-    return syscall(SYS_futex, uaddr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL, 0);
+    return syscall(SYS_futex, uaddr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL, 0xffffffff);
 }
 
 static inline int futex_wake(int *uaddr, int val) {
-    return syscall(SYS_futex, uaddr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, val, NULL, NULL, 0);
+    return syscall(SYS_futex, uaddr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, val, NULL, NULL, 0xffffffff);
 }
 
 // Atomic compare-and-swap

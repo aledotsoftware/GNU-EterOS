@@ -57,3 +57,11 @@
 - Mapped `sys_select` (23), `sys_poll` (7), and `sys_sysinfo` (99) to `syscall_linux_table`.
 - Mapped `sys_fchmodat` (268) and `sys_fchmod` (91) in both Linux and Native tables.
 - Verified `sys_readlink` and `sys_readlinkat` were correctly mapped to indices 89 and 267.
+## Android Subsystem Compatibility Update (Current Run)
+- Conducted gap analysis between EterOS Linux compatibility and Android (Bionic/Linker) expectations.
+- Implemented `/dev/binder` stub in `kernel/fs/devfs.c` supporting the `BINDER_VERSION_IOWR` ioctl response, and basic stubs for `BINDER_WRITE_READ` and `BINDER_SET_CONTEXT_MGR`.
+- Implemented Linux native `sys_memfd_create` (syscall 319) in `kernel/arch/x86_64/syscall.c` leveraging anonymous Shared Memory nodes (`shmfs`).
+- Modified `shmfs_close` to safely release anonymous shared memory pages when the open file descriptor count hits zero.
+- Added `FUTEX_WAIT_BITSET` and `FUTEX_WAKE_BITSET` support in `include/futex.h`, `kernel/futex.c` and updated `sys_futex` to extract bitset masks from the `val3` system call argument.
+- Correctly implemented `CLONE_CHILD_SETTID` semantics in `kernel/task.c` securely writing the new task ID to the user-provided `child_tid` pointer.
+- Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
