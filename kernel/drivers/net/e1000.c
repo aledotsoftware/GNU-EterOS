@@ -341,3 +341,7 @@ int e1000_receive(void* buffer, uint16_t max_len) {
     }
     return 0;
 }
+
+int e1000_is_active(void) {
+    return e1000_active;
+}

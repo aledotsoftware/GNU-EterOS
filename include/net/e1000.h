@@ -118,4 +118,7 @@ int e1000_receive(void* buffer, uint16_t max_len);
 /* Obtener dirección MAC */
 uint8_t* e1000_get_mac(void);
 
+/* Retorna 1 si el driver está activo, 0 si no */
+int e1000_is_active(void);
+
 #endif /* ETEROS_NET_E1000_H */

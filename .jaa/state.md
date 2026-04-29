@@ -66,3 +66,10 @@
 - Correctly implemented `CLONE_CHILD_SETTID` semantics in `kernel/task.c` securely writing the new task ID to the user-provided `child_tid` pointer.
 - Re-verified full kernel compilation (`make clean && make all`) and successfully passed all native host VFS/Syscall C tests.
 - [EterOS] Conectado driver e1000 y Syscalls de red (socket, connect, bind, accept, listen, etc.) hacia stack lwIP, habilitando DHCP nativo. Corregida la validación de punteros para prevenir fallos TOCTOU en getsockopt.
+
+## Network Control Panel Bot Update (Current Run)
+- Integrated EterOS network commands (`net`, `dhcp`, `wget`) with the underlying network initialization state by implementing and leveraging `e1000_is_active()` in `kernel/drivers/net/e1000.c`.
+- Network shell commands now output accurate diagnostic messages (`Network disabled: Driver not active or NIC not detected.`) instead of blindly printing empty interfaces or timing out.
+- Implemented a new network status dialog in the kernel Control Panel (`cmd_panel.c`).
+- Users can now select the `Estado de Red (IP & DHCP)` option in the panel to view network state, renew DHCP, and perform basic connectivity checks (e.g., `wget tudexgames.com`), tying graphical actions directly to the `cmd_net` subsystems.
+- All code successfully compiles and native tests (`run_tests.sh`) pass.
