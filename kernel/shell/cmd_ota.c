@@ -76,9 +76,9 @@ void cmd_ota(const char* args) {
         uint8_t boot_part = nvram_get_boot_partition();
         terminal_write_string("\n\n  [Slots de Arranque]:\n");
         terminal_write_string("    Slot Activo: ");
-        terminal_write_string(boot_part == 0 ? "A (0)" : "B (1)");
+        terminal_write_string(boot_part == 0 ? "A (0)" : (boot_part == 1 ? "B (1)" : "Desconocido"));
         terminal_write_string("\n    Slot Pendiente: ");
-        terminal_write_string(boot_part == 0 ? "B (1)" : "A (0)");
+        terminal_write_string(boot_part == 0 ? "B (1)" : (boot_part == 1 ? "A (0)" : "Desconocido"));
         terminal_write_string("\n\n");
     } else if (strcmp(subcmd, "seturl") == 0) {
         if (!*p) {
@@ -100,6 +100,13 @@ void cmd_ota(const char* args) {
             terminal_write_string("Uso: ota checksig <on|off>\n");
         }
     } else if (strcmp(subcmd, "update") == 0) {
+        fs_node_t *passive_part = partition_get_passive_root();
+        if (!passive_part) {
+            terminal_write_string("\n  [OTA] ERROR: No se encontro una particion pasiva (Slot B) disponible para actualizar.\n");
+            terminal_write_string("  [OTA] Asegurese de que el disco tenga al menos 2 particiones configuradas.\n");
+            return;
+        }
+
         terminal_write_string("\n  [OTA] Buscando actualizaciones en ");
         terminal_write_string(ota_repo_url);
         terminal_write_string("...\n");
@@ -230,6 +237,7 @@ receive:
             if (payload_size <= 64) {
                 terminal_write_string("  [OTA] ERROR: Payload demasiado pequeno para contener firma.\n");
                 kfree(payload_data);
+                kfree(passive_part);
                 return;
             }
 
@@ -248,6 +256,7 @@ receive:
             if (!ed25519_verify(sig, payload_data + 64, payload_size - 64, pk)) {
                 terminal_write_string("  [OTA] ERROR: Fallo la validacion de la firma Ed25519.\n");
                 kfree(payload_data);
+                kfree(passive_part);
                 return;
             }
             terminal_write_string("  [OTA] Firma verificada correctamente.\n");
@@ -255,21 +264,16 @@ receive:
             terminal_write_string("  [OTA] ADVERTENCIA: Instalando actualizacion SIN verificar firma.\n");
         }
 
-        fs_node_t *passive_part = partition_get_passive_root();
-        if (!passive_part) {
-            terminal_write_string("  [OTA] ERROR: No se encontro la particion pasiva (Slot B).\n");
-            kfree(payload_data);
-            return;
-        }
-
         uint8_t current_part = nvram_get_boot_partition();
         uint8_t next_part = (current_part == 0) ? 1 : 0;
 
-        terminal_write_string("  [OTA] Escribiendo imagen en Slot ");
+        terminal_write_string("  [OTA] Preparando para escribir nueva imagen.\n");
+        terminal_write_string("  [OTA] ADVERTENCIA: El slot pasivo actual (Slot ");
         terminal_write_string(next_part == 0 ? "A" : "B");
-        terminal_write_string(" (");
+        terminal_write_string(", particion ");
         terminal_write_string(passive_part->name);
-        terminal_write_string(")...\n");
+        terminal_write_string(") sera sobreescrito.\n");
+        terminal_write_string("  [OTA] Escribiendo imagen...\n");
 
         uint32_t write_offset = 0;
         uint32_t data_offset = ota_require_sig ? 64 : 0; // write the actual image without signature

@@ -37,11 +37,13 @@ int ed25519_verify(const unsigned char *signature, const unsigned char *message,
 }
 
 void ed25519_publickey(const unsigned char *secret_key, unsigned char *public_key) {
+    if (!secret_key || !public_key) return;
     (void)secret_key;
     (void)public_key;
 }
 
 void ed25519_sign(unsigned char *signature, const unsigned char *message, size_t message_len, const unsigned char *public_key, const unsigned char *secret_key) {
+    if (!signature || (!message && message_len > 0) || !public_key || !secret_key) return;
     (void)signature;
     (void)message;
     (void)message_len;

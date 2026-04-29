@@ -154,6 +154,7 @@ void sha256_final(SHA256_CTX *ctx, uint8_t hash[32])
 
 void sha256(const uint8_t *data, size_t len, uint8_t hash[32])
 {
+	if ((!data && len > 0) || !hash) return;
 	SHA256_CTX ctx;
 	sha256_init(&ctx);
 	sha256_update(&ctx, data, len);
