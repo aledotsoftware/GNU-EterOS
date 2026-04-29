@@ -58,7 +58,7 @@ static void proc_append_int(char* out, size_t out_sz, int64_t v) {
 /* ========================================================================= */
 static ssize_t proc_version_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node;
-    const char* version = "eterOS version 0.1.0 (Genesis) (gcc version 12.2.0)\n";
+    const char* version = "eterOS version 0.2.0 (Genesis SMP) (gcc version 12.2.0)\n";
     size_t len = strlen(version);
 
     if (offset >= len) return 0;
