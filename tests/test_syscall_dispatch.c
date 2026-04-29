@@ -135,8 +135,8 @@ __attribute__((weak)) int task_fork(void* regs) { return -1; }
 __attribute__((weak)) int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) { return -1; }
 __attribute__((weak)) int task_waitpid(int pid, int* status, int options) { return -1; }
 
-__attribute__((weak)) int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) { return -1; }
-__attribute__((weak)) int futex_wake(uint32_t *uaddr, int count, int op) { return -1; }
+__attribute__((weak)) int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint32_t bitset) { return -1; }
+__attribute__((weak)) int futex_wake(uint32_t *uaddr, int count, int op, uint32_t bitset) { return -1; }
 
 __attribute__((weak)) uint32_t timer_get_uptime_seconds(void) { return 0; }
 __attribute__((weak)) uint64_t timer_get_ticks(void) { return 0; }

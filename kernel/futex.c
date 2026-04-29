@@ -19,6 +19,7 @@
 typedef struct futex_node {
     task_t *task;
     uint32_t *uaddr;
+    uint32_t bitset;
     struct futex_node *next;
 } futex_node_t;
 
@@ -57,7 +58,7 @@ static int validate_uaddr(uint32_t *uaddr) {
     return 1;
 }
 
-int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) {
+int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint32_t bitset) {
     const struct timespec *ts = (const struct timespec *)timeout;
     uint64_t target_tick = 0;
     int has_timeout = 0;
@@ -98,6 +99,7 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) {
 
     node->task = task_get_current();
     node->uaddr = uaddr;
+    node->bitset = bitset;
     node->next = b->head;
     b->head = node;
 
@@ -152,7 +154,7 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op) {
     return 0;
 }
 
-int futex_wake(uint32_t *uaddr, int count, int op) {
+int futex_wake(uint32_t *uaddr, int count, int op, uint32_t bitset) {
     if (!validate_uaddr(uaddr)) return -EFAULT;
 
     int is_private = (op & FUTEX_PRIVATE_FLAG) ? 1 : 0;
@@ -168,20 +170,25 @@ int futex_wake(uint32_t *uaddr, int count, int op) {
 
     while (curr && woken < count) {
         if (curr->uaddr == uaddr && (is_private || curr->task->cr3 == current->cr3)) {
-            /* Wake up this task */
-            if (curr->task->state == TASK_BLOCKED) {
-                task_wakeup(curr->task);
+            if ((curr->bitset & bitset) != 0) {
+                /* Wake up this task */
+                if (curr->task->state == TASK_BLOCKED) {
+                    task_wakeup(curr->task);
+                }
+
+                /* Remove from list */
+                futex_node_t *to_remove = curr; /* Kept for logic, but we don't free it */
+                (void)to_remove;
+
+                *pp = curr->next;
+                curr = curr->next;
+
+                /* We do NOT free the node here. The waiter does it. */
+                woken++;
+            } else {
+                pp = &curr->next;
+                curr = curr->next;
             }
-
-            /* Remove from list */
-            futex_node_t *to_remove = curr; /* Kept for logic, but we don't free it */
-            (void)to_remove;
-
-            *pp = curr->next;
-            curr = curr->next;
-
-            /* We do NOT free the node here. The waiter does it. */
-            woken++;
         } else {
             pp = &curr->next;
             curr = curr->next;

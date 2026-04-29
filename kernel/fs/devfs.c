@@ -88,6 +88,8 @@ static uint32_t dev_null_write(fs_node_t *node, uint32_t offset, uint32_t size, 
 /* ========================================================================= */
 
 #define BINDER_VERSION_IOWR 0xc0046209 /* Linux ioctl code for BINDER_VERSION */
+#define BINDER_WRITE_READ 0xc0306201
+#define BINDER_SET_CONTEXT_MGR 0x40046207
 
 struct binder_version {
     int32_t protocol_version;
@@ -110,6 +112,12 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
         struct binder_version *ver = (struct binder_version*)arg;
         ver->protocol_version = 8; /* Current Binder protocol version */
         return 0;
+    }
+    if (request == BINDER_WRITE_READ) {
+        return 0; /* Pretend it succeeded */
+    }
+    if (request == BINDER_SET_CONTEXT_MGR) {
+        return 0; /* Pretend it succeeded */
     }
     return -1; /* ENOTTY */
 }

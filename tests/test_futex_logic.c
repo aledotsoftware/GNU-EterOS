@@ -98,7 +98,7 @@ void task_wakeup(task_t* t) {
 void test_futex_wait_mismatch(void) {
     printf("Test: futex_wait mismatch...\n");
     uint32_t uaddr = 100;
-    int ret = futex_wait(&uaddr, 101, NULL, 0); /* Expected 101, but is 100 */
+    int ret = futex_wait(&uaddr, 101, NULL, 0, 0xffffffff); /* Expected 101, but is 100 */
     assert(ret == -EAGAIN);
     printf("PASS\n");
 }
@@ -108,7 +108,7 @@ void test_futex_wait_success(void) {
 
     uint32_t uaddr = 200;
 
-    int ret = futex_wait(&uaddr, 200, NULL, 0);
+    int ret = futex_wait(&uaddr, 200, NULL, 0, 0xffffffff);
     assert(ret == -EINTR); /* Because not woken */
     assert(task1.state == TASK_BLOCKED);
 
@@ -133,7 +133,7 @@ void test_futex_wake_logic(void) {
     buckets[idx].head = node;
     task2.state = TASK_BLOCKED;
 
-    int count = futex_wake(&uaddr, 1, 0);
+    int count = futex_wake(&uaddr, 1, 0, 0xffffffff);
 
     assert(count == 1);
     assert(task2.state == TASK_READY);
