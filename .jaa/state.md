@@ -78,3 +78,10 @@
 - [GRAPHICS] Implemented window minimize capability in `userspace/marea_shell.c`, allowing windows to be hidden to the taskbar and restored by clicking their corresponding tray entries. Added `hit_minimize_button`, `hit_maximize_button`, and `hit_taskbar_window` functions and bound them in `handle_mouse_event`.
 - [OTA-UPDATE] Hardened `kernel/drivers/disk/partition.c` A/B slot logic to securely prioritize `nvram_get_boot_partition` while keeping MBR partition indices as fallback to prevent boot regressions. Added explicit null-pointer and bounds validation across cryptographic functions (`sha256`, `ed25519_sign`, `ed25519_publickey`) preventing kernel panics on malformed data. Improved `cmd_ota.c` diagnostic flow, moving passive slot verification before downloading updates, avoiding corrupted states.
 - [VISION-CLI] Actualizados los strings de versión y prompt para mantener consistencia en los UIs. El sistema web y los comandos shell ahora indican correctamente "v0.2.0 Genesis SMP" y "root@eteros".
+
+## EterOS Orchestrator Audit (Current Run)
+- Executed `make clean` and `make all`. Verified `build/kernel.img` and `build/initrd.img` build successfully.
+- Executed `bash tests/run_tests.sh` and `bash tests/run_integration.sh`. Verified all host C tests and QEMU headless boot tests passed with success.
+- Checked `.jaa.md` state instructions and codebase capabilities (`shell`, `lwip` config, `syscall.c`).
+- Updated `ORCHESTRATOR_REPORT.md` with findings: Real codebase lacks native `gethostbyname` DNS integration exposed to syscalls (userland libc does manual UDP), JFS runs only in RAM without disk sync via `bcache`, and `login.elf` requires `/etc/passwd` connection to complete multi-user bootstrap. Verified version strings match "0.2.0 Genesis SMP".
+- Set priority cycle for agents: `network-socket-api-bot`, `vfs-posix-filesystem-bot`, `users-security-panel-bot`, and `linux-syscall-compliance-bot`.

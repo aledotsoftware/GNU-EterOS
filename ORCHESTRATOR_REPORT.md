@@ -1,49 +1,51 @@
 # EterOS Orchestrator Meta-Agent Audit Report
 
 ## 1. Estado Actual de Compilación y Ejecución
-**Fecha:** 2026-04-29
+**Fecha:** 2026-05-04
 **Commit auditado:** HEAD
+**Versión Actualizada:** 0.2.0 Genesis SMP
 
 ### ✅ Resultados de Verificación
-- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria.
-- **Make clean:** Éxito. Funciona correctamente eliminando artefactos sin borrar código fuente rastreado en git.
-- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente.
-- **Verificaciones Bash:** Scripts en `verification/` se ejecutan sin errores.
-- **Prueba de Arranque (QEMU Headless):** Éxito. La secuencia de booteo inicializa BSP, GDT, PMM, VMM (Paginación), Scheduler y VFS correctamente. Realiza exitosamente la transición al anillo 3 levantando `login.elf` y mostrando el prompt `eterOS login: ` antes del timeout.
+- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP.
+- **Make clean:** Éxito. Funciona correctamente eliminando artefactos (como `.o` y `build/`) sin borrar código fuente rastreado en git.
+- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente (incluyendo tests de red, IPC/futexes, sys_memfd_create, clonación y VFS).
+- **Prueba de Arranque y QEMU Headless:** Éxito (`tests/run_integration.sh` OK). La secuencia de booteo inicializa BSP, GDT, PMM, VMM (Paginación), Scheduler y VFS correctamente con 64MB, 128MB y 512MB de RAM. Realiza exitosamente la transición al anillo 3 levantando el entorno en initrd sin kernel panics.
 
 ---
 
 ## 2. Evaluación de Subsistemas según Visión EterOS
 
 ### 2.1 Subsistemas Robustos (Core y Fundaciones)
-- **Kernel Boot / Memoria:** `pmm.c`, `vmm.c` estables y testeados, identidad paginada funciona, QEMU bootable en 128M.
-- **Task Scheduler:** `smp.c` inicializa (aunque en modo uniprocesador por ahora), IPC via `futex.c` maduro con tests robustos.
-- **VFS / Initrd:** Montajes básicos (`/dev`, `/proc`, `/tmp`), ELF loader parsea bien secciones PT_LOAD y PT_INTERP, Path Traversal seguro implementado y probado.
+- **Kernel Boot / Memoria:** `pmm.c`, `vmm.c` estables y testeados. Identidad paginada funciona correctamente, y el allocator soporta `kmalloc_aligned` e inicializaciones limpias de hardware (ACPI).
+- **Task Scheduler & IPC:** `smp.c` inicializa APs. La sincronización basada en VFS (binder prototipo) y futex (`FUTEX_WAIT_BITSET`, `FUTEX_WAKE_BITSET`) madura y validada mediante host tests robustos que simulan carga.
+- **VFS / Filesystems:** Montajes extensos probados (`/dev`, `/proc`, `/tmp`, `fat32`, `jfs`, `shmfs`). ELF loader validado mitigando vulnerabilidades (ej. desbordes `PT_INTERP`).
+- **Control Panel & UI:** Subsistemas gráficos de minimizar ventanas (`hit_minimize_button`), UI web debounced y reportes de estado unificados mostrando "0.2.0 Genesis SMP" consistentemente.
 
 ### 2.2 Áreas de Mejora a Corto Plazo (Para Compatibilidad Base)
-- **Syscalls Linux x86_64:** La capa base para syscalls como `sys_openat`, `sys_read`, y señales funciona, pero carece de implementaciones completas tipo GNU para IOCTLs complejos y TTY pty multiplexing.
-- **Red (lwIP):** Soporte e1000 básico. El wrapper de socket en C libc no se integra bien nativamente al VFS. DNS aún por UDP raw hardcodeado.
-- **Comandos CLI Shell:** Stubbed (ej. comandos de red).
+- **Networking (lwIP):** Implementación de e1000 estable conectada mediante sockets, bind, accept nativos, posibilitando DHCP real. **Blocker principal:** Falta integración del wrapper VFS/Syscall con un `sys_gethostbyname` nativo para resolver DNS en utilities (evitando hardcoding IP o implementaciones UDP crudas en userspace o utils como NTP/OTA).
+- **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM. Se requiere acoplarlo con `kernel/fs/bcache.c` para volcados de estado al almacenamiento en disco duro persistente.
+- **Control Multi-usuario:** Soporte base (`O_APPEND` reparado, modos `0600` de permisos VFS consolidados). **Blocker principal:** `login.elf` necesita leer y validar exhaustivamente el entorno contra archivos dinámicos reales `/etc/passwd` y `/etc/shadow` montados, en lugar de mocks temporales o estáticos.
+- **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas (`sys_select`, `sys_poll`, `sys_sysinfo`, `sys_mmap_fixed`, `sys_memfd_create`, `sys_pipe2`). Faltan TTY/PTY multiplexing para ejecutar bash, y un subconjunto ioctl más extenso compatible con GNU.
 
 ### 2.3 Metas Aspiracionales de la Plataforma (Largo Plazo)
-- Soporte Completo GNU Coreutils: ❌ No logrado (Requiere syscall layer avanzado).
-- Entorno de Escritorio GNU Desktop: ❌ No logrado (Dependencias DRM/KMS, servidor X/Wayland no portados).
-- Capa de Compatibilidad Android: ❌ No logrado.
+- Soporte Completo GNU Coreutils: ❌ Parcial. Progresando mediante `linux-syscall-compliance-bot`.
+- Entorno de Escritorio GNU Desktop: ❌ En diseño remoto (esperando framebuffer DRM/KMS).
+- Capa de Compatibilidad Android: ⏳ En progreso (`/dev/binder` activo para versioning, en preparación para Linker compatibility).
 
 ---
 
 ## 3. Orden de Ejecución Recomendado (Próximo Ciclo)
 
-Basado en las brechas observadas en la arquitectura actual (`kernel/main.c`, `kernel/shell/`, etc) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
+Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64/syscall.c`, VFS, lwIP config) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
 
-1. **`network-socket-api-bot`:** Conectar nativamente la capa VFS y libc (`gethostbyname`) con las capacidades DNS de la pila lwIP integrada, eliminando las llamadas DNS hardcodeadas por UDP (blocker crítico para dependencias de red como NTP y OTA).
-2. **`vfs-posix-filesystem-bot`:** Implementar el puente para persistir el Journaling File System (JFS) volcando su estado hacia un disco físico subyacente mediante la capa `bcache`, superando el actual prototipo solo en RAM.
-3. **`users-security-panel-bot`:** Finalizar la integración multiusuario; desarrollar `login.elf` interactuando con archivos reales `/etc/shadow` y `/etc/passwd` y aplicar validaciones de permisos UIDs a nivel del VFS y shell.
-4. **`linux-syscall-compliance-bot`:** Expandir soporte progresivo de syscalls (ej. TTY/Pty) apuntando a levantar las primeras utilidades CLI complejas de GNU como objetivo de transición medible.
+1. **`network-socket-api-bot`:** Resolver nativamente las carencias del DNS. Implementar/exponer `gethostbyname` desde lwIP al subsistema syscall / libc del userland para que comandos como `ntp`, `ota` y `wget` no dependan de llamadas UDP de red hardcodeadas ni resoluciones manuales en la libc nativa (que actualmente duplica la funcionalidad).
+2. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM.
+3. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
+4. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
 
 ---
 
 ## 4. Hallazgos adicionales y Riesgos
-- El código real carece de una integración nativa de DNS con `gethostbyname` y utiliza un fallback hardcodeado mediante UDP, bloqueando herramientas como NTP y OTA.
-- El Journaling File System (JFS) opera exclusivamente en RAM sin sincronización hacia disco físico, representando un riesgo de pérdida de estado.
-- `login.elf` ha sido empaquetado, pero carece de conexión integral con `/etc/passwd` para completar su flujo de autenticación, frenando el acceso de usuarios más allá de root.
+- La libc actual de userspace en `userspace/libc/src/netdb.c` procesa paquetes UDP de forma síncrona manual, duplicando la carga del kernel lwIP de forma ineficiente y propensa a cuelgues si `8.8.8.8` no responde.
+- La inexistencia de validaciones en disco para el `jfs` arriesga la confiabilidad de cualquier metadato salvado actualmente por el sistema durante la runtime de QEMU.
+- Es mandatorio seguir validando que los comandos de pre-commit corran con `bash tests/run_tests.sh` (con set -e activado), manteniendo la rigurosidad frente al scope creep.
