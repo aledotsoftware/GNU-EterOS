@@ -69,8 +69,13 @@ context_switch:
 ;   Restaura el estado de usuario y retorna via sysret.
 ;   La tarea hija "despierta" aquí con RSP apuntando a los registros guardados.
 ; -----------------------------------------------------------------------------
+extern sched_lock
+
 global fork_return
 fork_return:
+    ; Release sched_lock held by the scheduler before returning to userspace
+    mov dword [sched_lock], 0
+
     pop r15
     pop r14
     pop r13

@@ -85,3 +85,4 @@
 - Checked `.jaa.md` state instructions and codebase capabilities (`shell`, `lwip` config, `syscall.c`).
 - Updated `ORCHESTRATOR_REPORT.md` with findings: Real codebase lacks native `gethostbyname` DNS integration exposed to syscalls (userland libc does manual UDP), JFS runs only in RAM without disk sync via `bcache`, and `login.elf` requires `/etc/passwd` connection to complete multi-user bootstrap. Verified version strings match "0.2.0 Genesis SMP".
 - Set priority cycle for agents: `network-socket-api-bot`, `vfs-posix-filesystem-bot`, `users-security-panel-bot`, and `linux-syscall-compliance-bot`.
+- Resolved issue in `fork_return` where newly cloned child processes returned to userspace holding the `sched_lock`, leading to deadlock on multi-task concurrency. Added an explicit `mov dword [sched_lock], 0` release inside the `fork_return` ASM stub.

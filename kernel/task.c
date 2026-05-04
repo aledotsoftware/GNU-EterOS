@@ -114,7 +114,7 @@ static int      task_count    = 0;    /* Número total de tareas */
 static uint32_t next_id       = 0;    /* Generador de IDs */
 /* static uint32_t sched_ticks removed in favor of per-CPU */
 static bool     scheduler_active = false; /* El scheduler está inicializado? */
-static spinlock_t sched_lock  = 0;    /* SMP protection */
+spinlock_t sched_lock = 0;    /* SMP protection */
 
 /* Queue Globals (O(1) Scheduler) */
 static task_t*  sleep_head = NULL;
