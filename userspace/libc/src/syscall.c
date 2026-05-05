@@ -305,3 +305,60 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
     if (ret < 0) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
+
+
+int fsync(int fd) {
+    long ret = syscall1(SYS_fsync, fd);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int fdatasync(int fd) {
+    long ret = syscall1(SYS_fdatasync, fd);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int chown(const char *pathname, uid_t owner, gid_t group) {
+    long ret = syscall3(SYS_chown, (long)pathname, owner, group);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int fchown(int fd, uid_t owner, gid_t group) {
+    long ret = syscall3(SYS_fchown, fd, owner, group);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int lchown(const char *pathname, uid_t owner, gid_t group) {
+    long ret = syscall3(SYS_lchown, (long)pathname, owner, group);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+
+
+int fchdir(int fd) {
+    long ret = syscall1(SYS_fchdir, fd);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+int truncate(const char *path, int64_t length) {
+    long ret = syscall2(SYS_truncate, (long)path, length);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}
+
+ssize_t pread(int fd, void *buf, size_t count, int64_t offset) {
+    long ret = syscall4(SYS_pread64, fd, (long)buf, count, offset);
+    if (ret < 0) { errno = -ret; return -1; }
+    return (ssize_t)ret;
+}
+
+ssize_t pwrite(int fd, const void *buf, size_t count, int64_t offset) {
+    long ret = syscall4(SYS_pwrite64, fd, (long)buf, count, offset);
+    if (ret < 0) { errno = -ret; return -1; }
+    return (ssize_t)ret;
+}
