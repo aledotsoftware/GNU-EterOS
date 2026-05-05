@@ -501,8 +501,9 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
 
     /* If neither MAP_PRIVATE (0x02) nor MAP_SHARED (0x01) are set */
     if (!(flags & 0x03)) {
-        if (current && current->os_abi == ELFOSABI_LINUX && fd != -1) {
+        if (current && current->os_abi == ELFOSABI_LINUX) {
             /* Allow file-backed mmap without MAP_ANONYMOUS in Linux ABI */
+            /* Or fallback to MAP_PRIVATE if purely anonymous */
             flags |= MAP_PRIVATE;
         } else {
             return -ENODEV;
@@ -771,7 +772,7 @@ static int check_node_permission(fs_node_t* node, uint32_t req_mask) {
 }
 
 static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
-    if (!vmm_verify_user_access(path, 1, 0)) return -EFAULT;
+    if (!vmm_check_user_string(path, 256)) return -EFAULT;
     char* kpath = (char*)kmalloc(256);
     if (!kpath) return -ENOMEM;
     int res = resolve_path(dirfd, path, kpath, 256);
@@ -1095,6 +1096,7 @@ static int64_t sys_fchmodat(int dirfd, const char* path, int mode) {
 }
 
 static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
+    if (!vmm_check_user_string(path, 256)) return -EFAULT;
     if (!vmm_verify_user_access(buf, bufsiz, 1)) return -EFAULT;
 
     char* kpath = (char*)kmalloc(256);
@@ -1691,10 +1693,12 @@ static int64_t sys_brk(uint64_t brk) {
 static int64_t sys_arch_prctl(int code, uint64_t addr) {
     task_t* current = task_get_current();
     if (code == ARCH_SET_FS) {
+        if (addr >= USER_BASE) return -EPERM;
         current->fs_base = addr;
         wrmsr(MSR_FS_BASE, addr);
         return 0;
     } else if (code == ARCH_SET_GS) {
+        if (addr >= USER_BASE) return -EPERM;
         current->gs_base = addr;
         wrmsr(MSR_KERNEL_GS_BASE, addr);
         return 0;

@@ -49,33 +49,32 @@ int elf_get_interp(const char* path, char* out_interp, uint32_t out_interp_size)
 
         if (phdr.p_type != PT_INTERP) continue;
 
-        if (phdr.p_filesz < 2 || phdr.p_filesz > out_interp_size) {
+        if (phdr.p_filesz < 2) {
             kfree(node);
-            return -E2BIG;
+            return -ENOEXEC;
         }
         if (phdr.p_offset > UINT32_MAX) {
             kfree(node);
             return -ENOEXEC;
         }
 
-        if (read_fs(node, (uint32_t)phdr.p_offset, (uint32_t)phdr.p_filesz, (uint8_t*)out_interp) != (ssize_t)phdr.p_filesz) {
+        uint32_t read_size = phdr.p_filesz;
+        if (read_size > out_interp_size - 1) {
+            read_size = out_interp_size - 1;
+        }
+
+        if (read_fs(node, (uint32_t)phdr.p_offset, read_size, (uint8_t*)out_interp) != (ssize_t)read_size) {
             kfree(node);
             return -ENOEXEC;
         }
 
-        out_interp[out_interp_size - 1] = '\0';
-        for (uint32_t j = 0; j < phdr.p_filesz; j++) {
+        out_interp[read_size] = '\0';
+
+        for (uint32_t j = 0; j < read_size; j++) {
             if (out_interp[j] == '\0') {
                 kfree(node);
                 return 1;
             }
-        }
-
-        /* Ensure NUL termination even if malformed payload omitted it. */
-        if (phdr.p_filesz < out_interp_size) {
-            out_interp[phdr.p_filesz] = '\0';
-        } else {
-            out_interp[out_interp_size - 1] = '\0';
         }
         kfree(node);
         return 1;
