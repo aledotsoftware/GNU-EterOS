@@ -1303,6 +1303,116 @@ static int64_t sys_pwrite64(int fd, const void* buf, size_t count, int64_t offse
     return written;
 }
 
+
+static int64_t sys_fsync(int fd) {
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    task_t* current = task_get_current();
+    if (!current || !current->fd_table[fd].node) return -EBADF;
+    // In EterOS, JFS runs in RAM and fat32/initrd/devfs are synchronous or RAM based.
+    // For now, fsync is a no-op that succeeds.
+    return 0;
+}
+
+static int64_t sys_fdatasync(int fd) {
+    return sys_fsync(fd);
+}
+
+static int64_t sys_truncate(const char* path, int64_t length) {
+    if (length < 0) return -EINVAL;
+    if (!vmm_check_user_string(path, 256)) return -EFAULT;
+
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+    int res = resolve_path(AT_FDCWD, path, kpath, 256);
+    if (res < 0) { kfree(kpath); return res; }
+
+    fs_node_t* node = vfs_lookup(fs_root, kpath);
+    kfree(kpath);
+    if (!node) return -ENOENT;
+    if ((node->flags & 0x7) == FS_DIRECTORY) {
+        kfree(node);
+        return -EISDIR;
+    }
+    if (!check_node_permission(node, 2)) {
+        kfree(node);
+        return -EACCES;
+    }
+
+    int ret = -ENOSYS;
+    if (node->truncate) {
+        ret = node->truncate(node, (uint32_t)length);
+    }
+    kfree(node);
+    return ret;
+}
+
+static int64_t sys_fchdir(int fd) {
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    task_t* current = task_get_current();
+    if (!current || !current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if ((node->flags & 0x7) != FS_DIRECTORY) return -ENOTDIR;
+    if (!check_node_permission(node, 1)) return -EACCES;
+
+    // In EterOS, cwd is a string, but an FD doesn't store its resolved path easily.
+    // However, we can map some cases or just return -ENOSYS if we can't resolve it.
+    // For now, we will simply set cwd to the root if we can't figure it out, but ideally we need reverse lookup.
+    // Actually, vfs_lookup doesn't save names. Let's return -ENOSYS since it's hard to get path from FD.
+    // Wait, let's just make it a stub that sets cwd to "/" for now to satisfy basic tests if needed, or return ENOSYS.
+    // Let's implement a dummy one.
+    return -ENOSYS;
+}
+
+static int64_t sys_chown(const char* path, uint32_t owner, uint32_t group) {
+    if (!vmm_check_user_string(path, 256)) return -EFAULT;
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+    int res = resolve_path(AT_FDCWD, path, kpath, 256);
+    if (res < 0) { kfree(kpath); return res; }
+
+    fs_node_t* node = vfs_lookup(fs_root, kpath);
+    kfree(kpath);
+    if (!node) return -ENOENT;
+
+    // VFS currently doesn't have a chown op, we just update the in-memory node if we have permission.
+    // Only root or owner can change ownership.
+    task_t* current = task_get_current();
+    if (current->uid != 0 && current->uid != node->uid) {
+        kfree(node);
+        return -EPERM;
+    }
+
+    node->uid = owner;
+    node->gid = group;
+    // Ideally we would flush to disk here, but EterOS VFS is mostly RAM based.
+    kfree(node);
+    return 0;
+}
+
+static int64_t sys_fchown(int fd, uint32_t owner, uint32_t group) {
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    task_t* current = task_get_current();
+    if (!current || !current->fd_table[fd].node) return -EBADF;
+
+    fs_node_t* node = current->fd_table[fd].node;
+    if (current->uid != 0 && current->uid != node->uid) return -EPERM;
+
+    node->uid = owner;
+    node->gid = group;
+    return 0;
+}
+
+static int64_t sys_lchown(const char* path, uint32_t owner, uint32_t group) {
+    return sys_chown(path, owner, group); // Basic fallback for symlinks
+}
+
+static int64_t sys_umask(int mask) {
+    // EterOS doesn't have a global umask in task_t yet, so we just mock it.
+    // Return the old umask (assume 0022).
+    return 0022;
+}
+
 static int64_t sys_ftruncate(int fd, int64_t length) {
     if (length < 0) return -EINVAL;
     task_t* current = task_get_current();
@@ -3187,6 +3297,9 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
     [72] = (syscall_ptr_t)sys_fcntl,
+    [74] = (syscall_ptr_t)sys_fsync,
+    [75] = (syscall_ptr_t)sys_fdatasync,
+    [76] = (syscall_ptr_t)sys_truncate,
     [77] = (syscall_ptr_t)sys_ftruncate,
     [97] = (syscall_ptr_t)sys_getrlimit,
     [99] = (syscall_ptr_t)sys_sysinfo,
@@ -3195,6 +3308,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [131] = (syscall_ptr_t)sys_sigaltstack,
     [79] = (syscall_ptr_t)sys_getcwd,
     [80] = (syscall_ptr_t)sys_chdir,
+    [81] = (syscall_ptr_t)sys_fchdir,
     [83] = (syscall_ptr_t)sys_mkdir,
     [84] = (syscall_ptr_t)sys_rmdir,
     [87] = (syscall_ptr_t)sys_unlink,
@@ -3247,6 +3361,10 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [89] = (syscall_ptr_t)sys_readlink,
     [90] = (syscall_ptr_t)sys_chmod,
     [91] = (syscall_ptr_t)sys_fchmod,
+    [92] = (syscall_ptr_t)sys_chown,
+    [93] = (syscall_ptr_t)sys_fchown,
+    [94] = (syscall_ptr_t)sys_lchown,
+    [95] = (syscall_ptr_t)sys_umask,
     [267] = (syscall_ptr_t)sys_readlinkat,
     [319] = (syscall_ptr_t)sys_memfd_create,
 };
@@ -3299,9 +3417,13 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
     [72] = (syscall_ptr_t)sys_fcntl,
+    [74] = (syscall_ptr_t)sys_fsync,
+    [75] = (syscall_ptr_t)sys_fdatasync,
+    [76] = (syscall_ptr_t)sys_truncate,
     [77] = (syscall_ptr_t)sys_ftruncate,
     [79] = (syscall_ptr_t)sys_getcwd,
     [80] = (syscall_ptr_t)sys_chdir,
+    [81] = (syscall_ptr_t)sys_fchdir,
     [83] = (syscall_ptr_t)sys_mkdir,
     [84] = (syscall_ptr_t)sys_rmdir,
     [87] = (syscall_ptr_t)sys_unlink,
@@ -3360,6 +3482,10 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [89] = (syscall_ptr_t)sys_readlink,
     [90] = (syscall_ptr_t)sys_chmod,
     [91] = (syscall_ptr_t)sys_fchmod,
+    [92] = (syscall_ptr_t)sys_chown,
+    [93] = (syscall_ptr_t)sys_fchown,
+    [94] = (syscall_ptr_t)sys_lchown,
+    [95] = (syscall_ptr_t)sys_umask,
     [267] = (syscall_ptr_t)sys_readlinkat,
 };
 
@@ -3385,6 +3511,8 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [54] = (syscall_ptr_t)sys_ioctl,
     [145] = (syscall_ptr_t)sys_readv,
     [146] = (syscall_ptr_t)sys_writev,
+    [180] = (syscall_ptr_t)sys_pread64,
+    [181] = (syscall_ptr_t)sys_pwrite64,
     [33] = (syscall_ptr_t)sys_access,
     [42] = (syscall_ptr_t)sys_pipe,
     [82] = (syscall_ptr_t)sys_select,
@@ -3392,6 +3520,14 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [63] = (syscall_ptr_t)sys_dup2,
     [15] = (syscall_ptr_t)sys_chmod,
     [94] = (syscall_ptr_t)sys_fchmod,
+    [118] = (syscall_ptr_t)sys_fsync,
+    [175] = (syscall_ptr_t)sys_rt_sigprocmask,
+    [92] = (syscall_ptr_t)sys_truncate,
+    [133] = (syscall_ptr_t)sys_fchdir,
+    [182] = (syscall_ptr_t)sys_chown,
+    [207] = (syscall_ptr_t)sys_fchown,
+    [16] = (syscall_ptr_t)sys_lchown,
+    [60] = (syscall_ptr_t)sys_umask,
     [162] = (syscall_ptr_t)sys_nanosleep,
     [20] = (syscall_ptr_t)sys_getpid,
     [114] = (syscall_ptr_t)sys_wait4,
