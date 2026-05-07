@@ -22,7 +22,7 @@
 - **Control Panel & UI:** Subsistemas gráficos de minimizar ventanas (`hit_minimize_button`), UI web debounced y reportes de estado unificados mostrando "0.2.0 Genesis SMP" consistentemente.
 
 ### 2.2 Áreas de Mejora a Corto Plazo (Para Compatibilidad Base)
-- **Networking (lwIP):** Implementación de e1000 estable conectada mediante sockets, bind, accept nativos, posibilitando DHCP real. **Blocker principal:** Falta integración del wrapper VFS/Syscall con un `sys_gethostbyname` nativo para resolver DNS en utilities (evitando hardcoding IP o implementaciones UDP crudas en userspace o utils como NTP/OTA).
+- **Networking (lwIP): Implementación de e1000 estable conectada mediante sockets, bind, accept nativos, posibilitando DHCP real. DNS nativo ya expuesto a libc usando SYS_gethostbyname.
 - **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM. Se requiere acoplarlo con `kernel/fs/bcache.c` para volcados de estado al almacenamiento en disco duro persistente.
 - **Control Multi-usuario:** Soporte base (`O_APPEND` reparado, modos `0600` de permisos VFS consolidados). **Blocker principal:** `login.elf` necesita leer y validar exhaustivamente el entorno contra archivos dinámicos reales `/etc/passwd` y `/etc/shadow` montados, en lugar de mocks temporales o estáticos.
 - **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas (`sys_select`, `sys_poll`, `sys_sysinfo`, `sys_mmap_fixed`, `sys_memfd_create`, `sys_pipe2`). Faltan TTY/PTY multiplexing para ejecutar bash, y un subconjunto ioctl más extenso compatible con GNU.
@@ -38,15 +38,15 @@
 
 Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64/syscall.c`, VFS, lwIP config) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
 
-1. **`network-socket-api-bot`:** Resolver nativamente las carencias del DNS. Implementar/exponer `gethostbyname` desde lwIP al subsistema syscall / libc del userland para que comandos como `ntp`, `ota` y `wget` no dependan de llamadas UDP de red hardcodeadas ni resoluciones manuales en la libc nativa (que actualmente duplica la funcionalidad en `userspace/libc/src/netdb.c`).
-2. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM.
-3. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
-4. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
+1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM.
+2. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
+3. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
+4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown), parsear FADT y proveer apagado suave para el sistema.
 
 ---
 
 ## 4. Hallazgos adicionales y Riesgos
-- La libc actual de userspace en `userspace/libc/src/netdb.c` procesa paquetes UDP de forma síncrona manual, duplicando la carga del kernel lwIP de forma ineficiente y propensa a cuelgues si `8.8.8.8` no responde.
+- La libc ahora utiliza exitosamente `SYS_gethostbyname` para resolución DNS asíncrona delegada al kernel.
 - La inexistencia de validaciones en disco para el `jfs` arriesga la confiabilidad de cualquier metadato salvado actualmente por el sistema durante la runtime de QEMU.
 - Es mandatorio seguir validando que los comandos de pre-commit corran con `bash tests/run_tests.sh` (con set -e activado), manteniendo la rigurosidad frente al scope creep.
 
