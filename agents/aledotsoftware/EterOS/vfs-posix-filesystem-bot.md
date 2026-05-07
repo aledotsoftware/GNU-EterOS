@@ -6,6 +6,9 @@ kernel/fs/
 ## Description
 VFS, initrd, procfs, shmfs, FAT32/JFS, ELF loader.
 
+## Current Goal (as of 2026-05-07)
+Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM.
+
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
 - Antes de editar, lee los archivos reales del subsistema y confirma qué ya existe.

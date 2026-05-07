@@ -6,6 +6,9 @@ kernel/arch/x86_64/syscall.c
 ## Description
 Cobertura progresiva de syscalls Linux x86_64 con foco en GNU/Linux real.
 
+## Current Goal (as of 2026-05-07)
+Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
+
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
 - Antes de editar, lee los archivos reales del subsistema y confirma qué ya existe.
