@@ -16,3 +16,4 @@ int sys_lwip_getsockname(int fd, struct sockaddr *name, socklen_t *namelen) { re
 int sys_lwip_getpeername(int fd, struct sockaddr *name, socklen_t *namelen) { return -1; }
 int sys_lwip_setsockopt(int fd, int level, int optname, const void *optval, socklen_t optlen) { return -1; }
 int sys_lwip_getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen) { return -1; }
+int net_gethostbyname(const char* hostname, uint32_t* out_ip) { return -1; }

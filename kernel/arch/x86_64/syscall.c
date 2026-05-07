@@ -3064,6 +3064,12 @@ static int64_t sys_getdents64(int fd, struct linux_dirent64* dirp, unsigned int 
     return bpos;
 }
 
+static int64_t sys_gethostbyname(const char* name, uint32_t* out_ip) {
+    if (!name || !vmm_check_user_string(name, 256)) return -EFAULT;
+    if (!out_ip || !vmm_verify_user_access(out_ip, sizeof(uint32_t), 1)) return -EFAULT;
+    return net_gethostbyname(name, out_ip);
+}
+
 static int64_t sys_getcwd(char* buf, size_t size) {
     if (!buf || size == 0) return -EINVAL;
     if (!vmm_verify_user_access(buf, size, 1)) return -EFAULT;
@@ -3354,6 +3360,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [293] = (syscall_ptr_t)sys_pipe2,
     [302] = (syscall_ptr_t)sys_prlimit64,
     [318] = (syscall_ptr_t)sys_getrandom,
+    [400] = (syscall_ptr_t)sys_gethostbyname,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
     [82] = (syscall_ptr_t)sys_rename,
@@ -3474,6 +3481,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [293] = (syscall_ptr_t)sys_pipe2,
     [302] = (syscall_ptr_t)sys_prlimit64,
     [318] = (syscall_ptr_t)sys_getrandom,
+    [400] = (syscall_ptr_t)sys_gethostbyname,
     [319] = (syscall_ptr_t)sys_memfd_create,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
@@ -3571,6 +3579,7 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [331] = (syscall_ptr_t)sys_pipe2,
     [339] = (syscall_ptr_t)sys_prlimit64,
     [355] = (syscall_ptr_t)sys_getrandom,
+    [400] = (syscall_ptr_t)sys_gethostbyname,
     [152] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [1] = (syscall_ptr_t)sys_exit_wrapper,
     [38] = (syscall_ptr_t)sys_rename,
