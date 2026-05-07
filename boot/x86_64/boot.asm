@@ -846,7 +846,7 @@ setup_page_tables:
 
     ; 2. Configurar PML4[0] → PDPT
     mov eax, PAGE_TABLE_ADDR + 0x1000
-    or eax, 0x03                        ; Present + Writable
+    or eax, 0x07                        ; Present + Writable + User
     mov [PAGE_TABLE_ADDR], eax
 
     ; 3. Configurar PDPT[0..3] → PD0..PD3 (4 entries = 4 GB)
@@ -855,14 +855,14 @@ setup_page_tables:
     mov ecx, 4
 .loop_pdpt:
     mov [edi], eax
-    or dword [edi], 0x03                ; Present + RW
+    or dword [edi], 0x07                ; Present + RW + User
     add edi, 8
     add eax, 0x1000
     loop .loop_pdpt
 
     ; 4. Llenar los 4 PDs (0..3) con entradas Huge (2 MB)
     mov edi, PAGE_TABLE_ADDR + 0x2000
-    mov eax, 0x00000083                 ; Phys 0 + Huge + RW + Present
+    mov eax, 0x00000087                 ; Phys 0 + Huge + RW + Present + User
     mov ecx, 512 * 4                    ; 2048 entradas de 2 MB = 4 GB
 .loop_pds:
     mov [edi], eax
