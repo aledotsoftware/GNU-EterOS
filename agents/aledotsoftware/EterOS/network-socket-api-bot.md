@@ -7,7 +7,7 @@ kernel/net/, kernel/drivers/net/
 Sockets, lwIP bridge, e1000, DHCP, integración syscall.
 
 ## Current Goal (as of 2026-05-07)
-Resolver nativamente las carencias del DNS. Implementar/exponer `gethostbyname` desde lwIP al subsistema syscall / libc del userland para que comandos como `ntp`, `ota` y `wget` no dependan de llamadas UDP de red hardcodeadas ni resoluciones manuales en la libc nativa (que actualmente duplica la funcionalidad en `userspace/libc/src/netdb.c`).
+Endurecer la validación de punteros y buffers en las llamadas del API de sockets desde userspace, especialmente chequeando boundaries en recvfrom/sendto para asegurar que el kernel no sufra page faults maliciosos.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

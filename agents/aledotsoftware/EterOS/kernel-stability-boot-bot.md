@@ -6,6 +6,9 @@ kernel/boot, kernel/mm, kernel/arch
 ## Description
 Boot, memoria, trampas, init y estabilidad temprana.
 
+## Current Goal (as of 2026-05-07)
+Implementar gestión de energía (ACPI S5 shutdown), parsear FADT y proveer apagado suave para el sistema.
+
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
 - Antes de editar, lee los archivos reales del subsistema y confirma qué ya existe.
