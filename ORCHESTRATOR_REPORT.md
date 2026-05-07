@@ -1,14 +1,14 @@
 # EterOS Orchestrator Meta-Agent Audit Report
 
 ## 1. Estado Actual de Compilación y Ejecución
-**Fecha:** 2026-05-04
+**Fecha:** 2026-05-07
 **Commit auditado:** HEAD
 **Versión Actualizada:** 0.2.0 Genesis SMP
 
 ### ✅ Resultados de Verificación
 - **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP.
 - **Make clean:** Éxito. Funciona correctamente eliminando artefactos (como `.o` y `build/`) sin borrar código fuente rastreado en git.
-- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente (incluyendo tests de red, IPC/futexes, sys_memfd_create, clonación y VFS).
+- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente (incluyendo tests de red, IPC/futexes, sys_memfd_create, clonación, coverage de syscalls Linux y VFS).
 - **Prueba de Arranque y QEMU Headless:** Éxito (`tests/run_integration.sh` OK). La secuencia de booteo inicializa BSP, GDT, PMM, VMM (Paginación), Scheduler y VFS correctamente con 64MB, 128MB y 512MB de RAM. Realiza exitosamente la transición al anillo 3 levantando el entorno en initrd sin kernel panics.
 
 ---
@@ -38,7 +38,7 @@
 
 Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64/syscall.c`, VFS, lwIP config) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
 
-1. **`network-socket-api-bot`:** Resolver nativamente las carencias del DNS. Implementar/exponer `gethostbyname` desde lwIP al subsistema syscall / libc del userland para que comandos como `ntp`, `ota` y `wget` no dependan de llamadas UDP de red hardcodeadas ni resoluciones manuales en la libc nativa (que actualmente duplica la funcionalidad).
+1. **`network-socket-api-bot`:** Resolver nativamente las carencias del DNS. Implementar/exponer `gethostbyname` desde lwIP al subsistema syscall / libc del userland para que comandos como `ntp`, `ota` y `wget` no dependan de llamadas UDP de red hardcodeadas ni resoluciones manuales en la libc nativa (que actualmente duplica la funcionalidad en `userspace/libc/src/netdb.c`).
 2. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM.
 3. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
 4. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.

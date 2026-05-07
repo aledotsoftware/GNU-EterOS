@@ -87,3 +87,10 @@
 - Set priority cycle for agents: `network-socket-api-bot`, `vfs-posix-filesystem-bot`, `users-security-panel-bot`, and `linux-syscall-compliance-bot`.
 - Resolved issue in `fork_return` where newly cloned child processes returned to userspace holding the `sched_lock`, leading to deadlock on multi-task concurrency. Added an explicit `mov dword [sched_lock], 0` release inside the `fork_return` ASM stub.
 - [LINUX-SYSCALL] Implemented Progressive Linux x86_64 Syscalls (fsync, fdatasync, truncate, fchdir, chown, fchown, lchown, umask, pread64, pwrite64) inside `kernel/arch/x86_64/syscall.c`. Added POSIX wrappers in `userspace/libc/src/syscall.c` preventing duplicate symbols with `posix.c`. Extensively tested coverage successfully.
+
+## EterOS Orchestrator Audit (2026-05-07)
+- Executed `make clean` and `make all`. Verified `build/kernel.img` and `build/initrd.img` build successfully.
+- Executed `bash tests/run_tests.sh` and `bash tests/run_integration.sh`. Verified all host C tests and QEMU headless boot tests passed with success.
+- Checked `.jaa.md` state instructions and codebase capabilities (`shell`, `lwip` config, `syscall.c`).
+- Updated `ORCHESTRATOR_REPORT.md` with findings: Real codebase lacks native `gethostbyname` DNS integration exposed to syscalls (userland libc does manual UDP), JFS runs only in RAM without disk sync via `bcache`, and `login.elf` requires `/etc/passwd` connection to complete multi-user bootstrap. Verified version strings match "0.2.0 Genesis SMP".
+- Set priority cycle for agents: `network-socket-api-bot`, `vfs-posix-filesystem-bot`, `users-security-panel-bot`, and `linux-syscall-compliance-bot`.
