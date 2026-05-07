@@ -133,6 +133,7 @@
 #define SYS_dup3                292
 #define SYS_pipe2               293
 #define SYS_epoll_create1       291
+#define SYS_gethostbyname       400
 
 long syscall(long nr, ...);
 
