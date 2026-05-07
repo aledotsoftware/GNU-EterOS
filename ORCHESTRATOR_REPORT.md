@@ -49,3 +49,9 @@ Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64
 - La libc actual de userspace en `userspace/libc/src/netdb.c` procesa paquetes UDP de forma síncrona manual, duplicando la carga del kernel lwIP de forma ineficiente y propensa a cuelgues si `8.8.8.8` no responde.
 - La inexistencia de validaciones en disco para el `jfs` arriesga la confiabilidad de cualquier metadato salvado actualmente por el sistema durante la runtime de QEMU.
 - Es mandatorio seguir validando que los comandos de pre-commit corran con `bash tests/run_tests.sh` (con set -e activado), manteniendo la rigurosidad frente al scope creep.
+
+---
+
+## 5. Changelog / Ultimos Avances
+- Build y QA verificado exitosamente para la versión "0.2.0 Genesis SMP".
+- Agentes clave (`network-socket-api-bot`, `vfs-posix-filesystem-bot`, `users-security-panel-bot`, `linux-syscall-compliance-bot`) alineados con metas medibles e inmediatas.
