@@ -36,6 +36,22 @@ struct syscall_regs;
  */
 void task_init_ap(void);
 
+static inline uint64_t task_irq_save(void) {
+    uint64_t flags = 0;
+#ifndef __ETEROS_HOST_TEST__
+    __asm__ volatile ("pushfq; popq %0; cli" : "=r"(flags) : : "memory");
+#endif
+    return flags;
+}
+
+static inline void task_irq_restore(uint64_t flags) {
+#ifndef __ETEROS_HOST_TEST__
+    if (flags & 0x200) {
+        __asm__ volatile ("sti");
+    }
+#endif
+}
+
 typedef struct file_descriptor {
     struct fs_node* node;
     uint32_t offset;

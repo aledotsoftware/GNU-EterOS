@@ -48,18 +48,6 @@
 
 extern void fork_return(void);
 
-static inline uint64_t task_irq_save(void) {
-    uint64_t flags;
-    __asm__ volatile ("pushfq; popq %0; cli" : "=r"(flags) : : "memory");
-    return flags;
-}
-
-static inline void task_irq_restore(uint64_t flags) {
-    if (flags & 0x200) {
-        __asm__ volatile ("sti");
-    }
-}
-
 /* ========================================================================= */
 /* Helper de Stack de Kernel                                                 */
 /* ========================================================================= */
@@ -791,22 +779,30 @@ void task_yield(void) {
 void task_block_with_timeout(uint64_t wake_tick) {
     if (!scheduler_active) return;
 
+    uint64_t irq_flags = task_irq_save();
+
     spin_lock(&sched_lock);
     task_t* current = task_get_current();
     current->wake_tick = wake_tick;
     current->state = TASK_BLOCKED;
     enqueue_sleep(current);
     spin_unlock(&sched_lock);
+
+    task_irq_restore(irq_flags);
 }
 
 void task_block(void) {
     if (!scheduler_active) return;
+
+    uint64_t irq_flags = task_irq_save();
 
     spin_lock(&sched_lock);
     task_t* current = task_get_current();
     current->wake_tick = 0;
     current->state = TASK_BLOCKED;
     spin_unlock(&sched_lock);
+
+    task_irq_restore(irq_flags);
 }
 
 void task_sleep(uint64_t ms) {
@@ -818,6 +814,8 @@ void task_sleep(uint64_t ms) {
     uint64_t ticks = ((uint64_t)ms * TIMER_HZ) / 1000;
     if (ms > 0 && ticks == 0) ticks = 1;
 
+    uint64_t irq_flags = task_irq_save();
+
     /* Lock to modify state */
     spin_lock(&sched_lock);
     task_t* current = task_get_current();
@@ -826,8 +824,14 @@ void task_sleep(uint64_t ms) {
     enqueue_sleep(current);
     spin_unlock(&sched_lock);
 
+    /* We do NOT restore interrupts here before schedule() to prevent
+       a race condition where a timer interrupt fires and wakes this task
+       before we actually yield. schedule() will handle sti upon return. */
+
     /* Ceder CPU */
     schedule();
+
+    task_irq_restore(irq_flags);
 }
 
 void task_wake_expired(uint64_t current_tick) {
@@ -850,9 +854,7 @@ void task_wakeup(task_t* t) {
     if (!scheduler_active || !t) return;
 
     /* Save interrupt state */
-    uint64_t rflags;
-    __asm__ volatile("pushfq; pop %0" : "=r"(rflags));
-    __asm__ volatile("cli");
+    uint64_t irq_flags = task_irq_save();
 
     spin_lock(&sched_lock);
     /* Only wake if BLOCKED or SLEEPING.
@@ -874,10 +876,7 @@ void task_wakeup(task_t* t) {
     }
     spin_unlock(&sched_lock);
 
-    /* Restore interrupts if they were enabled */
-    if (rflags & 0x200) {
-        __asm__ volatile("sti");
-    }
+    task_irq_restore(irq_flags);
 }
 
 static void task_mark_parent_wait_event(task_t* current, int wait_status, int wait_code) {

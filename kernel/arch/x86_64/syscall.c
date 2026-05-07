@@ -3724,6 +3724,12 @@ void syscall_int80_handler(struct syscall_regs* regs) {
     /* Mapeo del ABI i386 Linux a nuestra convencion x86_64 interna: */
     /* eax -> rax, ebx -> rdi, ecx -> rsi, edx -> rdx, esi -> r10, edi -> r8, ebp -> r9 */
 
+    task_t* current = task_get_current();
+    cpu_info_t* cpu = get_current_cpu();
+    if (current && cpu) {
+        current->user_rsp = cpu->user_stack_scratch;
+    }
+
     struct syscall_regs mapped_regs;
     memcpy(&mapped_regs, regs, sizeof(struct syscall_regs));
 

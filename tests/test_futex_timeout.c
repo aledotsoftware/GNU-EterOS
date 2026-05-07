@@ -41,6 +41,9 @@ void init_tasks() {
 
 /* Mock Implementations */
 
+void hal_interrupts_disable(void) {}
+void hal_interrupts_enable(void) {}
+
 void *kmalloc(size_t size) {
     return malloc(size);
 }

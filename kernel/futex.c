@@ -88,11 +88,13 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint3
     futex_node_t *node = (futex_node_t*)kmalloc(sizeof(futex_node_t));
     if (!node) return -ENOMEM;
 
+    uint64_t irq_flags = task_irq_save();
     spin_lock(&b->lock);
 
     /* 3. Re-check value under lock to avoid race */
     if (*uaddr != val) {
         spin_unlock(&b->lock);
+        task_irq_restore(irq_flags);
         kfree(node);
         return -EAGAIN;
     }
@@ -112,6 +114,8 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint3
 
     spin_unlock(&b->lock);
 
+    task_irq_restore(irq_flags);
+
     /* 5. Yield CPU */
     schedule();
 
@@ -121,6 +125,7 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint3
         timed_out = 1;
     }
 
+    irq_flags = task_irq_save();
     spin_lock(&b->lock);
 
     /* Search for our node */
@@ -141,6 +146,7 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint3
     }
 
     spin_unlock(&b->lock);
+    task_irq_restore(irq_flags);
 
     /* Free the node that we allocated */
     kfree(node);
@@ -161,6 +167,7 @@ int futex_wake(uint32_t *uaddr, int count, int op, uint32_t bitset) {
     int bucket_idx = futex_hash(uaddr, is_private);
     futex_bucket_t *b = &buckets[bucket_idx];
 
+    uint64_t irq_flags = task_irq_save();
     spin_lock(&b->lock);
 
     futex_node_t **pp = &b->head;
@@ -196,6 +203,7 @@ int futex_wake(uint32_t *uaddr, int count, int op, uint32_t bitset) {
     }
 
     spin_unlock(&b->lock);
+    task_irq_restore(irq_flags);
 
     return woken;
 }
