@@ -1,7 +1,7 @@
 # EterOS Orchestrator Meta-Agent Audit Report
 
 ## 1. Estado Actual de Compilación y Ejecución
-**Fecha:** 2026-05-07
+**Fecha:** 2026-05-08
 **Commit auditado:** HEAD
 **Versión Actualizada:** 0.2.0 Genesis SMP
 
@@ -38,7 +38,7 @@
 
 Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64/syscall.c`, VFS, lwIP config) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
 
-1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM.
+1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
 2. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
 3. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
 4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown), parsear FADT y proveer apagado suave para el sistema.
