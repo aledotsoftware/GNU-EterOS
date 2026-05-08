@@ -41,7 +41,7 @@ Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64
 1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
 2. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
 3. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
-4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown), parsear FADT y proveer apagado suave para el sistema.
+4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
 
 ---
 
@@ -55,4 +55,5 @@ Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64
 ## 5. Changelog / Ultimos Avances
 - Build y QA verificado exitosamente para la versión "0.2.0 Genesis SMP".
 - El Meta-Agent Orquestador auditó el build, los test de host y la ejecución con QEMU, todo funciona a la perfección.
-- Agentes clave (`network-socket-api-bot`, `vfs-posix-filesystem-bot`, `users-security-panel-bot`, `linux-syscall-compliance-bot`) listos y en cola para ejecución.
+- Se identificó que la función `acpi_poweroff` actual envía parámetros hardcodeados (`5 << 10`) a los bloques de control ACPI S5, lo que no cumple con las especificaciones para todos los hardwares.
+- Agentes clave (`kernel-stability-boot-bot`, `network-socket-api-bot`, `vfs-posix-filesystem-bot`, `users-security-panel-bot`, `linux-syscall-compliance-bot`) listos y en cola para ejecución.
