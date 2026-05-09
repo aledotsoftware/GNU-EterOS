@@ -7,7 +7,7 @@ kernel/fs/
 VFS, initrd, procfs, shmfs, FAT32/JFS, ELF loader.
 
 ## Current Goal
-Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Para esto debes utilizar explícitamente `partition_get_active_root()` declarado en `include/drivers/disk.h` a fin de interactuar con la partición en el dispositivo de almacenamiento subyacente.
+Implementar cache coherente para inode states e iteradores optimizados de directorio.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

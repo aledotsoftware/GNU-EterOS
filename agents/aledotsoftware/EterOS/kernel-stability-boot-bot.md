@@ -7,7 +7,7 @@ kernel/boot, kernel/mm, kernel/arch
 Boot, memoria, trampas, init y estabilidad temprana.
 
 ## Current Goal
-Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`, reemplazando los parámetros hardcodeados (`5 << 10`). Además, es necesario proveer pruebas unitarias del parseador (`test_acpi_s5.c`) con simulaciones válidas que certifiquen el correcto parseo, evadiendo colgar (`hlt`) el test para no bloquear la ejecución.
+Incorporar apagado S4 hibernate experimental salvando estado al block cache JFS.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
