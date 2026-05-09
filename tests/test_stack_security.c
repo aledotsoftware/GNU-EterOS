@@ -1,4 +1,6 @@
+#ifndef __ETEROS_HOST_TEST__
 #define __ETEROS_HOST_TEST__
+#endif
 #include <stdio.h>
 /* Use custom declaration for exit to avoid collision with kernel stdlib.h */
 void exit(int status);
