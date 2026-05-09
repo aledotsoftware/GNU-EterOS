@@ -385,3 +385,10 @@ echo "Running test_syscall_linux_coverage..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_syscall_linux_coverage.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_linux_coverage
 ./tests/test_syscall_linux_coverage
 rm tests/test_syscall_linux_coverage
+
+# Test ACPI S5
+echo "---------------------------------------------------"
+echo "Running test_acpi_s5..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_acpi_s5.c kernel/string.c -o tests/test_acpi_s5
+./tests/test_acpi_s5
+rm tests/test_acpi_s5

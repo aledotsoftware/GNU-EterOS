@@ -37,10 +37,10 @@ int main(int argc, char *argv[]) {
         snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
     }
 
-    /* Assign next UID/GID */
+    /* Assign next UID/GID from /etc/passwd */
     int next_uid = 1000;
 
-    int fd = open("/etc/shadow", O_RDONLY);
+    int fd = open("/etc/passwd", O_RDONLY);
     if (fd >= 0) {
         char line[MAX_LINE];
         while (read_line(fd, line, sizeof(line)) > 0) {
@@ -82,16 +82,26 @@ int main(int argc, char *argv[]) {
         close(fd);
     }
 
+    /* Append to /etc/passwd */
+    fd = open("/etc/passwd", O_WRONLY | O_APPEND | O_CREAT, 0644);
+    if (fd < 0) {
+        printf("Error: Could not open /etc/passwd for writing\n");
+        return 1;
+    }
+    char passwd_entry[MAX_LINE];
+    snprintf(passwd_entry, sizeof(passwd_entry), "%s:x:%d:%d::/home/%s:/bin/sh\n", username, next_uid, next_uid, username);
+    write(fd, passwd_entry, strlen(passwd_entry));
+    close(fd);
+
     /* Append to /etc/shadow */
     fd = open("/etc/shadow", O_WRONLY | O_APPEND | O_CREAT, 0600);
     if (fd < 0) {
         printf("Error: Could not open /etc/shadow for writing\n");
         return 1;
     }
-
-    char entry[MAX_LINE];
-    snprintf(entry, sizeof(entry), "%s:%s:%d:%d\n", username, hash_str, next_uid, next_uid);
-    write(fd, entry, strlen(entry));
+    char shadow_entry[MAX_LINE];
+    snprintf(shadow_entry, sizeof(shadow_entry), "%s:%s:19000:0:99999:7:::\n", username, hash_str);
+    write(fd, shadow_entry, strlen(shadow_entry));
     close(fd);
 
     printf("User '%s' created successfully.\n", username);

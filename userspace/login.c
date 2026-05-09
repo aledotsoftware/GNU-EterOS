@@ -23,12 +23,25 @@ int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
+    /* Initialize /etc/passwd if missing */
+    int passwd_fd = open("/etc/passwd", O_RDONLY);
+    if (passwd_fd < 0) {
+        passwd_fd = open("/etc/passwd", O_WRONLY | O_CREAT, 0644);
+        if (passwd_fd >= 0) {
+            const char* root_entry = "root:x:0:0:root:/root:/bin/sh\n";
+            write(passwd_fd, root_entry, strlen(root_entry));
+            close(passwd_fd);
+        }
+    } else {
+        close(passwd_fd);
+    }
+
     /* Initialize /etc/shadow if missing */
     int shadow_fd = open("/etc/shadow", O_RDONLY);
     if (shadow_fd < 0) {
         shadow_fd = open("/etc/shadow", O_WRONLY | O_CREAT, 0600);
         if (shadow_fd >= 0) {
-            const char* root_entry = "root::0:0\n";
+            const char* root_entry = "root::19000:0:99999:7:::\n";
             write(shadow_fd, root_entry, strlen(root_entry));
             close(shadow_fd);
         }

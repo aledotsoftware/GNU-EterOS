@@ -1,3 +1,6 @@
+#ifndef HALT_MACRO
+#define HALT_MACRO() __asm__ volatile("hlt")
+#endif
 /*
  * ACPI Parser para éterOS
  *
@@ -18,7 +21,7 @@
 static acpi_rsdp_t* rsdp = NULL;
 static acpi_rsdt_t* rsdt = NULL;
 static acpi_madt_t* madt = NULL;
-static acpi_fadt_t* fadt = NULL;
+acpi_fadt_t* fadt = NULL;
 
 /* Estado global de CPUs (Topología) */
 cpu_info_t cpus[MAX_CPUS];
@@ -167,22 +170,80 @@ uint32_t acpi_get_lapic_addr(void) {
 }
 
 #include <io.h>
+
+static int acpi_parse_s5(uint64_t dsdt_addr, uint16_t *slp_typa, uint16_t *slp_typb) {
+    if (!dsdt_addr) return -1;
+    acpi_header_t* dsdt = (acpi_header_t*)(uint64_t)dsdt_addr;
+    if (memcmp(dsdt->signature, "DSDT", 4) != 0) return -1;
+
+    uint8_t* aml = (uint8_t*)dsdt + sizeof(acpi_header_t);
+    uint32_t aml_len = dsdt->length - sizeof(acpi_header_t);
+
+    for (uint32_t i = 0; i < aml_len - 5; i++) {
+        /* Find _S5_ */
+        if (aml[i] == '_' && aml[i+1] == 'S' && aml[i+2] == '5' && aml[i+3] == '_') {
+            /* Check if it's a PackageOp (0x12) */
+            if (aml[i+4] == 0x12) {
+                uint32_t ptr = i + 5;
+                /* Skip PkgLength (variable length encoding) */
+                uint8_t lead_byte = aml[ptr];
+                uint32_t pkg_len_bytes = (lead_byte >> 6) + 1;
+                ptr += pkg_len_bytes;
+
+                /* Skip NumElements */
+                ptr++;
+
+                /* The next bytes are the elements. They usually are BytePrefix (0x0A) followed by the byte,
+                   or WordPrefix (0x0B) followed by word. Or if it's a small integer it could be 0x00, 0x01, or 0x0A <val> */
+
+                uint16_t typa = 0, typb = 0;
+
+                /* Parse SLP_TYPa */
+                if (aml[ptr] == 0x0A) { typa = aml[ptr+1]; ptr += 2; }
+                else if (aml[ptr] == 0x00) { typa = 0; ptr++; }
+                else if (aml[ptr] == 0x01) { typa = 1; ptr++; }
+                else { typa = aml[ptr]; ptr++; } /* Fallback */
+
+                /* Parse SLP_TYPb */
+                if (aml[ptr] == 0x0A) { typb = aml[ptr+1]; ptr += 2; }
+                else if (aml[ptr] == 0x00) { typb = 0; ptr++; }
+                else if (aml[ptr] == 0x01) { typb = 1; ptr++; }
+                else { typb = aml[ptr]; ptr++; } /* Fallback */
+
+                *slp_typa = typa;
+                *slp_typb = typb;
+                return 0;
+            }
+        }
+    }
+    return -1;
+}
+
 void acpi_poweroff(void) {
     if (!fadt) {
         serial_write_string("[ACPI] Cannot poweroff, FADT not found.\n");
         return;
     }
 
-    /* Out to PM1a control block */
-    /* SLP_EN (bit 13) | SLP_TYPa = 5 (bits 10-12) */
-    outw(fadt->pm1a_control_block, 0x2000 | (5 << 10));
+    uint16_t slp_typa = 5; /* Default */
+    uint16_t slp_typb = 5;
+
+    if (acpi_parse_s5(fadt->dsdt, &slp_typa, &slp_typb) == 0) {
+        serial_write_string("[ACPI] _S5_ parsed successfully.\n");
+    } else {
+        serial_write_string("[ACPI] _S5_ not found, using defaults.\n");
+    }
+
+    /* Out to PM1a/b control block */
+    /* SLP_EN (bit 13) | SLP_TYP */
+    outw(fadt->pm1a_control_block, 0x2000 | (slp_typa << 10));
 
     if (fadt->pm1b_control_block) {
-        outw(fadt->pm1b_control_block, 0x2000 | (5 << 10));
+        outw(fadt->pm1b_control_block, 0x2000 | (slp_typb << 10));
     }
 
     serial_write_string("[ACPI] Poweroff signal sent.\n");
     while (1) {
-        __asm__ volatile("hlt");
+        HALT_MACRO();
     }
 }

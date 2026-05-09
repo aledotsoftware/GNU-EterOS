@@ -1726,27 +1726,27 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
     /* SECURITY FIX: Validate pointers for known IOCTLs */
     /* Legacy IOCTLs (TCGETS/TCSETS) use void* arg as pointer without encoding */
     if (request == TCGETS) {
-        if (!vmm_verify_user_access(arg, sizeof(struct termios), 1)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, sizeof(struct termios), 1)) return -EFAULT;
     } else if (request == TCSETS) {
-        if (!vmm_verify_user_access(arg, sizeof(struct termios), 0)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, sizeof(struct termios), 0)) return -EFAULT;
     } else if (request == TIOCGWINSZ) {
-        if (!vmm_verify_user_access(arg, sizeof(struct winsize), 1)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, sizeof(struct winsize), 1)) return -EFAULT;
     } else if (request == TIOCSWINSZ) {
-        if (!vmm_verify_user_access(arg, sizeof(struct winsize), 0)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, sizeof(struct winsize), 0)) return -EFAULT;
     } else if (request == TIOCGPGRP || request == TIOCGPTN || request == FIONREAD) {
-        if (!vmm_verify_user_access(arg, sizeof(int), 1)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, sizeof(int), 1)) return -EFAULT;
     } else if (request == TIOCSPGRP || request == TIOCSPTLCK || request == FIONBIO) {
-        if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
     } else if (request == TIOCSCTTY) {
         /* Accept null arg or int* arg; userspace commonly passes (void*)1 in Linux. */
         if (arg != NULL && !vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
     } else if (request == FIONBIO) {
-        if (!vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
     } else if (request == 0x8912) { /* SIOCGIFCONF */
-        if (!vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
         return -ENOSYS; // Network stack stubbed
     } else if (request == 0x4600) { /* FBIOGET_VSCREENINFO */
-        if (!vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
+        if (!arg || !vmm_verify_user_access(arg, 16, 1)) return -EFAULT;
     }
 
     task_t* current = task_get_current();
