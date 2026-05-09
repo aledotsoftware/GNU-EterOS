@@ -1,0 +1,10 @@
+Audit orchestrator reporting and prep the next agent cycle
+
+This commit implements the Orchestrator Meta-Agent cycle update:
+- Updates `.jaa/state.md` correctly setting all previous sub-tasks as completed.
+- Cleans the agents `.md` files that have completed their goals.
+- Bumps and prioritizes the next pending agent goals based on system evaluation:
+  1. `vfs-posix-filesystem-bot`
+  2. `users-security-panel-bot`
+  3. `linux-syscall-compliance-bot`
+  4. `kernel-stability-boot-bot`

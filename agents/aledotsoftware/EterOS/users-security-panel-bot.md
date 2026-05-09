@@ -6,7 +6,7 @@ userspace/login.c, userspace/passwd.c, kernel/shell/cmd_user.c
 ## Description
 Login, passwd, shadow, alta/baja de usuarios, permisos básicos.
 
-## Current Goal (as of 2026-05-07)
+## Current Goal
 Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
 
 ## Guidelines
