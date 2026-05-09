@@ -23,9 +23,9 @@
 
 ### 2.2 Áreas de Mejora a Corto Plazo (Para Compatibilidad Base)
 - **Networking (lwIP):** Implementación de e1000 estable conectada mediante sockets, bind, accept nativos, posibilitando DHCP real. DNS nativo ya expuesto a libc usando SYS_gethostbyname.
-- **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM. Se requiere acoplarlo con `kernel/fs/bcache.c` para volcados de estado al almacenamiento en disco duro persistente.
-- **Control Multi-usuario:** Soporte base (`O_APPEND` reparado, modos `0600` de permisos VFS consolidados). **Blocker principal:** `login.elf` necesita leer y validar exhaustivamente el entorno contra archivos dinámicos reales `/etc/passwd` y `/etc/shadow` montados, en lugar de mocks temporales o estáticos.
-- **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas (`sys_select`, `sys_poll`, `sys_sysinfo`, `sys_mmap_fixed`, `sys_memfd_create`, `sys_pipe2`). Faltan TTY/PTY multiplexing para ejecutar bash, y un subconjunto ioctl más extenso compatible con GNU.
+- **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM y bloque. Se debe revisar compatibilidad total VFS POSIX, soporte hardlinks y atomic commits.
+- **Control Multi-usuario:** Soporte base con parseo shadow y passwd operativo, modos `0600` de permisos VFS consolidados.
+- **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas. TTY ioctls han sido completados en un subconjunto. Faltan PTY de control extenso para pseudo-terminals modernos.
 
 ### 2.3 Metas Aspiracionales de la Plataforma (Largo Plazo)
 - Soporte Completo GNU Coreutils: ❌ Parcial. Progresando mediante `linux-syscall-compliance-bot`.
@@ -36,24 +36,23 @@
 
 ## 3. Orden de Ejecución Recomendado (Próximo Ciclo)
 
-Basado en las brechas observables en la arquitectura actual y considerando que los bugs del CI y test fueron resueltos en este ciclo de urgencia, los agentes deben activarse en este orden:
+Basado en las brechas observables en la arquitectura actual y considerando que los bugs del CI y test fueron resueltos en este ciclo de urgencia, se priorizan los hitos siguientes:
 
-1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
-2. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
-3. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
-4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
+1. **`vfs-posix-filesystem-bot`:** Implementar cache coherente para inode states e iteradores optimizados de directorio.
+2. **`users-security-panel-bot`:** Implementar control de permisos de grupo estricto y encriptar perfiles home al inicio.
+3. **`linux-syscall-compliance-bot`:** Terminar y robustecer pseudo-tty (PTY) de forma de acomodar aplicaciones GNU complejas en `marea_shell`.
+4. **`kernel-stability-boot-bot`:** Incorporar apagado S4 hibernate experimental salvando estado al block cache JFS.
 
 ---
 
 ## 4. Hallazgos adicionales y Riesgos
 - La libc ahora utiliza exitosamente `SYS_gethostbyname` para resolución DNS asíncrona delegada al kernel.
-- La inexistencia de validaciones en disco para el `jfs` arriesga la confiabilidad de cualquier metadato salvado actualmente por el sistema durante la runtime de QEMU.
-- Es mandatorio seguir validando que los comandos de pre-commit corran con `bash tests/run_tests.sh` (con set -e activado), manteniendo la rigurosidad frente al scope creep. Ahora que los `|| true` fueron limpiados, se espera que el CI aborte ante la primera falla.
+- Se debe observar que la nueva validación S5 ACPI debe robustecer el fallback en sistemas pre-2010.
 
 ---
 
 ## 5. Changelog / Ultimos Avances
-- El Orchestrator Meta-Agent re-auditó el sistema, verificando definitivamente que los errores y warnings residuales del ciclo anterior fueron completamente solventados (issues de cast int/unsigned int, variables en desuso y redefiniciones macro de host tests).
-- El sistema de testing fue validado y se corroboró la exitosa remoción de `|| true` en `tests/run_tests.sh`.
+- El Orchestrator Meta-Agent re-auditó el sistema. Se verificó exitosamente que los hitos de persistencia JFS (mediante bcache), lectura real de /etc/shadow, validaciones ioctl para TTY/binder, y soporte ACPI S5 fueron completados e integrados sin introducir regresiones.
+- El sistema de testing fue validado y todos los test nativos pasan exitosamente (`tests/run_tests.sh`).
 - Se reafirma el estado libre de regresiones.
-- Los agentes han sido puestos en espera para recibir este nuevo reporte. Se confirma y da luz verde al inicio del ciclo de los siguientes hitos: persistencia JFS en disco duro (`vfs-posix-filesystem-bot`), login mediante standard POSIX (`users-security-panel-bot`), soporte terminal TTY para migración GNU (`linux-syscall-compliance-bot`), y el soft power-off ACPI S5 (`kernel-stability-boot-bot`).
+- Los agentes han sido alineados. Se confirma y da luz verde al inicio del nuevo ciclo enfocado en POSIX group permissions (`users-security-panel-bot`), PTY handling (`linux-syscall-compliance-bot`), VFS caching (`vfs-posix-filesystem-bot`) y S4 hibernate (`kernel-stability-boot-bot`).
