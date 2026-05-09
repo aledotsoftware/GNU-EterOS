@@ -7,7 +7,7 @@ kernel/fs/devfs.c (binder)
 Binder, expectativas Android/Linux y capa futura sobre la misma base.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Resolver los warnings de "signedness comparison" en `kernel/fs/devfs.c` (específicamente durante las verificaciones de ioctls para Binder IPC como `BINDER_VERSION_IOWR` y `BINDER_WRITE_READ`) garantizando la correcta compatibilidad de tipos y expandiendo progresivamente la interfaz de ioctls para soporte Android.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
