@@ -38,10 +38,12 @@
 
 Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64/syscall.c`, VFS, lwIP config) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
 
-1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
-2. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
-3. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
-4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
+1. **`testing-ci-validation-bot`:** Resolver los warnings de redefinición de macros en los tests nativos (`tests/run_tests.sh`) evitando colisiones que rompan el pipeline CI.
+
+2. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
+3. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
+4. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
+5. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
 
 ---
 
@@ -50,6 +52,7 @@ Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64
 - La inexistencia de validaciones en disco para el `jfs` arriesga la confiabilidad de cualquier metadato salvado actualmente por el sistema durante la runtime de QEMU.
 - Es mandatorio seguir validando que los comandos de pre-commit corran con `bash tests/run_tests.sh` (con set -e activado), manteniendo la rigurosidad frente al scope creep.
 - **Nuevos Warnings:** Se detectaron warnings de compilación en `kernel/fs/devfs.c` (signedness comparison en `BINDER_VERSION_IOWR` y `BINDER_WRITE_READ`) y variables no usadas/unused parameters en `kernel/arch/x86_64/syscall.c` (incluyendo wrappers de sockets VFS inactivos y el parámetro de `sys_umask`).
+- **Warnings en Tests:** Se identificaron warnings de redefinición de macros (`__ETEROS_HOST_TEST__`, `PROT_READ`, `PROT_WRITE`, `HAL_MEM_WRITE`, `HAL_MEM_WRITE_COMBINING`, `VGA_BUFFER_ADDR`) durante la ejecución de los tests nativos (`tests/run_tests.sh`). Estos deben ser resueltos cuidando de no romper las pruebas.
 
 ---
 
@@ -63,3 +66,5 @@ Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64
 - Se identificó que la función `acpi_poweroff` actual envía parámetros hardcodeados (`5 << 10`) a los bloques de control ACPI S5, lo que no cumple con las especificaciones para todos los hardwares.
 - Se confirmaron robustas validaciones de boundaries de memoria en el API de red (`sys_recvfrom` y `sys_sendto`) para resguardar la seguridad y estabilidad frente a buffers maliciosos desde userspace. La meta del `network-socket-api-bot` ha sido completada.
 - Agentes clave (`vfs-posix-filesystem-bot`, `users-security-panel-bot`, `linux-syscall-compliance-bot`, `kernel-stability-boot-bot`) listos y en cola para ejecución.
+
+- El Orchestrator Meta-Agent ha auditado el sistema y los reportes/estado global (`.jaa/state.md`) han sido actualizados delegando al `testing-ci-validation-bot` la resolución de las advertencias de compilación del host (`__ETEROS_HOST_TEST__`, macros duplicadas en tests) y posponiendo el resto de las tareas para preservar la estabilidad de QA.
