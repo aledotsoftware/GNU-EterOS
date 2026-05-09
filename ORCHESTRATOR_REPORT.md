@@ -6,9 +6,9 @@
 **Versión Actualizada:** 0.2.0 Genesis SMP
 
 ### ✅ Resultados de Verificación
-- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP. Se resolvieron exitosamente varios warnings persistentes que afectaban compilación cruzada y devfs.
+- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP. **Sin embargo, persisten warnings de compilación:** comparación de signos en `kernel/fs/devfs.c` (ioctl BINDER) y funciones/parámetros sin uso en `kernel/arch/x86_64/syscall.c` (wrappers de sockets y parámetro mask en sys_umask).
 - **Make clean:** Éxito. Funciona correctamente eliminando artefactos (como `.o` y `build/`) sin borrar código fuente rastreado en git.
-- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente y con los fix de macros ya no detonan warnings de redefiniciones con `__ETEROS_HOST_TEST__`.
+- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente, pero **persisten warnings de redefinición de macros** (como `__ETEROS_HOST_TEST__`, `PROT_READ`, etc.) durante la ejecución.
 - **Prueba de Arranque y QEMU Headless:** Éxito (`tests/run_integration.sh` OK). La secuencia de booteo inicializa BSP, GDT, PMM, VMM (Paginación), Scheduler y VFS correctamente con 64MB, 128MB y 512MB de RAM. Realiza exitosamente la transición al anillo 3 levantando el entorno en initrd sin kernel panics.
 
 ---
@@ -36,12 +36,13 @@
 
 ## 3. Orden de Ejecución Recomendado (Próximo Ciclo)
 
-Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64/syscall.c`, VFS, lwIP config) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
+Basado en las brechas observables en la arquitectura actual y los nuevos hallazgos de compilación, los agentes deben activarse en este orden:
 
-1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
-2. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
-3. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
-4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
+1. **`aether-droid-subsystem-bot`, `network-socket-api-bot`, `userspace-libc-posix-bot`, `testing-ci-validation-bot`:** Ejecución prioritaria para limpiar todos los warnings de compilación (signedness, unused vars) y redefiniciones de macros en los tests detectados en la auditoría del Orquestador.
+2. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
+3. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
+4. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
+5. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
 
 ---
 
@@ -53,6 +54,6 @@ Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64
 ---
 
 ## 5. Changelog / Ultimos Avances
-- El Orchestrator Meta-Agent auditó el sistema, verificó compilación y tests nativos.
-- Se ha revisado que los warnings detectados previamente en `devfs.c` (signedness en la API Binder), `syscall.c` (sockets VFS) y de redefinición de macros en pruebas se han solucionado y estabilizado. El reporte se ha limpiado de esos bloqueos.
-- Se alistaron las instrucciones para el próximo pipeline con los agentes prioritarios de persistencia, autenticación, soporte de tty y apagado acpi s5 encolados.
+- El Orchestrator Meta-Agent auditó el sistema, verificando compilación y tests nativos.
+- Se ha detectado la regresión/persistencia de warnings de compilación en `devfs.c` (signedness en la API Binder), `syscall.c` (sockets VFS, sys_umask) y de redefinición de macros en pruebas.
+- Se han actualizado las asignaciones de tareas de los agentes respectivos para resolver estos warnings antes de avanzar con los grandes milestones (persistencia JFS, autenticación, soporte de tty y apagado acpi s5).

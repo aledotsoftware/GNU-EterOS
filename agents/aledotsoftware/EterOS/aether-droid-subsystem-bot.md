@@ -7,7 +7,7 @@ kernel/fs/devfs.c (binder)
 Binder, expectativas Android/Linux y capa futura sobre la misma base.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Investigar y arreglar los warnings de compilación de "comparison of integer expressions of different signedness" en `kernel/fs/devfs.c`, específicamente en la función `dev_binder_ioctl` (alrededor de las líneas 110 y 116 al comparar el parámetro request contra `BINDER_VERSION_IOWR` y `BINDER_WRITE_READ`).
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

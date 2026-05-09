@@ -7,7 +7,7 @@ tests/, verification/
 Tests nativos, verification scripts, CI y matrices de build.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Resolver los warnings de redefinición de macros (`__ETEROS_HOST_TEST__`, `PROT_READ`, `PROT_WRITE`, `HAL_MEM_WRITE`, `HAL_MEM_WRITE_COMBINING`, `VGA_BUFFER_ADDR`) observados durante la ejecución de los tests nativos host (ej. en `tests/test_stack_security.c`, `tests/test_mmap_fixed.c`, `tests/test_framebuffer_scroll.c`) usando bloques protectores `#ifndef`.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

@@ -7,7 +7,7 @@ kernel/net/, kernel/drivers/net/
 Sockets, lwIP bridge, e1000, DHCP, integración syscall.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Remover o proteger con macros los wrappers de socket sin uso `socket_read_fs`, `socket_write_fs` y `socket_close_fs` en `kernel/arch/x86_64/syscall.c` para resolver los warnings de compilación de funciones estáticas sin uso.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

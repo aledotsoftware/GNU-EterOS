@@ -7,7 +7,7 @@ userspace/libc/
 Libc, crt0, wrappers, pthread/signal/stdio/dirent.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Solucionar el warning de parámetro sin usar `mask` en la función `sys_umask` dentro de `kernel/arch/x86_64/syscall.c` agregando un casting a `void` (`(void)mask;`).
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
