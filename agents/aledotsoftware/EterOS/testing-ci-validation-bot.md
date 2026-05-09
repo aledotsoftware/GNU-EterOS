@@ -7,7 +7,7 @@ tests/, verification/
 Tests nativos, verification scripts, CI y matrices de build.
 
 ## Current Goal
-Resolver los warnings de redefinición de macros en los tests nativos (`tests/run_tests.sh`) como `__ETEROS_HOST_TEST__`, `PROT_READ`, `HAL_MEM_WRITE`, etc., evitando colisiones que rompan el pipeline CI.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

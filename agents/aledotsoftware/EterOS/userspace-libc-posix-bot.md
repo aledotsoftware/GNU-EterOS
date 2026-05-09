@@ -7,7 +7,7 @@ userspace/libc/
 Libc, crt0, wrappers, pthread/signal/stdio/dirent.
 
 ## Current Goal
-Solucionar el warning de parámetro no utilizado ("unused parameter") en `kernel/arch/x86_64/syscall.c` (para la syscall relacionada con los modos de VFS/umask detectada en el audit), y expandir los wrappers de la libc que la utilicen.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

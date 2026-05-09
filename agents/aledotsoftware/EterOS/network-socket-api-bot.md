@@ -7,7 +7,7 @@ kernel/net/, kernel/drivers/net/
 Sockets, lwIP bridge, e1000, DHCP, integración syscall.
 
 ## Current Goal
-Resolver los warnings de compilación de funciones no utilizadas (`socket_close_fs`, `socket_write_fs`, `socket_read_fs`) en `kernel/arch/x86_64/syscall.c` asegurando que los VFS wrappers de sockets estén adecuadamente referenciados o condicionalmente compilados/removidos, para mantener la limpieza y estabilidad en la compilación.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

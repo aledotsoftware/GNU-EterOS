@@ -6,9 +6,9 @@
 **Versión Actualizada:** 0.2.0 Genesis SMP
 
 ### ✅ Resultados de Verificación
-- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP.
+- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP. Se resolvieron exitosamente varios warnings persistentes que afectaban compilación cruzada y devfs.
 - **Make clean:** Éxito. Funciona correctamente eliminando artefactos (como `.o` y `build/`) sin borrar código fuente rastreado en git.
-- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente.
+- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente y con los fix de macros ya no detonan warnings de redefiniciones con `__ETEROS_HOST_TEST__`.
 - **Prueba de Arranque y QEMU Headless:** Éxito (`tests/run_integration.sh` OK). La secuencia de booteo inicializa BSP, GDT, PMM, VMM (Paginación), Scheduler y VFS correctamente con 64MB, 128MB y 512MB de RAM. Realiza exitosamente la transición al anillo 3 levantando el entorno en initrd sin kernel panics.
 
 ---
@@ -22,7 +22,7 @@
 - **Control Panel & UI:** Subsistemas gráficos de minimizar ventanas (`hit_minimize_button`), UI web debounced y reportes de estado unificados mostrando "0.2.0 Genesis SMP" consistentemente.
 
 ### 2.2 Áreas de Mejora a Corto Plazo (Para Compatibilidad Base)
-- **Networking (lwIP): Implementación de e1000 estable conectada mediante sockets, bind, accept nativos, posibilitando DHCP real. DNS nativo ya expuesto a libc usando SYS_gethostbyname.
+- **Networking (lwIP):** Implementación de e1000 estable conectada mediante sockets, bind, accept nativos, posibilitando DHCP real. DNS nativo ya expuesto a libc usando SYS_gethostbyname.
 - **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM. Se requiere acoplarlo con `kernel/fs/bcache.c` para volcados de estado al almacenamiento en disco duro persistente.
 - **Control Multi-usuario:** Soporte base (`O_APPEND` reparado, modos `0600` de permisos VFS consolidados). **Blocker principal:** `login.elf` necesita leer y validar exhaustivamente el entorno contra archivos dinámicos reales `/etc/passwd` y `/etc/shadow` montados, en lugar de mocks temporales o estáticos.
 - **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas (`sys_select`, `sys_poll`, `sys_sysinfo`, `sys_mmap_fixed`, `sys_memfd_create`, `sys_pipe2`). Faltan TTY/PTY multiplexing para ejecutar bash, y un subconjunto ioctl más extenso compatible con GNU.
@@ -38,12 +38,10 @@
 
 Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64/syscall.c`, VFS, lwIP config) respecto a los objetivos del proyecto, los agentes deben activarse en este orden:
 
-1. **`testing-ci-validation-bot`:** Resolver los warnings de redefinición de macros en los tests nativos (`tests/run_tests.sh`) evitando colisiones que rompan el pipeline CI.
-
-2. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
-3. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
-4. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
-5. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
+1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
+2. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
+3. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
+4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
 
 ---
 
@@ -51,20 +49,10 @@ Basado en las brechas observables en la arquitectura actual (`kernel/arch/x86_64
 - La libc ahora utiliza exitosamente `SYS_gethostbyname` para resolución DNS asíncrona delegada al kernel.
 - La inexistencia de validaciones en disco para el `jfs` arriesga la confiabilidad de cualquier metadato salvado actualmente por el sistema durante la runtime de QEMU.
 - Es mandatorio seguir validando que los comandos de pre-commit corran con `bash tests/run_tests.sh` (con set -e activado), manteniendo la rigurosidad frente al scope creep.
-- **Nuevos Warnings:** Se detectaron warnings de compilación en `kernel/fs/devfs.c` (signedness comparison en `BINDER_VERSION_IOWR` y `BINDER_WRITE_READ`) y variables no usadas/unused parameters en `kernel/arch/x86_64/syscall.c` (incluyendo wrappers de sockets VFS inactivos y el parámetro de `sys_umask`).
-- **Warnings en Tests:** Se identificaron warnings de redefinición de macros (`__ETEROS_HOST_TEST__`, `PROT_READ`, `PROT_WRITE`, `HAL_MEM_WRITE`, `HAL_MEM_WRITE_COMBINING`, `VGA_BUFFER_ADDR`) durante la ejecución de los tests nativos (`tests/run_tests.sh`). Estos deben ser resueltos cuidando de no romper las pruebas.
 
 ---
 
 ## 5. Changelog / Ultimos Avances
-- El Orchestrator Meta-Agent auditó el sistema, verificó compilación (con warnings a resolver), ejecución correcta en QEMU Headless y éxito en las pruebas nativas del host.
-- Se confirmaron los bloqueos pendientes para Android compatibility y resoluciones de warnings, agendándolos para los agentes correspondientes en el próximo ciclo junto con los hitos de persistencia (JFS), autenticación y syscalls.
-- El Orchestrator Meta-Agent auditó el sistema, verificó compilación y tests exitosos, y confirmó el orden de ejecución para el próximo ciclo con los agentes `vfs-posix-filesystem-bot`, `users-security-panel-bot`, `linux-syscall-compliance-bot`, y `kernel-stability-boot-bot`.
-- Build y QA verificado exitosamente para la versión "0.2.0 Genesis SMP".
-- El Orchestrator Meta-Agent ha validado el estado del sistema, confirmando que las pruebas de compilación e integración se ejecutan correctamente, y ha alineado las instrucciones de los agentes para el próximo ciclo, manteniendo el orden de ejecución y actualizando los agentes sin metas actuales a "Waiting for new assignment".
-- El Meta-Agent Orquestador auditó el build, los test de host y la ejecución con QEMU, todo funciona a la perfección.
-- Se identificó que la función `acpi_poweroff` actual envía parámetros hardcodeados (`5 << 10`) a los bloques de control ACPI S5, lo que no cumple con las especificaciones para todos los hardwares.
-- Se confirmaron robustas validaciones de boundaries de memoria en el API de red (`sys_recvfrom` y `sys_sendto`) para resguardar la seguridad y estabilidad frente a buffers maliciosos desde userspace. La meta del `network-socket-api-bot` ha sido completada.
-- Agentes clave (`vfs-posix-filesystem-bot`, `users-security-panel-bot`, `linux-syscall-compliance-bot`, `kernel-stability-boot-bot`) listos y en cola para ejecución.
-
-- El Orchestrator Meta-Agent ha auditado el sistema y los reportes/estado global (`.jaa/state.md`) han sido actualizados delegando al `testing-ci-validation-bot` la resolución de las advertencias de compilación del host (`__ETEROS_HOST_TEST__`, macros duplicadas en tests) y posponiendo el resto de las tareas para preservar la estabilidad de QA.
+- El Orchestrator Meta-Agent auditó el sistema, verificó compilación y tests nativos.
+- Se ha revisado que los warnings detectados previamente en `devfs.c` (signedness en la API Binder), `syscall.c` (sockets VFS) y de redefinición de macros en pruebas se han solucionado y estabilizado. El reporte se ha limpiado de esos bloqueos.
+- Se alistaron las instrucciones para el próximo pipeline con los agentes prioritarios de persistencia, autenticación, soporte de tty y apagado acpi s5 encolados.
