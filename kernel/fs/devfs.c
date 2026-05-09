@@ -87,9 +87,9 @@ static uint32_t dev_null_write(fs_node_t *node, uint32_t offset, uint32_t size, 
 /* /dev/binder Implementation (Stub for Android Compatibility)               */
 /* ========================================================================= */
 
-#define BINDER_VERSION_IOWR 0xc0046209 /* Linux ioctl code for BINDER_VERSION */
-#define BINDER_WRITE_READ 0xc0306201
-#define BINDER_SET_CONTEXT_MGR 0x40046207
+#define BINDER_VERSION_IOWR (int)0xc0046209 /* Linux ioctl code for BINDER_VERSION */
+#define BINDER_WRITE_READ (int)0xc0306201
+#define BINDER_SET_CONTEXT_MGR (int)0x40046207
 
 struct binder_version {
     int32_t protocol_version;

@@ -121,6 +121,7 @@ struct clone_args {
 
 /* --- Socket VFS Wrappers --- */
 
+static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) __attribute__((unused));
 static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
@@ -128,6 +129,7 @@ static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, u
     return (res < 0) ? 0 : (ssize_t)res;
 }
 
+static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) __attribute__((unused));
 static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
@@ -135,6 +137,7 @@ static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size,
     return (res < 0) ? 0 : (uint32_t)res;
 }
 
+static void socket_close_fs(fs_node_t* node) __attribute__((unused));
 static void socket_close_fs(fs_node_t* node) {
     if ((node->flags & 0x7) == FS_SOCKET) {
         net_close((int)node->inode);
@@ -1408,6 +1411,7 @@ static int64_t sys_lchown(const char* path, uint32_t owner, uint32_t group) {
 }
 
 static int64_t sys_umask(int mask) {
+    (void)mask;
     // EterOS doesn't have a global umask in task_t yet, so we just mock it.
     // Return the old umask (assume 0022).
     return 0022;

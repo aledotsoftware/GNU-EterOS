@@ -6,9 +6,9 @@
 **Versión Actualizada:** 0.2.0 Genesis SMP
 
 ### ✅ Resultados de Verificación
-- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP. **Sin embargo, persisten warnings de compilación:** comparación de signos en `kernel/fs/devfs.c` (ioctl BINDER) y funciones/parámetros sin uso en `kernel/arch/x86_64/syscall.c` (wrappers de sockets y parámetro mask en sys_umask).
+- **Make all (Build):** Éxito. Kernel compilado a `build/kernel.img` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP. Los warnings de compilación previamente detectados (comparación de signos en `kernel/fs/devfs.c` y funciones/parámetros sin uso en `kernel/arch/x86_64/syscall.c`) fueron corregidos exitosamente.
 - **Make clean:** Éxito. Funciona correctamente eliminando artefactos (como `.o` y `build/`) sin borrar código fuente rastreado en git.
-- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente, pero **persisten warnings de redefinición de macros** (como `__ETEROS_HOST_TEST__`, `PROT_READ`, etc.) durante la ejecución.
+- **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente. Los warnings de redefinición de macros en el entorno de host (`__ETEROS_HOST_TEST__`, `PROT_READ`, `PROT_WRITE`, `HAL_MEM_WRITE`, `HAL_MEM_WRITE_COMBINING`, `VGA_BUFFER_ADDR`) han sido resueltos satisfactoriamente en `tests/test_stack_security.c`, `tests/test_mmap_fixed.c`, y `tests/test_framebuffer_scroll.c`. El uso de `|| true` también ha sido removido del script de testeo, lo que garantiza rigor en el entorno de integración contínua (CI).
 - **Prueba de Arranque y QEMU Headless:** Éxito (`tests/run_integration.sh` OK). La secuencia de booteo inicializa BSP, GDT, PMM, VMM (Paginación), Scheduler y VFS correctamente con 64MB, 128MB y 512MB de RAM. Realiza exitosamente la transición al anillo 3 levantando el entorno en initrd sin kernel panics.
 
 ---
@@ -36,26 +36,24 @@
 
 ## 3. Orden de Ejecución Recomendado (Próximo Ciclo)
 
-Basado en las brechas observables en la arquitectura actual y los nuevos hallazgos de compilación, los agentes deben activarse en este orden:
+Basado en las brechas observables en la arquitectura actual y considerando que los bugs del CI y test fueron resueltos en este ciclo de urgencia, los agentes deben activarse en este orden:
 
-1. **`aether-droid-subsystem-bot`, `network-socket-api-bot`, `userspace-libc-posix-bot`, `testing-ci-validation-bot`:** Ejecución prioritaria para limpiar todos los warnings de compilación (signedness, unused vars) y redefiniciones de macros en los tests detectados en la auditoría del Orquestador.
-2. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
-3. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
-4. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
-5. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
+1. **`vfs-posix-filesystem-bot`:** Conectar el backend de `jfs.c` (Journaling File System) con `kernel/fs/bcache.c` para proveer persistencia real de bloques al disco, reemplazando su actual funcionamiento volátil exclusivo en memoria RAM. Se debe usar explícitamente `partition_get_active_root()` de `kernel/drivers/disk/partition.c` para interactuar con la partición física subyacente y enlazarlo con el `bcache`.
+2. **`users-security-panel-bot`:** Completar el puente de autenticación de usuario; ajustar `login.elf` para parsear `/etc/shadow` y `/etc/passwd` de un sistema en vivo usando archivos seguros creados por `useradd`, asegurando control de acceso real y montajes dinámicos si fuera necesario al bootear `/etc`.
+3. **`linux-syscall-compliance-bot`:** Implementar TTY y subconjuntos PTY. Añadir en `kernel/arch/x86_64/syscall.c` los endpoints que posibiliten el pipeline para terminales robustos (por ej. `sys_ioctl` extenso para TTY), meta crucial para portar utilidades complejas de GNU a userspace.
+4. **`kernel-stability-boot-bot`:** Implementar gestión de energía (ACPI S5 shutdown). Se debe parsear la tabla DSDT (referenciada en FADT) para encontrar el objeto AML `_S5_` y extraer los valores reales de `SLP_TYPa` y `SLP_TYPb` para proveer un apagado suave y seguro para el sistema, y escribir estos valores a los bloques de control `pm1a_control_block` y `pm1b_control_block`.
 
 ---
 
 ## 4. Hallazgos adicionales y Riesgos
 - La libc ahora utiliza exitosamente `SYS_gethostbyname` para resolución DNS asíncrona delegada al kernel.
 - La inexistencia de validaciones en disco para el `jfs` arriesga la confiabilidad de cualquier metadato salvado actualmente por el sistema durante la runtime de QEMU.
-- Es mandatorio seguir validando que los comandos de pre-commit corran con `bash tests/run_tests.sh` (con set -e activado), manteniendo la rigurosidad frente al scope creep.
-- **Riesgo en CI:** Se ha detectado el uso de `|| true` en algunas líneas de `tests/run_tests.sh`, lo que enmascara fallos reales y genera falsos positivos. Esto debe ser corregido por `testing-ci-validation-bot`.
+- Es mandatorio seguir validando que los comandos de pre-commit corran con `bash tests/run_tests.sh` (con set -e activado), manteniendo la rigurosidad frente al scope creep. Ahora que los `|| true` fueron limpiados, se espera que el CI aborte ante la primera falla.
 
 ---
 
 ## 5. Changelog / Ultimos Avances
-- El Orchestrator Meta-Agent auditó el sistema, verificando compilación y tests nativos.
-- Se ha detectado la regresión/persistencia de warnings de compilación en `devfs.c` (signedness en la API Binder), `syscall.c` (sockets VFS, sys_umask) y de redefinición de macros en pruebas.
-- Se han actualizado las asignaciones de tareas de los agentes respectivos para resolver estos warnings antes de avanzar con los grandes milestones (persistencia JFS, autenticación, soporte de tty y apagado acpi s5).
-- Se asignó a `testing-ci-validation-bot` la eliminación de `|| true` en `tests/run_tests.sh` para evitar falsos positivos en el CI.
+- El Orchestrator Meta-Agent auditó el sistema, verificando que los errores y warnings residuales del ciclo anterior fueron finalmente solventados (issues de cast int/unsigned int, variables en desuso y redefiniciones macro de host tests).
+- Todos los warnings de redefinición de macros en `tests/test_stack_security.c`, `tests/test_mmap_fixed.c`, y `tests/test_framebuffer_scroll.c` han sido corregidos mediante bloques ifdef y undef para que no choquen con definiciones previas en el pipeline.
+- El script de ejecución de test (`tests/run_tests.sh`) fue liberado de los enmascaramientos de errores (`|| true`), previniendo así falsos positivos.
+- Se ha encolado como prioridad absoluta avanzar con los pendientes: persistencia JFS en disco duro, login mediante standard POSIX, soporte terminal para la migración GNU, y el soft power-off ACPI S5.
