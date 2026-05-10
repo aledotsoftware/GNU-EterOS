@@ -38,10 +38,9 @@
 
 Basado en las brechas observables en la arquitectura actual y considerando que los bugs del CI y test fueron resueltos en este ciclo de urgencia, se priorizan los hitos siguientes:
 
-1. **`vfs-posix-filesystem-bot`:** Implementar cache coherente para inode states e iteradores optimizados de directorio.
-2. **`users-security-panel-bot`:** Implementar control de permisos de grupo estricto y encriptar perfiles home al inicio.
-3. **`linux-syscall-compliance-bot`:** Terminar y robustecer pseudo-tty (PTY) de forma de acomodar aplicaciones GNU complejas en `marea_shell`.
-4. **`kernel-stability-boot-bot`:** Incorporar apagado S4 hibernate experimental salvando estado al block cache JFS.
+1. **`aether-linux-subsystem-bot`:** Implementar soporte de carga dinámica de librerías (.so) en el cargador ELF.
+2. **`aether-droid-subsystem-bot`:** Expandir el stub de /dev/binder para soportar enrutamiento básico de transacciones IPC estilo Android.
+3. **`graphics-power-panel-bot`:** Diseñar e implementar una abstracción DRM/KMS básica sobre el framebuffer actual.
 
 ---
 
@@ -55,4 +54,4 @@ Basado en las brechas observables en la arquitectura actual y considerando que l
 - El Orchestrator Meta-Agent re-auditó el sistema. Se verificó exitosamente que los hitos de persistencia JFS (mediante bcache), lectura real de /etc/shadow, validaciones ioctl para TTY/binder, y soporte ACPI S5 fueron completados e integrados sin introducir regresiones.
 - El sistema de testing fue validado y todos los test nativos pasan exitosamente (\`tests/run_tests.sh\`).
 - Se reafirma el estado libre de regresiones.
-- Los agentes han sido alineados. Se confirma y da luz verde al inicio del nuevo ciclo enfocado en POSIX group permissions (\`users-security-panel-bot\`), PTY handling (\`linux-syscall-compliance-bot\`), VFS caching (\`vfs-posix-filesystem-bot\`) y S4 hibernate (\`kernel-stability-boot-bot\`).
+- Los agentes han sido alineados. Se confirma y da luz verde al inicio del nuevo ciclo enfocado en carga dinámica de librerías ELF (`aether-linux-subsystem-bot`), transacciones IPC Binder Android (`aether-droid-subsystem-bot`), y abstracción DRM/KMS (`graphics-power-panel-bot`).

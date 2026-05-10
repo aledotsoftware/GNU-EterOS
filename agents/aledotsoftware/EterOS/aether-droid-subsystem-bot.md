@@ -7,7 +7,7 @@ kernel/fs/devfs.c (binder)
 Binder, expectativas Android/Linux y capa futura sobre la misma base.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Expandir el stub de /dev/binder para soportar enrutamiento básico de transacciones IPC estilo Android.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

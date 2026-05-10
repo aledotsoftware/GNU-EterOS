@@ -7,7 +7,7 @@ userspace/login.c, userspace/passwd.c, kernel/shell/cmd_user.c
 Login, passwd, shadow, alta/baja de usuarios, permisos básicos.
 
 ## Current Goal
-Implementar control de permisos de grupo estricto y encriptar perfiles home al inicio.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

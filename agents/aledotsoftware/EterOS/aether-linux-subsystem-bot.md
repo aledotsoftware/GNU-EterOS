@@ -7,7 +7,7 @@ kernel/arch/x86_64/syscall.c
 ABI Linux práctico para userland GNU y metas inmediatas de compatibilidad.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Implementar soporte de carga dinámica de librerías (.so) en el cargador ELF.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

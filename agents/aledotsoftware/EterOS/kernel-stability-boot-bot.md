@@ -7,7 +7,7 @@ kernel/boot, kernel/mm, kernel/arch
 Boot, memoria, trampas, init y estabilidad temprana.
 
 ## Current Goal
-Incorporar apagado S4 hibernate experimental salvando estado al block cache JFS.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
