@@ -41,18 +41,20 @@ Basado en las brechas observables en la arquitectura actual y considerando que l
 1. **`aether-linux-subsystem-bot`:** Implementar soporte de carga dinámica de librerías (.so) en el cargador ELF.
 2. **`aether-droid-subsystem-bot`:** Expandir el stub de /dev/binder para soportar enrutamiento básico de transacciones IPC estilo Android.
 3. **`graphics-power-panel-bot`:** Diseñar e implementar una abstracción DRM/KMS básica sobre el framebuffer actual.
+4. **`linux-syscall-compliance-bot`:** Expandir la compatibilidad de POSIX PTY ioctls y soporte más robusto para fork/exec/clone que soporte la terminal GNU real (bash/coreutils).
+5. **`users-security-panel-bot`:** Implementar binario `/bin/login` que coordine la entrada multiusuario, genere tokens de sesión y asigne `/dev/ttyX`.
 
 ---
 
 ## 4. Hallazgos adicionales y Riesgos
-- La libc ahora utiliza exitosamente `SYS_gethostbyname` para resolución DNS asíncrona delegada al kernel.
-- Se debe observar que la nueva validación S5 ACPI debe robustecer el fallback en sistemas pre-2010.
+- La auditoría en `kernel/fs/elf.c` confirma que la detección del tipo de binario `ET_DYN` permite offset base de carga y `PT_INTERP` se parsea, pero falta el parseo de `PT_DYNAMIC` para la carga dinámica de librerías en EterOS.
+- En `kernel/fs/devfs.c`, el código actual detecta `BINDER_WRITE_READ` y `BINDER_SET_CONTEXT_MGR`, pero simplemente retornan éxito ficticio sin implementar transacciones, requiriendo intervención crítica.
+- La abstracción DRM/KMS es prioritaria dado que la implementación gráfica en `kernel/gfx/gfx.c` asume resoluciones fijas o fallbacks a VBE sin protocolo GOP unificado (marcado con TODOs).
 - El driver de Journaling JFS ha sido exitosamente puenteado a la capa física del bloque de disco usando `bcache`, logrando persistencia real en memoria no volátil, como se verificó en este reporte y pruebas locales.
 
 ---
 
 ## 5. Changelog / Ultimos Avances
 - El Orchestrator Meta-Agent re-auditó el sistema y verificó que el build y test run en la versión actual es un éxito total.
-- Se verificó exitosamente que los hitos de persistencia JFS (mediante bcache), lectura real de /etc/shadow y /etc/passwd en login.elf, validaciones ioctl para TTY/binder, y soporte ACPI S5 de poweroff fueron completados e integrados sin introducir regresiones.
-- Los test nativos C (vía `tests/run_tests.sh`) pasan con cobertura total y el script se ejecuta de forma rigurosa tras quitar los tolerantes `|| true`.
-- Se han alineado los archivos `.md` de cada agente y también el state del sistema. Las instrucciones establecen el comienzo oficial de un ciclo de desarrollo enfocado en la carga dinámica ELF (`aether-linux-subsystem-bot`), transacciones en IPC Binder Android (`aether-droid-subsystem-bot`), y abstracción DRM/KMS gráfica (`graphics-power-panel-bot`).
+- Los test nativos C (vía `tests/run_tests.sh`) y scripts de integración headless en QEMU pasan con cobertura total y el pipeline es riguroso.
+- Se han alineado los archivos `.md` de cada agente y también el state del sistema. Las instrucciones establecen el comienzo oficial de un ciclo de desarrollo enfocado en la carga dinámica ELF (`aether-linux-subsystem-bot`), transacciones en IPC Binder Android (`aether-droid-subsystem-bot`), y abstracción DRM/KMS gráfica (`graphics-power-panel-bot`), sustentados todos en las brechas y bloques encontrados dentro del código fuente de `P:\EterOS`.
