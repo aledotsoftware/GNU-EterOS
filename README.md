@@ -256,14 +256,13 @@ make iso      # Genera un ISO booteable para grabar en USB
 Aunque éterOS vv0.2.0 es altamente funcional, las siguientes áreas son la prioridad actual de desarrollo:
 
 🔴 **Críticos (Blockers):**
-1.  **Resolución DNS Nativa:** lwIP la soporta, pero falta exponerla a la capa VFS para que comandos como `ntp` y `ota` no dependan de IPs hardcodeadas.
-2.  **Persistencia JFS:** El driver de Journaling actual guarda todo en RAM. Falta el puente para volcar el journal al driver de disco duro físico a través de la capa `bcache`.
-3.  **Gestión de Energía (ACPI):** Se parsea la topología de la CPU, pero falta implementar el apagado suave (`S5`) y suspensión mediante las tablas FADT.
+1.  **Cargador de Librerías Dinámicas (`.so`):** Actualmente el loader ELF asume compilación estática. Se requiere soporte para `PT_DYNAMIC` para avanzar hacia el port completo de la libc GNU.
+2.  **Aether-Droid (Binder IPC):** Implementación de transacciones y enrutamiento en el driver `/dev/binder` dentro del kernel para habilitar comunicación inter-proceso estilo Android.
+3.  **Abstracción DRM/KMS:** El motor Omni v2.0 opera sobre LFB (Linear Framebuffer). Se necesita una abstracción DRM (Direct Rendering Manager) y KMS (Kernel Mode Setting) para un entorno de escritorio completo.
 
-🟡 **Mejoras Arquitectónicas:**
-4.  **Aether-Droid:** Implementación del driver `/dev/binder` en el kernel para habilitar IPC estilo Android.
-5.  **Cargador de Librerías Dinámicas (`.so`):** Actualmente el loader ELF asume compilación estática.
-6.  **Sistema Multiusuario:** Existen UIDs en la estructura del proceso, pero falta el binario `login.elf` interactuando con `/etc/shadow` y aplicando permisos en el VFS.
+🟡 **Mejoras Arquitectónicas (Largo Plazo):**
+4.  **Compatibilidad Syscalls Linux:** Expandir la compatibilidad de POSIX PTY ioctls y soporte más robusto para `fork/exec/clone` que soporte la terminal GNU real (bash/coreutils).
+5.  **Sistema Multiusuario Completo:** Si bien ya se parsean `/etc/shadow` y `/etc/passwd` y hay UIDs por proceso, se requiere un binario `/bin/login` que coordine la entrada, genere tokens de sesión y asigne `/dev/ttyX`.
 
 ---
 

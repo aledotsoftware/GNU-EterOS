@@ -47,11 +47,12 @@ Basado en las brechas observables en la arquitectura actual y considerando que l
 ## 4. Hallazgos adicionales y Riesgos
 - La libc ahora utiliza exitosamente `SYS_gethostbyname` para resolución DNS asíncrona delegada al kernel.
 - Se debe observar que la nueva validación S5 ACPI debe robustecer el fallback en sistemas pre-2010.
+- El driver de Journaling JFS ha sido exitosamente puenteado a la capa física del bloque de disco usando `bcache`, logrando persistencia real en memoria no volátil, como se verificó en este reporte y pruebas locales.
 
 ---
 
 ## 5. Changelog / Ultimos Avances
-- El Orchestrator Meta-Agent re-auditó el sistema. Se verificó exitosamente que los hitos de persistencia JFS (mediante bcache), lectura real de /etc/shadow, validaciones ioctl para TTY/binder, y soporte ACPI S5 fueron completados e integrados sin introducir regresiones.
-- El sistema de testing fue validado y todos los test nativos pasan exitosamente (\`tests/run_tests.sh\`).
-- Se reafirma el estado libre de regresiones.
-- Los agentes han sido alineados. Se confirma y da luz verde al inicio del nuevo ciclo enfocado en carga dinámica de librerías ELF (`aether-linux-subsystem-bot`), transacciones IPC Binder Android (`aether-droid-subsystem-bot`), y abstracción DRM/KMS (`graphics-power-panel-bot`).
+- El Orchestrator Meta-Agent re-auditó el sistema y verificó que el build y test run en la versión actual es un éxito total.
+- Se verificó exitosamente que los hitos de persistencia JFS (mediante bcache), lectura real de /etc/shadow y /etc/passwd en login.elf, validaciones ioctl para TTY/binder, y soporte ACPI S5 de poweroff fueron completados e integrados sin introducir regresiones.
+- Los test nativos C (vía `tests/run_tests.sh`) pasan con cobertura total y el script se ejecuta de forma rigurosa tras quitar los tolerantes `|| true`.
+- Se han alineado los archivos `.md` de cada agente y también el state del sistema. Las instrucciones establecen el comienzo oficial de un ciclo de desarrollo enfocado en la carga dinámica ELF (`aether-linux-subsystem-bot`), transacciones en IPC Binder Android (`aether-droid-subsystem-bot`), y abstracción DRM/KMS gráfica (`graphics-power-panel-bot`).
