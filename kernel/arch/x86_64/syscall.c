@@ -1737,7 +1737,7 @@ static int64_t sys_ioctl(int fd, unsigned long request, void* arg) {
         if (!arg || !vmm_verify_user_access(arg, sizeof(int), 1)) return -EFAULT;
     } else if (request == TIOCSPGRP || request == TIOCSPTLCK || request == FIONBIO) {
         if (!arg || !vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
-    } else if (request == TIOCSCTTY) {
+    } else if (request == TIOCSCTTY || request == TIOCNOTTY) {
         /* Accept null arg or int* arg; userspace commonly passes (void*)1 in Linux. */
         if (arg != NULL && !vmm_verify_user_access(arg, sizeof(int), 0)) return -EFAULT;
     } else if (request == FIONBIO) {

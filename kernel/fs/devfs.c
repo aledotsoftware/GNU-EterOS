@@ -235,6 +235,13 @@ static int dev_tty_ioctl(fs_node_t *node, int request, void *arg) {
             if (dev_tty_fg_pgid == 0) dev_tty_fg_pgid = (int)current->pgid;
             spin_unlock(&dev_tty_lock);
             return 0;
+        case TIOCNOTTY:
+            if (dev_tty_session == (int)current->sid) {
+                dev_tty_session = -1;
+                dev_tty_fg_pgid = 0;
+            }
+            spin_unlock(&dev_tty_lock);
+            return 0;
         case TIOCGPGRP:
             if (!arg) { spin_unlock(&dev_tty_lock); return -EINVAL; }
             *(int*)arg = dev_tty_fg_pgid;
@@ -472,6 +479,12 @@ static int dev_pty_ioctl(fs_node_t *node, int request, void *arg) {
             if (p->session_id != -1 && p->session_id != (int)current->sid) return -EPERM;
             p->session_id = (int)current->sid;
             if (p->fg_pgid == 0) p->fg_pgid = (int)current->pgid;
+            return 0;
+        case TIOCNOTTY:
+            if (p->session_id == (int)current->sid) {
+                p->session_id = -1;
+                p->fg_pgid = 0;
+            }
             return 0;
         case TIOCGPGRP:
             if (!arg) return -EINVAL;

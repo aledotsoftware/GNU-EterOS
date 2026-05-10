@@ -1965,20 +1965,32 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     }
 
     /* Close O_CLOEXEC descriptors on exec */
-    /* Since exec unshares FD table if shared, we should unshare here but for now just clear them locally */
+    /* Unshare FD table if shared (i.e. thread calling exec) */
     if (current->fd_table != current->fd_table_internal) {
-        /* Make a copy to unshare on exec as exec replaces address space and we shouldn't affect other threads */
-        memcpy(current->fd_table_internal, current->fd_table, sizeof(current->fd_table_internal));
-        current->fd_table = current->fd_table_internal;
-    }
-
-    for (int i = 0; i < MAX_FD; i++) {
-        if (current->fd_table[i].node && (current->fd_table[i].flags & O_CLOEXEC)) {
-            if (__atomic_sub_fetch(&current->fd_table[i].node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
-                close_fs(current->fd_table[i].node);
-                kfree(current->fd_table[i].node);
+        for (int i = 0; i < MAX_FD; i++) {
+            if (current->fd_table[i].node) {
+                if (current->fd_table[i].flags & O_CLOEXEC) {
+                    /* Do not copy over CLOEXEC FDs when unsharing */
+                    current->fd_table_internal[i].node = NULL;
+                } else {
+                    current->fd_table_internal[i] = current->fd_table[i];
+                    __atomic_fetch_add(&current->fd_table_internal[i].node->ref_count, 1, __ATOMIC_SEQ_CST);
+                }
+            } else {
+                current->fd_table_internal[i].node = NULL;
             }
-            current->fd_table[i].node = NULL;
+        }
+        current->fd_table = current->fd_table_internal;
+    } else {
+        /* Not shared, just close CLOEXEC FDs */
+        for (int i = 0; i < MAX_FD; i++) {
+            if (current->fd_table[i].node && (current->fd_table[i].flags & O_CLOEXEC)) {
+                if (__atomic_sub_fetch(&current->fd_table[i].node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
+                    close_fs(current->fd_table[i].node);
+                    kfree(current->fd_table[i].node);
+                }
+                current->fd_table[i].node = NULL;
+            }
         }
     }
 
