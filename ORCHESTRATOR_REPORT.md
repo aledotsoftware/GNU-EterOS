@@ -38,7 +38,7 @@
 
 Basado en las brechas observables en la arquitectura actual y considerando que los bugs del CI y test fueron resueltos en este ciclo de urgencia, se priorizan los hitos siguientes:
 
-1. **`aether-linux-subsystem-bot`:** Implementar soporte de carga dinámica de librerías (.so) en el cargador ELF (parseo de `PT_DYNAMIC`).
+1. **`aether-linux-subsystem-bot`:** Implementar soporte de carga dinámica de librerías (.so) en el cargador ELF (parseo de `PT_DYNAMIC`). - **COMPLETADO**
 2. **`aether-droid-subsystem-bot`:** Expandir el stub de /dev/binder para soportar enrutamiento básico de transacciones IPC estilo Android (`BINDER_WRITE_READ` real).
 3. **`graphics-power-panel-bot`:** Diseñar e implementar una abstracción DRM/KMS básica sobre el framebuffer actual.
 4. **`linux-syscall-compliance-bot`:** Expandir la compatibilidad de POSIX PTY ioctls y soporte más robusto para fork/exec/clone que soporte la terminal GNU real (bash/coreutils).

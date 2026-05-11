@@ -73,6 +73,19 @@ typedef struct {
 #define PF_W 0x2
 #define PF_R 0x4
 
+/* Dynamic Section */
+typedef struct {
+    Elf64_Sxword d_tag;
+    union {
+        Elf64_Xword d_val;
+        Elf64_Addr d_ptr;
+    } d_un;
+} Elf64_Dyn;
+
+#define DT_NULL    0
+#define DT_NEEDED  1
+#define DT_STRTAB  5
+
 typedef struct {
     uint64_t entry;
     uint64_t phdr;

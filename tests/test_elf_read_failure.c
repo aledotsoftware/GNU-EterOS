@@ -52,6 +52,21 @@ typedef int64_t  int64_t;
 typedef size_t   size_t;
 
 /* Types from task.h */
+typedef uint64_t Elf64_Xword;
+typedef int64_t Elf64_Sxword;
+typedef uint64_t Elf64_Addr;
+typedef struct {
+    Elf64_Sxword d_tag;
+    union {
+        Elf64_Xword d_val;
+        Elf64_Addr d_ptr;
+    } d_un;
+} Elf64_Dyn;
+
+#define DT_NULL    0
+#define DT_NEEDED  1
+#define DT_STRTAB  5
+
 typedef struct {
     char name[32];
     uint64_t os_abi;
@@ -59,8 +74,8 @@ typedef struct {
     uint64_t brk;
     uint32_t euid;
     uint32_t egid;
+    uint64_t mmap_base;
 } task_t;
-
 /* Types from fs/vfs.h */
 typedef struct fs_node {
     char name[128];
@@ -80,12 +95,15 @@ typedef uint16_t Elf64_Half;
 typedef uint64_t Elf64_Off;
 typedef uint32_t Elf64_Word;
 typedef uint64_t Elf64_Xword;
+typedef int64_t Elf64_Sxword;
+typedef uint64_t Elf64_Addr;
 
 #define EI_NIDENT 16
 #define ET_EXEC 2
 #define ET_DYN 3
 #define EM_X86_64 62
 #define PT_LOAD 1
+#define PT_DYNAMIC 2
 #define PT_INTERP 3
 #define PT_PHDR 6
 #define PF_R 0x4
@@ -142,6 +160,41 @@ void serial_write_string(const char* str) {
     printf("[SERIAL] %s", str);
 }
 
+size_t eteros_strlen(const char* s) { size_t l=0; while(*s++) l++; return l; }
+size_t eteros_strlcpy(char *dst, const char *src, size_t dsize) {
+    const char *osrc = src;
+    size_t nleft = dsize;
+    if (nleft != 0) {
+        while (--nleft != 0) {
+            if ((*dst++ = *src++) == '\0') break;
+        }
+    }
+    if (nleft == 0) {
+        if (dsize != 0) *dst = '\0';
+        while (*src++) ;
+    }
+    return (src - osrc - 1);
+}
+
+size_t eteros_strlcat(char *dst, const char *src, size_t dsize) {
+    const char *odst = dst;
+    const char *osrc = src;
+    size_t n = dsize;
+    size_t dlen;
+    while (n-- != 0 && *dst != '\0') dst++;
+    dlen = dst - odst;
+    n = dsize - dlen;
+    if (n == 0) return (dlen + strlen(src));
+    while (*src != '\0') {
+        if (n != 1) {
+            *dst++ = *src;
+            n--;
+        }
+        src++;
+    }
+    *dst = '\0';
+    return (dlen + (src - osrc));
+}
 void utoa_hex_s(uint64_t val, char* buf, size_t size) {
     snprintf(buf, size, "%lx", val);
 }

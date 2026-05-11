@@ -360,13 +360,77 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         }
     }
 
-    if (current) {
+    /* Pass 3: Parse PT_DYNAMIC to load shared libraries (.so) */
+    for (int i = 0; i < header.e_phnum; i++) {
+        Elf64_Phdr phdr;
+        uint64_t offset = header.e_phoff + (i * header.e_phentsize);
+        read_fs(node, offset, sizeof(Elf64_Phdr), (uint8_t*)&phdr);
+
+        if (phdr.p_type == PT_DYNAMIC) {
+            uint64_t dyn_vaddr = phdr.p_vaddr + load_offset;
+
+            /* Validate dyn_vaddr against basic bounds to prevent kernel panic */
+            if (dyn_vaddr < USER_BASE || dyn_vaddr + phdr.p_memsz < dyn_vaddr || dyn_vaddr + phdr.p_memsz > 0x0000800000000000) {
+                serial_write_string("[ELF] Error: Invalid PT_DYNAMIC address.\n");
+                continue;
+            }
+
+            Elf64_Dyn* dyn = (Elf64_Dyn*)dyn_vaddr;
+            uint64_t strtab = 0;
+
+            /* Limit iteration to prevent infinite loops on malformed DYNAMIC section */
+            uint64_t max_dyn_entries = phdr.p_memsz / sizeof(Elf64_Dyn);
+
+            /* First pass: find DT_STRTAB */
+            for (uint64_t d = 0; d < max_dyn_entries; d++) {
+                if (dyn[d].d_tag == DT_NULL) break;
+                if (dyn[d].d_tag == DT_STRTAB) {
+                    strtab = dyn[d].d_un.d_ptr + load_offset;
+                    break;
+                }
+            }
+
+            /* Second pass: load DT_NEEDED */
+            if (strtab && strtab >= USER_BASE && strtab < 0x0000800000000000) {
+                for (uint64_t d = 0; d < max_dyn_entries; d++) {
+                    if (dyn[d].d_tag == DT_NULL) break;
+                    if (dyn[d].d_tag == DT_NEEDED) {
+                        /* Validate string pointer to prevent page faults */
+                        uint64_t str_addr = strtab + dyn[d].d_un.d_val;
+                        if (str_addr < USER_BASE || str_addr >= 0x0000800000000000) {
+                            serial_write_string("[ELF] Error: Invalid DT_NEEDED string address.\n");
+                            continue;
+                        }
+
+                        char* lib_name = (char*)str_addr;
+                        char lib_path[256];
+                        strlcpy(lib_path, "/lib/", sizeof(lib_path));
+                        strlcat(lib_path, lib_name, sizeof(lib_path));
+
+                        serial_write_string("[ELF] Autoloading dynamic library: ");
+                        serial_write_string(lib_path);
+                        serial_write_string("\n");
+
+                        if (current) {
+                            uint64_t lib_base = current->mmap_base;
+                            elf_load_file(lib_path, lib_base);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (current && base_vaddr == 0) {
         current->brk = max_vaddr;
         serial_write_string("[ELF] Set process BRK to 0x");
         char brk_buf[32];
         utoa_hex_s(max_vaddr, brk_buf, sizeof(brk_buf));
         serial_write_string(brk_buf);
         serial_write_string("\n");
+    } else if (current) {
+        /* Advance mmap_base for shared libraries */
+        current->mmap_base = PAGE_ALIGN_UP(max_vaddr + PAGE_SIZE);
     }
 
     kfree(node);

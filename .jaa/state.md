@@ -4,6 +4,7 @@ Este archivo contiene el estado compartido entre todos los repositorios gestiona
 Los agentes pueden leer este estado para entender el contexto de otros proyectos.
 
 ## 🚀 ACTIVE MILESTONES
+- [JAA] PT_DYNAMIC parsing for kernel ELF dynamic loading (.so) - **COMPLETADO**
 - [JAA] Implementación de Jerarquía de Contexto (.jaa.md global) - **COMPLETADO**
 - [JAA] Sistema de Estado Global (system-state.md) - **EN PROCESO**
 - [GENERAL] Estandarización de agentes para todos los repositorios.
