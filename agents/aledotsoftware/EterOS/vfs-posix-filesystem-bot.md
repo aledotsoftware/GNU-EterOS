@@ -7,7 +7,7 @@ kernel/fs/
 VFS, initrd, procfs, shmfs, FAT32/JFS, ELF loader.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Implementar soporte de hardlinks y commits atómicos en el driver JFS (`kernel/fs/jfs.c`).
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
