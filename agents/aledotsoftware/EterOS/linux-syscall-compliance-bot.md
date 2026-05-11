@@ -7,7 +7,7 @@ kernel/arch/x86_64/syscall.c
 Cobertura progresiva de syscalls Linux x86_64 con foco en GNU/Linux real.
 
 ## Current Goal
-Expandir la compatibilidad de POSIX PTY ioctls y soporte más robusto para fork/exec/clone que soporte la terminal GNU real (bash/coreutils).
+Implementar soporte de señales de job control (`SIGSTOP`, `SIGCONT`, `SIGCHLD`, `SIGTTIN`, `SIGTTOU`) en el entorno syscall para complementar el subsistema PTY, permitiendo control real de procesos en bash/coreutils.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
