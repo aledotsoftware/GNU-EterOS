@@ -55,6 +55,5 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 
 ## 5. Changelog / Ultimos Avances
 - El Orchestrator Meta-Agent ha auditado nuevamente el sistema (2026-05-12) y verificado que el build y test run en la versión actual es un éxito total, incluyendo integración en QEMU Headless.
-- Se reafirman las prioridades actuales para este ciclo, enfocándose en la alineación del roadmap crítico con un énfasis real en el control de procesos (login.c session tty), soporte JFS de hardlinks, ruteo IPC Binder Android y abstracción gráfica DRM/KMS.
-- El siguiente ciclo debe comenzar INMEDIATAMENTE asignando el bot `users-security-panel-bot` para implementar `setsid()` y `ioctl(TIOCSCTTY)` en `userspace/login.c`, estableciendo sesiones de terminal reales.
-- Todos los archivos `.md` de los agentes correspondientes han sido revisados y alineados con esta priorización activa.
+- Se re-auditó el proyecto (2026-05-12). El plan de orquestación ha sido ajustado, confirmando la compleción del `linux-syscall-compliance-bot` y manteniendo activos los objetivos críticos de TTY en `/bin/login`, *hardlinks* en JFS, IPC Binder y DRM. Los `.md` de agentes y `ORCHESTRATOR_REPORT.md` reflejan estas prioridades bloqueantes. El siguiente bot en ejecutar sus tareas es `users-security-panel-bot` para asignar TTY/PTY usando `setsid()` e `ioctl(TIOCSCTTY)` en `userspace/login.c`.
+- **NUEVO:** El objetivo crítico del `users-security-panel-bot` (asignación de TTY/PTY en `login.c` mediante `setsid()` e `ioctl(TIOCSCTTY)`) ha sido delegado al agente y será resuelto de inmediato. El reporte asume que la próxima iteración del orchestrator validará su implementación.
