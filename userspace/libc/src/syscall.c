@@ -362,3 +362,9 @@ ssize_t pwrite(int fd, const void *buf, size_t count, int64_t offset) {
     if (ret < 0) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
+
+int reboot(int magic, int magic2, int cmd, void *arg) {
+    long ret = syscall4(SYS_reboot, magic, magic2, cmd, (long)arg);
+    if (ret < 0) { errno = -ret; return -1; }
+    return 0;
+}

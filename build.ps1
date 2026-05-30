@@ -26,7 +26,9 @@ param(
     [string]$Target = "all",
 
     [ValidateSet("x86_64", "i386", "aarch64")]
-    [string]$Arch = "x86_64"
+    [string]$Arch = "x86_64",
+
+    [string]$Changelog = "Auto-compilacion sin detalles"
 )
 
 $ErrorActionPreference = "Stop"
@@ -242,6 +244,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\net\core\raw_tcp.c",
     "$KERNEL_DIR\net\core\tcp.c",
     "$KERNEL_DIR\net\core\ip_utils.c",
+    "$KERNEL_DIR\net\core\lwip_stubs.c",
     "$KERNEL_DIR\mm\heap.c",
     "$KERNEL_DIR\mm\pmm.c",
     "$KERNEL_DIR\mm\vmm.c",
@@ -264,6 +267,7 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\fs\jfs.c",
     "$KERNEL_DIR\fs\shmfs.c",
     "$KERNEL_DIR\drivers\disk\partition.c",
+    "$KERNEL_DIR\drivers\disk\ata.c",
     "$KERNEL_DIR\drivers\input\input.c",
     "$KERNEL_DIR\drivers\tty.c",
     "$KERNEL_DIR\gfx\gfx.c",
@@ -409,11 +413,66 @@ function Invoke-BootBuild {
     }
 }
 
+function Invoke-BumpVersion {
+    $mainCPath = "$KERNEL_DIR\main.c"
+    $content = Get-Content $mainCPath -Raw
+    if ($content -match '#define\s+ETEROS_VERSION_PATCH\s+(\d+)') {
+        $oldPatch = [int]$matches[1]
+        $newPatch = $oldPatch + 1
+        $content = $content -replace "(#define\s+ETEROS_VERSION_PATCH\s+)\d+", "`${1}$newPatch"
+        Set-Content -Path $mainCPath -Value $content -NoNewline
+        Write-Step "VER" "Versión incrementada a Patch $newPatch"
+    }
+}
+
+function Invoke-ExportUpdate {
+    $mainCPath = "$KERNEL_DIR\main.c"
+    $content = Get-Content $mainCPath -Raw
+    $major = "0"; $minor = "0"; $patch = "0"
+    if ($content -match '#define\s+ETEROS_VERSION_MAJOR\s+(\d+)') { $major = $matches[1] }
+    if ($content -match '#define\s+ETEROS_VERSION_MINOR\s+(\d+)') { $minor = $matches[1] }
+    if ($content -match '#define\s+ETEROS_VERSION_PATCH\s+(\d+)') { $patch = $matches[1] }
+    $version = "$major.$minor.$patch"
+    
+    $updateRoot = "p:\update.tudexnetworks.com"
+    $versionDir = "$updateRoot\$version"
+    
+    if (!(Test-Path $versionDir)) {
+        New-Item -ItemType Directory -Force -Path $versionDir | Out-Null
+    }
+    
+    Write-Step "OTA" "Exportando actualización OTA (v$version)..."
+    Copy-Item $OS_IMAGE "$versionDir\eteros.img" -Force
+    
+    $metadataPath = "$updateRoot\metadata.json"
+    $history = @()
+    if (Test-Path $metadataPath) {
+        try {
+            $oldMeta = Get-Content $metadataPath -Raw | ConvertFrom-Json
+            if ($oldMeta.history) {
+                $history = @($oldMeta.history)
+            }
+            if ($oldMeta.latest_version -and $oldMeta.latest_version -ne $version) {
+                $history = @( @{ version = $oldMeta.latest_version; changelog = $oldMeta.changelog } ) + $history
+            }
+        } catch {}
+    }
+
+    $metadata = [ordered]@{
+        path = "/$version/eteros.img"
+        latest_version = $version
+        changelog = $Changelog
+        history = $history
+    }
+    $metadata | ConvertTo-Json -Depth 5 | Set-Content $metadataPath
+    Write-Step "OK" "Actualización $version exportada a $updateRoot con historial"
+}
+
 function Invoke-KernelBuild {
+    Invoke-BumpVersion
     $objFiles = @()
 
     # Compilar ASM stubs si existen
-    # Compilar TODOS los archivos ASM/S en arch/$Arch
     $asmFiles = Get-ChildItem "$KERNEL_DIR\arch\$Arch" -Include @("*.asm", "*.S") -Recurse
     
     foreach ($asmFile in $asmFiles) {
@@ -770,7 +829,20 @@ function Invoke-UserspaceBuild {
     $ErrorActionPreference = "Stop"
     if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar busybox"; exit 1 }
 
-    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $testWaitidElf, $testProcfsElf, $testPtyJobElf, $testShebangExecElf, $testPtInterpRouteElf, $ldEterElf, $ptInterpDemoElf, $testAuxvElf, $testDlopenElf, $eterPosixValidateElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf"
+    # eter_update
+    $eterUpdateSrc = "$userDir\eter_update.c"
+    $eterUpdateObj = "$BUILD_DIR\userspace\eter_update.o"
+    & $CC -m64 -mcmodel=large -ffreestanding -fno-builtin -fno-stack-protector -nostdlib -Wall -Wextra -Os -I"$userDir\libc\include" -c $eterUpdateSrc -o $eterUpdateObj
+    if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar eter_update.c"; exit 1 }
+
+    $eterUpdateElf = "$initrdRoot\u.elf"
+    $ErrorActionPreference = "Continue"
+    & $LD -T "$userDir\linker.ld" -nostdlib -m elf_x86_64 -o $eterUpdateElf $eterUpdateObj $libcObjs 2>&1
+    $ldExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($ldExit -ne 0) { Write-Step "ERR" "Fallo al enlazar eter_update.elf"; exit 1 }
+
+    Write-Step "OK" "Userspace construido: $testElf, $testSyscallsElf, $testEpollElf, $testSigAltElf, $testSignalPosixElf, $testWaitidElf, $testProcfsElf, $testPtyJobElf, $testShebangExecElf, $testPtInterpRouteElf, $ldEterElf, $ptInterpDemoElf, $testAuxvElf, $testDlopenElf, $eterPosixValidateElf, $shElf, $eterlandElf, $mareaShellElf, $aptGetElf, $busyboxElf, $eterUpdateElf"
 }
 
 function Invoke-InitrdBuild {
@@ -872,6 +944,9 @@ function Invoke-ImageBuild {
 
     $totalSize = (Get-Item $imagePath).Length
     Write-Step "OK" "Imagen: $imagePath ($totalSize bytes)"
+
+    # Exportar la actualización OTA al dominio/directorio local
+    Invoke-ExportUpdate
 }
 
 function Invoke-VdiBuild {
@@ -1151,6 +1226,10 @@ function Invoke-QemuRun {
         # -nographic redirects serial 0 to stdio automatically so no need for -serial stdio
     }
     else {
+        # Red de QEMU
+        $qemuArgs += "-netdev", "user,id=n1"
+        $qemuArgs += "-device", "e1000,netdev=n1"
+        $qemuArgs += "-object", "filter-dump,id=f1,netdev=n1,file=network.pcap"
         # Regular mode with GUI -> use serial stdio
         $qemuArgs += "-serial", "stdio"
     }

@@ -139,6 +139,67 @@ static uint32_t dev_zero_write(fs_node_t *node, uint32_t offset, uint32_t size, 
 /* ========================================================================= */
 /* /dev/tty Implementation                                                   */
 /* ========================================================================= */
+#include <drivers/ata.h>
+
+/* ========================================================================= */
+/* /dev/sda Implementation (Raw Disk)                                        */
+/* ========================================================================= */
+static ssize_t dev_sda_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node;
+    if (!buffer) return 0;
+    
+    uint32_t start_sector = offset / 512;
+    uint32_t sector_offset = offset % 512;
+    uint32_t end_sector = (offset + size - 1) / 512;
+    uint32_t total_sectors = end_sector - start_sector + 1;
+    
+    uint8_t sect_buf[512];
+    uint32_t bytes_read = 0;
+    
+    for (uint32_t i = 0; i < total_sectors; i++) {
+        uint32_t current_lba = start_sector + i;
+        ata_read_sector(current_lba, sect_buf);
+        
+        uint32_t chunk_start = (i == 0) ? sector_offset : 0;
+        uint32_t chunk_end = (i == total_sectors - 1) ? ((size - bytes_read < 512 - chunk_start) ? chunk_start + (size - bytes_read) : 512) : 512;
+        uint32_t chunk_size = chunk_end - chunk_start;
+        
+        memcpy(buffer + bytes_read, sect_buf + chunk_start, chunk_size);
+        bytes_read += chunk_size;
+    }
+    
+    return bytes_read;
+}
+
+static uint32_t dev_sda_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node;
+    if (!buffer) return 0;
+    
+    uint32_t start_sector = offset / 512;
+    uint32_t sector_offset = offset % 512;
+    uint32_t end_sector = (offset + size - 1) / 512;
+    uint32_t total_sectors = end_sector - start_sector + 1;
+    
+    uint8_t sect_buf[512];
+    uint32_t bytes_written = 0;
+    
+    for (uint32_t i = 0; i < total_sectors; i++) {
+        uint32_t current_lba = start_sector + i;
+        uint32_t chunk_start = (i == 0) ? sector_offset : 0;
+        uint32_t chunk_end = (i == total_sectors - 1) ? ((size - bytes_written < 512 - chunk_start) ? chunk_start + (size - bytes_written) : 512) : 512;
+        uint32_t chunk_size = chunk_end - chunk_start;
+        
+        if (chunk_size < 512) {
+            ata_read_sector(current_lba, sect_buf);
+        }
+        
+        memcpy(sect_buf + chunk_start, buffer + bytes_written, chunk_size);
+        ata_write_sector(current_lba, sect_buf);
+        bytes_written += chunk_size;
+    }
+    
+    return bytes_written;
+}
 static ssize_t dev_tty_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset;
     task_t* current = task_get_current();
@@ -832,6 +893,11 @@ static int devfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) 
         entry->inode = 9;
         return 0;
     }
+    if (index == 10) {
+        strlcpy(entry->name, "sda", sizeof(entry->name));
+        entry->inode = 10;
+        return 0;
+    }
     return 1; /* EOF */
 }
 
@@ -913,6 +979,13 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->inode = 9;
         fnode->readdir = devfs_pts_readdir;
         fnode->finddir = devfs_pts_finddir;
+    } else if (strcmp(name, "sda") == 0) {
+        strlcpy(fnode->name, "sda", sizeof(fnode->name));
+        fnode->flags = FS_BLOCKDEVICE;
+        fnode->mask = 0600; // Solo root puede escribir el disco crudo
+        fnode->inode = 10;
+        fnode->read = dev_sda_read;
+        fnode->write = dev_sda_write;
     } else {
         kfree(fnode);
         return 0;

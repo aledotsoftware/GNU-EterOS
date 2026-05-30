@@ -1,0 +1,56 @@
+name: OTA Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags (e.g., v1.0.0)
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install NASM
+        run: choco install nasm -y
+
+      - name: Build EterOS Image
+        run: |
+          # Add your custom toolchain setup here if needed (e.g. x86_64-elf-gcc)
+          # We assume the tools are in PATH or C:\x86_64-elf-tools
+          .\build.ps1 -Target image
+
+      - name: Generate Metadata
+        id: metadata
+        run: |
+          $version = "${{ github.ref_name }}"
+          $hash = (Get-FileHash -Path build\x86_64\eteros.img -Algorithm SHA256).Hash.ToLower()
+          $url = "https://github.com/${{ github.repository }}/releases/download/$version/eteros.img"
+          
+          $json = @{
+            version = $version
+            sha256 = $hash
+            url = $url
+          } | ConvertTo-Json
+          
+          Set-Content -Path build\x86_64\metadata.json -Value $json
+          Write-Output "Generated metadata.json:"
+          Get-Content build\x86_64\metadata.json
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build\x86_64\eteros.img
+            build\x86_64\metadata.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

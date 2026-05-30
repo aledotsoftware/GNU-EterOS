@@ -50,6 +50,7 @@ typedef int (*unlink_type_t)(struct fs_node*, char*);
 typedef int (*ioctl_type_t)(struct fs_node*, int, void*);
 typedef int (*truncate_type_t)(struct fs_node*, uint32_t);
 typedef int (*rename_type_t)(struct fs_node*, char*, struct fs_node*, char*);
+typedef int (*link_type_t)(struct fs_node*, struct fs_node*, char*);
 
 typedef struct fs_node {
     char name[128];
@@ -75,6 +76,7 @@ typedef struct fs_node {
     unlink_type_t unlink;
     truncate_type_t truncate;
     rename_type_t rename;
+    link_type_t link;
     struct fs_node *ptr; /* Used by mountpoints and symlinks */
     uint32_t ref_count;   /* Reference counting for shared nodes */
     spinlock_t lock;      /* SMP lock for this node */
@@ -93,10 +95,13 @@ fs_node_t *finddir_fs(fs_node_t *node, char *name);
 int create_fs(fs_node_t *parent, char *name, uint16_t permission);
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission);
 int unlink_fs(fs_node_t *parent, char *name);
+int link_fs(fs_node_t *parent, fs_node_t *target, char *name);
 int ioctl_fs(fs_node_t *node, int request, void *arg);
 
 int vfs_mount(const char *path, fs_node_t *fs);
 int vfs_mkdir(const char *path, uint16_t permission);
+int vfs_link(const char *oldpath, const char *newpath);
+int vfs_unlink(const char *path);
 
 /**
  * Resolves a path to a filesystem node.

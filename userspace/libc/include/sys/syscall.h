@@ -134,6 +134,7 @@
 #define SYS_pipe2               293
 #define SYS_epoll_create1       291
 #define SYS_gethostbyname       400
+#define SYS_reboot              169
 
 long syscall(long nr, ...);
 

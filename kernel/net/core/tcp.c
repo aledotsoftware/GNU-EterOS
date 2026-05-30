@@ -38,6 +38,9 @@ static int tcp_send_packet(socket_entry_t* sock, const void* payload, int len, i
     /* IP */
     ip->ver_ihl = 0x45;
     ip->len = htons(sizeof(struct ip_header) + sizeof(struct tcp_header) + len);
+    static uint16_t g_ip_id = 1;
+    ip->id = htons(g_ip_id++);
+    ip->frag_offset = htons(0x4000); /* DF bit */
     ip->ttl = 64;
     ip->proto = IP_PROTO_TCP;
     ip->src = my_ip;

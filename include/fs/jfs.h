@@ -36,6 +36,7 @@ typedef struct {
     uint32_t inode;
     uint32_t size;
     uint32_t flags;
+    uint32_t nlink;
     uint32_t blocks[12]; /* Direct blocks */
 } jfs_inode_t;
 

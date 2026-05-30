@@ -46,24 +46,7 @@ void pci_write_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uin
     
     address = (uint32_t)((bus << 16) | (slot << 11) | (func << 8) | (offset & 0xFC) | ((uint32_t)0x80000000));
     outl(PCI_CONFIG_ADDRESS, address);
-    
-    // Para escribir solo 16 bits sin corromper el resto, leemos 32 bits, modificamos y escribimos.
-    // Esto es más simple si escribimos siempre 32 bits, pero el estándar permite acceso 16/8 bits.
-    // Para simplificar esta implementación inicial, asumimos que el bus soporta escrituras directas.
-    // La forma correcta es Read-Modify-Write de 32 bits:
-    uint32_t current_val = inl(PCI_CONFIG_DATA);
-    
-    if ((offset & 2) == 0) {
-        // Lower word
-        current_val &= 0xFFFF0000;
-        current_val |= value;
-    } else {
-        // Upper word
-        current_val &= 0x0000FFFF;
-        current_val |= ((uint32_t)value << 16);
-    }
-    
-    outl(PCI_CONFIG_DATA, current_val);
+    outw(PCI_CONFIG_DATA + (offset & 2), value);
 }
 
 /* ========================================================================= */

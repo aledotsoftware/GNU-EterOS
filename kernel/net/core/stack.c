@@ -44,10 +44,15 @@ uint16_t net_checksum(void* vdata, size_t length) {
     return (uint16_t)~acc;
 }
 
+#include <net/defs.h>
 int net_init(void) {
     memset(socket_table, 0, sizeof(socket_table));
-    network_ready = 0;
+    my_ip = htonl(0x0A00020F);      // 10.0.2.15
+    gateway_ip = htonl(0x0A000202); // 10.0.2.2
+    dns_ip = htonl(0x0A000203);     // 10.0.2.3
+    network_ready = 1;
     sem_init(&net_sem, 0);
+    hal_console_write("[NET] Static IP configured: 10.0.2.15\n");
     return 0;
 }
 
@@ -222,7 +227,10 @@ int net_arp_lookup(uint32_t target_ip) {
 }
 
 socket_t net_socket(int domain, int type, int protocol) {
-    if (domain != AF_INET || type != SOCK_STREAM || protocol != IPPROTO_TCP) return -1;
+    if (domain != AF_INET || type != SOCK_STREAM || (protocol != IPPROTO_TCP && protocol != 0)) {
+        hal_console_write("[DEBUG] net_socket rejected args\n");
+        return -1;
+    }
 
     for (int i = 0; i < MAX_SOCKETS; i++) {
         if (!socket_table[i].used) {
@@ -236,6 +244,7 @@ socket_t net_socket(int domain, int type, int protocol) {
             return i;
         }
     }
+    hal_console_write("[DEBUG] net_socket table full\n");
     return -1;
 }
 

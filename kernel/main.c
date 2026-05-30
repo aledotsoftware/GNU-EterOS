@@ -46,7 +46,7 @@
 /* ========================================================================= */
 #define ETEROS_VERSION_MAJOR    0
 #define ETEROS_VERSION_MINOR    2  /* Bump for SMP support */
-#define ETEROS_VERSION_PATCH    0
+#define ETEROS_VERSION_PATCH    19
 #define ETEROS_CODENAME         "Genesis SMP"
 
 /* ========================================================================= */
@@ -133,6 +133,8 @@ void __attribute__((section(".text.boot"))) kmain(void) {
     /* ---- 2. Obtener Info del Bootloader (si aplica) ---- */
     /* En x86, esto está en 0xA000. En ARM, puede ser NULL o DTB. */
     #if defined(ARCH_X86_64)
+        extern void ata_init(void);
+        ata_init();
         boot_info_t* boot_info = (boot_info_t*)BOOT_INFO_ADDR;
     #else
         void* boot_info = NULL;
@@ -213,12 +215,12 @@ void __attribute__((section(".text.boot"))) kmain(void) {
             fs_root = initialise_initrd(boot_info->initrd_addr, boot_info->initrd_size);
             if (fs_root) {
                 hal_console_write("[VFS] Initrd mounted at /\n");
-                desktop_autostart = boot_info &&
+                desktop_autostart = false; /* boot_info &&
                                     boot_info->signature == 0x544F424B &&
                                     boot_info->fb_addr != 0 &&
                                     boot_info->fb_width != 0 &&
                                     boot_info->fb_height != 0 &&
-                                    (finddir_fs(fs_root, "marea_shell.elf") != NULL);
+                                    (finddir_fs(fs_root, "marea_shell.elf") != NULL); */
 
                 /* Dynamic Mounts */
                 vfs_mkdir("/dev", 0);

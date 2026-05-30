@@ -66,12 +66,13 @@ static uint32_t e1000_read_reg(uint16_t offset) {
 
 static void e1000_init_rx(void) {
     /* 1. Asignar memoria para descriptores */
-    rx_descs = (volatile struct e1000_rx_desc*)kmalloc(PAGE_SIZE);
+    void* raw_rx = kmalloc(NUM_RX_DESC * sizeof(struct e1000_rx_desc) + 16);
+    rx_descs = (volatile struct e1000_rx_desc*)(((uintptr_t)raw_rx + 15) & ~15);
     if (!rx_descs) {
         serial_write_string("[E1000] ERROR: Failed to allocate RX descriptors.\n");
         return;
     }
-    memset((void*)rx_descs, 0, PAGE_SIZE);
+    memset((void*)rx_descs, 0, NUM_RX_DESC * sizeof(struct e1000_rx_desc));
     
     /* 2. Asignar buffers para cada descriptor */
     for (int i = 0; i < NUM_RX_DESC; i++) {
@@ -110,12 +111,13 @@ static void e1000_init_rx(void) {
 
 static void e1000_init_tx(void) {
     /* 1. Asignar memoria para descriptores TX */
-    tx_descs = (volatile struct e1000_tx_desc*)kmalloc(PAGE_SIZE);
+    void* raw_tx = kmalloc(NUM_TX_DESC * sizeof(struct e1000_tx_desc) + 16);
+    tx_descs = (volatile struct e1000_tx_desc*)(((uintptr_t)raw_tx + 15) & ~15);
     if (!tx_descs) {
         serial_write_string("[E1000] ERROR: Failed to allocate TX descriptors.\n");
         return;
     }
-    memset((void*)tx_descs, 0, PAGE_SIZE);
+    memset((void*)tx_descs, 0, NUM_TX_DESC * sizeof(struct e1000_tx_desc));
 
     for (int i = 0; i < NUM_TX_DESC; i++) {
         tx_buffers[i] = (uint8_t*)kmalloc(PAGE_SIZE);
@@ -285,19 +287,24 @@ int e1000_send_packet(const void* data, uint16_t len) {
     if (!e1000_active) return -1;
     if (len > PAGE_SIZE) return -1;
 
+    uint16_t send_len = len;
+    if (send_len < 60) send_len = 60;
+
     while (!(tx_descs[tx_cur].status & E1000_STA_DD)) {
         task_yield();
     }
     
+    memset(tx_buffers[tx_cur], 0, send_len);
     memcpy(tx_buffers[tx_cur], data, len);
     tx_descs[tx_cur].addr = (uint64_t)(uintptr_t)tx_buffers[tx_cur];
-    tx_descs[tx_cur].length = len;
+    tx_descs[tx_cur].length = send_len;
     tx_descs[tx_cur].cmd = E1000_CMD_EOP | E1000_CMD_IFCS | E1000_CMD_RS; // End of Packet, Insert FCS, Report Status
     tx_descs[tx_cur].status = 0;
     
     uint8_t old_cur = tx_cur;
     tx_cur = (tx_cur + 1) % NUM_TX_DESC;
     
+    __asm__ volatile("sfence" ::: "memory");
     e1000_write_reg(E1000_TDT, tx_cur);
     
     /* Esperar a que se envíe (bloqueante por ahora, polling status DD) */

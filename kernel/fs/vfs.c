@@ -111,6 +111,12 @@ int unlink_fs(fs_node_t *parent, char *name) {
     return -1;
 }
 
+int link_fs(fs_node_t *parent, fs_node_t *target, char *name) {
+    if ((parent->flags & 0x7) == FS_DIRECTORY && parent->link != 0)
+        return parent->link(parent, target, name);
+    return -1;
+}
+
 int ioctl_fs(fs_node_t *node, int request, void *arg) {
     if (node->ioctl != 0) {
         spin_lock(&node->lock);
@@ -206,6 +212,68 @@ int vfs_mkdir(const char *path, uint16_t permission) {
 }
 
 extern fs_node_t* tty_create_node(void);
+
+int vfs_link(const char *oldpath, const char *newpath) {
+    if (!oldpath || !newpath) return -1;
+    fs_node_t *target = vfs_lookup(fs_root, oldpath);
+    if (!target) return -1;
+
+    char parent_path[128];
+    char name[128];
+    int len = strlen(newpath);
+    int last_slash = -1;
+
+    for (int i = 0; i < len; i++) if (newpath[i] == '/') last_slash = i;
+
+    if (last_slash == -1) { kfree(target); return -1; }
+
+    if (last_slash == 0) {
+        strlcpy(parent_path, "/", sizeof(parent_path));
+        strlcpy(name, newpath + 1, sizeof(name));
+    } else {
+        if (last_slash >= 127) { kfree(target); return -1; }
+        memcpy(parent_path, newpath, last_slash);
+        parent_path[last_slash] = '\0';
+        strlcpy(name, newpath + last_slash + 1, sizeof(name));
+    }
+
+    fs_node_t *parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) { kfree(target); return -1; }
+
+    int ret = link_fs(parent, target, name);
+    kfree(parent);
+    kfree(target);
+    return ret;
+}
+
+int vfs_unlink(const char *path) {
+    if (!path) return -1;
+    char parent_path[128];
+    char name[128];
+    int len = strlen(path);
+    int last_slash = -1;
+
+    for (int i = 0; i < len; i++) if (path[i] == '/') last_slash = i;
+
+    if (last_slash == -1) return -1;
+
+    if (last_slash == 0) {
+        strlcpy(parent_path, "/", sizeof(parent_path));
+        strlcpy(name, path + 1, sizeof(name));
+    } else {
+        if (last_slash >= 127) return -1;
+        memcpy(parent_path, path, last_slash);
+        parent_path[last_slash] = '\0';
+        strlcpy(name, path + last_slash + 1, sizeof(name));
+    }
+
+    fs_node_t *parent = vfs_lookup(fs_root, parent_path);
+    if (!parent) return -1;
+
+    int ret = unlink_fs(parent, name);
+    kfree(parent);
+    return ret;
+}
 
 int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir) {
     if (!out_path || !path || size <= 0) return -1;

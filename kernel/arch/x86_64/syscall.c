@@ -946,6 +946,28 @@ static int64_t sys_mkdir(const char* path, int mode) {
     return sys_mkdirat(AT_FDCWD, path, mode);
 }
 
+static int64_t sys_linkat(int olddirfd, const char* oldpath, int newdirfd, const char* newpath, int flags) {
+    (void)flags;
+    if (!vmm_verify_user_access(oldpath, 1, 0) || !vmm_verify_user_access(newpath, 1, 0)) return -EFAULT;
+    
+    char* kold = (char*)kmalloc(256);
+    char* knew = (char*)kmalloc(256);
+    if (!kold || !knew) { kfree(kold); kfree(knew); return -ENOMEM; }
+
+    int res1 = resolve_path(olddirfd, oldpath, kold, 256);
+    int res2 = resolve_path(newdirfd, newpath, knew, 256);
+
+    if (res1 < 0 || res2 < 0) { kfree(kold); kfree(knew); return -EINVAL; }
+
+    int ret = vfs_link(kold, knew);
+    kfree(kold); kfree(knew);
+    return ret;
+}
+
+static int64_t sys_link(const char* oldpath, const char* newpath) {
+    return sys_linkat(AT_FDCWD, oldpath, AT_FDCWD, newpath, 0);
+}
+
 static int64_t sys_unlinkat(int dirfd, const char* path, int flags) {
     (void)flags;
     char* kpath = (char*)kmalloc(256);
@@ -3321,6 +3343,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [81] = (syscall_ptr_t)sys_fchdir,
     [83] = (syscall_ptr_t)sys_mkdir,
     [84] = (syscall_ptr_t)sys_rmdir,
+    [86] = (syscall_ptr_t)sys_link,
     [87] = (syscall_ptr_t)sys_unlink,
     [96] = (syscall_ptr_t)sys_gettimeofday,
     [102] = (syscall_ptr_t)sys_getuid,
@@ -3352,6 +3375,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [264] = (syscall_ptr_t)sys_renameat,
     [266] = (syscall_ptr_t)sys_symlinkat,
     [263] = (syscall_ptr_t)sys_unlinkat,
+    [265] = (syscall_ptr_t)sys_linkat,
     [268] = (syscall_ptr_t)sys_fchmodat,
     [269] = (syscall_ptr_t)sys_faccessat,
     [270] = (syscall_ptr_t)sys_pselect6,
@@ -3437,6 +3461,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [81] = (syscall_ptr_t)sys_fchdir,
     [83] = (syscall_ptr_t)sys_mkdir,
     [84] = (syscall_ptr_t)sys_rmdir,
+    [86] = (syscall_ptr_t)sys_link,
     [87] = (syscall_ptr_t)sys_unlink,
     [96] = (syscall_ptr_t)sys_gettimeofday,
     [97] = (syscall_ptr_t)sys_getrlimit,
@@ -3471,6 +3496,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [258] = (syscall_ptr_t)sys_mkdirat,
     [262] = (syscall_ptr_t)sys_newfstatat,
     [263] = (syscall_ptr_t)sys_unlinkat,
+    [265] = (syscall_ptr_t)sys_linkat,
     [264] = (syscall_ptr_t)sys_renameat,
     [266] = (syscall_ptr_t)sys_symlinkat,
     [268] = (syscall_ptr_t)sys_fchmodat,
@@ -3552,6 +3578,7 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [12] = (syscall_ptr_t)sys_chdir,
     [39] = (syscall_ptr_t)sys_mkdir,
     [40] = (syscall_ptr_t)sys_rmdir,
+    [9] = (syscall_ptr_t)sys_link,
     [10] = (syscall_ptr_t)sys_unlink,
     [199] = (syscall_ptr_t)sys_getuid,
     [213] = (syscall_ptr_t)sys_setuid,

@@ -83,5 +83,6 @@ int usleep(unsigned int usec);
 
 /* Misc */
 char *getcwd(char *buf, size_t size);
+int reboot(int magic, int magic2, int cmd, void *arg);
 
 #endif /* _UNISTD_H */
