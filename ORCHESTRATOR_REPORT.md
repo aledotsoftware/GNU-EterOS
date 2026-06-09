@@ -38,9 +38,8 @@
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`vfs-posix-filesystem-bot`:** Implementar soporte de `hardlinks` y la syscall asociada en el driver JFS (`kernel/fs/jfs.c` y VFS base).
-2. **`aether-droid-subsystem-bot`:** Crear estructuras reales en `kernel/fs/devfs.c` para Binder (`BINDER_WRITE_READ`) estableciendo un motor de ruteo IPC.
-3. **`graphics-power-panel-bot`:** Crear abstracción DRM base (`kernel/gfx/drm.c` o similar `/dev/dri/card0`).
+1. **`aether-droid-subsystem-bot`:** Crear estructuras reales en `kernel/fs/devfs.c` para Binder (`BINDER_WRITE_READ`) estableciendo un motor de ruteo IPC.
+2. **`graphics-power-panel-bot`:** Crear abstracción DRM base (`kernel/gfx/drm.c` o similar `/dev/dri/card0`).
 
 ---
 
@@ -55,5 +54,5 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 ## 5. Changelog / Ultimos Avances
 - El Orchestrator Meta-Agent ha auditado nuevamente el sistema (2026-05-12) y verificado que el build y test run en la versión actual es un éxito total, incluyendo integración en QEMU Headless.
 - Se re-auditó el proyecto (2026-05-12). El plan de orquestación ha sido ajustado, confirmando la compleción del `linux-syscall-compliance-bot` y manteniendo activos los objetivos críticos de TTY en `/bin/login`, *hardlinks* en JFS, IPC Binder y DRM. Los `.md` de agentes y `ORCHESTRATOR_REPORT.md` reflejan estas prioridades bloqueantes. El siguiente bot en ejecutar sus tareas es `users-security-panel-bot` para asignar TTY/PTY usando `setsid()` e `ioctl(TIOCSCTTY)` en `userspace/login.c`.
-- **NUEVO:** El objetivo crítico del `users-security-panel-bot` (asignación de TTY/PTY en `login.c` mediante `setsid()` e `ioctl(TIOCSCTTY)`) ha sido delegado al agente y será resuelto de inmediato. El reporte asume que la próxima iteración del orchestrator validará su implementación.
 - **2026-05-12 (Update):** El `users-security-panel-bot` ha completado la asignación de TTY/PTY en `login.c`. El nuevo objetivo delegado es la implementación de *hardlinks* en JFS (`kernel/fs/jfs.c`), asignado al `vfs-posix-filesystem-bot`.
+- **2026-05-12 (Update 2):** El `vfs-posix-filesystem-bot` ha completado la implementación de `hardlinks` (sys_linkat y VFS support). El nuevo objetivo delegado es para `aether-droid-subsystem-bot` para implementar estructuras de ruteo de IPC y compatibilidad de Android Binder.

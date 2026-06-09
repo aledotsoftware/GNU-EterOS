@@ -66,7 +66,7 @@ nic_driver_t mock_nic = {
 };
 nic_driver_t* current_nic = &mock_nic;
 
-#include "kernel/net/core/stack.c"
+#include "../kernel/net/core/stack.c"
 
 /* Mock string operations that kernel uses */
 void* eteros_memcpy(void* dest, const void* src, size_t n) {
@@ -146,6 +146,8 @@ int main() {
     socket_entry_t* s = &socket_table[sock_id];
     s->local_port = 80; /* We will target port 80 */
     s->state = SOCKET_STATE_LISTEN; /* Listen state */
+    s->protocol = IPPROTO_TCP;
+    s->used = 1;
 
     /* Construct Base Valid Packet */
     uint8_t packet[200];
@@ -162,7 +164,7 @@ int main() {
     ip->ver_ihl = 0x45; /* Ver 4, IHL 5 (20 bytes) */
     ip->len = htons(20 + 20); /* IP Header + TCP Header (no payload) */
     ip->proto = IP_PROTO_TCP;
-    ip->dest = 0; /* my_ip is 0 initially, so it accepts all */
+    ip->dest = my_ip; /* my_ip is 10.0.2.15 after net_init() */
 
     /* TCP */
     tcp->dest_port = htons(80);

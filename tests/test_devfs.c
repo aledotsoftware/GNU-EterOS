@@ -69,6 +69,17 @@ int input_mouse_pending(void) {
 }
 
 /* Include DevFS source directly to test static functions */
+int ata_read_sector(uint32_t lba, uint8_t *buffer) {
+    (void)lba;
+    (void)buffer;
+    return 0;
+}
+int ata_write_sector(uint32_t lba, uint8_t *buffer) {
+    (void)lba;
+    (void)buffer;
+    return 0;
+}
+
 #include "../kernel/fs/devfs.c"
 
 void test_devfs_finddir() {

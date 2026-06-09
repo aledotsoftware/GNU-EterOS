@@ -260,6 +260,8 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
 fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*)malloc(sizeof(fs_node_t)); }
 
 
+int vfs_link(const char *oldpath, const char *newpath) { (void)oldpath; (void)newpath; return -1; }
+
 #include "../kernel/arch/x86_64/syscall.c"
 
 int main() {

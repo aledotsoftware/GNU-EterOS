@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include "sha256.h"
 
 #define MAX_LINE 256
@@ -63,6 +64,9 @@ int main(int argc, char *argv[]) {
         close(auto_fd);
         if (len > 0 && auto_buf[0] == '1') {
             /* Auto-login as root (UID 0) */
+            setsid();
+            ioctl(0, TIOCSCTTY, 0);
+
             if (setuid(0) < 0 || setgid(0) < 0) {
                 printf("Error: Failed to drop privileges for autologin\n");
                 return 1;
@@ -162,6 +166,10 @@ int main(int argc, char *argv[]) {
 
                     printf("\nWelcome to eterOS, %s!\n", username);
                     close(fd);
+
+                    setsid();
+                    ioctl(0, TIOCSCTTY, 0);
+
                     if (setgid(gid) < 0 || setuid(uid) < 0) {
                         printf("Error: Failed to drop privileges\n");
                         exit(1);

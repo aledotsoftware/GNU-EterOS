@@ -28,6 +28,8 @@ cpu_info_t cpu_mock_struct;
 
 fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*)malloc(sizeof(fs_node_t)); }
 
+int vfs_link(const char *oldpath, const char *newpath) { (void)oldpath; (void)newpath; return -1; }
+
 #include "../kernel/arch/x86_64/syscall.c"
 
 #undef assert

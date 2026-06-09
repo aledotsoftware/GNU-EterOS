@@ -47,6 +47,12 @@ bool vmm_verify_user_access_called = false;
 int kmalloc_count = 0;
 int kfree_count = 0;
 
+int vfs_link(const char *oldpath, const char *newpath) {
+    (void)oldpath;
+    (void)newpath;
+    return -1;
+}
+
 /* Globals for linking */
 socket_entry_t socket_table[MAX_SOCKETS];
 sem_t net_sem;
@@ -219,6 +225,7 @@ fs_node_t* shmfs_create_memfd(const char* name) {
     (void)name;
     return (fs_node_t*)malloc(sizeof(fs_node_t));
 }
+
 
 
 

@@ -30,6 +30,11 @@
 /* Hack to mock inline functions in cpu.h */
 void pmm_ref_page(void* p) { (void)p; }
 int shmfs_truncate(fs_node_t* node, uint32_t length) { (void)node; (void)length; return -1; }
+int vfs_link(const char *oldpath, const char *newpath) {
+    (void)oldpath;
+    (void)newpath;
+    return -1;
+}
 #define get_current_cpu real_get_current_cpu
 #define get_cpu_id real_get_cpu_id
 #include "../include/cpu.h"
