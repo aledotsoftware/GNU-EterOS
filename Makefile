@@ -182,6 +182,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/arch/x86_64/pat.c \
               $(KERNEL_DIR)/arch/x86_64/apic.c \
               $(KERNEL_DIR)/arch/x86_64/syscall.c \
+              $(KERNEL_DIR)/drivers/disk/ata.c \
               $(KERNEL_DIR)/drivers/disk/partition.c \
               $(KERNEL_DIR)/fs/elf.c \
               $(KERNEL_DIR)/drivers/net/e1000.c \

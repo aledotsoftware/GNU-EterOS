@@ -38,22 +38,22 @@
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`vfs-posix-filesystem-bot`:** Implementar soporte de `hardlinks` y la syscall asociada en el driver JFS (`kernel/fs/jfs.c` y VFS base).
+1. **`users-security-panel-bot`:** Implementar la asignación correcta de sesión y TTY/PTY en el binario `userspace/login.c` (`setsid` y `ioctl(TIOCSCTTY)`).
 2. **`aether-droid-subsystem-bot`:** Crear estructuras reales en `kernel/fs/devfs.c` para Binder (`BINDER_WRITE_READ`) estableciendo un motor de ruteo IPC.
 3. **`graphics-power-panel-bot`:** Crear abstracción DRM base (`kernel/gfx/drm.c` o similar `/dev/dri/card0`).
 
 ---
 
 ## 4. Hallazgos adicionales y Riesgos
-- En `kernel/fs/devfs.c`, la implementación PTY existe y está siendo inicializada, pero el binario `login.c` aún opera directamente sobre stdout/stdin sin enlazarse correctamente a una sesión de terminal virtual, lo cual impide el job control apropiado de las shell hijas.
+- En la auditoría reciente se comprobó que el binario `login.c` **aún no realiza** las llamadas a `setsid()` ni a `ioctl(0, TIOCSCTTY, 0)`, lo cual impide el job control en el userspace de forma correcta. Esta omisión generó una desalineación en el reporte anterior.
+- El soporte para *hardlinks* en el driver JFS (`kernel/fs/jfs.c`) **ya se encuentra implementado**, validado por las funciones `jfs_link` y `jfs_unlink` manejando los campos `nlink` correctamente.
 - En `kernel/fs/devfs.c`, el código actual detecta `BINDER_WRITE_READ` y `BINDER_SET_CONTEXT_MGR`, pero simplemente retornan éxito ficticio sin implementar transacciones reales, requiriendo intervención crítica.
 - La abstracción DRM/KMS es prioritaria dado que la implementación gráfica en `kernel/gfx/gfx.c` asume resoluciones fijas o fallbacks a VBE sin protocolo GOP unificado.
-- El driver de Journaling JFS ha sido exitosamente puenteado a la capa física del bloque de disco usando `bcache`, logrando persistencia real en memoria no volátil, como se verificó en este reporte y pruebas locales. Falta implementar hardlinks.
 
 ---
 
 ## 5. Changelog / Ultimos Avances
 - El Orchestrator Meta-Agent ha auditado nuevamente el sistema (2026-05-12) y verificado que el build y test run en la versión actual es un éxito total, incluyendo integración en QEMU Headless.
-- Se re-auditó el proyecto (2026-05-12). El plan de orquestación ha sido ajustado, confirmando la compleción del `linux-syscall-compliance-bot` y manteniendo activos los objetivos críticos de TTY en `/bin/login`, *hardlinks* en JFS, IPC Binder y DRM. Los `.md` de agentes y `ORCHESTRATOR_REPORT.md` reflejan estas prioridades bloqueantes. El siguiente bot en ejecutar sus tareas es `users-security-panel-bot` para asignar TTY/PTY usando `setsid()` e `ioctl(TIOCSCTTY)` en `userspace/login.c`.
-- **NUEVO:** El objetivo crítico del `users-security-panel-bot` (asignación de TTY/PTY en `login.c` mediante `setsid()` e `ioctl(TIOCSCTTY)`) ha sido delegado al agente y será resuelto de inmediato. El reporte asume que la próxima iteración del orchestrator validará su implementación.
-- **2026-05-12 (Update):** El `users-security-panel-bot` ha completado la asignación de TTY/PTY en `login.c`. El nuevo objetivo delegado es la implementación de *hardlinks* en JFS (`kernel/fs/jfs.c`), asignado al `vfs-posix-filesystem-bot`.
+- Se re-auditó el proyecto (2026-05-12). Se detectó que el reporte anterior listó como completada la tarea de `users-security-panel-bot` (`login.c` TTY) de forma prematura. Se le reasignó esta tarea como prioridad máxima.
+- Se confirmó que el objetivo del `vfs-posix-filesystem-bot` (hardlinks en JFS) ya está resuelto en código base (`jfs_link`). Su estado ha sido marcado como "*(Waiting for new assignment)*".
+- El plan de orquestación ha sido ajustado para enfocarse ahora en solucionar definitivamente la asignación TTY/PTY en `/bin/login`, seguido por el desarrollo en IPC Binder y DRM.

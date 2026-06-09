@@ -7,7 +7,7 @@ userspace/login.c, userspace/passwd.c, kernel/shell/cmd_user.c
 Login, passwd, shadow, alta/baja de usuarios, permisos básicos.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Implementar asignación de TTY/PTY en `userspace/login.c` llamando a `setsid()` seguido de `ioctl(0, TIOCSCTTY, 0)` antes de realizar el exec del shell, para garantizar que el terminal controlador se asocie correctamente a la nueva sesión.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
