@@ -51,13 +51,133 @@ char *getenv(const char *name) {
     return NULL;
 }
 
+static int __environ_allocated = 0;
+
 int setenv(const char *name, const char *value, int overwrite) {
-    (void)name;
-    (void)value;
-    (void)overwrite;
-    // Simple mock, as proper setenv requires reallocating environ array.
-    // Full implementation requires mallocing and managing memory which is out of scope for stub.
-    return -1;
+    if (!name || name[0] == '\0' || strchr(name, '=')) {
+        return -1;
+    }
+
+    size_t name_len = strlen(name);
+    size_t value_len = value ? strlen(value) : 0;
+
+    // Find if it already exists
+    for (int i = 0; environ && environ[i] != NULL; i++) {
+        if (strncmp(environ[i], name, name_len) == 0 && environ[i][name_len] == '=') {
+            if (!overwrite) return 0;
+
+            char *new_str = malloc(name_len + value_len + 2);
+            if (!new_str) return -1;
+            strcpy(new_str, name);
+            new_str[name_len] = '=';
+            if (value) strcpy(new_str + name_len + 1, value);
+            else new_str[name_len + 1] = '\0';
+
+            environ[i] = new_str;
+            return 0;
+        }
+    }
+
+    // Allocate new string
+    char *new_str = malloc(name_len + value_len + 2);
+    if (!new_str) return -1;
+    strcpy(new_str, name);
+    new_str[name_len] = '=';
+    if (value) strcpy(new_str + name_len + 1, value);
+    else new_str[name_len + 1] = '\0';
+
+    // Count current environment size
+    int env_count = 0;
+    while (environ && environ[env_count] != NULL) env_count++;
+
+    // Reallocate environ
+    char **new_environ;
+    if (__environ_allocated) {
+        new_environ = realloc(environ, (env_count + 2) * sizeof(char *));
+    } else {
+        new_environ = malloc((env_count + 2) * sizeof(char *));
+        if (new_environ && environ) {
+            for (int i = 0; i < env_count; i++) {
+                new_environ[i] = environ[i];
+            }
+        }
+    }
+
+    if (!new_environ) {
+        free(new_str);
+        return -1;
+    }
+
+    new_environ[env_count] = new_str;
+    new_environ[env_count + 1] = NULL;
+    environ = new_environ;
+    __environ_allocated = 1;
+
+    return 0;
+}
+
+int unsetenv(const char *name) {
+    if (!name || name[0] == '\0' || strchr(name, '=')) {
+        return -1;
+    }
+
+    if (!environ) return 0;
+
+    size_t name_len = strlen(name);
+    int write_idx = 0;
+
+    for (int i = 0; environ[i] != NULL; i++) {
+        if (strncmp(environ[i], name, name_len) == 0 && environ[i][name_len] == '=') {
+            // Skip this one
+            continue;
+        }
+        environ[write_idx++] = environ[i];
+    }
+    environ[write_idx] = NULL;
+
+    return 0;
+}
+
+int putenv(char *string) {
+    if (!string) return -1;
+
+    char *eq = strchr(string, '=');
+    if (!eq) {
+        return unsetenv(string);
+    }
+
+    size_t name_len = eq - string;
+
+    for (int i = 0; environ && environ[i] != NULL; i++) {
+        if (strncmp(environ[i], string, name_len) == 0 && environ[i][name_len] == '=') {
+            environ[i] = string;
+            return 0;
+        }
+    }
+
+    int env_count = 0;
+    while (environ && environ[env_count] != NULL) env_count++;
+
+    char **new_environ;
+    if (__environ_allocated) {
+        new_environ = realloc(environ, (env_count + 2) * sizeof(char *));
+    } else {
+        new_environ = malloc((env_count + 2) * sizeof(char *));
+        if (new_environ && environ) {
+            for (int i = 0; i < env_count; i++) {
+                new_environ[i] = environ[i];
+            }
+        }
+    }
+
+    if (!new_environ) return -1;
+
+    new_environ[env_count] = string;
+    new_environ[env_count + 1] = NULL;
+    environ = new_environ;
+    __environ_allocated = 1;
+
+    return 0;
 }
 
 void abort(void) {
@@ -199,6 +319,102 @@ unsigned long strtoul(const char *nptr, char **endptr, int base) {
         /* strtoul handles negative by returning the wrapped unsigned value */
         nptr++;
         // Ignoring negative handling for simplicity, though standard requires it.
+    }
+
+    if (base == 0) {
+        if (*nptr == '0') {
+            if (*(nptr + 1) == 'x' || *(nptr + 1) == 'X') {
+                base = 16;
+                nptr += 2;
+            } else {
+                base = 8;
+            }
+        } else {
+            base = 10;
+        }
+    } else if (base == 16) {
+        if (*nptr == '0' && (*(nptr + 1) == 'x' || *(nptr + 1) == 'X')) {
+            nptr += 2;
+        }
+    }
+
+    while (1) {
+        int v = -1;
+        if (*nptr >= '0' && *nptr <= '9') v = *nptr - '0';
+        else if (*nptr >= 'a' && *nptr <= 'z') v = *nptr - 'a' + 10;
+        else if (*nptr >= 'A' && *nptr <= 'Z') v = *nptr - 'A' + 10;
+
+        if (v < 0 || v >= base) break;
+
+        res = res * base + v;
+        nptr++;
+    }
+
+    if (endptr) *endptr = (char *)nptr;
+
+    return res;
+}
+
+long long strtoll(const char *nptr, char **endptr, int base) {
+    long long res = 0;
+    int sign = 1;
+
+    if (!nptr) return 0;
+
+    while (*nptr == ' ' || *nptr == '\t' || *nptr == '\n') nptr++;
+
+    if (*nptr == '-') {
+        sign = -1;
+        nptr++;
+    } else if (*nptr == '+') {
+        nptr++;
+    }
+
+    if (base == 0) {
+        if (*nptr == '0') {
+            if (*(nptr + 1) == 'x' || *(nptr + 1) == 'X') {
+                base = 16;
+                nptr += 2;
+            } else {
+                base = 8;
+            }
+        } else {
+            base = 10;
+        }
+    } else if (base == 16) {
+        if (*nptr == '0' && (*(nptr + 1) == 'x' || *(nptr + 1) == 'X')) {
+            nptr += 2;
+        }
+    }
+
+    while (1) {
+        int v = -1;
+        if (*nptr >= '0' && *nptr <= '9') v = *nptr - '0';
+        else if (*nptr >= 'a' && *nptr <= 'z') v = *nptr - 'a' + 10;
+        else if (*nptr >= 'A' && *nptr <= 'Z') v = *nptr - 'A' + 10;
+
+        if (v < 0 || v >= base) break;
+
+        res = res * base + v;
+        nptr++;
+    }
+
+    if (endptr) *endptr = (char *)nptr;
+
+    return res * sign;
+}
+
+unsigned long long strtoull(const char *nptr, char **endptr, int base) {
+    unsigned long long res = 0;
+
+    if (!nptr) return 0;
+
+    while (*nptr == ' ' || *nptr == '\t' || *nptr == '\n') nptr++;
+
+    if (*nptr == '+') {
+        nptr++;
+    } else if (*nptr == '-') {
+        nptr++;
     }
 
     if (base == 0) {
