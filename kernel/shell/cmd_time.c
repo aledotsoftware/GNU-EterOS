@@ -62,12 +62,12 @@ static void unix_to_rtc(time_t timestamp, rtc_time_t* t) {
     t->day = d;
 }
 
-#include "../../include/net/e1000.h"
+#include "../../include/net/nic.h"
 
 void cmd_ntp(const char* args) {
     (void)args;
 
-    if (!e1000_is_active()) {
+    if (!current_nic) {
         terminal_write_string("  [NTP] Network disabled: Driver not active or NIC not detected.\n");
         return;
     }

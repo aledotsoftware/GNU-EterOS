@@ -3,7 +3,7 @@
 #include "../../include/mouse.h"
 #include "../../include/rtc.h"
 #include "../../include/nvram.h"
-#include "../../include/net/e1000.h"
+#include "../../include/net/nic.h"
 #include "../../include/fs/initrd.h"
 #include "../../include/vga.h"
 
@@ -446,7 +446,7 @@ void cmd_panel(const char* args) {
                 if (c != KB_KEY_ESCAPE) wait_for_enter();
                 draw_panel_menu();
             } else if (opt == '6') {
-                if (!e1000_is_active()) {
+                if (!current_nic) {
                     cmd_clear("");
                     terminal_write_string("\n  -- Red y Conectividad --\n");
                     terminal_write_string("  Error: Adaptador de red no activo o no detectado.\n");
