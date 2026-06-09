@@ -183,6 +183,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/arch/x86_64/apic.c \
               $(KERNEL_DIR)/arch/x86_64/syscall.c \
               $(KERNEL_DIR)/drivers/disk/partition.c \
+              $(KERNEL_DIR)/drivers/disk/ata.c \
               $(KERNEL_DIR)/fs/elf.c \
               $(KERNEL_DIR)/drivers/net/e1000.c \
               $(KERNEL_DIR)/apps/wget.c \
@@ -191,6 +192,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
 
 NET_CORE_SRCS = $(KERNEL_DIR)/net/core/ip_utils.c \
                 $(KERNEL_DIR)/net/core/dhcp.c \
+                $(KERNEL_DIR)/net/core/lwip_stubs.c \
                 $(KERNEL_DIR)/net/core/nic.c \
                 $(KERNEL_DIR)/net/mock.c \
                 $(LWIP_SRCS) \
@@ -407,7 +409,8 @@ ifeq ($(ARCH), x86_64)
 	        -serial stdio                                 \
 	        -m 128M                                       \
 	        -no-reboot                                    \
-	        -no-shutdown
+	        -no-shutdown \
+	        -net nic,model=e1000 -net user
 else
 	@echo "[ERR]  'make run' solo soportado para x86_64 por ahora."
 endif
@@ -421,7 +424,8 @@ ifeq ($(ARCH), x86_64)
 	        -m 128M                                       \
 	        -nographic                                    \
 	        -no-reboot                                    \
-	        -no-shutdown
+	        -no-shutdown \
+	        -net nic,model=e1000 -net user
 endif
 
 # ---- Depuración con GDB ----
@@ -433,7 +437,8 @@ ifeq ($(ARCH), x86_64)
 	        -serial stdio                                 \
 	        -m 128M                                       \
 	        -no-reboot                                    \
-	        -no-shutdown                                  \
+	        -no-shutdown \
+	        -net nic,model=e1000 -net user                                  \
 	        -s -S
 endif
 

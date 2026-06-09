@@ -182,3 +182,5 @@ int main() {
     free(fs_root);
     return 0;
 }
+
+int vfs_link(const char* oldpath, const char* newpath) { return -1; }

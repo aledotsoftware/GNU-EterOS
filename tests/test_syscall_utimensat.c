@@ -38,6 +38,8 @@ fs_node_t* fs_root = NULL;
 int total_cpus = 1;
 cpu_info_t cpus[MAX_CPUS];
 
+int vfs_link(const char* oldpath, const char* newpath) { return -1; }
+
 task_t* task_get_current(void) { return &current_task_mock; }
 cpu_info_t* get_current_cpu(void) { return &cpus[0]; }
 int get_cpu_id(void) { return 0; }

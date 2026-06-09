@@ -72,6 +72,8 @@ int total_cpus = 1;
 cpu_info_t cpus[MAX_CPUS];
 
 /* Mocks */
+int vfs_link(const char* oldpath, const char* newpath) { return -1; }
+
 task_t* task_get_current(void) {
     return &current_task_mock;
 }

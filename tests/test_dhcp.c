@@ -62,7 +62,7 @@ void terminal_write_string(const char* str) {
 #include "../kernel/string.c"
 
 /* Include Code Under Test */
-#include "../kernel/net/dhcp.c"
+#include "../kernel/net/core/dhcp.c"
 
 int main() {
     printf("Running DHCP Utils Test...\n");

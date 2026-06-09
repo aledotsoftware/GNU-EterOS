@@ -1,3 +1,4 @@
+
 #ifndef __ETEROS_HOST_TEST__
 #define __ETEROS_HOST_TEST__
 #endif
@@ -123,3 +124,9 @@ int main() {
     return 0;
 }
 void serial_write_string(const char* s) {}
+
+
+// STUBS ADDED
+#include <stdint.h>
+int ata_read_sector(uint32_t lba, uint8_t *buffer) { return 0; }
+int ata_write_sector(uint32_t lba, uint8_t *buffer) { return 0; }
