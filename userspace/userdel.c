@@ -78,6 +78,9 @@ int main(int argc, char *argv[]) {
     unlink("/etc/shadow");
     rename("/etc/shadow.tmp", "/etc/shadow");
 
+    /* Enforce shadow file permissions */
+    chmod("/etc/shadow", 0600);
+
     printf("User '%s' deleted successfully.\n", username);
     return 0;
 }

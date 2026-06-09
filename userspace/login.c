@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include "sha256.h"
 
 #define MAX_LINE 256
@@ -48,6 +49,8 @@ int main(int argc, char *argv[]) {
     } else {
         close(shadow_fd);
     }
+    /* Always enforce shadow file permissions to 0600 */
+    chmod("/etc/shadow", 0600);
 
     /* Check for preferred shell from argv */
     const char* preferred_shell = "sh.elf";
@@ -62,6 +65,9 @@ int main(int argc, char *argv[]) {
         int len = read(auto_fd, auto_buf, 1);
         close(auto_fd);
         if (len > 0 && auto_buf[0] == '1') {
+            setsid();
+            ioctl(0, TIOCSCTTY, 0);
+
             /* Auto-login as root (UID 0) */
             if (setuid(0) < 0 || setgid(0) < 0) {
                 printf("Error: Failed to drop privileges for autologin\n");
@@ -162,6 +168,10 @@ int main(int argc, char *argv[]) {
 
                     printf("\nWelcome to eterOS, %s!\n", username);
                     close(fd);
+
+                    setsid();
+                    ioctl(0, TIOCSCTTY, 0);
+
                     if (setgid(gid) < 0 || setuid(uid) < 0) {
                         printf("Error: Failed to drop privileges\n");
                         exit(1);
