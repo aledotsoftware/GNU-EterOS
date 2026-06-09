@@ -1,5 +1,5 @@
 #include "shell_internal.h"
-#include "../../include/net/e1000.h"
+#include "../../include/net/nic.h"
 #include "../../include/net/dhcp.h"
 #include "../../include/net/defs.h"
 #include "../../include/stdio.h"
@@ -7,12 +7,12 @@
 void cmd_net(const char* args) {
     (void)args;
     terminal_write_string("==== Network Status ====\n");
-    if (!e1000_is_active()) {
+    if (!current_nic) {
         terminal_write_string("Network disabled: Driver not active or NIC not detected.\n");
         return;
     }
 
-    uint8_t* mac = e1000_get_mac();
+    uint8_t* mac = current_nic->get_mac();
 
     char buf[64];
     snprintf(buf, sizeof(buf), "MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -40,7 +40,7 @@ void cmd_net(const char* args) {
 
 void cmd_dhcp(const char* args) {
     (void)args;
-    if (!e1000_is_active()) {
+    if (!current_nic) {
         terminal_write_string("Network disabled: Driver not active or NIC not detected.\n");
         return;
     }
@@ -50,7 +50,7 @@ void cmd_dhcp(const char* args) {
 }
 
 void cmd_wget(const char* args) {
-    if (!e1000_is_active()) {
+    if (!current_nic) {
         terminal_write_string("Network disabled: Driver not active or NIC not detected.\n");
         return;
     }
