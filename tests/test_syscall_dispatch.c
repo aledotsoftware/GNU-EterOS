@@ -12,6 +12,8 @@
 
 /* GLOBAL MOCK STATE */
 task_t current_task_mock;
+int vfs_link(const char* oldpath, const char* newpath) { return -1; }
+
 task_t* task_get_current(void) { return &current_task_mock; }
 void task_exit(int status) { printf("task_exit(%d) called\n", status); }
 void task_yield(void) { printf("task_yield called\n"); }

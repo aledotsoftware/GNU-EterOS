@@ -146,6 +146,8 @@ int main() {
     socket_entry_t* s = &socket_table[sock_id];
     s->local_port = 80; /* We will target port 80 */
     s->state = SOCKET_STATE_LISTEN; /* Listen state */
+    s->used = 1;
+    s->protocol = IPPROTO_TCP;
 
     /* Construct Base Valid Packet */
     uint8_t packet[200];
@@ -158,11 +160,13 @@ int main() {
     /* Ethernet */
     eth->type = htons(ETHERNET_TYPE_IP);
 
+    my_ip = 0x0A00020F; /* 10.0.2.15 */
+
     /* IP */
     ip->ver_ihl = 0x45; /* Ver 4, IHL 5 (20 bytes) */
     ip->len = htons(20 + 20); /* IP Header + TCP Header (no payload) */
     ip->proto = IP_PROTO_TCP;
-    ip->dest = 0; /* my_ip is 0 initially, so it accepts all */
+    ip->dest = my_ip; /* Target our IP */
 
     /* TCP */
     tcp->dest_port = htons(80);

@@ -82,20 +82,20 @@ static inline int get_native_sock(int fd) {
     return (int)node->inode;
 }
 
-int sys_lwip_connect(int fd, const struct sockaddr *name, uint32_t namelen) {
+int sys_lwip_connect(int fd, const struct sockaddr_old *name, uint32_t namelen) {
     int sock = get_native_sock(fd);
     if (sock < 0) return -9;
     return net_connect(sock, (const struct sockaddr_in_old*)name, namelen);
 }
 
-ssize_t sys_lwip_sendto(int fd, const void *dataptr, size_t size, int flags, const struct sockaddr *to, uint32_t tolen) {
+ssize_t sys_lwip_sendto(int fd, const void *dataptr, size_t size, int flags, const struct sockaddr_old *to, uint32_t tolen) {
     (void)to; (void)tolen;
     int sock = get_native_sock(fd);
     if (sock < 0) return -9;
     return net_send(sock, dataptr, size, flags);
 }
 
-ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, struct sockaddr *from, uint32_t *fromlen) {
+ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, struct sockaddr_old *from, uint32_t *fromlen) {
     (void)from; (void)fromlen;
     int sock = get_native_sock(fd);
     if (sock < 0) return -9;
@@ -118,9 +118,9 @@ int sys_lwip_close(int fd) {
 void net_dhcp_renew(void) {}
 int sys_lwip_getsockopt(int s, int level, int optname, void *optval, uint32_t *optlen) { (void)s; (void)level; (void)optname; (void)optval; (void)optlen; return -1; }
 int sys_lwip_setsockopt(int s, int level, int optname, const void *optval, uint32_t optlen) { (void)s; (void)level; (void)optname; (void)optval; (void)optlen; return -1; }
-int sys_lwip_getpeername(int s, struct sockaddr *name, uint32_t *namelen) { (void)s; (void)name; (void)namelen; return -1; }
-int sys_lwip_getsockname(int s, struct sockaddr *name, uint32_t *namelen) { (void)s; (void)name; (void)namelen; return -1; }
+int sys_lwip_getpeername(int s, struct sockaddr_old *name, uint32_t *namelen) { (void)s; (void)name; (void)namelen; return -1; }
+int sys_lwip_getsockname(int s, struct sockaddr_old *name, uint32_t *namelen) { (void)s; (void)name; (void)namelen; return -1; }
 int sys_lwip_listen(int s, int backlog) { (void)s; (void)backlog; return -1; }
-int sys_lwip_bind(int s, const struct sockaddr *name, uint32_t namelen) { (void)s; (void)name; (void)namelen; return -1; }
-int sys_lwip_accept(int s, struct sockaddr *addr, uint32_t *addrlen) { (void)s; (void)addr; (void)addrlen; return -1; }
+int sys_lwip_bind(int s, const struct sockaddr_old *name, uint32_t namelen) { (void)s; (void)name; (void)namelen; return -1; }
+int sys_lwip_accept(int s, struct sockaddr_old *addr, uint32_t *addrlen) { (void)s; (void)addr; (void)addrlen; return -1; }
 int net_gethostbyname(const char *name, uint32_t *out_ip) { (void)name; (void)out_ip; return -1; }

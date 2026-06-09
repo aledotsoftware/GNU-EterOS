@@ -8,6 +8,7 @@
 #include "../../include/mm.h"
 #include "../../include/net/socket.h"
 #include "../../include/net/lwip_socket.h"
+#include "../../include/net/lwip_socket.h"
 #include "../../include/net/defs.h"
 #include "../../include/task.h"
 
@@ -131,7 +132,7 @@ void cmd_ota(const char* args) {
             }
         }
 
-        socket_t sock = net_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        int sock = sys_lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (sock < 0) {
             terminal_write_string("  [OTA] Failed to create socket.\n");
             return;
@@ -143,7 +144,7 @@ void cmd_ota(const char* args) {
         addr.sin_addr = ip;
 
         terminal_write_string("  [OTA] Conectando a repositorio...\n");
-        if (net_connect(sock, &addr, sizeof(addr)) != 0) {
+        if (sys_lwip_connect(sock, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
             terminal_write_string("  [OTA] Conexion fallida.\n");
             sys_lwip_close(sock);
             return;
@@ -158,7 +159,7 @@ void cmd_ota(const char* args) {
         if (strlcat(request, host, req_size) >= req_size) goto trunc;
         if (strlcat(request, "\r\nUser-Agent: eterOS-OTA/0.1\r\nConnection: close\r\n\r\n", req_size) >= req_size) goto trunc;
 
-        net_send(sock, request, strlen(request), 0);
+        sys_lwip_send(sock, request, strlen(request), 0);
         goto receive;
 
 trunc:
@@ -186,7 +187,7 @@ receive:
         // Leer e ignorar cabeceras HTTP hasta encontrar \r\n\r\n
         int headers_done = 0;
 
-        while ((len = net_recv(sock, buffer, sizeof(buffer), 0)) > 0) {
+        while ((len = sys_lwip_recv(sock, buffer, sizeof(buffer), 0)) > 0) {
             if (!headers_done) {
                 // Busqueda ineficiente pero simple de \r\n\r\n
                 for (int j = 0; j < len - 3; j++) {

@@ -38,6 +38,8 @@ fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*
 
 /* Mock minimal kernel dependencies for syscall.c to compile in the test */
 task_t current_task_mock;
+int vfs_link(const char* oldpath, const char* newpath) { return -1; }
+
 task_t* task_get_current(void) { return &current_task_mock; }
 void task_exit(int status) {}
 void task_yield(void) {}

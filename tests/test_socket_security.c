@@ -60,6 +60,8 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
 cpu_info_t cpus[MAX_CPUS];
 
 /* Mocks */
+int vfs_link(const char* oldpath, const char* newpath) { return -1; }
+
 task_t* task_get_current(void) { return &current_task_mock; }
 cpu_info_t* get_current_cpu(void) { return &cpus[0]; }
 int get_cpu_id(void) { return 0; }

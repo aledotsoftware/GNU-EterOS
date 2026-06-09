@@ -42,6 +42,7 @@ typedef int (*ioctl_type_t)(struct fs_node*, int, void*);
 typedef int (*create_type_t)(struct fs_node*, char*, uint16_t);
 typedef int (*mkdir_type_t)(struct fs_node*, char*, uint16_t);
 typedef int (*unlink_type_t)(struct fs_node*, char*);
+    typedef int (*link_type_t)(struct fs_node*, struct fs_node*, const char*);
 
 typedef struct fs_node {
     char name[128];
@@ -65,6 +66,7 @@ typedef struct fs_node {
     create_type_t create;
     mkdir_type_t mkdir;
     unlink_type_t unlink;
+    link_type_t link;
     struct fs_node *ptr;
     uint32_t ref_count;
     spinlock_t lock;

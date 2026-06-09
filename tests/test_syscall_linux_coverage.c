@@ -34,6 +34,8 @@ fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*
 #define assert(x) do { if (!(x)) { printf("Assertion failed: %s\n", #x); exit(1); } } while (0)
 
 task_t current_task_mock;
+int vfs_link(const char* oldpath, const char* newpath) { return -1; }
+
 task_t* task_get_current(void) { return &current_task_mock; }
 void task_exit(int status) {}
 void task_yield(void) {}
