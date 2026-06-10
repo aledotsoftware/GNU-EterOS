@@ -1,9 +1,0 @@
-kernel: Implemented TIOCNOTTY and fixed O_CLOEXEC bug in task_exec
-
-Implemented `TIOCNOTTY` ioctl in headers and handlers within `devfs.c` and
-`syscall.c` to improve POSIX compatibility for terminal interactions.
-
-Fixed a bug in `kernel/task.c` during `exec` where `O_CLOEXEC`
-handling over aggressively iterated and closed descriptors while missing
-necessary `ref_count` increments on inherited file descriptors when unsharing
-a shared file descriptor table.
