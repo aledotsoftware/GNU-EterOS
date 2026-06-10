@@ -1,7 +1,7 @@
 {
   "name": "eter-web-ui",
   "version": "1.0.0",
-  "description": "Web UI for Eter OS",
+  "description": "Web UI for eterOS",
   "scripts": {
     "test": "jest"
   },

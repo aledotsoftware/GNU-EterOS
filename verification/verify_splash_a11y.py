@@ -20,7 +20,7 @@ def run():
             alt = img_locator.get_attribute("aria-label")
             print(f"Image Aria-Label: {alt}")
 
-            if alt == "Eter OS":
+            if alt == "eterOS":
                 print("PASS: Image has correct a11y attributes.")
             else:
                 print(f"FAIL: Image missing correct aria-label text. Found: {alt}")
