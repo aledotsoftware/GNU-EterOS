@@ -80,6 +80,13 @@ int main(int argc, char *argv[]) {
             }
         }
         close(fd);
+    } else {
+        fd = open("/etc/passwd", O_WRONLY | O_CREAT, 0644);
+        if (fd >= 0) {
+            const char* root_entry = "root:x:0:0:root:/root:/bin/sh\n";
+            write(fd, root_entry, strlen(root_entry));
+            close(fd);
+        }
     }
 
     /* Append to /etc/passwd */
@@ -92,6 +99,20 @@ int main(int argc, char *argv[]) {
     snprintf(passwd_entry, sizeof(passwd_entry), "%s:x:%d:%d::/home/%s:/bin/sh\n", username, next_uid, next_uid, username);
     write(fd, passwd_entry, strlen(passwd_entry));
     close(fd);
+
+    /* Check if shadow exists */
+    int fd_shadow = open("/etc/shadow", O_RDONLY);
+    if (fd_shadow < 0) {
+        fd_shadow = open("/etc/shadow", O_WRONLY | O_CREAT, 0600);
+        if (fd_shadow >= 0) {
+            const char* root_entry = "root::19000:0:99999:7:::\n";
+            write(fd_shadow, root_entry, strlen(root_entry));
+            close(fd_shadow);
+        }
+    } else {
+        close(fd_shadow);
+    }
+
 
     /* Append to /etc/shadow */
     fd = open("/etc/shadow", O_WRONLY | O_APPEND | O_CREAT, 0600);

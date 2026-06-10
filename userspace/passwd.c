@@ -55,31 +55,30 @@ int main(int argc, char *argv[]) {
     while (read_line(fd, line, sizeof(line)) > 0) {
         char user[32];
         user[0] = '\0';
-        char uid_str[16];
-        uid_str[0] = '\0';
-        char gid_str[16];
-        gid_str[0] = '\0';
+        char rest_of_line[MAX_LINE];
+        rest_of_line[0] = '\0';
 
         int field = 0;
         int c_idx = 0;
-        int u_idx = 0;
-        int g_idx = 0;
+        int r_idx = 0;
 
         for (int i = 0; line[i] != '\0'; i++) {
             if (line[i] == ':') {
                 field++;
-                continue;
+                if (field == 1) continue; // Skip the first colon
+                if (field == 2) {
+                     rest_of_line[r_idx++] = ':'; // Keep the second colon and onward
+                     continue;
+                }
             }
+
             if (field == 0 && c_idx < 31) {
                 user[c_idx++] = line[i];
                 user[c_idx] = '\0';
-            } else if (field == 2 && u_idx < 15) {
-                uid_str[u_idx++] = line[i];
-                uid_str[u_idx] = '\0';
-            } else if (field == 3 && g_idx < 15) {
+            } else if (field >= 2 && r_idx < MAX_LINE - 1) {
                 if (line[i] != '\n') {
-                    gid_str[g_idx++] = line[i];
-                    gid_str[g_idx] = '\0';
+                    rest_of_line[r_idx++] = line[i];
+                    rest_of_line[r_idx] = '\0';
                 }
             }
         }
@@ -87,7 +86,12 @@ int main(int argc, char *argv[]) {
         if (strcmp(user, username) == 0) {
             found = 1;
             char entry[MAX_LINE];
-            snprintf(entry, sizeof(entry), "%s:%s:%s:%s\n", user, hash_str, uid_str, gid_str);
+            if (strlen(rest_of_line) == 0) {
+                // Fallback to default POSIX shadow fields if the original line was malformed or legacy
+                snprintf(entry, sizeof(entry), "%s:%s:19000:0:99999:7:::\n", user, hash_str);
+            } else {
+                snprintf(entry, sizeof(entry), "%s:%s%s\n", user, hash_str, rest_of_line);
+            }
             write(temp_fd, entry, strlen(entry));
         } else {
             write(temp_fd, line, strlen(line));

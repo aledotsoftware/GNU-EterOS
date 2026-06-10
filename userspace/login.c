@@ -98,6 +98,62 @@ int main(int argc, char *argv[]) {
         password[len] = '\0';
         if (password[len-1] == '\n') password[len-1] = '\0';
 
+        /* Read /etc/passwd to get UID and GID */
+        int fd_passwd = open("/etc/passwd", O_RDONLY);
+        if (fd_passwd < 0) {
+            printf("Error: Could not open /etc/passwd\n");
+            continue;
+        }
+
+        int found_user = 0;
+        int target_uid = -1;
+        int target_gid = -1;
+        char line[MAX_LINE];
+
+        while (read_line(fd_passwd, line, sizeof(line)) > 0) {
+            char user[32];
+            user[0] = '\0';
+            char uid_str[16];
+            uid_str[0] = '\0';
+            char gid_str[16];
+            gid_str[0] = '\0';
+
+            int field = 0;
+            int c_idx = 0;
+            int u_idx = 0;
+            int g_idx = 0;
+
+            for (int i = 0; line[i] != '\0'; i++) {
+                if (line[i] == ':') {
+                    field++;
+                    continue;
+                }
+                if (field == 0 && c_idx < 31) {
+                    user[c_idx++] = line[i];
+                    user[c_idx] = '\0';
+                } else if (field == 2 && u_idx < 15) {
+                    uid_str[u_idx++] = line[i];
+                    uid_str[u_idx] = '\0';
+                } else if (field == 3 && g_idx < 15) {
+                    gid_str[g_idx++] = line[i];
+                    gid_str[g_idx] = '\0';
+                }
+            }
+
+            if (strcmp(user, username) == 0) {
+                found_user = 1;
+                target_uid = strlen(uid_str) > 0 ? atoi(uid_str) : -1;
+                target_gid = strlen(gid_str) > 0 ? atoi(gid_str) : -1;
+                break;
+            }
+        }
+        close(fd_passwd);
+
+        if (!found_user) {
+            printf("\nLogin incorrect.\n");
+            continue;
+        }
+
         /* Read /etc/shadow to authenticate */
         int fd = open("/etc/shadow", O_RDONLY);
         if (fd < 0) {
@@ -118,22 +174,15 @@ int main(int argc, char *argv[]) {
         }
 
         int found = 0;
-        char line[MAX_LINE];
         while (read_line(fd, line, sizeof(line)) > 0) {
             char user[32];
             user[0] = '\0';
             char stored_hash[65];
             stored_hash[0] = '\0';
-            char uid_str[16];
-            uid_str[0] = '\0';
-            char gid_str[16];
-            gid_str[0] = '\0';
 
             int field = 0;
             int c_idx = 0;
             int h_idx = 0;
-            int u_idx = 0;
-            int g_idx = 0;
 
             for (int i = 0; line[i] != '\0'; i++) {
                 if (line[i] == ':') {
@@ -146,19 +195,8 @@ int main(int argc, char *argv[]) {
                 } else if (field == 1 && h_idx < 64) {
                     stored_hash[h_idx++] = line[i];
                     stored_hash[h_idx] = '\0';
-                } else if (field == 2 && u_idx < 15) {
-                    uid_str[u_idx++] = line[i];
-                    uid_str[u_idx] = '\0';
-                } else if (field == 3 && g_idx < 15) {
-                    if (line[i] != '\n') {
-                        gid_str[g_idx++] = line[i];
-                        gid_str[g_idx] = '\0';
-                    }
                 }
             }
-
-            int uid = strlen(uid_str) > 0 ? atoi(uid_str) : -1;
-            int gid = strlen(gid_str) > 0 ? atoi(gid_str) : -1;
 
             if (strcmp(user, username) == 0) {
                 found = 1;
@@ -172,7 +210,7 @@ int main(int argc, char *argv[]) {
                     setsid();
                     ioctl(0, TIOCSCTTY, 0);
 
-                    if (setgid(gid) < 0 || setuid(uid) < 0) {
+                    if (setgid(target_gid) < 0 || setuid(target_uid) < 0) {
                         printf("Error: Failed to drop privileges\n");
                         exit(1);
                     }
