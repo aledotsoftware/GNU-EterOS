@@ -5,10 +5,10 @@ echo "Building and running tests..."
 
 # Test Heap
 echo "---------------------------------------------------"
-# echo "Running test_heap..."
-# gcc -D__ETEROS_HOST_TEST__ tests/test_heap.c -o tests/test_heap
-# ./tests/test_heap
-# rm tests/test_heap
+echo "Running test_heap..."
+gcc -D__ETEROS_HOST_TEST__ tests/test_heap.c -o tests/test_heap
+./tests/test_heap
+rm tests/test_heap
 
 # Test String
 echo "---------------------------------------------------"
@@ -66,11 +66,6 @@ gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_crypto.c kernel
 ./tests/test_crypto
 rm tests/test_crypto
 
-# Test ELF Security (Disabled - File Missing)
-# echo "---------------------------------------------------"
-# echo "Running test_elf_security..."
-# gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_elf_security.c kernel/string.c -o tests/test_elf_security
-# ./tests/test_elf_security
 # rm tests/test_elf_security
 
 # Test ELF Read Failure
@@ -134,11 +129,6 @@ gcc -g -O0 -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vmm_unmap.c -o tests/test
 rm tests/test_vmm_unmap
 rm tests/vmm_mock.c
 
-# Test Reclaimer (Disabled - File Missing)
-# echo "---------------------------------------------------"
-# echo "Running test_reclaimer..."
-# gcc -D__ETEROS_HOST_TEST__ tests/test_reclaimer.c -o tests/test_reclaimer
-# ./tests/test_reclaimer
 # rm tests/test_reclaimer
 
 # Test Stdio
@@ -306,11 +296,6 @@ gcc -D__ETEROS_HOST_TEST__ tests/verify_gradient.c -o tests/verify_gradient
 ./tests/verify_gradient
 rm tests/verify_gradient
 
-# Test Libc Expansion
-# echo "---------------------------------------------------"
-# echo "Running test_libc_expansion..."
-# gcc -D__ETEROS_HOST_TEST__ -Iuserspace/libc/include tests/test_libc_expansion.c -o tests/test_libc_expansion
-# ./tests/test_libc_expansion
 # rm tests/test_libc_expansion
 
 # Test Xtensa UART

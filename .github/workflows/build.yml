@@ -75,6 +75,18 @@ jobs:
           chmod +x tests/run_integration.sh
           bash tests/run_integration.sh
 
+      - name: "Ejecutar Tests Web UI"
+        run: |
+          cd web_ui
+          npm install
+          npm test
+
+      - name: "Ejecutar Scripts de Verificación Visual"
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+          for f in verification/*.py; do python3 "$f" || exit 1; done
+
       - name: "Generar Reporte de Tests (Summary)"
         run: |
           echo "## Resumen de Pruebas y Construcción" >> $GITHUB_STEP_SUMMARY
