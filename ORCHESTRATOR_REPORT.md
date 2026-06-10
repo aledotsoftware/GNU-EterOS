@@ -1,4 +1,4 @@
-# EterOS Orchestrator Meta-Agent Audit Report
+# eterOS Orchestrator Meta-Agent Audit Report
 
 ## 1. Estado Actual de Compilación y Ejecución
 **Fecha:** 2026-05-12
@@ -13,7 +13,7 @@
 
 ---
 
-## 2. Evaluación de Subsistemas según Visión EterOS
+## 2. Evaluación de Subsistemas según Visión eterOS
 
 ### 2.1 Subsistemas Robustos (Core y Fundaciones)
 - **Kernel Boot / Memoria:** `pmm.c`, `vmm.c` estables y testeados. Identidad paginada funciona correctamente, y el allocator soporta `kmalloc_aligned` e inicializaciones limpias de hardware (ACPI).

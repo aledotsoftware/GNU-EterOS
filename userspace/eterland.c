@@ -223,7 +223,7 @@ void execute_command() {
             term_print(arg, term_fg);
             term_print("\n", term_fg);
         } else if (strcmp(cmd, "uname") == 0) {
-            term_print("\nEterOS (Marea UI)\n", 0x3498DB);
+            term_print("\neterOS (Marea UI)\n", 0x3498DB);
             term_print("Graphics Server: Eterland (Zero-copy capable)\n", term_fg);
         } else if (strcmp(cmd, "run") == 0) {
             if (strlen(arg) > 0) {
@@ -365,7 +365,7 @@ int main(int argc, char* argv[]) {
     draw_desktop();
     draw_window();
 
-    term_print("EterOS Marea UI v0.2.0\n", 0x3498DB);
+    term_print("eterOS Marea UI v0.2.0\n", 0x3498DB);
     term_print("Type 'help' for commands.\n\n", 0x95A5A6);
     term_print("root@eteros", 0x2ECC71);
     term_print(" ~ $ ", 0x3498DB);

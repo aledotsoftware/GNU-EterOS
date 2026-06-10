@@ -609,7 +609,7 @@ static void draw_taskbar(void) {
     draw_text(clock_x, ty + (TASKBAR_HEIGHT - 16) / 2, clock_str, COL_TEXT_SECONDARY, 0);
 
     /* System tray indicators before clock */
-    const char* tray_str = "etOS";
+    const char* tray_str = "eterOS";
     int sys_x = clock_x - text_width(tray_str) - 20;
     draw_text(sys_x, ty + (TASKBAR_HEIGHT - 16) / 2, tray_str, COL_TEXT_SECONDARY, 0);
 }
