@@ -14,6 +14,15 @@
 #define MOCK_CONNECTOR_ID  2
 #define MOCK_FB_ID         3
 #define MOCK_HANDLE        4
+#define MOCK_ENCODER_ID    5
+
+static void populate_mock_modeinfo(struct drm_mode_modeinfo *mode) {
+    memset(mode, 0, sizeof(struct drm_mode_modeinfo));
+    mode->hdisplay = framebuffer_get_width();
+    mode->vdisplay = framebuffer_get_height();
+    mode->vrefresh = 60;
+    strlcpy(mode->name, "1024x768", sizeof(mode->name));
+}
 
 static int drm_ioctl_getresources(struct drm_mode_card_res *res) {
     if (!res) return -EINVAL;
@@ -30,16 +39,73 @@ static int drm_ioctl_getresources(struct drm_mode_card_res *res) {
         uint32_t conn_id = MOCK_CONNECTOR_ID;
         memcpy((void*)res->connector_id_ptr, &conn_id, sizeof(uint32_t));
     }
+    if (res->count_encoders > 0 && res->encoder_id_ptr) {
+        uint32_t enc_id = MOCK_ENCODER_ID;
+        memcpy((void*)res->encoder_id_ptr, &enc_id, sizeof(uint32_t));
+    }
 
     res->count_fbs = 1;
     res->count_crtcs = 1;
     res->count_connectors = 1;
-    res->count_encoders = 0;
+    res->count_encoders = 1;
     res->min_width = 320;
     res->max_width = 4096;
     res->min_height = 200;
     res->max_height = 4096;
 
+    return 0;
+}
+
+static int drm_ioctl_get_connector(struct drm_mode_get_connector *conn) {
+    if (!conn) return -EINVAL;
+
+    if (conn->count_modes > 0 && conn->modes_ptr) {
+        struct drm_mode_modeinfo mode;
+        populate_mock_modeinfo(&mode);
+        memcpy((void*)conn->modes_ptr, &mode, sizeof(struct drm_mode_modeinfo));
+    }
+    if (conn->count_encoders > 0 && conn->encoders_ptr) {
+        uint32_t enc_id = MOCK_ENCODER_ID;
+        memcpy((void*)conn->encoders_ptr, &enc_id, sizeof(uint32_t));
+    }
+
+    conn->count_modes = 1;
+    conn->count_encoders = 1;
+    conn->encoder_id = MOCK_ENCODER_ID;
+    conn->connector_id = MOCK_CONNECTOR_ID;
+    conn->connection = 1; /* Connected */
+
+    return 0;
+}
+
+static int drm_ioctl_get_encoder(struct drm_mode_get_encoder *enc) {
+    if (!enc) return -EINVAL;
+    enc->encoder_id = MOCK_ENCODER_ID;
+    enc->crtc_id = MOCK_CRTC_ID;
+    enc->possible_crtcs = 1;
+    enc->possible_clones = 0;
+    return 0;
+}
+
+static int drm_ioctl_get_crtc(struct drm_mode_crtc *crtc) {
+    if (!crtc) return -EINVAL;
+    crtc->crtc_id = MOCK_CRTC_ID;
+    crtc->fb_id = MOCK_FB_ID;
+    crtc->x = 0;
+    crtc->y = 0;
+    crtc->mode_valid = 1;
+    populate_mock_modeinfo(&crtc->mode);
+    return 0;
+}
+
+static int drm_ioctl_set_crtc(struct drm_mode_crtc *crtc) {
+    (void)crtc;
+    return 0; /* Fake success */
+}
+
+static int drm_ioctl_add_fb(struct drm_mode_fb_cmd *fb) {
+    if (!fb) return -EINVAL;
+    fb->fb_id = MOCK_FB_ID;
     return 0;
 }
 
@@ -78,6 +144,16 @@ static int dev_dri_card0_ioctl(fs_node_t *node, int request, void *arg) {
             return drm_ioctl_create_dumb((struct drm_mode_create_dumb*)arg);
         case DRM_IOCTL_MODE_MAP_DUMB:
             return drm_ioctl_map_dumb((struct drm_mode_map_dumb*)arg);
+        case DRM_IOCTL_MODE_GETCONNECTOR:
+            return drm_ioctl_get_connector((struct drm_mode_get_connector*)arg);
+        case DRM_IOCTL_MODE_GETENCODER:
+            return drm_ioctl_get_encoder((struct drm_mode_get_encoder*)arg);
+        case DRM_IOCTL_MODE_GETCRTC:
+            return drm_ioctl_get_crtc((struct drm_mode_crtc*)arg);
+        case DRM_IOCTL_MODE_SETCRTC:
+            return drm_ioctl_set_crtc((struct drm_mode_crtc*)arg);
+        case DRM_IOCTL_MODE_ADDFB:
+            return drm_ioctl_add_fb((struct drm_mode_fb_cmd*)arg);
         default:
             serial_write_string("[DRM] Unhandled IOCTL\n");
             return -EINVAL;

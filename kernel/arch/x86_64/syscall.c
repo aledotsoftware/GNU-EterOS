@@ -549,7 +549,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         if (file_node && file_node->truncate && file_node->truncate == shmfs_truncate && (flags & 0x01)) { /* MAP_SHARED */
             is_shmfs = 1;
             shm_obj = (shm_object_t*)(uintptr_t)file_node->impl;
-        } else if (file_node && strcmp(file_node->name, "fb0") == 0) {
+        } else if (file_node && (strcmp(file_node->name, "fb0") == 0 || strcmp(file_node->name, "card0") == 0)) {
             is_fb0 = 1;
         }
     }
