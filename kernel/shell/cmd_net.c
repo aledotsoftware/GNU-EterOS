@@ -8,7 +8,7 @@ void cmd_net(const char* args) {
     (void)args;
     terminal_write_string("==== Network Status ====\n");
     if (!current_nic) {
-        terminal_write_string("Network disabled: Driver not active or NIC not detected.\n");
+        terminal_write_string("Network disabled.\n");
         return;
     }
 
@@ -41,7 +41,7 @@ void cmd_net(const char* args) {
 void cmd_dhcp(const char* args) {
     (void)args;
     if (!current_nic) {
-        terminal_write_string("Network disabled: Driver not active or NIC not detected.\n");
+        terminal_write_string("Network disabled.\n");
         return;
     }
     terminal_write_string("Requesting DHCP...\n");
@@ -51,7 +51,7 @@ void cmd_dhcp(const char* args) {
 
 void cmd_wget(const char* args) {
     if (!current_nic) {
-        terminal_write_string("Network disabled: Driver not active or NIC not detected.\n");
+        terminal_write_string("Network disabled.\n");
         return;
     }
     if (!args || args[0] == '\0') {

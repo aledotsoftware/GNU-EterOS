@@ -68,7 +68,7 @@ void cmd_ntp(const char* args) {
     (void)args;
 
     if (!current_nic) {
-        terminal_write_string("  [NTP] Network disabled: Driver not active or NIC not detected.\n");
+        terminal_write_string("  [NTP] Network disabled.\n");
         return;
     }
 
