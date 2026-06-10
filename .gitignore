@@ -38,3 +38,5 @@ qemu_test.log
 /qemu_debug.log
 qemu.log
 qemu.out
+venv/
+venv2/

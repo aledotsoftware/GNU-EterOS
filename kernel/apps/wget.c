@@ -51,21 +51,21 @@ void wget_run(const char* url_in) {
         return;
     }
     
+    if (!network_ready) {
+        terminal_write_string("[WGET] Error: La red no esta lista.\n");
+        return;
+    }
+
     /* Use safe ip_aton from kernel/net/ip_utils.c (via net/defs.h) */
     uint32_t ip = ip_aton(host);
     if (ip == 0) {
-        /* Simple hardcoded resolution for testing if not an IP */
-        if (strcmp(host, "google.com") == 0) ip = 0x4850fa8e; /* 142.250.80.72 */
-        else if (strcmp(host, "tudexgames.com") == 0) ip = 0x288C43AC; /* 172.67.140.40 */
-        else {
-            terminal_write_string("[WGET] Error: Solo soportamos IP o hosts harcodeados.\n");
+        uint32_t resolved_ip = 0;
+        if (net_gethostbyname(host, &resolved_ip) == 0) {
+            ip = resolved_ip;
+        } else {
+            terminal_write_string("[WGET] Error: Resolucion DNS fallo.\n");
             return;
         }
-    }
-    
-    if (!network_ready) {
-        terminal_write_string("[WGET] Error: La red no esta lista o no hay IP asignada.\n");
-        return;
     }
 
     int sock = sys_lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);

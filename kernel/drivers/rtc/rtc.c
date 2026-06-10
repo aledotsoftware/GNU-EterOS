@@ -32,12 +32,10 @@ void rtc_init(void) {
 
 void rtc_get_time(rtc_time_t* time) {
     unsigned char second, minute, hour, day, month, year;
+    unsigned char last_second, last_minute, last_hour, last_day, last_month, last_year;
     unsigned char registerB;
 
     // Wait until update is not in progress
-    // To be safe, we should read until we get the same values twice
-    // or just wait for update flag to clear.
-    // Waiting for update flag to clear is usually enough if we are fast.
     while (rtc_is_updating());
 
     second = rtc_read_register(0x00);
@@ -46,6 +44,25 @@ void rtc_get_time(rtc_time_t* time) {
     day    = rtc_read_register(0x07);
     month  = rtc_read_register(0x08);
     year   = rtc_read_register(0x09);
+
+    do {
+        last_second = second;
+        last_minute = minute;
+        last_hour = hour;
+        last_day = day;
+        last_month = month;
+        last_year = year;
+
+        while (rtc_is_updating());
+        second = rtc_read_register(0x00);
+        minute = rtc_read_register(0x02);
+        hour   = rtc_read_register(0x04);
+        day    = rtc_read_register(0x07);
+        month  = rtc_read_register(0x08);
+        year   = rtc_read_register(0x09);
+    } while ((last_second != second) || (last_minute != minute) ||
+             (last_hour != hour) || (last_day != day) ||
+             (last_month != month) || (last_year != year));
 
     registerB = rtc_read_register(0x0B);
 
