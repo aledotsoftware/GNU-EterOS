@@ -1,5 +1,5 @@
 /**
- * éterOS — Marea Shell (Wayland-inspired Desktop Environment)
+ * eterOS — Marea Shell (Wayland-inspired Desktop Environment)
  * Copyright (c) 2026 Tudex Networks. All rights reserved.
  *
  * Proceso userspace que actúa como compositor y window manager.

@@ -1,8 +1,8 @@
-# 🌌 éterOS: El Sistema Operativo Universal (v0.2.0 "Genesis SMP")
+# 🌌 eterOS: El Sistema Operativo Universal (v0.2.0 "Genesis SMP")
 
-éterOS es un sistema operativo de **Nueva Era**, desarrollado desde el **"cero absoluto" (Bare-Metal)** en C y ensamblador. Diseñado con una arquitectura de **Kernel Híbrido** y una **HAL (Hardware Abstraction Layer)** universal, su objetivo es ser el tejido conectivo entre microcontroladores IoT, dispositivos móviles ARM64 y potentes servidores x86_64.
+eterOS es un sistema operativo de **Nueva Era**, desarrollado desde el **"cero absoluto" (Bare-Metal)** en C y ensamblador. Diseñado con una arquitectura de **Kernel Híbrido** y una **HAL (Hardware Abstraction Layer)** universal, su objetivo es ser el tejido conectivo entre microcontroladores IoT, dispositivos móviles ARM64 y potentes servidores x86_64.
 
-Este documento es el manifiesto técnico y la única fuente de verdad sobre la arquitectura, funcionamiento y visión de éterOS.
+Este documento es el manifiesto técnico y la única fuente de verdad sobre la arquitectura, funcionamiento y visión de eterOS.
 
 ---
 
@@ -25,13 +25,13 @@ Este documento es el manifiesto técnico y la única fuente de verdad sobre la a
 
 ## 1. Filosofía y Visión
 
-éterOS no es un clon de UNIX; es una reinvención. Se construye sobre tres pilares:
+eterOS no es un clon de UNIX; es una reinvención. Se construye sobre tres pilares:
 *   **Ether-Core (Arquitectura Híbrida):** Combina la estabilidad de un microkernel (aislando drivers en espacio de usuario) con el rendimiento de un núcleo monolítico para operaciones críticas.
 *   **Fluidez Nativa:** Ignoramos el lastre de los 90. Diseñado para hardware moderno: **UEFI/GOP**, **NVMe**, **Multicore (SMP)** y renderizado acelerado.
 *   **Aero-Minimalismo:** Una experiencia visual basada en vectores, transparencias (**Glassmorphism**) y una interfaz fluida denominada **Flux UI**.
 
 ### Sistema de Tiers (Portabilidad)
-La HAL permite que éterOS escale según el hardware:
+La HAL permite que eterOS escale según el hardware:
 *   **Tier 1 (Micro):** IoT, Sensores (ARM Cortex-M, RISC-V32). Sin MMU.
 *   **Tier 2 (Core):** Tablets, RPi (AArch64). MMU + Paging.
 *   **Tier 3 (Full):** PCs, Servidores (x86_64). MMU + Ring 0-3 + SMP.
@@ -82,7 +82,7 @@ El sistema está dividido en capas estrictas para garantizar la seguridad y la a
 ## 3. Secuencia de Arranque y Hardware
 
 ### El Salto al Modo Largo (x86_64)
-éterOS despierta en un entorno de **64 bits puro**:
+eterOS despierta en un entorno de **64 bits puro**:
 1.  **BIOS POST → MBR (boot.asm):** El bootloader de 2 etapas carga el kernel (128 sectores) y el Initrd.
 2.  **Detección:** Se consulta la memoria vía E820, se activa la puerta A20 y se detecta el framebuffer VBE.
 3.  **Transición:** Se configuran las tablas de paginación iniciales (Identity Mapping de 4GB), GDT de 64 bits y se activa PAE + EFER.LME.
@@ -128,13 +128,13 @@ La memoria se gestiona en tres niveles estrictos:
 ## 5. Planificador, SMP y Sincronización
 
 ### Scheduler (Round-Robin Preemptivo)
-El planificador de éterOS escala para múltiples núcleos.
+El planificador de eterOS escala para múltiples núcleos.
 *   **Estados:** `READY`, `RUNNING`, `SLEEPING`, `BLOCKED`, `ZOMBIE`.
 *   **Context Switch:** Ultra-optimizado en ensamblador (`context_switch.asm`). Guarda RSP, cambia espacio de direcciones (CR3) si es necesario, y salta.
 *   **Tick:** Impulsado por el timer PIT a 100Hz (10ms por quantum).
 
 ### SMP (Symmetric Multiprocessing)
-éterOS no es mononúcleo.
+eterOS no es mononúcleo.
 *   **AP Booting:** El procesador principal (BSP) copia un trampolín de 16 bits a memoria baja y envía señales `INIT` y `STARTUP` (SIPI) a los Application Processors (APs).
 *   **Per-CPU Data:** Utiliza el registro `GS_BASE` de x86_64 para almacenar punteros al contexto actual de cada CPU de forma aislada, evitando locks globales masivos.
 
@@ -160,7 +160,7 @@ El VFS abstrae el almacenamiento tras una API unificada (`read_fs`, `write_fs`, 
 
 ## 7. Networking y Stack TCP/IP
 
-éterOS posee capacidades de red avanzadas a través de su driver nativo **Intel PRO/1000 (e1000)** (descubierto vía escaneo PCI).
+eterOS posee capacidades de red avanzadas a través de su driver nativo **Intel PRO/1000 (e1000)** (descubierto vía escaneo PCI).
 
 ### Integración lwIP 2.2.0
 El kernel integra el stack industrial **lwIP** (`kernel/net/lwip_port`).
@@ -202,7 +202,7 @@ El objetivo es ejecutar binarios ELF de Linux sin modificarlos.
     *   *FS:* `stat`, `fstat`, `mkdir`, `unlink`.
 
 ### Mini-LibC (POSIX)
-Para aplicaciones nativas de éterOS, proveemos una librería en `userspace/libc/` con soporte para:
+Para aplicaciones nativas de eterOS, proveemos una librería en `userspace/libc/` con soporte para:
 *   Asignación dinámica (`malloc`/`free` usando bloques sobre `brk`).
 *   Manipulación de cadenas (`string.h`).
 *   Señales (`signal.h` con colas de interrupción diferida en el scheduler).
@@ -219,7 +219,7 @@ La infraestructura para instalar software se basa en dos fases:
 
 ## 11. Guía de Soporte ARM64 (Rockchip RK3566)
 
-éterOS está portando su HAL a la arquitectura AArch64 para correr en tablets y SBCs.
+eterOS está portando su HAL a la arquitectura AArch64 para correr en tablets y SBCs.
 *   **Estado:** Experimental (Bootea, inicializa UART, Serial Debug 1.5M baudios. Sin display aún).
 *   **Flasheo:**
     1. Compilar cross-compiler: `.\build.ps1 -Target all -Arch aarch64`
@@ -253,7 +253,7 @@ make iso      # Genera un ISO booteable para grabar en USB
 
 ## 13. Hoja de Ruta y Faltantes Críticos
 
-Aunque éterOS v0.2.0 es altamente funcional, las siguientes áreas son la prioridad actual de desarrollo:
+Aunque eterOS v0.2.0 es altamente funcional, las siguientes áreas son la prioridad actual de desarrollo:
 
 🔴 **Críticos (Blockers):**
 1.  **Cargador de Librerías Dinámicas (`.so`):** Actualmente el loader ELF asume compilación estática. Se requiere soporte para `PT_DYNAMIC` para avanzar hacia el port completo de la libc GNU.
@@ -268,8 +268,8 @@ Aunque éterOS v0.2.0 es altamente funcional, las siguientes áreas son la prior
 
 ## 📜 Licencia y Créditos
 
-© 2025 **Tudex Networks**. Desarrollado por el equipo de éterOS.
+© 2025 **Tudex Networks**. Desarrollado por el equipo de eterOS.
 Este proyecto es una obra de ingeniería dedicada a la exploración de nuevos paradigmas en sistemas operativos, empujando los límites del silicio.
 
 ---
-*"El éter es la plataforma; éterOS es la inteligencia que la habita."*
+*"El éter es la plataforma; eterOS es la inteligencia que la habita."*
