@@ -31,14 +31,15 @@ struct _eteros_IO_FILE {
     int buf_pos;
     int buf_mode;
     int should_free;
+    int buf_read_len;
 };
 
 static char __stdin_buf[BUFSIZ];
 static char __stdout_buf[BUFSIZ];
 
-static FILE __stdin = {0, 0, 0, __stdin_buf, BUFSIZ, 0, _IOLBF, 0};
-static FILE __stdout = {1, 0, 0, __stdout_buf, BUFSIZ, 0, _IOFBF, 0};
-static FILE __stderr = {2, 0, 0, NULL, 0, 0, _IONBF, 0};
+static FILE __stdin = {0, 0, 0, __stdin_buf, BUFSIZ, 0, _IOLBF, 0, 0};
+static FILE __stdout = {1, 0, 0, __stdout_buf, BUFSIZ, 0, _IOFBF, 0, 0};
+static FILE __stderr = {2, 0, 0, NULL, 0, 0, _IONBF, 0, 0};
 
 FILE *stdin = &__stdin;
 FILE *stdout = &__stdout;
@@ -80,7 +81,14 @@ static void fd_putc(int c, void *arg) {
 
 int fflush(FILE *stream) {
     if (!stream) return 0;
-    if (stream->buf_pos > 0) {
+    if (stream->buf_read_len > 0) {
+        int left = stream->buf_read_len - stream->buf_pos;
+        if (left > 0) {
+            lseek(stream->fd, -left, SEEK_CUR);
+        }
+        stream->buf_pos = 0;
+        stream->buf_read_len = 0;
+    } else if (stream->buf_pos > 0) {
         if (write(stream->fd, stream->buf, stream->buf_pos) < 0) {
             stream->error = 1;
             return EOF;
@@ -400,7 +408,6 @@ int vfprintf(FILE *stream, const char *format, va_list ap) {
 #define SPRINTF_MAX_LEN 65536
 
 int vsprintf(char *str, const char *format, va_list ap) {
-    return vsnprintf(str, 4096, format, ap);
     return vsnprintf(str, SPRINTF_MAX_LEN, format, ap);
 }
 
@@ -467,6 +474,7 @@ FILE *fopen(const char *pathname, const char *mode) {
     f->buf_pos = 0;
     f->buf_mode = _IOFBF; // Default to full buffering for files
     f->should_free = 1;
+    f->buf_read_len = 0;
 
     if (!f->buf) {
         free(f);
@@ -505,19 +513,69 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
     if (!stream || !ptr) return 0;
     if (size == 0 || nmemb == 0) return 0;
 
-    size_t bytes_to_read = size * nmemb;
-    ssize_t ret = read(stream->fd, ptr, bytes_to_read);
+    size_t total_bytes = size * nmemb;
+    char *p = (char *)ptr;
+    size_t read_bytes = 0;
 
-    if (ret < 0) {
-        stream->error = 1;
-        return 0;
-    }
-    if (ret == 0) {
-        stream->eof = 1;
-        return 0;
+    if (stream->buf_pos > 0 && stream->buf_read_len == 0) {
+        fflush(stream);
     }
 
-    return (size_t)ret / size;
+    if (stream->buf_mode == _IONBF) {
+        ssize_t ret = read(stream->fd, p, total_bytes);
+        if (ret < 0) {
+            stream->error = 1;
+            return 0;
+        }
+        if (ret == 0) {
+            stream->eof = 1;
+            return 0;
+        }
+        return (size_t)ret / size;
+    }
+
+    while (total_bytes > 0) {
+        if (stream->buf_pos >= stream->buf_read_len) {
+            stream->buf_pos = 0;
+            stream->buf_read_len = 0;
+
+            if (total_bytes >= (size_t)stream->buf_size) {
+                ssize_t ret = read(stream->fd, p, total_bytes);
+                if (ret < 0) {
+                    stream->error = 1;
+                    return read_bytes / size;
+                }
+                if (ret == 0) {
+                    stream->eof = 1;
+                    return read_bytes / size;
+                }
+                read_bytes += ret;
+                return read_bytes / size;
+            }
+
+            ssize_t ret = read(stream->fd, stream->buf, stream->buf_size);
+            if (ret < 0) {
+                stream->error = 1;
+                return read_bytes / size;
+            }
+            if (ret == 0) {
+                stream->eof = 1;
+                return read_bytes / size;
+            }
+            stream->buf_read_len = ret;
+        }
+
+        size_t chunk = stream->buf_read_len - stream->buf_pos;
+        if (chunk > total_bytes) chunk = total_bytes;
+
+        memcpy(p, stream->buf + stream->buf_pos, chunk);
+        stream->buf_pos += chunk;
+        p += chunk;
+        read_bytes += chunk;
+        total_bytes -= chunk;
+    }
+
+    return read_bytes / size;
 }
 
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
@@ -527,6 +585,10 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
     size_t total_bytes = size * nmemb;
     const char *p = (const char *)ptr;
     size_t written = 0;
+
+    if (stream->buf_read_len > 0) {
+        fflush(stream);
+    }
 
     if (stream->buf_mode == _IONBF) {
         ssize_t ret = write(stream->fd, p, total_bytes);
@@ -623,6 +685,12 @@ int getc(FILE *stream) {
 
 int ungetc(int c, FILE *stream) {
     if (!stream || c == EOF) return EOF;
+    if (stream->buf_read_len > 0 && stream->buf_pos > 0) {
+        stream->buf_pos--;
+        stream->buf[stream->buf_pos] = (char)c;
+        stream->eof = 0;
+        return c;
+    }
     // We do a simple lseek backwards since our buffer implementation
     // doesn't have an ungetc buffer.
     if (lseek(stream->fd, -1, SEEK_CUR) < 0) {

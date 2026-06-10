@@ -1,0 +1,14 @@
+--- userspace/libc/include/netinet/in.h
++++ userspace/libc/include/netinet/in.h
+@@ -4,6 +4,11 @@
+ #include <sys/socket.h>
+ #include <stdint.h>
+
++typedef uint32_t in_addr_t;
++struct in_addr {
++    in_addr_t s_addr;
++};
++
+ /* Byte Order Functions */
+ uint16_t htons(uint16_t hostshort);
+ uint16_t ntohs(uint16_t netshort);

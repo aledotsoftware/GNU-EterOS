@@ -7,7 +7,7 @@
 #include <sys/syscall.h>
 #include <errno.h>
 
-extern int errno;
+/* extern int errno; */
 
 static inline long syscall2(long n, long a1, long a2) {
     long ret;
@@ -36,7 +36,7 @@ sighandler_t signal(int sig, sighandler_t handler) {
 
     /* SYS_rt_sigaction expects 8 as sigsetsize (sizeof(uint64_t)) */
     long ret = syscall4_sig(SYS_rt_sigaction, sig, (long)&act, (long)&oldact, 8);
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = (int)(-ret);
         return SIG_ERR;
     }
@@ -58,7 +58,7 @@ int sigaction(int sig, const struct sigaction *act, struct sigaction *oldact) {
     }
 
     long ret = syscall4_sig(SYS_rt_sigaction, sig, (long)pact, (long)oldact, 8);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return 0;
 }
 
@@ -91,25 +91,25 @@ int sigaddset(sigset_t *set, int signum) {
 
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
     long ret = syscall4_sig(SYS_rt_sigprocmask, how, (long)set, (long)oldset, 8);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return 0;
 }
 
 int sigpending(sigset_t *set) {
     long ret = syscall2(SYS_rt_sigpending, (long)set, 8);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return 0;
 }
 
 int sigsuspend(const sigset_t *mask) {
     long ret = syscall2(SYS_rt_sigsuspend, (long)mask, 8);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return 0;
 }
 
 int sigaltstack(const stack_t *ss, stack_t *old_ss) {
     long ret = syscall2(SYS_sigaltstack, (long)ss, (long)old_ss);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return 0;
 }
 
@@ -118,6 +118,6 @@ int raise(int sig) {
     long ret_pid;
     __asm__ volatile ("syscall" : "=a"(ret_pid) : "a"((long)SYS_getpid) : "rcx", "r11", "memory");
     long ret = syscall2(SYS_kill, ret_pid, sig);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return 0;
 }

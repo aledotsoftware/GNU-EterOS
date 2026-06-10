@@ -218,20 +218,22 @@ int atoi(const char *nptr) {
 }
 
 void qsort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *)) {
-    // Simple insertion sort for now
+    if (!base || nmemb <= 1 || size == 0) return;
     char *arr = (char *)base;
-    char temp[size]; // VLA, size should be small enough
-    for (size_t i = 1; i < nmemb; i++) {
-        for (size_t j = i; j > 0 && compar(arr + (j - 1) * size, arr + j * size) > 0; j--) {
-            // Swap arr[j-1] and arr[j]
-            char *a = arr + (j - 1) * size;
-            char *b = arr + j * size;
-            for (size_t k = 0; k < size; k++) {
-                temp[k] = a[k];
-                a[k] = b[k];
-                b[k] = temp[k];
+    size_t gap = nmemb / 2;
+    while (gap > 0) {
+        for (size_t i = gap; i < nmemb; i++) {
+            for (size_t j = i; j >= gap && compar(arr + (j - gap) * size, arr + j * size) > 0; j -= gap) {
+                char *a = arr + (j - gap) * size;
+                char *b = arr + j * size;
+                for (size_t k = 0; k < size; k++) {
+                    char temp = a[k];
+                    a[k] = b[k];
+                    b[k] = temp;
+                }
             }
         }
+        gap /= 2;
     }
 }
 

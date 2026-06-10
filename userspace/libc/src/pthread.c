@@ -105,7 +105,7 @@ int pthread_join(pthread_t thread, void **retval) {
         *retval = NULL;
     }
     // We don't have a good way to wait for a specific thread without futexes and a proper tid tracking array.
-    // Basic mock: we yield for a short time to simulate waiting. Standard clone doesn't send SIGCHLD for CLONE_THREAD.
+    // Yield for a short time to wait for the thread to exit. Standard clone doesn't send SIGCHLD for CLONE_THREAD.
     // A robust pthread_join requires CLONE_CHILD_CLEARTID.
     for (int i = 0; i < 50; i++) {
         syscall(24); // SYS_sched_yield

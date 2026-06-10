@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <sys/wait.h>
 
-extern int errno;
+/* extern int errno; */
 
 int main(void) {
     printf("Starting SHM test...\n");

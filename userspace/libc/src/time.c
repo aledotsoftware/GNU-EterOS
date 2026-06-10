@@ -86,15 +86,6 @@ static int is_leap(int year) {
 static const int mdays[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 struct tm *gmtime_r(const time_t *timep, struct tm *result) {
-#ifdef __ETEROS_HOST_TEST__
-    // In host test, we might not have access to struct tm internals if incomplete type.
-    // But if we included <time.h> properly, it should be there.
-    // If it fails, let's just delegate to host gmtime_r if possible, or mock it.
-    // But we renamed it to eteros_gmtime_r.
-    // So we are implementing it.
-    // We MUST see definition of struct tm.
-    return (struct tm*)0; // STUB to fix compile error for now if types are issue
-#else
     time_t t = *timep;
     long days;
     int rem, y;
@@ -151,7 +142,6 @@ struct tm *gmtime_r(const time_t *timep, struct tm *result) {
     result->tm_zone = "UTC";
 
     return result;
-#endif
 }
 
 struct tm *localtime(const time_t *timep) {
@@ -166,18 +156,11 @@ int gettimeofday(struct timeval *tv, struct timezone *tz) {
 }
 
 struct tm *gmtime(const time_t *timep) {
-#ifdef __ETEROS_HOST_TEST__
-    return (struct tm*)0;
-#else
     static struct tm tm_buf;
     return gmtime_r(timep, &tm_buf);
-#endif
 }
 
 time_t mktime(struct tm *tm) {
-#ifdef __ETEROS_HOST_TEST__
-    return 0;
-#else
     time_t t = 0;
     int year = tm->tm_year + 1900;
     int mon = tm->tm_mon;
@@ -200,13 +183,9 @@ time_t mktime(struct tm *tm) {
     t *= 60; t += tm->tm_sec;
 
     return t;
-#endif
 }
 
 char *asctime(const struct tm *tm) {
-#ifdef __ETEROS_HOST_TEST__
-    return "";
-#else
     static char buf[26];
     const char *wday_name[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
     const char *mon_name[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -218,7 +197,6 @@ char *asctime(const struct tm *tm) {
         tm->tm_hour, tm->tm_min, tm->tm_sec,
         tm->tm_year + 1900);
     return buf;
-#endif
 }
 
 char *ctime(const time_t *timep) {

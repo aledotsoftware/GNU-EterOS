@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <stdarg.h>
 
-extern int errno;
+/* extern int errno; */
 extern char **environ;
 
 /* Syscall primitives (self-contained to avoid cross-TU dependencies). */
@@ -73,7 +73,7 @@ static inline long _syscall6(long n, long a1, long a2, long a3, long a4, long a5
 }
 
 static int _set_errno(long ret) {
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = (int)(-ret);
         return -1;
     }
@@ -207,7 +207,7 @@ int execvp(const char *file, char *const argv[]) {
 
 pid_t waitpid(pid_t pid, int *status, int options) {
     long ret = _syscall4(SYS_wait4, pid, (long)status, options, 0);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (pid_t)ret;
 }
 
@@ -229,19 +229,19 @@ int pipe2(int pipefd[2], int flags) {
 
 int dup(int oldfd) {
     long ret = _syscall1(SYS_dup, oldfd);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
 int dup2(int oldfd, int newfd) {
     long ret = _syscall2(SYS_dup2, oldfd, newfd);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
 int dup3(int oldfd, int newfd, int flags) {
     long ret = _syscall3(SYS_dup3, oldfd, newfd, flags);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
@@ -255,7 +255,7 @@ int openat(int dirfd, const char *pathname, int flags, ...) {
     }
 
     long ret = _syscall4(SYS_openat, dirfd, (long)pathname, flags, mode);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
@@ -267,7 +267,7 @@ int fcntl(int fd, int cmd, ...) {
     va_end(ap);
 
     long ret = _syscall3(SYS_fcntl, fd, cmd, arg);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
@@ -288,13 +288,13 @@ int faccessat(int dirfd, const char *pathname, int mode, int flags) {
 
 ssize_t readlink(const char *pathname, char *buf, size_t bufsiz) {
     long ret = _syscall3(SYS_readlink, (long)pathname, (long)buf, (long)bufsiz);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (ssize_t)ret;
 }
 
 ssize_t readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz) {
     long ret = _syscall4(SYS_readlinkat, dirfd, (long)pathname, (long)buf, (long)bufsiz);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (ssize_t)ret;
 }
 
@@ -310,7 +310,7 @@ int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags) {
 
 char *getcwd(char *buf, size_t size) {
     long ret = _syscall2(SYS_getcwd, (long)buf, (long)size);
-    if (ret < 0) { errno = (int)(-ret); return (void*)0; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return (void*)0; }
     return buf;
 }
 
@@ -337,7 +337,7 @@ gid_t getegid(void) {
 
 pid_t setsid(void) {
     long ret = _syscall0(SYS_setsid);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (pid_t)ret;
 }
 
@@ -348,7 +348,7 @@ int setpgid(pid_t pid, pid_t pgid) {
 
 pid_t getpgrp(void) {
     long ret = _syscall0(SYS_getpgrp);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (pid_t)ret;
 }
 
@@ -381,7 +381,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
     }
 
     ret = _syscall5(SYS_select, nfds, (long)readfds, (long)writefds, (long)exceptfds, (long)tsp);
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = (int)(-ret);
         return -1;
     }
@@ -390,26 +390,26 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 
 int epoll_create1(int flags) {
     long ret = _syscall1(SYS_epoll_create1, flags);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) {
     long ret = _syscall4(SYS_epoll_ctl, epfd, op, fd, (long)event);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout) {
     long ret = _syscall4(SYS_epoll_wait, epfd, (long)events, maxevents, timeout);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
 /* Memory */
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, int64_t offset) {
     long ret = _syscall6(SYS_mmap, (long)addr, (long)length, prot, flags, fd, offset);
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = (int)(-ret);
         return (void*)-1;
     }
@@ -437,7 +437,7 @@ void *mremap(void *old_addr, size_t old_size, size_t new_size, int flags, ...) {
 
     {
         long ret = _syscall5(SYS_mremap, (long)old_addr, (long)old_size, (long)new_size, flags, (long)new_addr);
-        if (ret < 0) {
+        if ((unsigned long)ret >= (unsigned long)-4095) {
             errno = (int)(-ret);
             return (void*)-1;
         }

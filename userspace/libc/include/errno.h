@@ -4,7 +4,8 @@
 #ifdef __ETEROS_HOST_TEST__
 #include_next <errno.h>
 #else
-extern int errno;
+int *__errno_location(void);
+#define errno (*__errno_location())
 
 #define EPERM       1  /* Operation not permitted */
 #define ENOENT      2  /* No such file or directory */

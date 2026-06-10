@@ -1,0 +1,24 @@
+--- userspace/libc/include/errno.h
++++ userspace/libc/include/errno.h
+@@ -4,7 +4,8 @@
+ #ifdef __ETEROS_HOST_TEST__
+ #include_next <errno.h>
+ #else
+-extern int errno;
++int *__errno_location(void);
++#define errno (*__errno_location())
+
+ #define EPERM       1  /* Operation not permitted */
+ #define ENOENT      2  /* No such file or directory */
+--- userspace/libc/src/errno.c
++++ userspace/libc/src/errno.c
+@@ -1,3 +1,8 @@
+ #include <errno.h>
+
+-int errno = 0;
++static int global_errno = 0;
++
++int *__errno_location(void) {
++    return &global_errno;
++}
++

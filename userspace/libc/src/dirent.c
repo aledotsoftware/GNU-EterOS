@@ -64,6 +64,14 @@ struct dirent *readdir(DIR *dirp) {
     return ent;
 }
 
+void rewinddir(DIR *dirp) {
+    if (dirp) {
+        syscall(SYS_lseek, dirp->fd, 0, SEEK_SET);
+        dirp->buf_pos = 0;
+        dirp->buf_end = 0;
+    }
+}
+
 int closedir(DIR *dirp) {
     if (!dirp) {
         errno = EBADF;
