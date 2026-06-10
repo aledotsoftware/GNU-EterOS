@@ -24,12 +24,12 @@
 - **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas. PTY ioctls han sido completados en un subconjunto. El subsistema **ya cuenta con soporte para job control signals (`SIGSTOP`, `SIGCONT`, `SIGCHLD`, `SIGTTIN`, `SIGTTOU`)**, implementado exitosamente en `kernel/arch/x86_64/syscall.c`.
 
 ### 2.2 Áreas de Mejora a Corto Plazo (Para Compatibilidad Base)
-- **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM y bloque. Se debe revisar compatibilidad total VFS POSIX, soporte hardlinks (enlaces rígidos) y atomic commits.
-- **Control Multi-usuario:** Soporte base con parseo shadow y passwd operativo, modos `0600` de permisos VFS consolidados. Sin embargo, el binario de login NO está asignando TTYs/PTYs adecuadamente mediante `setsid()` e `ioctl(TIOCSCTTY)`.
+- **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM y bloque. Se debe revisar compatibilidad total VFS POSIX y atomic commits (el soporte de hardlinks ha sido verificado y se encuentra operativo mediante `sys_linkat` y `vfs_link`).
+- **Control Multi-usuario:** Soporte base con parseo shadow y passwd operativo, modos `0600` de permisos VFS consolidados. El binario de login ya asigna TTYs/PTYs adecuadamente mediante `setsid()` e `ioctl(TIOCSCTTY)`.
 
 ### 2.3 Metas Aspiracionales de la Plataforma (Largo Plazo)
 - Soporte Completo GNU Coreutils: ❌ Parcial. Progresando mediante syscalls implementadas.
-- Entorno de Escritorio GNU Desktop: ❌ En diseño remoto (esperando abstracción DRM/KMS).
+- Entorno de Escritorio GNU Desktop: ⏳ En progreso. Se ha introducido una capa de abstracción DRM básica (`kernel/gfx/drm.c`).
 - Capa de Compatibilidad Android: ⏳ En progreso (`/dev/binder` es un stub y solo retorna éxito sin implementar transacciones reales).
 
 ---
@@ -38,17 +38,16 @@
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`vfs-posix-filesystem-bot`:** Implementar soporte de `hardlinks` y la syscall asociada en el driver JFS (`kernel/fs/jfs.c` y VFS base).
-2. **`aether-droid-subsystem-bot`:** Crear estructuras reales en `kernel/fs/devfs.c` para Binder (`BINDER_WRITE_READ`) estableciendo un motor de ruteo IPC.
-3. **`graphics-power-panel-bot`:** Crear abstracción DRM base (`kernel/gfx/drm.c` o similar `/dev/dri/card0`).
+1. **`aether-droid-subsystem-bot`:** Crear estructuras reales en `kernel/fs/devfs.c` para Binder (`BINDER_WRITE_READ`) estableciendo un motor de ruteo IPC.
+2. **`vfs-posix-filesystem-bot`:** Implementar atomic commits robustos en el journaling de JFS (`kernel/fs/jfs.c`).
+3. **`graphics-power-panel-bot`:** Expandir la abstracción DRM base con soporte KMS completo y mapeo de framebuffers reales.
 
 ---
 
 ## 4. Hallazgos adicionales y Riesgos
-- En `kernel/fs/devfs.c`, la implementación PTY existe y está siendo inicializada, pero el binario `login.c` aún opera directamente sobre stdout/stdin sin enlazarse correctamente a una sesión de terminal virtual, lo cual impide el job control apropiado de las shell hijas.
-- En `kernel/fs/devfs.c`, el código actual detecta `BINDER_WRITE_READ` y `BINDER_SET_CONTEXT_MGR`, pero simplemente retornan éxito ficticio sin implementar transacciones reales, requiriendo intervención crítica.
-- La abstracción DRM/KMS es prioritaria dado que la implementación gráfica en `kernel/gfx/gfx.c` asume resoluciones fijas o fallbacks a VBE sin protocolo GOP unificado.
-- El driver de Journaling JFS ha sido exitosamente puenteado a la capa física del bloque de disco usando `bcache`, logrando persistencia real en memoria no volátil, como se verificó en este reporte y pruebas locales. Falta implementar hardlinks.
+- En `kernel/fs/devfs.c`, el código actual detecta `BINDER_WRITE_READ` y `BINDER_SET_CONTEXT_MGR`, pero simplemente retornan éxito ficticio sin implementar transacciones reales, requiriendo intervención crítica de parte del `aether-droid-subsystem-bot`.
+- La abstracción DRM/KMS (`kernel/gfx/drm.c`) introducida proporciona los ioctls base (`DRM_IOCTL_MODE_GETRESOURCES`, `DRM_IOCTL_MODE_CREATE_DUMB`, `DRM_IOCTL_MODE_MAP_DUMB`) pero es un "mock" estático que reporta un solo display ficticio. Debe conectarse a los drivers de video reales (ej. VBE/framebuffer).
+- El driver de Journaling JFS ha sido exitosamente puenteado a la capa física del bloque de disco usando `bcache`, logrando persistencia real en memoria no volátil. Además, las syscalls para hardlinks (`link`, `linkat`, `vfs_link`) han sido verificadas en el VFS y apuntan al callback JFS correspondiente.
 
 ---
 
@@ -58,3 +57,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - **NUEVO:** El objetivo crítico del `users-security-panel-bot` (asignación de TTY/PTY en `login.c` mediante `setsid()` e `ioctl(TIOCSCTTY)`) ha sido delegado al agente y será resuelto de inmediato. El reporte asume que la próxima iteración del orchestrator validará su implementación.
 - **2026-05-12 (Update):** El `users-security-panel-bot` ha completado la asignación de TTY/PTY en `login.c`. El nuevo objetivo delegado es la implementación de *hardlinks* en JFS (`kernel/fs/jfs.c`), asignado al `vfs-posix-filesystem-bot`.
 - **2026-06-09 (Update):** El `userspace-libc-posix-bot` ha reestructurado `stdlib.c` añadiendo implementación dinámica para `setenv`, `unsetenv` y `putenv`, así como la adición de `strtoll` y `strtoull`. También se ha mejorado el mock de `pthread_join` usando esperas reales vía `SYS_sched_yield`. Build y QA integrales verificados con éxito.
+- **2026-06-10 (Update):** Auditoría por el `orchestrator-meta-agent`. Se verificó la exitosa integración de hardlinks en el driver JFS (`jfs_link` y syscalls asociadas `sys_linkat`) y la incorporación inicial de la capa DRM básica (`kernel/gfx/drm.c`). El objetivo principal se traslada ahora al `aether-droid-subsystem-bot` para la implementación real de las transacciones IPC Binder en `devfs.c`.
