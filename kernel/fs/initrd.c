@@ -233,38 +233,8 @@ int initrd_create(fs_node_t *parent, char *name, uint16_t permission) {
 }
 
 int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
-    (void)permission;
-
-    char target[256];
-    const char* prefix = initrd_dir_prefix(parent);
-
-    if (prefix && prefix[0] != '\0') {
-        strlcpy(target, prefix, sizeof(target));
-        strlcat(target, "/", sizeof(target));
-        strlcat(target, name, sizeof(target));
-    } else {
-        strlcpy(target, name, sizeof(target));
-    }
-
-    if (find_virtual_dir(target)) return -1; /* Already exists */
-
-    /* Check conflicts with real files */
-    for (uint32_t i = 0; i < file_count; i++) {
-        size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
-        if (strncmp(target, file_headers[i].name, name_len) == 0 && target[name_len] == '\0') return -1;
-    }
-
-    initrd_dir_t *new_dir = (initrd_dir_t*)kmalloc(sizeof(initrd_dir_t));
-    if (!new_dir) return -2;
-
-    strlcpy(new_dir->name, target, sizeof(new_dir->name));
-    /* Assign generic inode high up to avoid collision with file indices */
-    new_dir->inode = 0xF0000000 + virtual_dirs_count;
-    new_dir->next = virtual_dirs;
-    virtual_dirs = new_dir;
-    virtual_dirs_count++;
-
-    return 0;
+    (void)parent; (void)name; (void)permission;
+    return -EROFS;
 }
 
 fs_node_t *initrd_finddir(fs_node_t *node, char *name) {

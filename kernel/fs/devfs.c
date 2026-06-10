@@ -1271,6 +1271,16 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
     return fnode;
 }
 
+static int devfs_create(fs_node_t *parent, char *name, uint16_t permission) {
+    (void)parent; (void)name; (void)permission;
+    return -EROFS;
+}
+
+static int devfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
+    (void)parent; (void)name; (void)permission;
+    return -EROFS;
+}
+
 fs_node_t* devfs_init(void) {
     devfs_root = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!devfs_root) return NULL;
@@ -1282,6 +1292,8 @@ fs_node_t* devfs_init(void) {
     devfs_root->mask = 0555;
     devfs_root->readdir = devfs_readdir;
     devfs_root->finddir = devfs_finddir;
+    devfs_root->create = devfs_create;
+    devfs_root->mkdir = devfs_mkdir;
     dev_tty_termios.c_lflag = ECHO | ICANON | ISIG;
 
     return devfs_root;
