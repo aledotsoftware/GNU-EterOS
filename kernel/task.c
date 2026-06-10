@@ -994,33 +994,18 @@ int task_kill(uint32_t pid) {
     for (int i = 1; i < task_count; i++) {
         /* Kill all threads with this tgid */
         if (tasks[i].tgid == pid && tasks[i].state != TASK_DEAD) {
-            if (tasks[i].state == TASK_READY) {
-                dequeue_ready(&tasks[i]);
-            }
+            tasks[i].signal_pending |= (1ULL << SIGKILL);
 
-            tasks[i].state = TASK_DEAD;
-            tasks[i].exit_code = 128 + SIGKILL;
-            task_mark_parent_wait_event(&tasks[i], SIGKILL & 0x7F, CLD_KILLED);
+            if (tasks[i].state == TASK_BLOCKED || tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_STOPPED) {
+                tasks[i].state = TASK_READY;
+                dequeue_sleep(&tasks[i]);
+                enqueue_ready(&tasks[i]);
 
-            /* Reparent children to Kernel Task (0) */
-            for (int j = 0; j < MAX_TASKS; j++) {
-                if (tasks[j].id != 0 && tasks[j].parent_id == tasks[i].id) {
-                    tasks[j].parent_id = tasks[0].id;
+                cpu_info_t* current_cpu = get_current_cpu();
+                if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index) {
+                    lapic_send_ipi(cpus[tasks[i].target_cpu].apic_id, 0x20);
                 }
             }
-
-            task_wake_parent_waiter(&tasks[i]);
-
-            /* Clean up TID pointer if requested by clone */
-            if (tasks[i].clear_child_tid != NULL) {
-                if (vmm_verify_user_access(tasks[i].clear_child_tid, sizeof(uint32_t), 1)) {
-                    *tasks[i].clear_child_tid = 0;
-                    futex_wake(tasks[i].clear_child_tid, 1, FUTEX_WAKE, 0xffffffff);
-                }
-            }
-
-            serial_write_string("[SCHED] Killed thread TID ");
-            serial_write_string("\n");
             
             if (&tasks[i] == current) {
                 killed_self = 1;
@@ -1034,8 +1019,8 @@ int task_kill(uint32_t pid) {
 
     if (found) {
         if (killed_self) {
-            schedule();
-            for (;;) { __asm__ volatile("hlt"); }
+            task_exit_signal(SIGKILL);
+            /* task_exit_signal doesn't return */
         }
         return 0;
     }
@@ -1140,7 +1125,7 @@ int task_fork(void* regs_ptr) {
 
     /* POSIX/Linux Fields */
     tasks[slot].fd_table = tasks[slot].fd_table_internal;
-    memcpy(tasks[slot].fd_table_internal, parent->fd_table_internal, sizeof(parent->fd_table_internal));
+    memcpy(tasks[slot].fd_table_internal, parent->fd_table, sizeof(parent->fd_table_internal));
     strlcpy(tasks[slot].cwd, parent->cwd, sizeof(tasks[slot].cwd));
     /* VFS nodes are shared pointers! Refcounting handled here. */
     for (int i = 0; i < MAX_FD; i++) {
@@ -1446,7 +1431,7 @@ static void task_reap_zombie_locked(int zombie_slot) {
     if (zombie->cr3 != tasks[0].cr3) {
         int shared_cr3 = 0;
         for (int k = 0; k < MAX_TASKS; k++) {
-            if (k != zombie_slot && tasks[k].id != 0 && tasks[k].state != 0 && tasks[k].state != TASK_DEAD) {
+            if (k != zombie_slot && tasks[k].state != 0) {
                 if (tasks[k].cr3 == zombie->cr3) {
                     shared_cr3 = 1;
                     break;
