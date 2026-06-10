@@ -1,7 +1,9 @@
 from playwright.sync_api import sync_playwright
+import os
 
 def verify_app(page):
-    page.goto("file:///app/web_ui/index.html")
+    cwd = os.getcwd()
+    page.goto(f"file://{cwd}/web_ui/index.html")
     page.locator("#boot-splash").wait_for(state="detached")
     # Take a screenshot
     page.screenshot(path="verification/app_loaded.png")
