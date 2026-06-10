@@ -250,6 +250,13 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
             uint64_t vaddr = phdr.p_vaddr + load_offset;
             uint64_t file_offset = phdr.p_offset;
 
+            /* Check file_size versus mem_size */
+            if (file_size > mem_size) {
+                serial_write_string("[ELF] Error: file_size > mem_size in PT_LOAD.\n");
+                kfree(node);
+                return 0;
+            }
+
             /* Check for integer overflow in vaddr + mem_size */
             if (vaddr + mem_size < vaddr) {
                 serial_write_string("[ELF] Error: Segment address wraparound (overflow).\n");

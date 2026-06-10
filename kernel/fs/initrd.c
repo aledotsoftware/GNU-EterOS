@@ -1,4 +1,5 @@
 #include <fs/initrd.h>
+#include <errno.h>
 #include <fs/vfs.h>
 #include <fs/devfs.h>
 #include <fs/procfs.h>
@@ -31,6 +32,7 @@ static uint32_t virtual_dirs_count = 0;
 
 ssize_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer);
 int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry);
+int initrd_create(fs_node_t *parent, char *name, uint16_t permission);
 int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission);
 fs_node_t *initrd_finddir(fs_node_t *node, char *name);
 
@@ -99,6 +101,7 @@ static fs_node_t* initrd_make_dir_node(const char* name, const char* full_path) 
     fnode->readdir = &initrd_readdir;
     fnode->finddir = &initrd_finddir;
     fnode->mkdir = &initrd_mkdir;
+    fnode->create = &initrd_create;
     if (full_path && full_path[0]) {
         size_t n = strlen(full_path) + 1;
         char* p = (char*)kmalloc(n);
@@ -222,6 +225,11 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     }
 
     return 1; /* EOF */
+}
+
+int initrd_create(fs_node_t *parent, char *name, uint16_t permission) {
+    (void)parent; (void)name; (void)permission;
+    return -EROFS; // Initrd is read-only
 }
 
 int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
@@ -414,6 +422,7 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     initrd_root->readdir = &initrd_readdir;
     initrd_root->finddir = &initrd_finddir;
     initrd_root->mkdir = &initrd_mkdir;
+    initrd_root->create = &initrd_create;
     initrd_root->ptr = 0;
     initrd_root->impl = 0;
 

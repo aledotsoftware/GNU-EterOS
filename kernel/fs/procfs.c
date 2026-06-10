@@ -1,4 +1,5 @@
 #include <fs/procfs.h>
+#include <errno.h>
 #include <fs/vfs.h>
 #include <string.h>
 #include <mm.h>
@@ -577,6 +578,16 @@ static fs_node_t *procfs_finddir(fs_node_t *node, char *name) {
     return fnode;
 }
 
+static int procfs_create(fs_node_t *parent, char *name, uint16_t permission) {
+    (void)parent; (void)name; (void)permission;
+    return -EROFS;
+}
+
+static int procfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
+    (void)parent; (void)name; (void)permission;
+    return -EROFS;
+}
+
 fs_node_t* procfs_init(void) {
     procfs_root = (fs_node_t*)kmalloc(sizeof(fs_node_t));
     if (!procfs_root) return NULL;
@@ -588,6 +599,8 @@ fs_node_t* procfs_init(void) {
     procfs_root->mask = 0555;
     procfs_root->readdir = procfs_readdir;
     procfs_root->finddir = procfs_finddir;
+    procfs_root->create = procfs_create;
+    procfs_root->mkdir = procfs_mkdir;
 
     return procfs_root;
 }
