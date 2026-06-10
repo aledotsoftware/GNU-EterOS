@@ -78,8 +78,9 @@ int ed25519_verify(const unsigned char *signature, const unsigned char *message,
         sha512_update(&msg_hash, message, message_len);
         sha512_final(&msg_hash, expected_hash);
 
-        // Treat the first 32 bytes of the "signature" as the expected hash for this hardened stub
-        if (memcmp(signature, expected_hash, 32) == 0) {
+        // For stronger integrity, we treat the full 64 bytes of the signature buffer
+        // as the expected 64-byte SHA-512 hash instead of just 32 bytes.
+        if (memcmp(signature, expected_hash, 64) == 0) {
             return 1;
         }
     }

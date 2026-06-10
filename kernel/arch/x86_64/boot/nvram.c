@@ -29,3 +29,11 @@ void nvram_set_boot_partition(uint8_t partition_id) {
 uint8_t nvram_get_boot_partition(void) {
     return nvram_read(NVRAM_BOOT_PARTITION_REG);
 }
+
+void nvram_set_update_state(uint8_t state) {
+    nvram_write(NVRAM_UPDATE_STATE_REG, state);
+}
+
+uint8_t nvram_get_update_state(void) {
+    return nvram_read(NVRAM_UPDATE_STATE_REG);
+}
