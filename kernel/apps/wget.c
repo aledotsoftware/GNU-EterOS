@@ -63,6 +63,11 @@ void wget_run(const char* url_in) {
         }
     }
     
+    if (!network_ready) {
+        terminal_write_string("[WGET] Error: La red no esta lista o no hay IP asignada.\n");
+        return;
+    }
+
     int sock = sys_lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock < 0) {
         terminal_write_string("[WGET] Failed to create socket.\n");

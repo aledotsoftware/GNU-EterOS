@@ -1,6 +1,8 @@
 #include "shell_internal.h"
 #include "../../include/keyboard.h"
+#include "../../include/net/defs.h"
 #include "../../include/mouse.h"
+#include "../../include/task.h"
 #include "../../include/rtc.h"
 #include "../../include/nvram.h"
 #include "../../include/net/nic.h"
@@ -477,7 +479,11 @@ void cmd_panel(const char* args) {
                 if (c == '1') {
                     cmd_dhcp("");
                 } else if (c == '2') {
-                    cmd_wget("tudexgames.com");
+                    if (!network_ready) {
+                        terminal_write_string("  Error: Red no lista. Ejecute DHCP primero.\n");
+                    } else {
+                        cmd_wget("tudexgames.com");
+                    }
                 }
                 if (c != KB_KEY_ESCAPE) wait_for_enter();
                 draw_panel_menu();
