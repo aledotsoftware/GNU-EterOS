@@ -69,6 +69,11 @@ int input_mouse_pending(void) {
     return 1;
 }
 
+
+/* Stubs for DRM functions */
+int devfs_dri_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) { return 1; }
+fs_node_t *devfs_dri_finddir(fs_node_t *node, char *name) { return 0; }
+
 /* Include DevFS source directly to test static functions */
 #include "../kernel/fs/devfs.c"
 

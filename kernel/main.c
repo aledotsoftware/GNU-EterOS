@@ -28,6 +28,7 @@
 #include <fs/bcache.h>
 #include <vga.h>
 #include <gfx/gfx.h>
+#include <gfx/drm.h>
 #include <task.h>
 #include <net/defs.h>
 #include <net/socket.h>

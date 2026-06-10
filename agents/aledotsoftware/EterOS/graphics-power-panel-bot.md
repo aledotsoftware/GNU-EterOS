@@ -7,7 +7,7 @@ kernel/gfx/, kernel/drivers/video/
 Framebuffer/gfx/window/UI shell y panel gráfico.
 
 ## Current Goal
-Crear una abstracción inicial DRM (`kernel/gfx/drm.c`) y su nodo de dispositivo correspondiente (ej. `/dev/dri/card0`) para modernizar la gestión del framebuffer hacia el estándar Linux DRM/KMS.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

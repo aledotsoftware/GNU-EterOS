@@ -10,6 +10,7 @@
 #include <ioctl.h>
 #include <crypto/sha256.h>
 #include <framebuffer.h>
+#include <gfx/drm.h>
 #include <serial.h>
 #include <termios.h>
 #include <task.h>
@@ -898,6 +899,11 @@ static int devfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) 
         entry->inode = 10;
         return 0;
     }
+    if (index == 11) {
+        strlcpy(entry->name, "dri", sizeof(entry->name));
+        entry->inode = 11;
+        return 0;
+    }
     return 1; /* EOF */
 }
 
@@ -985,8 +991,14 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->mask = 0600; // Solo root puede escribir el disco crudo
         fnode->inode = 10;
         fnode->read = dev_sda_read;
-        fnode->write = dev_sda_write;
-    } else {
+        fnode->write = dev_sda_write;    } else if (strcmp(name, "dri") == 0) {
+        strlcpy(fnode->name, "dri", sizeof(fnode->name));
+        fnode->flags = FS_DIRECTORY;
+        fnode->mask = 0555;
+        fnode->inode = 11;
+        fnode->readdir = devfs_dri_readdir;
+        fnode->finddir = devfs_dri_finddir;
+} else {
         kfree(fnode);
         return 0;
     }
