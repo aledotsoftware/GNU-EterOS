@@ -104,6 +104,8 @@ static uint32_t next_id       = 0;    /* Generador de IDs */
 static bool     scheduler_active = false; /* El scheduler está inicializado? */
 spinlock_t sched_lock = 0;    /* SMP protection */
 
+static void task_reap_zombie_locked(int zombie_slot);
+
 /* Queue Globals (O(1) Scheduler) */
 static task_t*  sleep_head = NULL;
 
@@ -226,13 +228,24 @@ static int      cpu_last_load = 0;
 uint64_t kernel_stack_top = 0x90000;
 
 static int find_free_slot(void) {
-    if (~task_bitmap == 0) return -1;
+    if (~task_bitmap != 0) {
+        int slot = __builtin_ctzll(~task_bitmap);
+        if (slot < MAX_TASKS) {
+            task_bitmap |= (1ULL << slot);
+            return slot;
+        }
+    }
 
-    int slot = __builtin_ctzll(~task_bitmap);
-    if (slot >= MAX_TASKS) return -1;
+    /* Out of slots? Try to reap orphans of task 0 */
+    for (int i = 1; i < MAX_TASKS; i++) {
+        if (tasks[i].state == TASK_DEAD && tasks[i].parent_id == tasks[0].id) {
+            task_reap_zombie_locked(i);
+            task_bitmap |= (1ULL << i);
+            return i;
+        }
+    }
 
-    task_bitmap |= (1ULL << slot);
-    return slot;
+    return -1;
 }
 
 /* ========================================================================= */
@@ -923,16 +936,15 @@ static void task_exit_internal(int status, int wait_status, int wait_code) {
     current->exit_code = status;
     task_mark_parent_wait_event(current, wait_status, wait_code);
 
-    int slot = (int)(current - tasks);
-    if (slot >= 0 && slot < MAX_TASKS) {
-        task_bitmap &= ~(1ULL << slot);
+    /* Reparent children to Kernel Task (0) */
+    for (int i = 0; i < MAX_TASKS; i++) {
+        if (tasks[i].id != 0 && tasks[i].parent_id == current->id) {
+            tasks[i].parent_id = tasks[0].id;
+        }
     }
-    spin_unlock(&sched_lock);
 
-    /* Wake up any tasks waiting for this process */
-    __asm__ volatile("cli");
-    spin_lock(&sched_lock);
     task_wake_parent_waiter(current);
+
     spin_unlock(&sched_lock);
     __asm__ volatile("sti");
 
@@ -989,7 +1001,15 @@ int task_kill(uint32_t pid) {
             tasks[i].state = TASK_DEAD;
             tasks[i].exit_code = 128 + SIGKILL;
             task_mark_parent_wait_event(&tasks[i], SIGKILL & 0x7F, CLD_KILLED);
-            task_bitmap &= ~(1ULL << i);
+
+            /* Reparent children to Kernel Task (0) */
+            for (int j = 0; j < MAX_TASKS; j++) {
+                if (tasks[j].id != 0 && tasks[j].parent_id == tasks[i].id) {
+                    tasks[j].parent_id = tasks[0].id;
+                }
+            }
+
+            task_wake_parent_waiter(&tasks[i]);
 
             /* Clean up TID pointer if requested by clone */
             if (tasks[i].clear_child_tid != NULL) {
@@ -1004,8 +1024,6 @@ int task_kill(uint32_t pid) {
             
             if (&tasks[i] == current) {
                 killed_self = 1;
-            } else {
-                task_wake_parent_waiter(&tasks[i]);
             }
             found = 1;
         }
@@ -1446,6 +1464,10 @@ static void task_reap_zombie_locked(int zombie_slot) {
     zombie->wait_pending = 0;
     zombie->wait_code = 0;
     zombie->wait_status = 0;
+
+    if (zombie_slot >= 0 && zombie_slot < MAX_TASKS) {
+        task_bitmap &= ~(1ULL << zombie_slot);
+    }
 }
 
 int task_waitpid(int pid, int* status, int options) {
