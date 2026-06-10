@@ -63,12 +63,12 @@ function handleMenuKey(e, item) {
 }
 
 function spawnAbout() {
-    spawnApp("Acerca de Eter OS", "native", `
+    spawnApp("Acerca de eterOS", "native", `
         <div style="text-align: center; padding: 40px;">
             <div style="width: 80px; height: 80px; background: var(--accent-glow); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
                 <span style="font-size: 30px; font-weight: bold;">E</span>
             </div>
-            <h2>Eter OS</h2>
+            <h2>eterOS</h2>
             <p style="opacity: 0.6;">Versión 0.2.0 "Genesis SMP"</p>
             <p style="margin-top: 20px; font-size: 14px;">El primer sistema operativo conceptual diseñado para unir la web, Android y Linux en una sola experiencia premium.</p>
         </div>
@@ -91,7 +91,7 @@ function spawnSettings() {
             </div>
             <div class="settings-main">
                 <div class="settings-group">
-                    <h3>Personalización de Eter OS</h3>
+                    <h3>Personalización de eterOS</h3>
                     <div class="settings-item">
                         <div>
                             <span>Tema Global</span>
