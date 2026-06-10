@@ -101,6 +101,13 @@ void cmd_ota(const char* args) {
             terminal_write_string(" (No disponible)");
         }
 
+        uint8_t update_state = nvram_get_update_state();
+        terminal_write_string("\n\n  [Estado de Actualizacion]: ");
+        if (update_state == UPDATE_STATE_PENDING) terminal_write_string("Pendiente (Reinicio requerido)");
+        else if (update_state == UPDATE_STATE_SUCCESS) terminal_write_string("Exitoso (Arranque confirmado)");
+        else if (update_state == UPDATE_STATE_FAILED) terminal_write_string("Fallido (Rollback)");
+        else terminal_write_string("Ninguno/Limpio");
+
         terminal_write_string("\n\n");
     } else if (strcmp(subcmd, "seturl") == 0) {
         if (!*p) {
@@ -139,16 +146,18 @@ void cmd_ota(const char* args) {
 
         if (port == 443) {
             terminal_write_string("  [OTA] Error: TLS (HTTPS) no implementado. Conexión rechazada por seguridad.\n");
+            kfree(passive_part);
             return;
         }
 
         uint32_t ip = ip_aton(host);
         if (ip == 0) {
-            /* Simple hardcoded resolution for testing if not an IP */
-            if (strcmp(host, "repo.eteros.org") == 0) ip = 0x288C43AC; /* 172.67.140.40 */
-            else if (strcmp(host, "localhost") == 0) ip = 0x7F000001; /* 127.0.0.1 */
-            else {
-                terminal_write_string("  [OTA] Error: Solo soportamos IP o hosts hardcodeados (repo.eteros.org).\n");
+            uint32_t resolved_ip = 0;
+            if (net_gethostbyname(host, &resolved_ip) == 0) {
+                ip = resolved_ip;
+            } else {
+                terminal_write_string("  [OTA] Error: Resolucion DNS fallo para el host.\n");
+                kfree(passive_part);
                 return;
             }
         }
@@ -156,6 +165,7 @@ void cmd_ota(const char* args) {
         int sock = sys_lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (sock < 0) {
             terminal_write_string("  [OTA] Failed to create socket.\n");
+            kfree(passive_part);
             return;
         }
 
@@ -168,6 +178,7 @@ void cmd_ota(const char* args) {
         if (sys_lwip_connect(sock, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
             terminal_write_string("  [OTA] Conexion fallida.\n");
             sys_lwip_close(sock);
+            kfree(passive_part);
             return;
         }
 
@@ -186,6 +197,7 @@ void cmd_ota(const char* args) {
 trunc:
         terminal_write_string("  [OTA] Error: Request buffer overflow.\n");
         sys_lwip_close(sock);
+        kfree(passive_part);
         return;
 
 receive:
@@ -198,6 +210,7 @@ receive:
         if (!payload_data) {
             terminal_write_string("  [OTA] Error: Sin memoria para alojar la actualizacion.\n");
             sys_lwip_close(sock);
+            kfree(passive_part);
             return;
         }
 
@@ -363,6 +376,7 @@ receive:
 
         // Commit atomic switch
         nvram_set_boot_partition(next_part);
+        nvram_set_update_state(UPDATE_STATE_PENDING);
 
         terminal_write_string("  [OTA] Actualizacion completada con exito.\n");
         terminal_write_string("  [OTA] El sistema arrancara desde el Slot ");
