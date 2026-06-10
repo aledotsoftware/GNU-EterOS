@@ -78,6 +78,10 @@ static struct gdt_entry gdt[GDT_ENTRIES] __attribute__((aligned(16)));
 static struct tss_struct tss __attribute__((aligned(16)));
 struct gdt_ptr gdtr;
 
+/* Double Fault Stack */
+#define DF_STACK_SIZE 4096
+static uint8_t df_stack_bsp[DF_STACK_SIZE] __attribute__((aligned(16)));
+
 /* Funciones en ASM */
 extern void gdt_flush(uint64_t gdtr_addr);
 extern void tss_flush(void);
@@ -131,7 +135,8 @@ static void write_tss(int num, uint16_t ss0, uint64_t esp0) {
     /* Configurar Stack de Ring 0 */
     extern uint64_t kernel_stack_top;
     tss.rsp0 = (uint64_t)kernel_stack_top;
-    tss.ist[1] = tss.rsp0;
+    /* Use dedicated isolated stack for Double Faults (IST 1) */
+    tss.ist[1] = (uint64_t)df_stack_bsp + DF_STACK_SIZE;
     tss.iomap_base = sizeof(tss); /* Sin I/O map */
     
     (void)ss0; /* Unused */
@@ -214,9 +219,15 @@ void gdt_init_ap(cpu_info_t* cpu) {
     /* Copy first 5 entries (Null, Kernel Code/Data, User Code/Data) */
     memcpy(new_gdt, gdt, sizeof(struct gdt_entry) * 5);
 
+    /* Double fault stack for AP */
+    uint8_t* ap_df_stack = (uint8_t*)kmalloc(DF_STACK_SIZE);
+
     /* Initialize TSS */
     memset(new_tss, 0, sizeof(struct tss_struct));
     new_tss->rsp0 = 0; /* Will be set by scheduler later */
+    if (ap_df_stack) {
+        new_tss->ist[1] = (uint64_t)ap_df_stack + DF_STACK_SIZE;
+    }
     new_tss->iomap_base = sizeof(struct tss_struct);
 
     /* Setup TSS Descriptor in new GDT (index 5) */

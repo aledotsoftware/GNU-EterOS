@@ -382,6 +382,11 @@ static void _kfree_impl(void* ptr) {
 
     /* Merge with next block if free */
     if (block->next && block->next->is_free) {
+        /* Verify next block magic before merging */
+        if (block->next->magic != HEAP_MAGIC) {
+            serial_write_string("[MM] Error: Next block magic invalid during coalescing\n");
+            ASSERT(0 && "Heap corruption: Invalid magic in next block");
+        }
         /* Remove the next block from free list as it's being absorbed */
         remove_from_free_list(block->next);
 
@@ -394,6 +399,11 @@ static void _kfree_impl(void* ptr) {
 
     /* Merge with prev block if free */
     if (block->prev && block->prev->is_free) {
+        /* Verify prev block magic before merging */
+        if (block->prev->magic != HEAP_MAGIC) {
+            serial_write_string("[MM] Error: Prev block magic invalid during coalescing\n");
+            ASSERT(0 && "Heap corruption: Invalid magic in prev block");
+        }
         /* Prev is already free, so it should be in the free list.
            We merge 'block' into 'prev'.
            Because the size changes, it might belong to a different bucket now.

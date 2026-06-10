@@ -54,8 +54,8 @@ static void idt_set_gate(uint8_t vector, void* handler, uint8_t type_attr) {
     p[2] = 0x08;
     p[3] = 0x00;
 
-    /* IST (32-39) = 0 */
-    p[4] = 0x00;
+    /* IST (32-39) = 0 by default, but vector 8 (Double Fault) uses IST 1 */
+    p[4] = (vector == 8) ? 0x01 : 0x00;
 
     /* Type/Attr (40-47) */
     p[5] = type_attr;
@@ -296,10 +296,17 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     serial_write_string("\nStack Trace (RBP chain):\n");
     uint64_t* rbp;
     __asm__ volatile("mov %%rbp, %0" : "=r"(rbp));
-    for (int i=0; i<10 && rbp != NULL; i++) {
+    for (int i=0; i<15 && rbp != NULL; i++) {
         /* Fix: We shouldn't use user access check for kernel pointers during panic.
-           Instead check if it maps to physical memory. */
-        if (!vmm_virt_to_phys((uint64_t)rbp)) break;
+           Instead check if it maps to physical memory. Verify rbp and rbp+1 */
+        if (!vmm_virt_to_phys((uint64_t)rbp)) {
+            serial_write_string("  <Invalid RBP pointer>\n");
+            break;
+        }
+        if (!vmm_virt_to_phys((uint64_t)rbp + 8)) {
+            serial_write_string("  <Invalid return address pointer>\n");
+            break;
+        }
         uint64_t rip_caller = rbp[1];
         serial_write_string("  ["); itoa_s(i, buf, sizeof(buf), 10); serial_write_string(buf);
         serial_write_string("] 0x"); utoa_hex_s(rip_caller, buf, sizeof(buf)); serial_write_string(buf);

@@ -61,9 +61,17 @@ static int bitmap_test(uint64_t bit) {
 
 /* Marca un rango de direcciones físicas como OCUPADAS */
 void pmm_mark_region_used(uint64_t base, uint64_t size) {
+    if (size == 0) return;
+
     spin_lock(&pmm_lock);
     uint64_t start_page = base / PAGE_SIZE;
     uint64_t num_pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    /* Enforce boundary constraints */
+    if (start_page >= total_pages) {
+        spin_unlock(&pmm_lock);
+        return;
+    }
 
     for (uint64_t i = 0; i < num_pages; i++) {
         uint64_t page_idx = start_page + i;
@@ -72,6 +80,8 @@ void pmm_mark_region_used(uint64_t base, uint64_t size) {
                 bitmap_set(page_idx);
                 used_ram += PAGE_SIZE;
             }
+        } else {
+            break; /* Exceeded total_pages, safe to break */
         }
     }
     spin_unlock(&pmm_lock);
@@ -79,10 +89,18 @@ void pmm_mark_region_used(uint64_t base, uint64_t size) {
 
 /* Marca un rango de direcciones físicas como LIBRES (si existen en el mapa E820) */
 static void pmm_mark_region_free(uint64_t base, uint64_t size) {
+    if (size == 0) return;
+
     /* Internal helper called by pmm_init (single threaded), but for consistency we lock */
     spin_lock(&pmm_lock);
     uint64_t start_page = base / PAGE_SIZE;
     uint64_t num_pages = size / PAGE_SIZE; /* Round down for safety */
+
+    /* Enforce boundary constraints */
+    if (start_page >= total_pages) {
+        spin_unlock(&pmm_lock);
+        return;
+    }
 
     for (uint64_t i = 0; i < num_pages; i++) {
         uint64_t page_idx = start_page + i;
@@ -91,6 +109,8 @@ static void pmm_mark_region_free(uint64_t base, uint64_t size) {
                 bitmap_unset(page_idx);
                 used_ram -= PAGE_SIZE;
             }
+        } else {
+            break; /* Exceeded total_pages, safe to break */
         }
     }
     spin_unlock(&pmm_lock);
