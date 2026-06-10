@@ -34,3 +34,7 @@ EterOS has a growing Linux ABI compatibility layer capable of running standard x
 1. **Foundation:** Implement `memfd_create` and basic `/dev/binder` node.
 2. **Runtime:** Successfully load Bionic's `linker64` and a statically linked Android `hello-world`.
 3. **IPC:** Boot a basic `servicemanager` and perform a Binder transaction.
+
+### 2.6 Binder Memory Mapping (Future Work)
+**Current State:** A rudimentary Binder routing engine exists that copies payloads into a static kernel buffer, returning them to the context manager.
+**Strategy:** Transition to a true Binder memory model where `mmap` is used to map a shared read-only buffer into the receiver's address space. The kernel will allocate physical pages and map them into this VMA, copying the transaction data directly from the sender's user space into the receiver's mapped buffer, avoiding double-copying and static limits.

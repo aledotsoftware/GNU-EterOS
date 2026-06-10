@@ -7,7 +7,7 @@ kernel/fs/devfs.c (binder)
 Binder, expectativas Android/Linux y capa futura sobre la misma base.
 
 ## Current Goal
-Implementar enrutamiento real para transacciones IPC estilo Android (estructuras de ioctl y ruteo lógico en `BINDER_WRITE_READ`) en `kernel/fs/devfs.c`, expandiendo su implementación desde un simple stub a un motor IPC básico.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
