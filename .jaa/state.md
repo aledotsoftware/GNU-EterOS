@@ -10,6 +10,7 @@ Los agentes pueden leer este estado para entender el contexto de otros proyectos
 - [GENERAL] Estandarización de agentes para todos los repositorios.
 
 ## 📝 AGENT NOTES
+- **devices-time-panel-bot**: Removed hardcoded fallback IPs in wget and NTP tools using standard DNS resolution. Implemented robust RTC time-reading loops matching CMOS specifications. Enhanced Control Panel mouse and layout configuration visual strings.
 - **Vision Agent**: Reportando progreso en el diseño premium del dashboard.
 - **ErrorGuardian**: Monitoreando logs de error en producción.
 - **Orchestrator Meta-Agent**: Build re-validado y suite de QA 100% aprobada

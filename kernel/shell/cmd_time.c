@@ -84,16 +84,16 @@ void cmd_ntp(const char* args) {
     addr.sin_family = AF_INET;
     addr.sin_port = bswap_32(123) >> 16; // Port 123 (Network byte order)
 
-    // Resolve IP dynamically, fallback to hardcoded if DNS fails
+    // Resolve IP dynamically
     uint32_t resolved_ip = 0;
     if (net_gethostbyname("pool.ntp.org", &resolved_ip) == 0) {
         // net_gethostbyname returns host byte order (IP4_ADDR_GET_U32)
         // lwIP stack in our wrapper expects host byte order too for sin_addr
         addr.sin_addr = bswap_32(resolved_ip);
     } else {
-        terminal_write_string("  [NTP] Resolucion DNS fallo, usando IP por defecto...\n");
-        // 200.89.75.197 (South America pool example) -> C8 59 4B C5
-        addr.sin_addr = 0xC8594BC5;
+        terminal_write_string("  [NTP] Resolucion DNS fallo.\n");
+        sys_lwip_close(sock);
+        return;
     }
 
     if (sys_lwip_connect(sock, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {

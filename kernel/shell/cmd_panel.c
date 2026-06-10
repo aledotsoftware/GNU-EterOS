@@ -47,13 +47,13 @@ static void draw_panel_menu(void) {
 
     // Items are roughly at lines 4, 5, 6, 7, 8, 9, 10
     terminal_write_string("    1. Configurar Teclado (Layout & Typematic)\n"); // Y=4
-    terminal_write_string("    2. Configurar Mouse (Sensibilidad & Zurdo/Diestro)\n"); // Y=5
-    terminal_write_string("    3. Estado de Almacenamiento (A/B Slots & Initrd)\n"); // Y=6
-    terminal_write_string("    4. Configurar Tiempo (Zona Horaria & NTP)\n"); // Y=7
-    terminal_write_string("    5. Usuarios y Seguridad (Auto-login)\n"); // Y=8
-    terminal_write_string("    6. Estado de Red (IP & DHCP)\n"); // Y=9
-    terminal_write_string("    7. Salir del Panel\n"); // Y=10
-    terminal_write_string("\n  Use teclas [1-7] o click para seleccionar.\n");
+    terminal_write_string("    2. Configurar Mouse (Sensibilidad & Botones)\n"); // Y=5
+    terminal_write_string("    3. Estado de Almacenamiento (Slots & Initrd)\n"); // Y=6
+    terminal_write_string("    4. Configurar Tiempo (Zona Horaria & Sincronizacion)\n"); // Y=7
+    terminal_write_string("    5. Usuarios y Seguridad (Auto-login & Permisos)\n"); // Y=8
+    terminal_write_string("    6. Estado de Red (IP & DNS)\n"); // Y=9
+    terminal_write_string("    7. Salir del Panel de Control\n"); // Y=10
+    terminal_write_string("\n  Use teclas [1-7] o haga click para seleccionar.\n");
 
     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
 }
@@ -136,12 +136,12 @@ static void panel_keyboard(void) {
 static void panel_mouse_cfg(void) {
     cmd_clear("");
     terminal_write_string("\n  -- Mouse --\n");
-    terminal_write_string("  1. Sensibilidad: Baja (1)\n"); // Y=2
-    terminal_write_string("  2. Sensibilidad: Media (5)\n"); // Y=3
-    terminal_write_string("  3. Sensibilidad: Alta (10)\n"); // Y=4
-    terminal_write_string("  4. Modo Diestro\n"); // Y=5
-    terminal_write_string("  5. Modo Zurdo\n"); // Y=6
-    terminal_write_string("  Elija [1-5] o ESC para volver.\n");
+    terminal_write_string("  1. Sensibilidad: Baja (Multiplicador 1)\n"); // Y=2
+    terminal_write_string("  2. Sensibilidad: Media (Multiplicador 5)\n"); // Y=3
+    terminal_write_string("  3. Sensibilidad: Alta (Multiplicador 10)\n"); // Y=4
+    terminal_write_string("  4. Modo Diestro (Normal)\n"); // Y=5
+    terminal_write_string("  5. Modo Zurdo (Invertido)\n"); // Y=6
+    terminal_write_string("  Elija [1-5] o haga click para seleccionar, o ESC para volver.\n");
 
     char c = 0;
     while (1) {
@@ -231,12 +231,12 @@ static void panel_time(void) {
     cmd_clear("");
     terminal_write_string("\n  -- Tiempo --\n");
     cmd_time("");
-    terminal_write_string("  1. Sincronizar via red (NTP)\n"); // Y = varies based on cmd_time output length, usually 5-6 lines
+    terminal_write_string("  1. Sincronizar via red (NTP / Resolucion DNS)\n"); // Y = varies based on cmd_time output length, usually 5-6 lines
     // Let's print fixed options and read keyboard for simplicity to not hardcode dynamic Y positions here
     terminal_write_string("  2. Zona Horaria: Argentina (UTC-3)\n");
     terminal_write_string("  3. Zona Horaria: UTC (0)\n");
-    terminal_write_string("  4. Sincronizacion Manual (HH:MM:SS)\n");
-    terminal_write_string("  Elija [1-4] usando TECLADO (o ESC para volver).\n");
+    terminal_write_string("  4. Sincronizacion Manual Avanzada (HH:MM:SS)\n");
+    terminal_write_string("  Elija [1-4] usando el teclado numerico (o ESC para cancelar y volver).\n");
 
     char c = 0;
     while (1) {
