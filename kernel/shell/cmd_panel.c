@@ -12,25 +12,38 @@
 static volatile bool panel_running = false;
 static volatile int panel_mouse_x = 40;
 static volatile int panel_mouse_y = 12;
+static volatile int panel_mouse_acc_x = 0;
+static volatile int panel_mouse_acc_y = 0;
 static volatile bool panel_mouse_clicked = false;
 static volatile bool panel_mouse_moved = false;
 
 static void panel_mouse_callback(int8_t dx, int8_t dy, uint8_t buttons) {
     if (!panel_running) return;
 
+    panel_mouse_acc_x += dx;
+    panel_mouse_acc_y += dy;
+
     // Adjust scale for text mode (mouse delta is usually high res, so scale down)
-    int new_x = panel_mouse_x + (dx / 4);
-    int new_y = panel_mouse_y + (dy / 4);
+    int move_x = panel_mouse_acc_x / 4;
+    int move_y = panel_mouse_acc_y / 4;
 
-    if (new_x < 0) new_x = 0;
-    if (new_x >= 80) new_x = 79;
-    if (new_y < 0) new_y = 0;
-    if (new_y >= 25) new_y = 24;
+    if (move_x != 0 || move_y != 0) {
+        int new_x = panel_mouse_x + move_x;
+        int new_y = panel_mouse_y + move_y;
 
-    if (new_x != panel_mouse_x || new_y != panel_mouse_y) {
-        panel_mouse_x = new_x;
-        panel_mouse_y = new_y;
-        panel_mouse_moved = true;
+        if (new_x < 0) new_x = 0;
+        if (new_x >= 80) new_x = 79;
+        if (new_y < 0) new_y = 0;
+        if (new_y >= 25) new_y = 24;
+
+        if (new_x != panel_mouse_x || new_y != panel_mouse_y) {
+            panel_mouse_x = new_x;
+            panel_mouse_y = new_y;
+            panel_mouse_moved = true;
+        }
+
+        panel_mouse_acc_x -= move_x * 4;
+        panel_mouse_acc_y -= move_y * 4;
     }
 
     if (buttons & 1) { // Left click
@@ -248,9 +261,28 @@ static void panel_time(void) {
             if (c == KB_KEY_ESCAPE) break;
         }
 
-        // Disable mouse click mapping here since it's dynamic
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
+            // The output of cmd_time is about 6 lines long.
+            // Menu starts at roughly y=10.
+            // "1. Sincronizar via red"
+            // "2. Zona Horaria"
+            // "3. Zona Horaria UTC"
+            // "4. Sincronizacion Manual"
+            if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
+                // Approximate mapping based on typical cmd_time length
+                if (panel_mouse_y >= 8 && panel_mouse_y <= 13) {
+                    c = '1' + (panel_mouse_y - 8);
+                    if (c > '4') c = '4'; // Clamping
+                    break;
+                } else {
+                    c = KB_KEY_ESCAPE;
+                    break;
+                }
+            } else {
+                c = KB_KEY_ESCAPE;
+                break;
+            }
         }
         __asm__ volatile("cli");
         if (!keyboard_has_input() && !panel_mouse_clicked) {
@@ -417,20 +449,36 @@ void cmd_panel(const char* args) {
             } else if (opt == '5') {
                 cmd_clear("");
                 terminal_write_string("\n  -- Usuarios y Seguridad --\n");
-                terminal_write_string("  1. Habilitar Auto-login (autologin on)\n");
-                terminal_write_string("  2. Deshabilitar Auto-login (autologin off)\n");
-                terminal_write_string("  3. Crear Usuario (add)\n");
-                terminal_write_string("  4. Eliminar Usuario (del)\n");
-                terminal_write_string("  5. Cambiar Contrasena (passwd)\n");
+                terminal_write_string("  1. Habilitar Auto-login (autologin on)\n"); // y=2
+                terminal_write_string("  2. Deshabilitar Auto-login (autologin off)\n"); // y=3
+                terminal_write_string("  3. Crear Usuario (add)\n"); // y=4
+                terminal_write_string("  4. Eliminar Usuario (del)\n"); // y=5
+                terminal_write_string("  5. Cambiar Contrasena (passwd)\n"); // y=6
                 terminal_write_string("\n  Elija [1-5] o ESC para volver.\n");
                 char c = 0;
                 while (1) {
+                    terminal_set_cursor(panel_mouse_x, panel_mouse_y);
                     if (keyboard_has_input()) {
                         c = keyboard_getchar();
                         if ((c >= '1' && c <= '5') || c == KB_KEY_ESCAPE) break;
                     }
+                    if (panel_mouse_clicked) {
+                        panel_mouse_clicked = false;
+                        if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
+                            if (panel_mouse_y >= 2 && panel_mouse_y <= 6) {
+                                c = '1' + (panel_mouse_y - 2);
+                                break;
+                            } else {
+                                c = KB_KEY_ESCAPE;
+                                break;
+                            }
+                        } else {
+                            c = KB_KEY_ESCAPE;
+                            break;
+                        }
+                    }
                     __asm__ volatile("cli");
-                    if (!keyboard_has_input()) __asm__ volatile("sti; hlt");
+                    if (!keyboard_has_input() && !panel_mouse_clicked) __asm__ volatile("sti; hlt");
                     else __asm__ volatile("sti");
                 }
                 terminal_write_string("\n");
@@ -459,14 +507,32 @@ void cmd_panel(const char* args) {
                 cmd_clear("");
                 terminal_write_string("\n  -- Red y Conectividad --\n");
                 cmd_net("");
+                // cmd_net outputs ~4-5 lines, so options start roughly at y=7 or y=8
                 terminal_write_string("\n  1. Renovar DHCP\n");
                 terminal_write_string("  2. Probar conexion (wget tudexgames.com)\n");
                 terminal_write_string("\n  Elija [1-2] o ESC para volver.\n");
                 char c = 0;
                 while (1) {
+                    terminal_set_cursor(panel_mouse_x, panel_mouse_y);
                     if (keyboard_has_input()) {
                         c = keyboard_getchar();
                         if ((c >= '1' && c <= '2') || c == KB_KEY_ESCAPE) break;
+                    }
+                    if (panel_mouse_clicked) {
+                        panel_mouse_clicked = false;
+                        if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
+                            if (panel_mouse_y >= 7 && panel_mouse_y <= 9) { // rough estimate
+                                c = '1' + (panel_mouse_y - 7);
+                                if (c > '2') c = '2';
+                                break;
+                            } else {
+                                c = KB_KEY_ESCAPE;
+                                break;
+                            }
+                        } else {
+                            c = KB_KEY_ESCAPE;
+                            break;
+                        }
                     }
                     __asm__ volatile("cli");
                     if (!keyboard_has_input() && !panel_mouse_clicked) {

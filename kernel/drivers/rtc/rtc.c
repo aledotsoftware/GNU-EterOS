@@ -12,18 +12,23 @@
 static int8_t current_timezone = -3; // Default UTC-3 (Argentina)
 
 static int rtc_is_updating() {
-    outb(CMOS_ADDRESS, 0x0A);
-    return (inb(CMOS_DATA) & 0x80);
+    outb(CMOS_ADDRESS, 0x0A | 0x80); // Disable NMI
+    int ret = (inb(CMOS_DATA) & 0x80);
+    outb(CMOS_ADDRESS, 0x0A);        // Re-enable NMI
+    return ret;
 }
 
 static unsigned char rtc_read_register(int reg) {
-    outb(CMOS_ADDRESS, reg);
-    return inb(CMOS_DATA);
+    outb(CMOS_ADDRESS, reg | 0x80); // Disable NMI
+    unsigned char ret = inb(CMOS_DATA);
+    outb(CMOS_ADDRESS, reg);        // Re-enable NMI
+    return ret;
 }
 
 static void rtc_write_register(int reg, unsigned char val) {
-    outb(CMOS_ADDRESS, reg);
+    outb(CMOS_ADDRESS, reg | 0x80); // Disable NMI
     outb(CMOS_DATA, val);
+    outb(CMOS_ADDRESS, reg);        // Re-enable NMI
 }
 
 void rtc_init(void) {
