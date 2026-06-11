@@ -6,3 +6,4 @@
 - VFS security: Ensure read-only filesystems correctly return -EROFS for create/mkdir (devfs, initrd) to prevent write-attempt panics.
 - Userspace: Fixed libc syscall wrappers to correctly handle valid high-memory pointers (like mmap returns) by checking `(unsigned long)ret >= (unsigned long)-4095` instead of `ret < 0`.
 - Userspace: Verified `crt0.asm` fully aligns with Linux x86_64 ABI specifications for argc, argv, envp, and auxv setup pushed by the kernel.
+- **Network UI Support**: Integrated standard EterOS networking flags (`network_ready`, `current_nic`) into the shell networking utility `cmd_time.c` (`cmd_ntp`). Now correctly outputs diagnostics rather than simply 'Network disabled'.

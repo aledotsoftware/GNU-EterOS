@@ -4,6 +4,7 @@
 #include "../../include/net/socket.h"
 #include "../../include/net/lwip_socket.h"
 #include "../../include/net/dhcp.h" /* For ntohl/htonl if needed, but we can implement basic byte swaps */
+#include "../../include/net/nic.h"
 
 // Simple byte swap for 32-bit (network to host)
 static uint32_t bswap_32(uint32_t x) {
@@ -62,13 +63,11 @@ static void unix_to_rtc(time_t timestamp, rtc_time_t* t) {
     t->day = d;
 }
 
-#include "../../include/net/nic.h"
-
 void cmd_ntp(const char* args) {
     (void)args;
 
-    if (!current_nic) {
-        terminal_write_string("  [NTP] Network disabled.\n");
+    if (!current_nic || !network_ready) {
+        terminal_write_string("  [NTP] Error: Adaptador de red no activo o DHCP no asignado.\n");
         return;
     }
 
