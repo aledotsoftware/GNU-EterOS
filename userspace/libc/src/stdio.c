@@ -506,7 +506,7 @@ int fclose(FILE *stream) {
     int ret = close(stream->fd);
     if (stream->should_free && stream->buf) free(stream->buf);
     free(stream);
-    return (ret < 0) ? EOF : 0;
+    return ((unsigned long)ret >= (unsigned long)-4095) ? EOF : 0;
 }
 
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
@@ -523,7 +523,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
 
     if (stream->buf_mode == _IONBF) {
         ssize_t ret = read(stream->fd, p, total_bytes);
-        if (ret < 0) {
+        if ((unsigned long)ret >= (unsigned long)-4095) {
             stream->error = 1;
             return 0;
         }
@@ -541,7 +541,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
 
             if (total_bytes >= (size_t)stream->buf_size) {
                 ssize_t ret = read(stream->fd, p, total_bytes);
-                if (ret < 0) {
+                if ((unsigned long)ret >= (unsigned long)-4095) {
                     stream->error = 1;
                     return read_bytes / size;
                 }
@@ -554,7 +554,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
             }
 
             ssize_t ret = read(stream->fd, stream->buf, stream->buf_size);
-            if (ret < 0) {
+            if ((unsigned long)ret >= (unsigned long)-4095) {
                 stream->error = 1;
                 return read_bytes / size;
             }
@@ -592,7 +592,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
 
     if (stream->buf_mode == _IONBF) {
         ssize_t ret = write(stream->fd, p, total_bytes);
-        if (ret < 0) {
+        if ((unsigned long)ret >= (unsigned long)-4095) {
              stream->error = 1;
              return 0;
         }
@@ -610,7 +610,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
         // Optimize: If buffer is empty and data is large, write directly
         if (stream->buf_pos == 0 && chunk == (size_t)stream->buf_size) {
              ssize_t ret = write(stream->fd, p, total_bytes);
-             if (ret < 0) {
+             if ((unsigned long)ret >= (unsigned long)-4095) {
                  stream->error = 1;
                  return written / size;
              }
@@ -642,7 +642,7 @@ int fseek(FILE *stream, long offset, int whence) {
     if (!stream) return -1;
     fflush(stream);
     int64_t ret = lseek(stream->fd, offset, whence);
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         stream->error = 1;
         return -1;
     }
@@ -744,6 +744,6 @@ int remove(const char *pathname) {
 
 int rename(const char *oldpath, const char *newpath) {
     long ret = _syscall2(SYS_rename, (long)oldpath, (long)newpath);
-    if (ret < 0) { errno = (int)-ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)-ret; return -1; }
     return 0;
 }

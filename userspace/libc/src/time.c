@@ -49,7 +49,7 @@ time_t time(time_t *tloc) {
 
 int clock_gettime(int clock_id, struct timespec *tp) {
     long ret = _time_syscall2(SYS_clock_gettime, clock_id, (long)tp);
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         // Fallback to gettimeofday if clock_gettime fails
         if (ret == -ENOSYS && clock_id == CLOCK_REALTIME) {
              struct {
@@ -69,7 +69,7 @@ int clock_gettime(int clock_id, struct timespec *tp) {
 
 int nanosleep(const struct timespec *req, struct timespec *rem) {
     long ret = _time_syscall2(SYS_nanosleep, (long)req, (long)rem);
-    if (ret < 0) { errno = (int)-ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)-ret; return -1; }
     return 0;
 }
 
@@ -151,7 +151,7 @@ struct tm *localtime(const time_t *timep) {
 
 int gettimeofday(struct timeval *tv, struct timezone *tz) {
     long ret = _time_syscall2(96, (long)tv, (long)tz); // SYS_gettimeofday
-    if (ret < 0) { errno = (int)-ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)-ret; return -1; }
     return 0;
 }
 

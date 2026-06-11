@@ -88,7 +88,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
         : "rcx", "r11", "rdi", "rsi", "rdx", "r10", "r8", "memory"
     );
 
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         free(stack);
         free(targs);
         return -ret;

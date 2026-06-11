@@ -42,7 +42,7 @@ struct dirent *readdir(DIR *dirp) {
     if (dirp->buf_pos >= dirp->buf_end) {
         long ret = syscall(SYS_getdents64, dirp->fd, dirp->buf, sizeof(dirp->buf));
         if (ret <= 0) {
-            if (ret < 0) errno = -ret;
+            if ((unsigned long)ret >= (unsigned long)-4095) errno = -ret;
             return NULL; // EOF or error
         }
         dirp->buf_end = ret;
@@ -81,7 +81,7 @@ int closedir(DIR *dirp) {
     int ret = syscall(SYS_close, dirp->fd);
     free(dirp);
 
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = -ret;
         return -1;
     }
