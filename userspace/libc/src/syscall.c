@@ -84,7 +84,7 @@ long syscall(long nr, ...) {
         : "rcx", "r11", "memory"
     );
 
-    if (ret > -4096 && ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = -ret;
         return -1;
     }
@@ -106,7 +106,7 @@ int open(const char *pathname, int flags, ...) {
     }
 
     long ret = syscall3(SYS_open, (long)pathname, flags, mode);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
@@ -117,13 +117,13 @@ int creat(const char *pathname, mode_t mode) {
 
 int wait(int *wstatus) {
     long ret = syscall3(SYS_wait4, -1, (long)wstatus, 0);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
 int ioctl(int fd, int request, void *arg) {
     long ret = syscall3(SYS_ioctl, fd, request, (long)arg);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
@@ -157,49 +157,49 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 
 int close(int fd) {
     long ret = syscall1(SYS_close, fd);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
 ssize_t read(int fd, void *buf, size_t count) {
     long ret = syscall3(SYS_read, fd, (long)buf, count);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {
     long ret = syscall3(SYS_write, fd, (long)buf, count);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
 
 int64_t lseek(int fd, int64_t offset, int whence) {
     long ret = syscall3(SYS_lseek, fd, offset, whence);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int64_t)ret;
 }
 
 int stat(const char *pathname, struct stat *buf) {
     long ret = syscall2(SYS_stat, (long)pathname, (long)buf);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int fstat(int fd, struct stat *buf) {
     long ret = syscall2(SYS_fstat, fd, (long)buf);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int mkdir(const char *pathname, mode_t mode) {
     long ret = syscall2(SYS_mkdir, (long)pathname, mode);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int unlink(const char *pathname) {
     long ret = syscall1(SYS_unlink, (long)pathname);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
@@ -207,7 +207,7 @@ int unlink(const char *pathname) {
 
 int sysinfo(struct sysinfo *info) {
     long ret = syscall1(SYS_sysinfo, (long)info);
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = -ret;
         return -1;
     }
@@ -216,13 +216,13 @@ int sysinfo(struct sysinfo *info) {
 
 int rmdir(const char *pathname) {
     long ret = syscall1(SYS_rmdir, (long)pathname);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int chdir(const char *pathname) {
     long ret = syscall1(SYS_chdir, (long)pathname);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
@@ -232,19 +232,19 @@ int getpid(void) {
 
 int setuid(int uid) {
     long ret = syscall1(SYS_setuid, uid);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int setgid(int gid) {
     long ret = syscall1(SYS_setgid, gid);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int kill(int pid, int sig) {
     long ret = syscall2(SYS_kill, pid, sig);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
@@ -252,88 +252,88 @@ int kill(int pid, int sig) {
 
 int socket(int domain, int type, int protocol) {
     long ret = syscall3(SYS_socket, domain, type, protocol);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
     long ret = syscall3(SYS_connect, sockfd, (long)addr, addrlen);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
     long ret = syscall3(SYS_bind, sockfd, (long)addr, addrlen);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
 int listen(int sockfd, int backlog) {
     long ret = syscall2(SYS_listen, sockfd, backlog);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
 int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
     long ret = syscall3(SYS_accept, sockfd, (long)addr, (long)addrlen);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (int)ret;
 }
 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
     /* Use SYS_sendto with NULL dest address and 0 addrlen */
     long ret = syscall6(SYS_sendto, sockfd, (long)buf, len, flags, 0, 0);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
 
 ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
     /* Use SYS_recvfrom with NULL src address and NULL addrlen */
     long ret = syscall6(SYS_recvfrom, sockfd, (long)buf, len, flags, 0, 0);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
 
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen) {
     long ret = syscall6(SYS_sendto, sockfd, (long)buf, len, flags, (long)dest_addr, addrlen);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
 
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen) {
     long ret = syscall6(SYS_recvfrom, sockfd, (long)buf, len, flags, (long)src_addr, (long)addrlen);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
 
 
 int fsync(int fd) {
     long ret = syscall1(SYS_fsync, fd);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int fdatasync(int fd) {
     long ret = syscall1(SYS_fdatasync, fd);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int chown(const char *pathname, uid_t owner, gid_t group) {
     long ret = syscall3(SYS_chown, (long)pathname, owner, group);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int fchown(int fd, uid_t owner, gid_t group) {
     long ret = syscall3(SYS_fchown, fd, owner, group);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int lchown(const char *pathname, uid_t owner, gid_t group) {
     long ret = syscall3(SYS_lchown, (long)pathname, owner, group);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
@@ -341,30 +341,30 @@ int lchown(const char *pathname, uid_t owner, gid_t group) {
 
 int fchdir(int fd) {
     long ret = syscall1(SYS_fchdir, fd);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 int truncate(const char *path, int64_t length) {
     long ret = syscall2(SYS_truncate, (long)path, length);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }
 
 ssize_t pread(int fd, void *buf, size_t count, int64_t offset) {
     long ret = syscall4(SYS_pread64, fd, (long)buf, count, offset);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
 
 ssize_t pwrite(int fd, const void *buf, size_t count, int64_t offset) {
     long ret = syscall4(SYS_pwrite64, fd, (long)buf, count, offset);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
 }
 
 int reboot(int magic, int magic2, int cmd, void *arg) {
     long ret = syscall4(SYS_reboot, magic, magic2, cmd, (long)arg);
-    if (ret < 0) { errno = -ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return 0;
 }

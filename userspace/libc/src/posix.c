@@ -119,13 +119,13 @@ static int _join_path(char *dst, size_t dst_sz, const char *dir, const char *fil
 /* Process */
 int fork(void) {
     long ret = _syscall0(SYS_fork);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
 int execve(const char *pathname, char *const argv[], char *const envp[]) {
     long ret = _syscall3(SYS_execve, (long)pathname, (long)argv, (long)envp);
-    if (ret < 0) { errno = (int)(-ret); return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
 
@@ -467,7 +467,7 @@ unsigned int sleep(unsigned int seconds) {
     struct { int64_t sec; int64_t nsec; } req = {seconds, 0};
     struct { int64_t sec; int64_t nsec; } rem = {0, 0};
     long ret = _syscall2(SYS_nanosleep, (long)&req, (long)&rem);
-    if (ret < 0) return (unsigned int)rem.sec;
+    if ((unsigned long)ret >= (unsigned long)-4095) return (unsigned int)rem.sec;
     return 0;
 }
 
@@ -512,7 +512,7 @@ int uname(void *buf) {
 
 mode_t umask(mode_t mask) {
     long ret = _syscall1(SYS_umask, mask);
-    if (ret < 0) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = (int)(-ret);
         return (mode_t)-1;
     }
