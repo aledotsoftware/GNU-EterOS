@@ -2897,8 +2897,8 @@ static int64_t sys_mremap(void* old_addr, size_t old_size, size_t new_size, int 
 static int64_t sys_madvise(void* addr, size_t len, int advice) { (void)addr; (void)len; (void)advice; return 0; }
 static int64_t sys_getuid(void)  { return task_get_current()->uid; }
 static int64_t sys_getgid(void)  { return task_get_current()->gid; }
-static int64_t sys_geteuid(void) { return task_get_current()->uid; }
-static int64_t sys_getegid(void) { return task_get_current()->gid; }
+static int64_t sys_geteuid(void) { return task_get_current()->euid; }
+static int64_t sys_getegid(void) { return task_get_current()->egid; }
 static int64_t sys_setuid(uint32_t uid) {
     task_t* current = task_get_current();
     if (current->uid != 0 && current->uid != uid) {
@@ -2906,6 +2906,93 @@ static int64_t sys_setuid(uint32_t uid) {
     }
     current->uid = uid;
     current->euid = uid; /* SECURITY FIX: Sync effective UID */
+    return 0;
+}
+
+
+static int64_t sys_getpgid(int pid) {
+    if (pid == 0) {
+        return task_get_current()->pgid;
+    }
+    task_t* target = task_get_by_id(pid);
+    if (!target) return -ESRCH;
+    return target->pgid;
+}
+
+static int64_t sys_getsid(int pid) {
+    if (pid == 0) {
+        return task_get_current()->sid;
+    }
+    task_t* target = task_get_by_id(pid);
+    if (!target) return -ESRCH;
+    return target->sid;
+}
+
+static int64_t sys_setreuid(uint32_t ruid, uint32_t euid) {
+    task_t* current = task_get_current();
+    if (current->uid != 0) {
+        if (ruid != (uint32_t)-1 && ruid != current->uid && ruid != current->euid) return -EPERM;
+        if (euid != (uint32_t)-1 && euid != current->uid && euid != current->euid) return -EPERM;
+    }
+    if (ruid != (uint32_t)-1) current->uid = ruid;
+    if (euid != (uint32_t)-1) current->euid = euid;
+    return 0;
+}
+
+static int64_t sys_setregid(uint32_t rgid, uint32_t egid) {
+    task_t* current = task_get_current();
+    if (current->uid != 0) {
+        if (rgid != (uint32_t)-1 && rgid != current->gid && rgid != current->egid) return -EPERM;
+        if (egid != (uint32_t)-1 && egid != current->gid && egid != current->egid) return -EPERM;
+    }
+    if (rgid != (uint32_t)-1) current->gid = rgid;
+    if (egid != (uint32_t)-1) current->egid = egid;
+    return 0;
+}
+
+static int64_t sys_setresuid(uint32_t ruid, uint32_t euid, uint32_t suid) {
+    task_t* current = task_get_current();
+    if (current->uid != 0) {
+        if (ruid != (uint32_t)-1 && ruid != current->uid && ruid != current->euid) return -EPERM;
+        if (euid != (uint32_t)-1 && euid != current->uid && euid != current->euid) return -EPERM;
+        if (suid != (uint32_t)-1 && suid != current->uid && suid != current->euid) return -EPERM;
+    }
+    if (ruid != (uint32_t)-1) current->uid = ruid;
+    if (euid != (uint32_t)-1) current->euid = euid;
+    return 0;
+}
+
+static int64_t sys_setresgid(uint32_t rgid, uint32_t egid, uint32_t sgid) {
+    task_t* current = task_get_current();
+    if (current->uid != 0) {
+        if (rgid != (uint32_t)-1 && rgid != current->gid && rgid != current->egid) return -EPERM;
+        if (egid != (uint32_t)-1 && egid != current->gid && egid != current->egid) return -EPERM;
+        if (sgid != (uint32_t)-1 && sgid != current->gid && sgid != current->egid) return -EPERM;
+    }
+    if (rgid != (uint32_t)-1) current->gid = rgid;
+    if (egid != (uint32_t)-1) current->egid = egid;
+    return 0;
+}
+
+static int64_t sys_getresuid(uint32_t* ruid, uint32_t* euid, uint32_t* suid) {
+    task_t* current = task_get_current();
+    if (!vmm_verify_user_access(ruid, sizeof(uint32_t), 1)) return -EFAULT;
+    if (!vmm_verify_user_access(euid, sizeof(uint32_t), 1)) return -EFAULT;
+    if (!vmm_verify_user_access(suid, sizeof(uint32_t), 1)) return -EFAULT;
+    *ruid = current->uid;
+    *euid = current->euid;
+    *suid = current->uid; // Stub for saved set-user-ID
+    return 0;
+}
+
+static int64_t sys_getresgid(uint32_t* rgid, uint32_t* egid, uint32_t* sgid) {
+    task_t* current = task_get_current();
+    if (!vmm_verify_user_access(rgid, sizeof(uint32_t), 1)) return -EFAULT;
+    if (!vmm_verify_user_access(egid, sizeof(uint32_t), 1)) return -EFAULT;
+    if (!vmm_verify_user_access(sgid, sizeof(uint32_t), 1)) return -EFAULT;
+    *rgid = current->gid;
+    *egid = current->egid;
+    *sgid = current->gid; // Stub for saved set-group-ID
     return 0;
 }
 
@@ -3352,6 +3439,14 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [104] = (syscall_ptr_t)sys_getgid,
     [107] = (syscall_ptr_t)sys_geteuid,
     [108] = (syscall_ptr_t)sys_getegid,
+    [113] = (syscall_ptr_t)sys_setreuid,
+    [114] = (syscall_ptr_t)sys_setregid,
+    [117] = (syscall_ptr_t)sys_setresuid,
+    [118] = (syscall_ptr_t)sys_getresuid,
+    [119] = (syscall_ptr_t)sys_setresgid,
+    [120] = (syscall_ptr_t)sys_getresgid,
+    [121] = (syscall_ptr_t)sys_getpgid,
+    [124] = (syscall_ptr_t)sys_getsid,
     [109] = (syscall_ptr_t)sys_setpgid,
     [110] = (syscall_ptr_t)sys_getppid,
     [111] = (syscall_ptr_t)sys_getpgrp,
@@ -3422,6 +3517,8 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [13] = (syscall_ptr_t)sys_rt_sigaction,
     [14] = (syscall_ptr_t)sys_rt_sigprocmask,
     [16] = (syscall_ptr_t)sys_ioctl,
+    [17] = (syscall_ptr_t)sys_pread64,
+    [18] = (syscall_ptr_t)sys_pwrite64,
     [19] = (syscall_ptr_t)sys_readv,
     [20] = (syscall_ptr_t)sys_writev,
     [21] = (syscall_ptr_t)sys_access,
@@ -3472,6 +3569,14 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [104] = (syscall_ptr_t)sys_getgid,
     [107] = (syscall_ptr_t)sys_geteuid,
     [108] = (syscall_ptr_t)sys_getegid,
+    [113] = (syscall_ptr_t)sys_setreuid,
+    [114] = (syscall_ptr_t)sys_setregid,
+    [117] = (syscall_ptr_t)sys_setresuid,
+    [118] = (syscall_ptr_t)sys_getresuid,
+    [119] = (syscall_ptr_t)sys_setresgid,
+    [120] = (syscall_ptr_t)sys_getresgid,
+    [121] = (syscall_ptr_t)sys_getpgid,
+    [124] = (syscall_ptr_t)sys_getsid,
     [109] = (syscall_ptr_t)sys_setpgid,
     [110] = (syscall_ptr_t)sys_getppid,
     [111] = (syscall_ptr_t)sys_getpgrp,
@@ -3586,6 +3691,14 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [200] = (syscall_ptr_t)sys_getgid,
     [201] = (syscall_ptr_t)sys_geteuid,
     [202] = (syscall_ptr_t)sys_getegid,
+    [203] = (syscall_ptr_t)sys_setreuid,
+    [204] = (syscall_ptr_t)sys_setregid,
+    [208] = (syscall_ptr_t)sys_setresuid,
+    [209] = (syscall_ptr_t)sys_getresuid,
+    [210] = (syscall_ptr_t)sys_setresgid,
+    [211] = (syscall_ptr_t)sys_getresgid,
+    [132] = (syscall_ptr_t)sys_getpgid,
+    [147] = (syscall_ptr_t)sys_getsid,
     [64] = (syscall_ptr_t)sys_getppid,
     [224] = (syscall_ptr_t)sys_gettid,
     [240] = (syscall_ptr_t)sys_futex,
