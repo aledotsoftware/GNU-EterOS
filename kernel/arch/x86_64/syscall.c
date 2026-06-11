@@ -507,7 +507,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         if (current && current->os_abi == ELFOSABI_LINUX && fd != -1) {
             /* Allow file-backed mmap without MAP_ANONYMOUS in Linux ABI */
             flags |= MAP_PRIVATE;
-        } else {
+        } else if (fd != -1) {
             return -ENODEV;
         }
     }
@@ -1139,9 +1139,10 @@ static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t buf
         return -EINVAL; // Not a symlink
     }
 
-    if (read_bytes >= 0 && read_bytes < (ssize_t)bufsiz) {
-        buf[read_bytes] = '\0';
-    }
+    /* readlink does not append a null byte. The caller must use the return value
+       to determine the length of the string. But we MUST null terminate if the
+       caller uses it as a string directly, though standard behavior is NOT to.
+       We will follow POSIX/Linux standard here. */
 
     kfree(node);
     kfree(kpath);
@@ -1718,11 +1719,15 @@ static int64_t sys_arch_prctl(int code, uint64_t addr) {
     task_t* current = task_get_current();
     if (code == ARCH_SET_FS) {
         current->fs_base = addr;
+#ifndef __ETEROS_HOST_TEST__
         wrmsr(MSR_FS_BASE, addr);
+#endif
         return 0;
     } else if (code == ARCH_SET_GS) {
         current->gs_base = addr;
+#ifndef __ETEROS_HOST_TEST__
         wrmsr(MSR_KERNEL_GS_BASE, addr);
+#endif
         return 0;
     } else if (code == ARCH_GET_FS) {
         if (!vmm_verify_user_access((void*)addr, sizeof(uint64_t), 1)) return -EFAULT;
@@ -2001,22 +2006,22 @@ static int64_t sys_rt_sigaction(int sig, const struct kernel_sigaction* act,
     task_t* current = task_get_current();
     if (oldact) {
         if (!vmm_verify_user_access(oldact, sizeof(struct kernel_sigaction), 1)) return -EFAULT;
-        oldact->handler = current->signal_handlers[sig];
-        oldact->flags = current->signal_flags[sig];
-        oldact->restorer = current->signal_restorers[sig];
-        oldact->mask = current->signal_action_masks[sig];
+        oldact->handler = current->signal_handlers[sig - 1];
+        oldact->flags = current->signal_flags[sig - 1];
+        oldact->restorer = current->signal_restorers[sig - 1];
+        oldact->mask = current->signal_action_masks[sig - 1];
     }
     if (act) {
         if (!vmm_verify_user_access(act, sizeof(struct kernel_sigaction), 0)) return -EFAULT;
-        current->signal_handlers[sig] = act->handler;
-        current->signal_flags[sig] = act->flags;
-        current->signal_action_masks[sig] = act->mask;
-        current->signal_action_masks[sig] &= ~((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)));
+        current->signal_handlers[sig - 1] = act->handler;
+        current->signal_flags[sig - 1] = act->flags;
+        current->signal_action_masks[sig - 1] = act->mask;
+        current->signal_action_masks[sig - 1] &= ~((1ULL << (SIGKILL - 1)) | (1ULL << (SIGSTOP - 1)));
         /* Store restorer if provided */
         if (act->flags & SA_RESTORER) {
-             current->signal_restorers[sig] = act->restorer;
+             current->signal_restorers[sig - 1] = act->restorer;
         } else {
-             current->signal_restorers[sig] = NULL;
+             current->signal_restorers[sig - 1] = NULL;
         }
     }
     return 0;
