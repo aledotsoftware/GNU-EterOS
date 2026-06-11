@@ -1714,6 +1714,28 @@ static int64_t sys_brk(uint64_t brk) {
     return current->brk;
 }
 
+/* Android/Bionic needs prctl for PR_SET_VMA and PR_SET_NAME */
+static int64_t sys_prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5) {
+    (void)arg3; (void)arg4; (void)arg5;
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+
+    if (option == PR_SET_NAME) {
+        if (!vmm_verify_user_access((const void*)arg2, 1, 0)) return -EFAULT;
+        strlcpy(current->name, (const char*)arg2, sizeof(current->name));
+        return 0;
+    }
+    if (option == PR_GET_NAME) {
+        if (!vmm_verify_user_access((void*)arg2, 1, 1)) return -EFAULT;
+        strlcpy((char*)arg2, current->name, 16);
+        return 0;
+    }
+    if (option == PR_SET_VMA) {
+        return 0;
+    }
+    return -EINVAL;
+}
+
 /* TLS support via arch_prctl */
 static int64_t sys_arch_prctl(int code, uint64_t addr) {
     task_t* current = task_get_current();
@@ -3456,6 +3478,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [110] = (syscall_ptr_t)sys_getppid,
     [111] = (syscall_ptr_t)sys_getpgrp,
     [112] = (syscall_ptr_t)sys_setsid,
+    [157] = (syscall_ptr_t)sys_prctl,
     [158] = (syscall_ptr_t)sys_arch_prctl,
     [186] = (syscall_ptr_t)sys_gettid,
     [202] = (syscall_ptr_t)sys_futex,
@@ -3589,6 +3612,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [127] = (syscall_ptr_t)sys_rt_sigpending,
     [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
+    [157] = (syscall_ptr_t)sys_prctl,
     [158] = (syscall_ptr_t)sys_arch_prctl,
     [186] = (syscall_ptr_t)sys_gettid,
     [202] = (syscall_ptr_t)sys_futex,
@@ -3709,6 +3733,7 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [240] = (syscall_ptr_t)sys_futex,
     [141] = (syscall_ptr_t)sys_getdents64,
     [78]  = (syscall_ptr_t)sys_getdents64,
+    [172] = (syscall_ptr_t)sys_prctl,
     [258] = (syscall_ptr_t)sys_set_tid_address,
     [265] = (syscall_ptr_t)sys_clock_gettime,
     [266] = (syscall_ptr_t)sys_clock_getres,

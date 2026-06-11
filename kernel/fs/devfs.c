@@ -16,6 +16,7 @@
 #include <task.h>
 #include <errno.h>
 #include <sys/signal.h>
+#include <linux_compat.h>
 
 /* Global root node for DevFS */
 static fs_node_t* devfs_root = NULL;
@@ -88,59 +89,6 @@ static uint32_t dev_null_write(fs_node_t *node, uint32_t offset, uint32_t size, 
 /* ========================================================================= */
 /* /dev/binder Implementation (Basic Android IPC Routing)                      */
 /* ========================================================================= */
-#define BINDER_VERSION_IOWR (int)0xc0046209 /* Linux ioctl code for BINDER_VERSION */
-#define BINDER_WRITE_READ (int)0xc0306201
-#define BINDER_SET_CONTEXT_MGR (int)0x40046207
-
-struct binder_version {
-    int32_t protocol_version;
-};
-
-struct binder_write_read {
-    uint64_t write_size;
-    uint64_t write_consumed;
-    uint64_t write_buffer;
-    uint64_t read_size;
-    uint64_t read_consumed;
-    uint64_t read_buffer;
-};
-
-struct binder_transaction_data {
-    union {
-        uint32_t handle;
-        void *ptr;
-    } target;
-    void *cookie;
-    uint32_t code;
-    uint32_t flags;
-    int32_t sender_pid;
-    int32_t sender_euid;
-    uint64_t data_size;
-    uint64_t offsets_size;
-    union {
-        struct {
-            uint64_t buffer;
-            uint64_t offsets;
-        } ptr;
-        uint8_t buf[8];
-    } data;
-};
-
-enum {
-    BC_TRANSACTION = 0x40406300,
-    BC_REPLY       = 0x40406301,
-    BC_FREE_BUFFER = 0x40406303,
-};
-
-enum {
-    BR_ERROR = 0x80047200,
-    BR_OK    = 0x7201,
-    BR_TRANSACTION = 0x80287202,
-    BR_REPLY       = 0x80287203,
-    BR_DEAD_REPLY  = 0x7205,
-    BR_TRANSACTION_COMPLETE = 0x7206,
-    BR_NOOP        = 0x720c,
-};
 
 /* Basic state for routing */
 static int binder_context_mgr_pid = -1;
@@ -1022,7 +970,6 @@ static fs_node_t *devfs_input_finddir(fs_node_t *node, char *name) {
     return fnode;
 }
 
-
 /* ========================================================================= */
 /* /dev/random & /dev/urandom Implementation (CSPRNG)                        */
 /* ========================================================================= */
@@ -1107,6 +1054,27 @@ static int dev_fb0_ioctl(fs_node_t *node, int request, void *arg) {
 /* DevFS Directory Operations                                                */
 /* ========================================================================= */
 
+/* ========================================================================= */
+/* /dev/ashmem and /dev/__properties__ Stubs                                 */
+/* ========================================================================= */
+static ssize_t dev_ashmem_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset; (void)size; (void)buffer;
+    return 0;
+}
+static uint32_t dev_ashmem_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset; (void)size; (void)buffer;
+    return size;
+}
+static int dev_ashmem_ioctl(fs_node_t *node, int request, void *arg) {
+    (void)node; (void)arg;
+    if (request == ASHMEM_SET_NAME || request == ASHMEM_SET_SIZE) return 0;
+    return 0;
+}
+static ssize_t dev_properties_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node; (void)offset; (void)size; (void)buffer;
+    return 0;
+}
+
 static int devfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     (void)node;
 
@@ -1165,6 +1133,17 @@ static int devfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) 
         entry->inode = 10;
         return 0;
     }
+    if (index == 12) {
+        strlcpy(entry->name, "ashmem", sizeof(entry->name));
+        entry->inode = 12;
+        return 0;
+    }
+    if (index == 13) {
+        strlcpy(entry->name, "__properties__", sizeof(entry->name));
+        entry->inode = 13;
+        return 0;
+    }
+
     if (index == 11) {
         strlcpy(entry->name, "dri", sizeof(entry->name));
         entry->inode = 11;
@@ -1257,13 +1236,28 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         fnode->mask = 0600; // Solo root puede escribir el disco crudo
         fnode->inode = 10;
         fnode->read = dev_sda_read;
-        fnode->write = dev_sda_write;    } else if (strcmp(name, "dri") == 0) {
+        fnode->write = dev_sda_write;
+    } else if (strcmp(name, "dri") == 0) {
         strlcpy(fnode->name, "dri", sizeof(fnode->name));
         fnode->flags = FS_DIRECTORY;
         fnode->mask = 0555;
         fnode->inode = 11;
         fnode->readdir = devfs_dri_readdir;
         fnode->finddir = devfs_dri_finddir;
+    } else if (strcmp(name, "ashmem") == 0) {
+        strlcpy(fnode->name, "ashmem", sizeof(fnode->name));
+        fnode->flags = FS_CHARDEVICE;
+        fnode->mask = 0666;
+        fnode->read = dev_ashmem_read;
+        fnode->write = dev_ashmem_write;
+        fnode->ioctl = dev_ashmem_ioctl;
+        fnode->inode = 12;
+    } else if (strcmp(name, "__properties__") == 0) {
+        strlcpy(fnode->name, "__properties__", sizeof(fnode->name));
+        fnode->flags = FS_CHARDEVICE;
+        fnode->mask = 0444;
+        fnode->read = dev_properties_read;
+        fnode->inode = 13;
 } else {
         kfree(fnode);
         return 0;
