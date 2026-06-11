@@ -64,14 +64,19 @@ static void unix_to_rtc(time_t timestamp, rtc_time_t* t) {
 }
 
 void cmd_ntp(const char* args) {
-    (void)args;
+    const char* server = "pool.ntp.org";
+    if (args && *args) {
+        server = args;
+    }
 
     if (!current_nic || !network_ready) {
         terminal_write_string("  [NTP] Error: Adaptador de red no activo o DHCP no asignado.\n");
         return;
     }
 
-    terminal_write_string("  [NTP] Sincronizando con pool.ntp.org...\n");
+    terminal_write_string("  [NTP] Sincronizando con ");
+    terminal_write_string(server);
+    terminal_write_string("...\n");
 
     int sock = sys_lwip_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock < 0) {
@@ -85,7 +90,7 @@ void cmd_ntp(const char* args) {
 
     // Resolve IP dynamically
     uint32_t resolved_ip = 0;
-    if (net_gethostbyname("pool.ntp.org", &resolved_ip) == 0) {
+    if (net_gethostbyname(server, &resolved_ip) == 0) {
         // net_gethostbyname returns host byte order (IP4_ADDR_GET_U32)
         // lwIP stack in our wrapper expects host byte order too for sin_addr
         addr.sin_addr = bswap_32(resolved_ip);
