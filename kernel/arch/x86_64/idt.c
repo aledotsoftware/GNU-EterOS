@@ -297,8 +297,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     uint64_t* rbp;
     __asm__ volatile("mov %%rbp, %0" : "=r"(rbp));
     for (int i=0; i<15 && rbp != NULL; i++) {
-        /* Fix: We shouldn't use user access check for kernel pointers during panic.
-           Instead check if it maps to physical memory. Verify rbp and rbp+1 */
+        /* Instead check if it maps to physical memory. Verify rbp and rbp+1 */
         if (!vmm_virt_to_phys((uint64_t)rbp)) {
             serial_write_string("  <Invalid RBP pointer>\n");
             break;
