@@ -131,14 +131,30 @@ void mouse_process_byte(uint8_t byte) {
         int32_t dy = (int8_t)mouse_bytes[2];
         uint8_t buttons = mouse_bytes[0] & 0x07;
 
+        static int32_t mouse_acc_x = 0;
+        static int32_t mouse_acc_y = 0;
+
+        mouse_acc_x += dx;
+        mouse_acc_y += dy;
+
         // Apply sensitivity (default 5, lower is slower, higher is faster)
-        // A simple multiplier/divider for now. Real systems use acceleration curves.
         if (mouse_sensitivity < 5) {
-            dx = (dx * mouse_sensitivity) / 5;
-            dy = (dy * mouse_sensitivity) / 5;
+            dx = (mouse_acc_x * mouse_sensitivity) / 5;
+            dy = (mouse_acc_y * mouse_sensitivity) / 5;
+            mouse_acc_x -= (dx * 5) / mouse_sensitivity;
+            mouse_acc_y -= (dy * 5) / mouse_sensitivity;
         } else if (mouse_sensitivity > 5) {
-            dx = (dx * (mouse_sensitivity - 3)) / 2;
-            dy = (dy * (mouse_sensitivity - 3)) / 2;
+            int32_t factor = mouse_sensitivity - 3;
+            dx = (mouse_acc_x * factor) / 2;
+            dy = (mouse_acc_y * factor) / 2;
+            // Only consume what was actually processed by the division
+            mouse_acc_x -= (dx * 2) / factor;
+            mouse_acc_y -= (dy * 2) / factor;
+        } else {
+            dx = mouse_acc_x;
+            dy = mouse_acc_y;
+            mouse_acc_x = 0;
+            mouse_acc_y = 0;
         }
 
         // Apply handedness swap
