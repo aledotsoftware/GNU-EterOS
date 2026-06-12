@@ -21,7 +21,7 @@
 - **VFS / Filesystems:** Montajes extensos probados (`/dev`, `/proc`, `/tmp`, `fat32`, `jfs`, `shmfs`). ELF loader validado mitigando vulnerabilidades y soportando carga dinámica (`PT_DYNAMIC`).
 - **Control Panel & UI:** Subsistemas gráficos de minimizar ventanas (`hit_minimize_button`), UI web debounced y reportes de estado unificados mostrando "0.2.0 Genesis SMP" consistentemente.
 - **Testing & CI:** Entornos QEMU headless verificados, validaciones de código rigurosas (`run_tests.sh` y `run_integration.sh` OK). Integración continua robusta y fiable.
-- **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas. PTY ioctls han sido completados en un subconjunto. El subsistema **ya cuenta con soporte para job control signals (`SIGSTOP`, `SIGCONT`, `SIGCHLD`, `SIGTTIN`, `SIGTTOU`)**, implementado exitosamente en `kernel/arch/x86_64/syscall.c`.
+- **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas. PTY ioctls han sido completados en un subconjunto. El subsistema **ya cuenta con soporte para job control signals (`SIGSTOP`, `SIGCONT`, `SIGCHLD`, `SIGTTIN`, `SIGTTOU`)**, implementado exitosamente en `kernel/arch/x86_64/syscall.c`. Además, se verificó el parsing del segmento ELF `PT_DYNAMIC`.
 
 ### 2.2 Áreas de Mejora a Corto Plazo (Para Compatibilidad Base)
 - **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM y bloque. Se debe revisar compatibilidad total VFS POSIX y atomic commits (el soporte de hardlinks ha sido verificado y se encuentra operativo mediante `sys_linkat` y `vfs_link`).
@@ -30,7 +30,7 @@
 ### 2.3 Metas Aspiracionales de la Plataforma (Largo Plazo)
 - Soporte Completo GNU Coreutils: ❌ Parcial. Progresando mediante syscalls implementadas.
 - Entorno de Escritorio GNU Desktop: ⏳ En progreso. Se ha introducido una capa de abstracción DRM básica (`kernel/gfx/drm.c`).
-- Capa de Compatibilidad Android: ⏳ En progreso (`/dev/binder` es un stub y solo retorna éxito sin implementar transacciones reales).
+- Capa de Compatibilidad Android: ⏳ En progreso. La capa `/dev/binder` ya rutea mensajes (`BINDER_WRITE_READ`) con transacciones IPC básicas.
 
 ---
 
@@ -38,16 +38,16 @@
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`vfs-posix-filesystem-bot`:** Implementar atomic commits robustos en el journaling de JFS (`kernel/fs/jfs.c`). Reemplazar la simulación actual de transacciones de entrada única.
-2. **`graphics-power-panel-bot`:** Expandir la abstracción DRM base con soporte KMS completo y mapeo de framebuffers reales.
-3. **`aether-linux-subsystem-bot`:** Ampliar ABI Linux.
+1. **`graphics-power-panel-bot`:** Expandir la abstracción DRM base con soporte KMS completo y mapeo de framebuffers reales (específicamente la interfaz `/dev/dri/card0` en ioctls/mmap).
+2. **`aether-linux-subsystem-bot`:** Implementar soporte `PT_DYNAMIC` en el ELF loader (`kernel/fs/elf.c`) para cargar librerías dinámicas (`.so`).
+3. **`network-socket-api-bot`:** Completar la integración lwIP expandiendo más familias de AF_INET y syscalls socket.
 
 ---
 
 ## 4. Hallazgos adicionales y Riesgos
 - Se comprobó la implementación inicial real de Binder IPC (Android compat) en `kernel/fs/devfs.c`, introducida por el `aether-droid-subsystem-bot`. Binder ahora rutéa peticiones reales (`BINDER_WRITE_READ`) hacia un `context_mgr` y hacia clientes en lugar de ser un mero stub estático, utilizando `kmalloc` e inicializando una cola de transacciones.
 - La abstracción DRM/KMS (`kernel/gfx/drm.c`) introducida proporciona los ioctls base (`DRM_IOCTL_MODE_GETRESOURCES`, `DRM_IOCTL_MODE_CREATE_DUMB`, `DRM_IOCTL_MODE_MAP_DUMB`) pero es un "mock" estático que reporta un solo display ficticio. Debe conectarse a los drivers de video reales (ej. VBE/framebuffer). Mmap sobre framebuffer para `/dev/dri/card0` aún no está formalizado.
-- El driver de Journaling JFS realiza transacciones simuladas, escribiendo todo con `current_tx_id` pero en un bloque de 4 fases que escribe bloques 1 a 1 de forma estática en `jfs_journal_write()`. Es necesaria su reimplementación hacia verdaderos Atomic Commits.
+- El driver de Journaling JFS ha sido auditado. Fue asignado al `vfs-posix-filesystem-bot` en el ciclo anterior, pero el bot falló en implementar verdaderos Atomic Commits. **Se debe reintentar su reimplementación en el futuro**.
 
 ---
 
@@ -60,3 +60,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - **2026-06-10 (Update):** Auditoría por el `orchestrator-meta-agent`. Se verificó la exitosa integración de hardlinks en el driver JFS (`jfs_link` y syscalls asociadas `sys_linkat`) y la incorporación inicial de la capa DRM básica (`kernel/gfx/drm.c`). El objetivo principal se traslada ahora al `aether-droid-subsystem-bot` para la implementación real de las transacciones IPC Binder en `devfs.c`.
 - **2026-06-10 (Update):** El `kernel-stability-boot-bot` ha endurecido el arranque x86_64 añadiendo un stack aislado para Double Faults (IST 1 en TSS), verificaciones de memoria física durante panics y stack traces en la IDT, validación estricta de `HEAP_MAGIC` al liberar memoria, y límites seguros en el PMM (bitmap checks). Build y QEMU headless verificados con éxito.
 - **2026-06-10 (Update):** El `aether-droid-subsystem-bot` ha finalizado con éxito la implementación de colas y rutéo real en `/dev/binder` (`BINDER_WRITE_READ`) logrando una arquitectura IPC base para las transacciones. Build y QA confirmados exitosamente. El objetivo principal se traslada ahora al `vfs-posix-filesystem-bot` para actualizar el pseudo-journal de JFS a *atomic commits* verdaderos.
+- **2026-06-10 (Update):** El Orchestrator Meta-Agent verificó que los repositorios están en un estado saludable (`run_tests.sh` y build limpios). Se detectó que el objetivo de Atomic Commits en JFS fue intentado sin éxito, dejando artefactos en el código, por lo cual se revirtió. La delegación actual ha cambiado: la implementación de *mmap sobre framebuffer real en DRM* va al `graphics-power-panel-bot`, y el *cargador de librerías dinámicas PT_DYNAMIC* al `aether-linux-subsystem-bot`. El objetivo del `vfs-posix-filesystem-bot` se ha puesto en espera.
