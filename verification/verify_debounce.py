@@ -7,7 +7,7 @@ def verify_debounce():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        file_path = os.path.abspath("web_ui/index.html")
+        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))
         page.goto(f"file://{file_path}")
 
         # Wait for splash screen to disappear

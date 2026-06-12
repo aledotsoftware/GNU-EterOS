@@ -8,7 +8,7 @@ def test_sliders():
 
         # Load the local HTML file
         cwd = os.getcwd()
-        url = f"file://{cwd}/web_ui/index.html"
+        url = f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}"
         page.goto(url)
 
         # Open Control Center

@@ -8,7 +8,7 @@ def run():
 
         # Load the local file
         cwd = os.getcwd()
-        filepath = os.path.join(cwd, 'web_ui/index.html')
+        filepath = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))
         page.goto(f'file://{filepath}')
 
         # Wait for splash screen to disappear (simulation)

@@ -7,7 +7,7 @@ def run():
         page = browser.new_page()
 
         # Load the local HTML file
-        file_url = f"file://{os.path.abspath('web_ui/index.html')}"
+        file_url = f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}"
         page.goto(file_url)
 
         # 1. Click the calculator icon to open a window

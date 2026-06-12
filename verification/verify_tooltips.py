@@ -10,7 +10,7 @@ def verify_tooltips():
 
         # specific to the environment, get absolute path
         cwd = os.getcwd()
-        file_path = f"file://{cwd}/web_ui/index.html"
+        file_path = f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}"
 
         print(f"Navigating to {file_path}")
         page.goto(file_path)

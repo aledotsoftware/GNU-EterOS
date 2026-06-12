@@ -15,7 +15,7 @@ void gfx_init(boot_info_t* boot_info) {
     /* Initialize low-level framebuffer */
     framebuffer_init(boot_info);
 
-    /* // TODO: dynamic resolution requires GOP protocol support */
+    /* Dynamic resolution requires GOP protocol support */
 
     /* Enable double buffering immediately */
     framebuffer_enable_double_buffer();
