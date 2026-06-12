@@ -45,7 +45,7 @@ static uint16_t parse_url(const char* url, char* host, size_t host_size, char* p
 
 void cmd_ota(const char* args) {
     if (!args || !*args) {
-        terminal_write_string("Uso: ota [info | seturl <url> | update | checksig <on|off>]\n");
+        terminal_write_string("Uso: ota [info | seturl <url> | update | checksig <on|off> | confirm | rollback]\n");
         return;
     }
 
@@ -129,6 +129,11 @@ void cmd_ota(const char* args) {
             terminal_write_string("Uso: ota checksig <on|off>\n");
         }
     } else if (strcmp(subcmd, "update") == 0) {
+        if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
+             terminal_write_string("  [OTA] ERROR: Hay una actualizacion pendiente. Confirme o haga rollback antes de actualizar.\n");
+             return;
+        }
+
         fs_node_t *passive_part = partition_get_passive_root();
         if (!passive_part) {
             terminal_write_string("\n  [OTA] ERROR: No se encontro una particion pasiva (Slot B) disponible para actualizar.\n");
@@ -382,7 +387,24 @@ receive:
         terminal_write_string("  [OTA] El sistema arrancara desde el Slot ");
         terminal_write_string(next_part == 0 ? "A" : "B");
         terminal_write_string(" en el proximo reinicio.\n\n");
+    } else if (strcmp(subcmd, "confirm") == 0) {
+        if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
+            nvram_set_update_state(UPDATE_STATE_SUCCESS);
+            terminal_write_string("  [OTA] Actualizacion confirmada como exitosa.\n");
+        } else {
+            terminal_write_string("  [OTA] No hay ninguna actualizacion pendiente por confirmar.\n");
+        }
+    } else if (strcmp(subcmd, "rollback") == 0) {
+        if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
+            uint8_t current_part = nvram_get_boot_partition();
+            uint8_t next_part = (current_part == 0) ? 1 : 0;
+            nvram_set_boot_partition(next_part);
+            nvram_set_update_state(UPDATE_STATE_FAILED);
+            terminal_write_string("  [OTA] Rollback solicitado. El sistema regresara al slot anterior en el proximo reinicio.\n");
+        } else {
+            terminal_write_string("  [OTA] No hay ninguna actualizacion pendiente de la cual hacer rollback.\n");
+        }
     } else {
-        terminal_write_string("Comando OTA desconocido. Uso: ota [info | seturl <url> | update | checksig <on|off>]\n");
+        terminal_write_string("Comando OTA desconocido. Uso: ota [info | seturl <url> | update | checksig <on|off> | confirm | rollback]\n");
     }
 }
