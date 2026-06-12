@@ -12,6 +12,7 @@
 #include "lwip/tcp.h"
 #include "lwip/dns.h"
 #include "lwip/init.h"
+#include "lwip/tcpip.h"
 #include "lwip/netif.h"
 #include "lwip/timeouts.h"
 #include "lwip/ip_addr.h"
@@ -31,7 +32,7 @@ static struct netif main_netif;
 
 void net_init(void) {
     serial_write_string("[NET] Initializing lwIP...\n");
-    lwip_init();
+    tcpip_init(NULL, NULL);
 
     ip_addr_t ipaddr, netmask, gw;
     IP4_ADDR(&ipaddr, 0,0,0,0);
