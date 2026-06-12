@@ -866,7 +866,7 @@ static void term_print(marea_window_t* win, const char* str, uint32_t fg) {
 }
 
 static void term_draw_prompt(marea_window_t* win) {
-    term_print(win, "root@eteros", COL_TERM_PROMPT_USER);
+    term_print(win, "root@eterOS", COL_TERM_PROMPT_USER);
     term_print(win, " ", COL_TERM_FG);
     term_print(win, win->cwd, COL_TERM_PROMPT_DIR);
     term_print(win, " $ ", COL_TERM_PROMPT_DIR);
