@@ -94,9 +94,13 @@ int main(int argc, char *argv[]) {
         printf("Password: ");
         fflush(stdout);
         len = read(0, password, sizeof(password) - 1);
-        if (len <= 0) continue;
-        password[len] = '\0';
-        if (password[len-1] == '\n') password[len-1] = '\0';
+        if (len <= 0) {
+            len = 0;
+            password[0] = '\0';
+        } else {
+            password[len] = '\0';
+            if (password[len-1] == '\n') password[len-1] = '\0';
+        }
 
         /* Read /etc/passwd to get UID and GID */
         int fd_passwd = open("/etc/passwd", O_RDONLY);

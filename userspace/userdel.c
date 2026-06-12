@@ -32,6 +32,8 @@ static int remove_user_from_file(const char* filepath, const char* username) {
         close(fd);
         return -1;
     }
+    if (strstr(filepath, "shadow")) chmod(temp_filepath, 0600);
+    else chmod(temp_filepath, 0644);
 
     int found = 0;
     char line[MAX_LINE];
