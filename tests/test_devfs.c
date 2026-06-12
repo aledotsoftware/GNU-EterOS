@@ -74,6 +74,7 @@ int input_mouse_pending(void) {
 int devfs_dri_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) { return 1; }
 fs_node_t *devfs_dri_finddir(fs_node_t *node, char *name) { return 0; }
 
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max) { strncpy(dst, src, max); dst[max-1]='\0'; return strlen(dst); }
 /* Include DevFS source directly to test static functions */
 #include "../kernel/fs/devfs.c"
 

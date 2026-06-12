@@ -4,6 +4,7 @@
 #include <mm.h>
 #include <hal.h>
 #include <keyboard.h>
+#include <vmm.h>
 #include <vga.h>
 #include <input/event.h>
 #include <lock.h>
@@ -1067,13 +1068,28 @@ static uint32_t dev_ashmem_write(fs_node_t *node, uint32_t offset, uint32_t size
 }
 static int dev_ashmem_ioctl(fs_node_t *node, int request, void *arg) {
     (void)node; (void)arg;
-    if (request == ASHMEM_SET_NAME || request == ASHMEM_SET_SIZE) return 0;
+    if (request == ASHMEM_SET_NAME) {
+        char name[256];
+        if (arg) {
+            if (vmm_strncpy_from_user(name, (const char*)arg, sizeof(name)) < 0) {
+                return -EFAULT;
+            }
+        }
+        return 0;
+    }
+    if (request == ASHMEM_SET_SIZE) return 0;
     return 0;
 }
 static ssize_t dev_properties_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset; (void)size; (void)buffer;
-    return 0;
+    const char* dummy_props = "ro.build.version.sdk=29\nro.debuggable=1\n";
+    size_t len = strlen(dummy_props);
+    if (offset >= len) return 0;
+    if (offset + size > len) size = (uint32_t)(len - offset);
+    memcpy(buffer, dummy_props + offset, size);
+    return size;
 }
+
 
 static int devfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     (void)node;

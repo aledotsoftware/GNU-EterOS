@@ -283,11 +283,31 @@ static ssize_t proc_self_maps_read(fs_node_t *node, uint32_t offset, uint32_t si
     task_t* current = proc_node_task(node);
     if (!current || !buffer) return 0;
 
-    // Very basic mapping for the whole user range
-    char maps_str[256];
-    strlcpy(maps_str, "00400000-00800000 r-xp 00000000 00:00 0      /proc/self/exe\n", sizeof(maps_str));
-    strlcat(maps_str, "700000000000-7fffffffffff rw-p 00000000 00:00 0      [heap]\n", sizeof(maps_str));
-    strlcat(maps_str, "7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0      [stack]\n", sizeof(maps_str));
+    char maps_str[512];
+    maps_str[0] = '\0';
+    char temp[256];
+    char start_str[32];
+    char end_str[32];
+    strlcpy(temp, "00400000-00800000 r-xp 00000000 00:00 0      ", sizeof(temp));
+    strlcat(temp, current->executable_path ? current->executable_path : "/proc/self/exe", sizeof(temp));
+    strlcat(temp, "\n", sizeof(temp));
+    strlcat(maps_str, temp, sizeof(maps_str));
+    utoa_hex_s((uint64_t)(0x200000000ULL + 0x400000), start_str, sizeof(start_str));
+    utoa_hex_s(current->mmap_base, end_str, sizeof(end_str));
+    strlcpy(temp, start_str, sizeof(temp));
+    strlcat(temp, "-", sizeof(temp));
+    strlcat(temp, end_str, sizeof(temp));
+    strlcat(temp, " rw-p 00000000 00:00 0      [anon]\n", sizeof(temp));
+    strlcat(maps_str, temp, sizeof(maps_str));
+    utoa_hex_s(current->user_rsp & ~(PAGE_SIZE - 1), start_str, sizeof(start_str));
+    utoa_hex_s(0x00007FFFFFFFFFFFULL + 1, end_str, sizeof(end_str));
+    strlcpy(temp, start_str, sizeof(temp));
+    strlcat(temp, "-", sizeof(temp));
+    strlcat(temp, end_str, sizeof(temp));
+    strlcat(temp, " rw-p 00000000 00:00 0      [stack]\n", sizeof(temp));
+    strlcat(maps_str, temp, sizeof(maps_str));
+
+
 
     size_t len = strlen(maps_str);
     if (offset >= len) return 0;

@@ -632,7 +632,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
 #endif
         }
     }
-    return virt;
+    return (int64_t)virt;
 }
 
 static int64_t sys_socket(int domain, int type, int protocol) {
@@ -1732,6 +1732,15 @@ static int64_t sys_prctl(int option, unsigned long arg2, unsigned long arg3, uns
         return 0;
     }
     if (option == PR_SET_VMA) {
+        if (arg2 == PR_SET_VMA_ANON_NAME) {
+            char vma_name[256];
+            if (arg4) {
+                if (vmm_strncpy_from_user(vma_name, (const char*)arg4, sizeof(vma_name)) < 0) {
+                    return -EFAULT;
+                }
+                /* We successfully read the name. Future: store it in a VMA tree. */
+            }
+        }
         return 0;
     }
     return -EINVAL;
@@ -3319,6 +3328,7 @@ static int64_t sys_chdir(const char* path) {
 
 
 static int64_t sys_execveat(int dirfd, const char* path, char* const argv[], char* const envp[], int flags, struct syscall_regs* regs) {
+    (void)flags;
     char* kpath = (char*)kmalloc(256);
     if (!kpath) return -ENOMEM;
     int res = resolve_path(dirfd, path, kpath, 256);
