@@ -36,6 +36,8 @@
 #define AT_NULL   0
 #define AT_PHDR   3
 #define AT_PAGESZ 6
+#define AT_RANDOM 25
+#define AT_EXECFN 31
 #define AT_ENTRY  9
 #define AT_UID    11
 #define AT_EUID   12
@@ -2091,12 +2093,33 @@ int task_exec(const char* path, char* const argv[], char* const envp[], struct s
     /* Align Stack (16 bytes) */
     rsp &= ~0xF;
 
+    /* Push 16 random bytes for AT_RANDOM */
+    rsp -= 16;
+    if (rsp < stack_base) {
+        __asm__ volatile("mov %0, %%cr3" : : "r"(old_cr3) : "memory");
+        current->cr3 = old_cr3;
+        vmm_destroy_pml4(new_cr3_phys);
+        res = -E2BIG;
+        goto cleanup_error;
+    }
+    for (int i=0; i<16; i++) {
+        ((uint8_t*)rsp)[i] = (uint8_t)(timer_get_ticks() + i * 17); /* Basic pseudo-random */
+    }
+    uint64_t at_random_ptr = rsp;
+
     /* Build and Push AUXV (minimal Linux-compatible set). */
     struct {
         uint64_t a_type;
         uint64_t a_val;
-    } auxv[12];
+    } auxv[14];
     int auxc = 0;
+
+    auxv[auxc].a_type = AT_RANDOM;
+    auxv[auxc++].a_val = at_random_ptr;
+
+    /* AT_EXECFN points to argv[0] */
+    auxv[auxc].a_type = AT_EXECFN;
+    auxv[auxc++].a_val = uargv[0];
 
     auxv[auxc].a_type = AT_PAGESZ;
     auxv[auxc++].a_val = PAGE_SIZE;

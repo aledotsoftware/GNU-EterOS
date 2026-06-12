@@ -505,8 +505,8 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
 
     /* If neither MAP_PRIVATE (0x02) nor MAP_SHARED (0x01) are set */
     if (!(flags & 0x03)) {
-        if (current && current->os_abi == ELFOSABI_LINUX && fd != -1) {
-            /* Allow file-backed mmap without MAP_ANONYMOUS in Linux ABI */
+        if (current && current->os_abi == ELFOSABI_LINUX && (fd != -1 || (flags & MAP_ANONYMOUS))) {
+            /* Allow mmap without MAP_PRIVATE/MAP_SHARED in Linux ABI for compatibility */
             flags |= MAP_PRIVATE;
         } else if (fd != -1) {
             return -ENODEV;
@@ -3318,6 +3318,16 @@ static int64_t sys_chdir(const char* path) {
 }
 
 
+static int64_t sys_execveat(int dirfd, const char* path, char* const argv[], char* const envp[], int flags, struct syscall_regs* regs) {
+    char* kpath = (char*)kmalloc(256);
+    if (!kpath) return -ENOMEM;
+    int res = resolve_path(dirfd, path, kpath, 256);
+    if (res < 0) { kfree(kpath); return res; }
+    int64_t ret = task_exec(kpath, argv, envp, regs);
+    kfree(kpath);
+    return ret;
+}
+
 static int64_t sys_execve(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) {
     return task_exec(path, argv, envp, regs);
 }
@@ -3536,6 +3546,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [95] = (syscall_ptr_t)sys_umask,
     [267] = (syscall_ptr_t)sys_readlinkat,
     [319] = (syscall_ptr_t)sys_memfd_create,
+
 };
 
 static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
@@ -3658,6 +3669,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [318] = (syscall_ptr_t)sys_getrandom,
     [400] = (syscall_ptr_t)sys_gethostbyname,
     [319] = (syscall_ptr_t)sys_memfd_create,
+
     [169] = (syscall_ptr_t)sys_reboot,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [60] = (syscall_ptr_t)sys_exit_wrapper,
@@ -3801,6 +3813,11 @@ static void syscall_linux32_handler(struct syscall_regs* regs) {
         regs->rax = (uint64_t)task_fork((void*)regs);
         return;
     }
+    if (regs->rax == 358) { /* SYS_execveat for 32-bit */
+        regs->rax = (uint64_t)sys_execveat((int)regs->rdi, (const char*)regs->rsi, (char* const*)regs->rdx, (char* const*)regs->r10, (int)regs->r8, regs);
+        return;
+    }
+
     if (regs->rax == 11) { /* SYS_execve for 32-bit */
         regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
         return;
@@ -3847,6 +3864,11 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         regs->rax = (uint64_t)task_fork((void*)regs);
         return;
     }
+    if (regs->rax == 322) { /* SYS_execveat */
+        regs->rax = (uint64_t)sys_execveat((int)regs->rdi, (const char*)regs->rsi, (char* const*)regs->rdx, (char* const*)regs->r10, (int)regs->r8, regs);
+        return;
+    }
+
     if (regs->rax == SYS_execve) {
         regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
         return;
@@ -3901,6 +3923,11 @@ static void syscall_linux_handler(struct syscall_regs* regs) {
         regs->rax = (uint64_t)task_clone(args.flags, args.stack, (uint32_t*)(uintptr_t)args.parent_tid, (uint32_t*)(uintptr_t)args.child_tid, args.tls, regs);
         return;
     }
+    if (regs->rax == 322) { /* SYS_execveat */
+        regs->rax = (uint64_t)sys_execveat((int)regs->rdi, (const char*)regs->rsi, (char* const*)regs->rdx, (char* const*)regs->r10, (int)regs->r8, regs);
+        return;
+    }
+
     if (regs->rax == SYS_execve) {
         regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
         return;
