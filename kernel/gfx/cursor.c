@@ -37,7 +37,8 @@ static const char* cursor_bitmap[] = {
 
 /* Callback del driver del ratón */
 static void on_mouse_event(int8_t dx, int8_t dy, uint8_t buttons) {
-    (void)buttons; /* TODO: handle clicks */
+    /* Mouse clicks are currently handled directly by the event queue in userspace */
+    (void)buttons;
     gfx_cursor_move(dx, dy);
 }
 

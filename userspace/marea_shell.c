@@ -1464,8 +1464,28 @@ static void handle_mouse_event(const input_event_t* ev) {
                     return;
                 }
 
-                /* We implement hit_maximize_button visually, but don't implement full maximize logic yet
-                   We can just leave it as an empty handler or implement a simple maximize */
+
+                if (hit_maximize_button(win, mouse_x, mouse_y)) {
+                    if ((uint32_t)win->w == fb_info.width && (uint32_t)win->h == fb_info.height - TASKBAR_HEIGHT && win->x == 0 && win->y == 0) {
+                        /* Restore */
+                        win->x = 50;
+                        win->y = 50;
+                        win->w = 640;
+                        win->h = 480;
+                    } else {
+                        /* Maximize */
+                        win->x = 0;
+                        win->y = 0;
+                        win->w = fb_info.width;
+                        win->h = fb_info.height - TASKBAR_HEIGHT;
+                    }
+                    redraw_all();
+                    cursor_save_bg(mouse_x, mouse_y);
+                    cursor_draw(mouse_x, mouse_y);
+                    present();
+                    return;
+                }
+
 
                 if (hit_titlebar(win, mouse_x, mouse_y)) {
                     dragging = 1;

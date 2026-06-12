@@ -95,7 +95,7 @@ function spawnSettings() {
                     <div class="settings-item">
                         <div>
                             <span>Tema Global</span>
-                            <p style="font-size: 11px; opacity: 0.5;">Cambia el aspecto de todo el sistema.</p>
+                            <p style="font-size: 11px; opacity: 0.5;">Cambia el tema visual en EterOS.</p>
                         </div>
                         <select aria-label="Tema Global" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; cursor: pointer;">
                             <option>Oscuro Profundo (Default)</option>

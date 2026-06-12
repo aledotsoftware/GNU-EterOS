@@ -18,3 +18,7 @@
 - **Orchestrator**: Verified DRM framebuffer mmap and ELF PT_DYNAMIC support. Assigned lwIP and socket syscalls expansion to network-socket-api-bot.
 - UI Panel: Fixed `hlt` loops in `cmd_panel.c` to verify `!panel_mouse_moved` preventing unresponsive delays during mouse navigation.
 - Input: Enhanced `mouse.c` sensitivity scaling by using proper static accumulator variables, resolving rounding truncation to fix dropped slow movements while avoiding infinite phantom inputs drift.
+- **UI/Graphics Update**:
+  - Implemented missing window maximization functionality in `marea_shell.c`.
+  - Addressed legacy TODOs in `kernel/gfx/cursor.c` and `kernel/gfx/window.c` by accurately reflecting userspace integration for mouse clicks and future UEFI dependencies for GOP.
+  - Refactored Playwright verification scripts (`verification/verify_*.py`) to use portable, `__file__`-based relative paths, resolving directory execution dependency bugs and standardizing the automated QA pipeline for web-ui components.

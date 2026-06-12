@@ -3,7 +3,7 @@ import os
 
 def verify_app(page):
     cwd = os.getcwd()
-    page.goto(f"file://{cwd}/web_ui/index.html")
+    page.goto(f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}")
     page.locator("#boot-splash").wait_for(state="detached")
     # Take a screenshot
     page.screenshot(path="verification/app_loaded.png")
