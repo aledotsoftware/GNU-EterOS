@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
         close(fd);
         return 1;
     }
+    chmod("/etc/shadow.tmp", 0600);
 
     int found = 0;
     char line[MAX_LINE];

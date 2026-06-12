@@ -353,7 +353,7 @@ static void cmd_passwd(const char* args) {
             for (int i = 0; hash_str[i] != '\0' && e_len < MAX_LINE - 1; i++) entry[e_len++] = hash_str[i];
 
             if (r_idx == 0) {
-                // Fallback
+                // Fallback (exactly 8 colons in a standard entry: username:hash:19000:0:99999:7:::)
                 entry[e_len++] = ':'; entry[e_len++] = '1'; entry[e_len++] = '9'; entry[e_len++] = '0'; entry[e_len++] = '0'; entry[e_len++] = '0';
                 entry[e_len++] = ':'; entry[e_len++] = '0'; entry[e_len++] = ':'; entry[e_len++] = '9'; entry[e_len++] = '9'; entry[e_len++] = '9'; entry[e_len++] = '9'; entry[e_len++] = '9';
                 entry[e_len++] = ':'; entry[e_len++] = '7'; entry[e_len++] = ':'; entry[e_len++] = ':'; entry[e_len++] = ':';
