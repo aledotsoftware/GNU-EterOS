@@ -239,6 +239,15 @@ static int find_free_slot(void) {
     /* Out of slots? Try to reap orphans of task 0 */
     for (int i = 1; i < MAX_TASKS; i++) {
         if (tasks[i].state == TASK_DEAD && tasks[i].parent_id == tasks[0].id) {
+            int is_active = 0;
+            for (int c = 0; c < MAX_CPUS; c++) {
+                if (cpus[c].current_task == (volatile void*)&tasks[i]) {
+                    is_active = 1;
+                    break;
+                }
+            }
+            if (is_active) continue;
+
             task_reap_zombie_locked(i);
             task_bitmap |= (1ULL << i);
             return i;
@@ -681,9 +690,8 @@ void schedule(void) {
         spin_lock(&sched_lock);
         next_task = find_next_task(current);
         if (next_task == NULL) {
-             spin_unlock(&sched_lock);
-             __asm__ volatile("sti");
-             return;
+             /* Fallback to kernel idle task to prevent running on a dead task's stack */
+             next_task = &tasks[0];
         }
     }
 
@@ -1593,6 +1601,21 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
 
         if (found_event) {
             task_t* ev = &tasks[event_slot];
+            if (ev->state == TASK_DEAD) {
+                int is_active = 0;
+                for (int c = 0; c < MAX_CPUS; c++) {
+                    if (cpus[c].current_task == (volatile void*)ev) {
+                        is_active = 1;
+                        break;
+                    }
+                }
+                if (is_active) {
+                    spin_unlock(&sched_lock);
+                    __asm__ volatile("sti");
+                    task_sleep(10);
+                    continue;
+                }
+            }
             if (!(options & WNOWAIT)) {
                 if (ev->state == TASK_DEAD) task_reap_zombie_locked(event_slot);
                 else {
