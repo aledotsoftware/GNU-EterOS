@@ -1163,6 +1163,16 @@ static int64_t sys_symlink(const char* target, const char* linkpath) {
     return sys_symlinkat(target, AT_FDCWD, linkpath);
 }
 
+static int64_t sys_mknodat(int dirfd, const char* pathname, int mode, int dev) {
+    (void)dirfd; (void)pathname; (void)mode; (void)dev;
+    return -ENOSYS;
+}
+
+static int64_t sys_renameat2(int olddirfd, const char* oldpath, int newdirfd, const char* newpath, int flags) {
+    if (flags != 0) return -EINVAL; /* EterOS currently doesn't support RENAME_NOREPLACE/RENAME_EXCHANGE */
+    return sys_renameat(olddirfd, oldpath, newdirfd, newpath);
+}
+
 static int64_t sys_rename(const char* oldpath, const char* newpath) {
     return sys_renameat(AT_FDCWD, oldpath, AT_FDCWD, newpath);
 }
@@ -1839,6 +1849,72 @@ static int64_t sys_writev(int fd, const struct iovec *iov, int iovcnt) {
     }
     kfree(kiov);
     return total;
+}
+
+static int64_t sys_preadv(int fd, const struct iovec *iov, int iovcnt, int64_t offset) {
+    if (fd < 0 || !iov) return -EINVAL;
+    if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
+
+    struct iovec* kiov = NULL;
+    int res = copy_from_user_iovec(iov, iovcnt, &kiov);
+    if (res < 0) return res;
+
+    int64_t total = 0;
+    for (int i=0; i<iovcnt; i++) {
+        /* Validate each buffer before reading into it */
+        if (!vmm_verify_user_access(kiov[i].iov_base, kiov[i].iov_len, 1)) {
+            kfree(kiov);
+            return -EFAULT;
+        }
+
+        int64_t r = sys_pread64(fd, kiov[i].iov_base, kiov[i].iov_len, offset);
+        if (r < 0) {
+            kfree(kiov);
+            return total > 0 ? total : r;
+        }
+        total += r;
+        offset += r;
+    }
+    kfree(kiov);
+    return total;
+}
+
+static int64_t sys_pwritev(int fd, const struct iovec *iov, int iovcnt, int64_t offset) {
+    if (fd < 0 || !iov) return -EINVAL;
+    if (iovcnt < 0 || iovcnt > UIO_MAXIOV) return -EINVAL;
+
+    struct iovec* kiov = NULL;
+    int res = copy_from_user_iovec(iov, iovcnt, &kiov);
+    if (res < 0) return res;
+
+    int64_t total = 0;
+    for (int i=0; i<iovcnt; i++) {
+        /* Validate each buffer before writing */
+        if (!vmm_verify_user_access(kiov[i].iov_base, kiov[i].iov_len, 0)) {
+            kfree(kiov);
+            return -EFAULT;
+        }
+
+        int64_t r = sys_pwrite64(fd, kiov[i].iov_base, kiov[i].iov_len, offset);
+        if (r < 0) {
+            kfree(kiov);
+            return total > 0 ? total : r;
+        }
+        total += r;
+        offset += r;
+    }
+    kfree(kiov);
+    return total;
+}
+
+static int64_t sys_preadv2(int fd, const struct iovec *iov, int iovcnt, int64_t offset, int flags) {
+    (void)flags;
+    return sys_preadv(fd, iov, iovcnt, offset);
+}
+
+static int64_t sys_pwritev2(int fd, const struct iovec *iov, int iovcnt, int64_t offset, int flags) {
+    (void)flags;
+    return sys_pwritev(fd, iov, iovcnt, offset);
 }
 
 static int64_t sys_readv(int fd, const struct iovec *iov, int iovcnt) {
@@ -2812,6 +2888,15 @@ static int64_t sys_exit_group(int status) {
     task_exit(status);
     __builtin_unreachable();
 }
+
+static int64_t sys_vfork_wrapper(struct syscall_regs* regs) {
+    return task_fork((void*)regs);
+}
+
+static int64_t sys_rt_sigreturn_wrapper(struct syscall_regs* regs) {
+    sys_rt_sigreturn(regs);
+    return regs->rax; // Should not return if sigreturn succeeds, but if it does we return rax
+}
 static int64_t sys_munmap(void* addr, size_t len) {
     if ((uint64_t)addr % PAGE_SIZE != 0) return -EINVAL;
     if (len == 0) return -EINVAL;
@@ -3515,6 +3600,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [247] = (syscall_ptr_t)sys_waitid,
     [257] = (syscall_ptr_t)sys_openat,
     [258] = (syscall_ptr_t)sys_mkdirat,
+    [259] = (syscall_ptr_t)sys_mknodat,
     [262] = (syscall_ptr_t)sys_newfstatat,
     [264] = (syscall_ptr_t)sys_renameat,
     [266] = (syscall_ptr_t)sys_symlinkat,
@@ -3530,7 +3616,10 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [291] = (syscall_ptr_t)sys_epoll_create1,
     [292] = (syscall_ptr_t)sys_dup3,
     [293] = (syscall_ptr_t)sys_pipe2,
+    [295] = (syscall_ptr_t)sys_preadv,
+    [296] = (syscall_ptr_t)sys_pwritev,
     [302] = (syscall_ptr_t)sys_prlimit64,
+    [316] = (syscall_ptr_t)sys_renameat2,
     [318] = (syscall_ptr_t)sys_getrandom,
     [400] = (syscall_ptr_t)sys_gethostbyname,
     [169] = (syscall_ptr_t)sys_reboot,
@@ -3651,6 +3740,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [247] = (syscall_ptr_t)sys_waitid,
     [257] = (syscall_ptr_t)sys_openat,
     [258] = (syscall_ptr_t)sys_mkdirat,
+    [259] = (syscall_ptr_t)sys_mknodat,
     [262] = (syscall_ptr_t)sys_newfstatat,
     [263] = (syscall_ptr_t)sys_unlinkat,
     [265] = (syscall_ptr_t)sys_linkat,
@@ -3666,10 +3756,15 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [291] = (syscall_ptr_t)sys_epoll_create1,
     [292] = (syscall_ptr_t)sys_dup3,
     [293] = (syscall_ptr_t)sys_pipe2,
+    [295] = (syscall_ptr_t)sys_preadv,
+    [296] = (syscall_ptr_t)sys_pwritev,
     [302] = (syscall_ptr_t)sys_prlimit64,
+    [316] = (syscall_ptr_t)sys_renameat2,
     [318] = (syscall_ptr_t)sys_getrandom,
     [400] = (syscall_ptr_t)sys_gethostbyname,
     [319] = (syscall_ptr_t)sys_memfd_create,
+    [327] = (syscall_ptr_t)sys_preadv2,
+    [328] = (syscall_ptr_t)sys_pwritev2,
 
     [169] = (syscall_ptr_t)sys_reboot,
     [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
@@ -3818,12 +3913,10 @@ static void syscall_linux32_handler(struct syscall_regs* regs) {
         regs->rax = (uint64_t)sys_execveat((int)regs->rdi, (const char*)regs->rsi, (char* const*)regs->rdx, (char* const*)regs->r10, (int)regs->r8, regs);
         return;
     }
-
     if (regs->rax == 11) { /* SYS_execve for 32-bit */
         regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
         return;
     }
-
     syscall_ptr_t handler = syscall_linux32_table[regs->rax];
     if (handler) {
         ret = handler(regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8, regs->r9);
@@ -3869,12 +3962,10 @@ static void syscall_native_handler(struct syscall_regs* regs) {
         regs->rax = (uint64_t)sys_execveat((int)regs->rdi, (const char*)regs->rsi, (char* const*)regs->rdx, (char* const*)regs->r10, (int)regs->r8, regs);
         return;
     }
-
     if (regs->rax == SYS_execve) {
         regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
         return;
     }
-
     syscall_ptr_t handler = syscall_native_table[regs->rax];
     if (handler) {
         ret = handler(regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8, regs->r9);
@@ -3928,12 +4019,10 @@ static void syscall_linux_handler(struct syscall_regs* regs) {
         regs->rax = (uint64_t)sys_execveat((int)regs->rdi, (const char*)regs->rsi, (char* const*)regs->rdx, (char* const*)regs->r10, (int)regs->r8, regs);
         return;
     }
-
     if (regs->rax == SYS_execve) {
         regs->rax = (uint64_t)sys_execve((const char*)regs->rdi, (char* const*)regs->rsi, (char* const*)regs->rdx, regs);
         return;
     }
-
     syscall_ptr_t handler = syscall_linux_table[regs->rax];
     if (handler) {
         ret = handler(regs->rdi, regs->rsi, regs->rdx, regs->r10, regs->r8, regs->r9);

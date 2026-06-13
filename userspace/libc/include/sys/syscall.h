@@ -132,6 +132,8 @@
 #define SYS_ppoll               271
 #define SYS_dup3                292
 #define SYS_pipe2               293
+#define SYS_preadv              295
+#define SYS_pwritev             296
 #define SYS_epoll_create1       291
 #define SYS_gethostbyname       400
 #define SYS_reboot              169
