@@ -1,6 +1,7 @@
 #include <sys/syscall.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <sys/uio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -361,6 +362,24 @@ ssize_t pwrite(int fd, const void *buf, size_t count, int64_t offset) {
     long ret = syscall4(SYS_pwrite64, fd, (long)buf, count, offset);
     if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
     return (ssize_t)ret;
+}
+
+ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, int64_t offset) {
+    long ret = syscall4(SYS_preadv, fd, (long)iov, iovcnt, offset);
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
+    return (ssize_t)ret;
+}
+
+ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, int64_t offset) {
+    long ret = syscall4(SYS_pwritev, fd, (long)iov, iovcnt, offset);
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
+    return (ssize_t)ret;
+}
+
+pid_t vfork(void) {
+    long ret = syscall0(SYS_vfork);
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = -ret; return -1; }
+    return (pid_t)ret;
 }
 
 int reboot(int magic, int magic2, int cmd, void *arg) {
