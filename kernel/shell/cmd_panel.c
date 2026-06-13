@@ -54,18 +54,18 @@ static void panel_mouse_callback(int8_t dx, int8_t dy, uint8_t buttons) {
 static void draw_panel_menu(void) {
     cmd_clear("");
     terminal_write_string("\n");
-    terminal_write_colored("  ========================================\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    terminal_write_colored("          Panel de Control - eterOS v0.2.0       \n", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-    terminal_write_colored("  ========================================\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_write_colored("  +----------------------------------------+\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_write_colored("  |    Panel de Control - eterOS v0.2.0    |\n", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_write_colored("  +----------------------------------------+\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
     // Items are roughly at lines 4, 5, 6, 7, 8, 9, 10
-    terminal_write_string("    1. Configurar Teclado (Layout & Typematic)\n"); // Y=4
-    terminal_write_string("    2. Configurar Mouse (Sensibilidad & Botones)\n"); // Y=5
-    terminal_write_string("    3. Estado de Almacenamiento (Slots & Initrd)\n"); // Y=6
-    terminal_write_string("    4. Configurar Tiempo (Zona Horaria & Sincronizacion)\n"); // Y=7
-    terminal_write_string("    5. Usuarios y Seguridad (Auto-login & Permisos)\n"); // Y=8
-    terminal_write_string("    6. Estado de Red (IP & DNS)\n"); // Y=9
-    terminal_write_string("    7. Salir del Panel de Control\n"); // Y=10
+    terminal_write_string("    [1] Configurar Teclado (Layout & Typematic)\n"); // Y=4
+    terminal_write_string("    [2] Configurar Mouse (Sensibilidad & Botones)\n"); // Y=5
+    terminal_write_string("    [3] Estado de Almacenamiento (Slots & Initrd)\n"); // Y=6
+    terminal_write_string("    [4] Configurar Tiempo (Zona Horaria & NTP)\n"); // Y=7
+    terminal_write_string("    [5] Usuarios y Seguridad (Auto-login & Permisos)\n"); // Y=8
+    terminal_write_string("    [6] Estado de Red (IP & DNS)\n"); // Y=9
+    terminal_write_string("    [7] Salir del Panel de Control\n"); // Y=10
     terminal_write_string("\n  Use teclas [1-7] o haga click para seleccionar.\n");
 
     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
