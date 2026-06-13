@@ -7,7 +7,7 @@ kernel/net/, kernel/drivers/net/
 Sockets, lwIP bridge, e1000, DHCP, integración syscall.
 
 ## Current Goal
-Completar la integración lwIP expandiendo más familias de AF_INET y syscalls socket.
+*(Waiting for new assignment)*
 
 
 ## Guidelines

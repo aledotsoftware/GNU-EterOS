@@ -2322,15 +2322,13 @@ static int64_t sys_nanosleep(const struct timespec* req, struct timespec* rem) {
 
 
 static int64_t sys_sendmsg(int fd, const struct msghdr* msg, int flags) {
-    (void)fd; (void)flags;
     if (msg && !vmm_verify_user_access(msg, sizeof(struct msghdr), 0)) return -EFAULT;
-    return -EOPNOTSUPP;
+    return sys_lwip_sendmsg(fd, msg, flags);
 }
 
 static int64_t sys_recvmsg(int fd, struct msghdr* msg, int flags) {
-    (void)fd; (void)flags;
     if (msg && !vmm_verify_user_access(msg, sizeof(struct msghdr), 1)) return -EFAULT;
-    return -EOPNOTSUPP;
+    return sys_lwip_recvmsg(fd, msg, flags);
 }
 
 static int64_t sys_setsockopt(int fd, int level, int optname, const void* optval, int optlen) {
@@ -2357,14 +2355,7 @@ static int64_t sys_getsockname(int fd, struct sockaddr_old* addr, int* addrlen) 
 }
 
 static int64_t sys_shutdown(int fd, int how) {
-    (void)how;
-    task_t* current = task_get_current();
-    if (fd < 0 || fd >= MAX_FD) return -EBADF;
-    if (!current->fd_table[fd].node) return -EBADF;
-    fs_node_t* node = current->fd_table[fd].node;
-    if ((node->flags & 0x7) != FS_SOCKET) return -ENOTSOCK;
-    net_close((int)node->inode);
-    return 0;
+    return sys_lwip_shutdown(fd, how);
 }
 
 

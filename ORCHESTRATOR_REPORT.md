@@ -38,9 +38,8 @@
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`network-socket-api-bot`**: Completar la integración lwIP expandiendo más familias de AF_INET y syscalls socket.
-2. **`vfs-posix-filesystem-bot`**: Implementar verdaderos Atomic Commits en el subsistema JFS (`kernel/fs/jfs.c`).
-3. **`testing-ci-validation-bot`**: Expandir la cobertura de tests unitarios nativos de host.
+1. **`vfs-posix-filesystem-bot`**: Implementar verdaderos Atomic Commits en el subsistema JFS (`kernel/fs/jfs.c`).
+2. **`testing-ci-validation-bot`**: Expandir la cobertura de tests unitarios nativos de host.
 
 ---
 
@@ -62,3 +61,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - **2026-06-10 (Update):** El `kernel-stability-boot-bot` ha endurecido el arranque x86_64 añadiendo un stack aislado para Double Faults (IST 1 en TSS), verificaciones de memoria física durante panics y stack traces en la IDT, validación estricta de `HEAP_MAGIC` al liberar memoria, y límites seguros en el PMM (bitmap checks). Build y QEMU headless verificados con éxito.
 - **2026-06-10 (Update):** El `aether-droid-subsystem-bot` ha finalizado con éxito la implementación de colas y rutéo real en `/dev/binder` (`BINDER_WRITE_READ`) logrando una arquitectura IPC base para las transacciones. Build y QA confirmados exitosamente. El objetivo principal se traslada ahora al `vfs-posix-filesystem-bot` para actualizar el pseudo-journal de JFS a *atomic commits* verdaderos.
 - **2026-06-12 (Update):** El Orchestrator Meta-Agent verificó el correcto funcionamiento de PT_DYNAMIC y mmap sobre DRM. El siguiente objetivo prioritario delegado es expandir soporte lwIP y syscalls de socket a cargo del `network-socket-api-bot`.
+- **2026-06-13 (Update):** El Orchestrator Meta-Agent auditó el avance de sys_recvmsg, sys_sendmsg y sys_shutdown usando syscalls a lwIP. Los tests pasan exitosamente y se procedió a marcar `network-socket-api-bot` como completado, designando a `vfs-posix-filesystem-bot` (Atomic Commits en JFS) como el siguiente bloqueante principal.
