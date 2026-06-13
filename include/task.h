@@ -135,6 +135,7 @@ typedef struct task {
     uint64_t       brk;                     /* Program break (end of data segment) */
     uint64_t       fs_base;                 /* FS Segment Base (TLS) */
     uint64_t       gs_base;                 /* GS Segment Base (TLS) */
+    struct robust_list_head* robust_list;   /* Robust futex list pointer */
     uint8_t        os_abi;
     uint8_t        is_linux;                /* Linux Compatibility Flag */                  /* ABI (0=SysV/Native, 3=Linux) */
     uint64_t       user_rsp;                /* User Stack Pointer (saved during syscall) */

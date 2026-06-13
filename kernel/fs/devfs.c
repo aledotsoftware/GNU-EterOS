@@ -1067,17 +1067,34 @@ static uint32_t dev_ashmem_write(fs_node_t *node, uint32_t offset, uint32_t size
     return size;
 }
 static int dev_ashmem_ioctl(fs_node_t *node, int request, void *arg) {
-    (void)node; (void)arg;
+    if (!node || node->inode != 12) return -1;
     if (request == ASHMEM_SET_NAME) {
-        char name[256];
         if (arg) {
-            if (vmm_strncpy_from_user(name, (const char*)arg, sizeof(name)) < 0) {
+            char temp_name[256];
+            if (vmm_strncpy_from_user(temp_name, (const char*)arg, sizeof(temp_name)) < 0) {
+                return -EFAULT;
+            }
+            /* Only update the node's name for debugging purposes, since DevFS doesn't
+               support per-FD objects natively. */
+            strlcpy(node->name, temp_name, sizeof(node->name));
+        }
+        return 0;
+    }
+    if (request == ASHMEM_GET_NAME) {
+        if (arg) {
+            if (safe_copy_to_user(arg, node->name, sizeof(node->name)) < 0) {
                 return -EFAULT;
             }
         }
         return 0;
     }
-    if (request == ASHMEM_SET_SIZE) return 0;
+    if (request == ASHMEM_SET_SIZE) {
+        node->length = (uint32_t)(uintptr_t)arg;
+        return 0;
+    }
+    if (request == ASHMEM_GET_SIZE) {
+        return node->length;
+    }
     return 0;
 }
 static ssize_t dev_properties_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
