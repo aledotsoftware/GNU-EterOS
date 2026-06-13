@@ -211,7 +211,7 @@ void execute_command() {
         arg[j] = '\0';
 
         if (strcmp(cmd, "help") == 0) {
-            term_print("\nEterland Terminal UI Simulator\n", 0x2ECC71);
+            term_print("\nEterland Terminal UI Simulator v0.2.0\n", 0x2ECC71);
             term_print("Comandos: help, clear, echo, uname, ls, cat, run, exit\n", term_fg);
         } else if (strcmp(cmd, "clear") == 0) {
             draw_rect(win_x, win_y + 24, win_w, win_h - 24, term_bg);

@@ -251,16 +251,16 @@ make iso      # Genera un ISO booteable para grabar en USB
 
 ---
 
-## 13. Hoja de Ruta y Faltantes Críticos
+## 13. Hoja de Ruta y Faltantes Críticos (v0.2.0 Genesis SMP)
 
 Aunque eterOS v0.2.0 es altamente funcional, las siguientes áreas son la prioridad actual de desarrollo:
 
-🔴 **Críticos (Blockers):**
+🔴 **Críticos (Blockers Actuales):**
 1.  **Cargador de Librerías Dinámicas (`.so`):** Actualmente el loader ELF asume compilación estática. Se requiere soporte para `PT_DYNAMIC` para avanzar hacia el port completo de la libc GNU.
 2.  **Aether-Droid (Binder IPC):** Implementación de transacciones y enrutamiento en el driver `/dev/binder` dentro del kernel para habilitar comunicación inter-proceso estilo Android.
 3.  **Abstracción DRM/KMS:** El motor Omni v2.0 opera sobre LFB (Linear Framebuffer). Se necesita una abstracción DRM (Direct Rendering Manager) y KMS (Kernel Mode Setting) para un entorno de escritorio completo.
 
-🟡 **Mejoras Arquitectónicas (Largo Plazo):**
+🟡 **Mejoras Arquitectónicas (Corto y Medio Plazo):**
 4.  **Compatibilidad Syscalls Linux:** Expandir la compatibilidad de POSIX PTY ioctls y soporte más robusto para `fork/exec/clone` que soporte la terminal GNU real (bash/coreutils).
 5.  **Sistema Multiusuario Completo:** Si bien ya se parsean `/etc/shadow` y `/etc/passwd` y hay UIDs por proceso, se requiere un binario `/bin/login` que coordine la entrada, genere tokens de sesión y asigne `/dev/ttyX`.
 

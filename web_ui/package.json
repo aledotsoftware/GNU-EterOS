@@ -1,15 +1,14 @@
 {
   "name": "eter-web-ui",
   "version": "1.0.0",
-  "description": "Web UI for eterOS",
+  "description": "eterOS web ui concept",
+  "main": "app.js",
   "scripts": {
     "test": "jest"
   },
+  "dependencies": {},
   "devDependencies": {
-    "jest": "^29.0.0",
-    "jest-environment-jsdom": "^29.0.0"
-  },
-  "jest": {
-    "testEnvironment": "jsdom"
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
   }
 }
