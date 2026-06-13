@@ -23,3 +23,4 @@
   - Addressed legacy TODOs in `kernel/gfx/cursor.c` and `kernel/gfx/window.c` by accurately reflecting userspace integration for mouse clicks and future UEFI dependencies for GOP.
   - Refactored Playwright verification scripts (`verification/verify_*.py`) to use portable, `__file__`-based relative paths, resolving directory execution dependency bugs and standardizing the automated QA pipeline for web-ui components.
 - **Vision CLI**: Applied visual polish to EterOS web_ui, Marea Shell, Eterland, and cmd_panel. Cleaned up web UI menu alignment (flexbox, padding), added basic icons, fixed CSS hover gradients. Updated README and ORCHESTRATOR_REPORT to reflect visual updates. Verified using Playwright screenshots.
+- **Orchestrator**: Verified true atomic multi-block commits in JFS. Assigned native test expansion to testing-ci-validation-bot.

@@ -7,7 +7,7 @@ kernel/fs/
 VFS, initrd, procfs, shmfs, FAT32/JFS, ELF loader.
 
 ## Current Goal
-Implementar atomic commits robustos en el journaling de JFS (`kernel/fs/jfs.c`), reemplazando la simulación actual de entrada única.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

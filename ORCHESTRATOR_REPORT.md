@@ -24,7 +24,7 @@
 - **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas. PTY ioctls han sido completados en un subconjunto. El subsistema **ya cuenta con soporte para job control signals (`SIGSTOP`, `SIGCONT`, `SIGCHLD`, `SIGTTIN`, `SIGTTOU`)**, implementado exitosamente en `kernel/arch/x86_64/syscall.c`. Además, se verificó el parsing del segmento ELF `PT_DYNAMIC`.
 
 ### 2.2 Áreas de Mejora a Corto Plazo (Para Compatibilidad Base)
-- **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) opera puramente en RAM y bloque. Se debe revisar compatibilidad total VFS POSIX y atomic commits (el soporte de hardlinks ha sido verificado y se encuentra operativo mediante `sys_linkat` y `vfs_link`).
+- **Filesystems JFS:** El driver de Journaling actual (`jfs.c`) ahora implementa atomic commits verdaderos para operaciones VFS, además de contar con soporte de hardlinks operativo mediante `sys_linkat` y `vfs_link`.
 - **Control Multi-usuario:** Soporte base con parseo shadow y passwd operativo, modos `0600` de permisos VFS consolidados. El binario de login ya asigna TTYs/PTYs adecuadamente mediante `setsid()` e `ioctl(TIOCSCTTY)`.
 
 ### 2.3 Metas Aspiracionales de la Plataforma (Largo Plazo)
@@ -38,8 +38,7 @@
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`vfs-posix-filesystem-bot`**: Implementar verdaderos Atomic Commits en el subsistema JFS (`kernel/fs/jfs.c`).
-2. **`testing-ci-validation-bot`**: Expandir la cobertura de tests unitarios nativos de host.
+1. **`testing-ci-validation-bot`**: Expandir la cobertura de tests unitarios nativos de host.
 
 ---
 
@@ -47,7 +46,7 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - Se comprobó la implementación inicial real de Binder IPC (Android compat) en `kernel/fs/devfs.c`, introducida por el `aether-droid-subsystem-bot`. Binder ahora rutéa peticiones reales (`BINDER_WRITE_READ`) hacia un `context_mgr` y hacia clientes en lugar de ser un mero stub estático, utilizando `kmalloc` e inicializando una cola de transacciones.
 - Se verificó que el `graphics-power-panel-bot` implementó el mapeo del framebuffer (Mmap sobre `/dev/dri/card0`) exitosamente en la capa DRM.
 - Se verificó que el `aether-linux-subsystem-bot` implementó el parseo y soporte para `PT_DYNAMIC` en el ELF loader (`kernel/fs/elf.c`), permitiendo un paso crucial hacia la carga de librerías dinámicas (`.so`).
-- El driver de Journaling JFS ha sido auditado. Fue asignado al `vfs-posix-filesystem-bot` en el ciclo anterior, pero el bot falló en implementar verdaderos Atomic Commits. **Se debe reintentar su reimplementación en el futuro**.
+- El driver de Journaling JFS ha sido auditado y actualizado. Se han implementado con éxito verdaderos Atomic Commits en el subsistema, permitiendo la agrupación de bloques múltiples en transacciones atómicas.
 
 ---
 
@@ -62,3 +61,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - **2026-06-10 (Update):** El `aether-droid-subsystem-bot` ha finalizado con éxito la implementación de colas y rutéo real en `/dev/binder` (`BINDER_WRITE_READ`) logrando una arquitectura IPC base para las transacciones. Build y QA confirmados exitosamente. El objetivo principal se traslada ahora al `vfs-posix-filesystem-bot` para actualizar el pseudo-journal de JFS a *atomic commits* verdaderos.
 - **2026-06-12 (Update):** El Orchestrator Meta-Agent verificó el correcto funcionamiento de PT_DYNAMIC y mmap sobre DRM. El siguiente objetivo prioritario delegado es expandir soporte lwIP y syscalls de socket a cargo del `network-socket-api-bot`.
 - **2026-06-13 (Update):** El Orchestrator Meta-Agent auditó el avance de sys_recvmsg, sys_sendmsg y sys_shutdown usando syscalls a lwIP. Los tests pasan exitosamente y se procedió a marcar `network-socket-api-bot` como completado, designando a `vfs-posix-filesystem-bot` (Atomic Commits en JFS) como el siguiente bloqueante principal.
+- **2026-06-13 (Update 2):** El Orchestrator Meta-Agent auditó el driver JFS. El `vfs-posix-filesystem-bot` ha implementado satisfactoriamente los true atomic multi-block commits en `kernel/fs/jfs.c`. Build y tests nativos (`test_jfs.c`) pasan exitosamente. El objetivo principal se traslada ahora al `testing-ci-validation-bot` para expandir tests unitarios.

@@ -7,7 +7,7 @@ tests/, verification/
 Tests nativos, verification scripts, CI y matrices de build.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Expandir la cobertura de tests unitarios nativos de host.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
