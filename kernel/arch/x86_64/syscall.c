@@ -1523,7 +1523,30 @@ struct robust_list_head {
 static int64_t sys_set_robust_list(struct robust_list_head* head, size_t len) {
     if (len != sizeof(struct robust_list_head)) return -EINVAL;
     if (head && !vmm_verify_user_access(head, sizeof(struct robust_list_head), 0)) return -EFAULT;
-    /* Basic stub - robust futex list is not fully managed yet */
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+    current->robust_list = head;
+    return 0;
+}
+
+static int64_t sys_get_robust_list(int pid, struct robust_list_head** head_ptr, size_t* len_ptr) {
+    task_t* target;
+    if (pid == 0) {
+        target = task_get_current();
+    } else {
+        target = task_get_by_id(pid);
+    }
+    if (!target) return -ESRCH;
+
+    if (head_ptr) {
+        if (!vmm_verify_user_access(head_ptr, sizeof(struct robust_list_head*), 1)) return -EFAULT;
+        memcpy(head_ptr, &target->robust_list, sizeof(struct robust_list_head*));
+    }
+    if (len_ptr) {
+        size_t len = sizeof(struct robust_list_head);
+        if (!vmm_verify_user_access(len_ptr, sizeof(size_t), 1)) return -EFAULT;
+        memcpy(len_ptr, &len, sizeof(size_t));
+    }
     return 0;
 }
 
@@ -3611,6 +3634,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [270] = (syscall_ptr_t)sys_pselect6,
     [271] = (syscall_ptr_t)sys_ppoll,
     [273] = (syscall_ptr_t)sys_set_robust_list,
+    [274] = (syscall_ptr_t)sys_get_robust_list,
     [280] = (syscall_ptr_t)sys_utimensat,
     [290] = (syscall_ptr_t)sys_eventfd2,
     [291] = (syscall_ptr_t)sys_epoll_create1,
@@ -3751,6 +3775,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [270] = (syscall_ptr_t)sys_pselect6,
     [271] = (syscall_ptr_t)sys_ppoll,
     [273] = (syscall_ptr_t)sys_set_robust_list,
+    [274] = (syscall_ptr_t)sys_get_robust_list,
     [280] = (syscall_ptr_t)sys_utimensat,
     [290] = (syscall_ptr_t)sys_eventfd2,
     [291] = (syscall_ptr_t)sys_epoll_create1,
@@ -3868,6 +3893,7 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [308] = (syscall_ptr_t)sys_pselect6,
     [309] = (syscall_ptr_t)sys_ppoll,
     [311] = (syscall_ptr_t)sys_set_robust_list,
+    [312] = (syscall_ptr_t)sys_get_robust_list,
     [320] = (syscall_ptr_t)sys_utimensat,
     [332] = (syscall_ptr_t)sys_dup3,
     [331] = (syscall_ptr_t)sys_pipe2,
