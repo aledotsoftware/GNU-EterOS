@@ -144,7 +144,7 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     const char* prefix = initrd_dir_prefix(node);
     char child[128];
     uint32_t seen = 0;
-    if (!prefix) return -1;
+    if (!prefix) return -ENOENT;
 
     /* Virtual dirs first */
     for (initrd_dir_t* cur = virtual_dirs; cur; cur = cur->next) {
@@ -224,7 +224,7 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
         seen++;
     }
 
-    return 1; /* EOF */
+    return -ENOENT; /* EOF */
 }
 
 int initrd_create(fs_node_t *parent, char *name, uint16_t permission) {
