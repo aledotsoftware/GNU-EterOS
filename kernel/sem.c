@@ -17,14 +17,14 @@ void sem_wait(sem_t* sem) {
 
     while (1) {
         /* Disable interrupts to protect task state and schedule */
-        hal_interrupts_disable();
+        uint64_t irq_flags = task_irq_save();
 
         spin_lock(&sem->lock);
 
         if (sem->count > 0) {
             sem->count--;
             spin_unlock(&sem->lock);
-            hal_interrupts_enable();
+            task_irq_restore(irq_flags);
             return;
         }
 
@@ -33,8 +33,9 @@ void sem_wait(sem_t* sem) {
         task_block();
 
         spin_unlock(&sem->lock);
+        task_irq_restore(irq_flags);
 
-        /* Yield CPU (Scheduler will re-enable interrupts for next task) */
+        /* Yield CPU */
         schedule();
 
         /* When we wake up, interrupts are enabled. Loop again to try acquire. */
@@ -45,10 +46,7 @@ void sem_signal(sem_t* sem) {
     if (!sem) return;
 
     /* Save RFLAGS to restore interrupt state later */
-    uint64_t rflags;
-    __asm__ volatile("pushfq; pop %0" : "=r"(rflags));
-
-    hal_interrupts_disable();
+    uint64_t rflags = task_irq_save();
 
     spin_lock(&sem->lock);
 

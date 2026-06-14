@@ -321,6 +321,7 @@ void scheduler_init(void) {
     tasks[0].state = TASK_RUNNING;
     tasks[0].stack_base = NULL;  /* El kernel ya tiene su stack */
     tasks[0].rsp = 0;            /* Se llenará en el primer context_switch */
+    tasks[0].target_cpu = 0;
 
     /* Inicializar CR3 del kernel */
     uint64_t cr3;
@@ -423,6 +424,8 @@ void task_init_ap(void) {
     tasks[slot].kernel_stack_top = 0;
 
     cpu_info_t* cpu = get_current_cpu();
+    if (cpu) tasks[slot].target_cpu = cpu->index;
+
     char name[32] = "Idle AP ";
     if (cpu) {
         char buf[8];
@@ -646,8 +649,8 @@ static task_t* find_next_task(task_t* current) {
 void schedule(void) {
     if (!scheduler_active) return;
 
-    /* Deshabilitar interrupciones para proteger el estado del scheduler */
-    __asm__ volatile("cli");
+    /* Guardar RFLAGS y deshabilitar interrupciones */
+    uint64_t irq_flags = task_irq_save();
 
     /* Acquire Spinlock */
     spin_lock(&sched_lock);
@@ -655,7 +658,7 @@ void schedule(void) {
     cpu_info_t* cpu = get_current_cpu();
     if (!cpu) {
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return;
     }
 
@@ -776,7 +779,7 @@ void schedule(void) {
 
     /* We are back in the old task (now current) */
     spin_unlock(&sched_lock);
-    __asm__ volatile("sti");
+    task_irq_restore(irq_flags);
 }
 
 /**

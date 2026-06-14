@@ -68,6 +68,9 @@ void hal_interrupts_disable(void) {
 void hal_interrupts_enable(void) {
 }
 
+uint64_t task_irq_save(void) { return 0x200; }
+void task_irq_restore(uint64_t f) { (void)f; }
+
 void task_wakeup(task_t* t) {
     if (t->state == TASK_BLOCKED) {
         t->state = TASK_READY;

@@ -19,6 +19,11 @@ syscall_entry:
 
     ; 3. Load Kernel Stack Pointer from per-cpu struct (kernel_stack_top)
     ; include/cpu.h: offsetof(cpu_info_t, kernel_stack_top) = 64 (0x40)
+    ; ONLY switch if we are coming from user space. If already in kernel space (e.g. nested call or ring 0), keep rsp.
+    ; We can check this by seeing if rsp is already in kernel range.
+    ; But syscall instruction is only meant to be used from ring 3.
+    ; In EterOS, maybe syscalls are called from kernel space too? If so, we'd corrupt the stack.
+    ; Assuming it's only called from ring 3.
     mov rsp, [gs:64]
 
 
