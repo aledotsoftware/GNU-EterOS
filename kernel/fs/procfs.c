@@ -347,7 +347,7 @@ static ssize_t proc_fd_link_read(fs_node_t *node, uint32_t offset, uint32_t size
 /* /proc/self/fd/ implementation */
 static int proc_self_fd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     task_t* current = proc_node_task(node);
-    if (!current) return -1;
+    if (!current) return -ENOENT;
 
     uint32_t valid_idx = 0;
     for (int i = 0; i < MAX_FD; i++) {

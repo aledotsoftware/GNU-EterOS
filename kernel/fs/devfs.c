@@ -114,14 +114,14 @@ static client_queue_t cl_queues[BINDER_MAX_QUEUED];
 
 /* Helper to safely copy from user space. In a real kernel this would handle page faults. */
 static int safe_copy_from_user(void *dest, const void *src, size_t n) {
-    if (!src || !dest) return -1;
+    if (!src || !dest) return -EFAULT;
     memcpy(dest, src, n);
     return 0;
 }
 
 /* Helper to safely copy to user space. */
 static int safe_copy_to_user(void *dest, const void *src, size_t n) {
-    if (!src || !dest) return -1;
+    if (!src || !dest) return -EFAULT;
     memcpy(dest, src, n);
     return 0;
 }
@@ -139,29 +139,29 @@ static uint32_t dev_binder_write(fs_node_t *node, uint32_t offset, uint32_t size
 static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
     (void)node;
     task_t *current = task_get_current();
-    if (!current) return -1;
+    if (!current) return -ENOENT;
 
     if (request == BINDER_VERSION_IOWR) {
-        if (!arg) return -1;
+        if (!arg) return -EINVAL;
         struct binder_version ver;
         ver.protocol_version = 8; /* Current Binder protocol version */
-        if (safe_copy_to_user(arg, &ver, sizeof(ver)) != 0) return -1;
+        if (safe_copy_to_user(arg, &ver, sizeof(ver)) != 0) return -EFAULT;
         return 0;
     }
     if (request == BINDER_SET_CONTEXT_MGR) {
         spin_lock(&binder_lock);
         if (binder_context_mgr_pid != -1 && binder_context_mgr_pid != (int)current->id) {
             spin_unlock(&binder_lock);
-            return -1; /* Already set */
+            return -EPERM; /* Already set */
         }
         binder_context_mgr_pid = (int)current->id;
         spin_unlock(&binder_lock);
         return 0;
     }
     if (request == BINDER_WRITE_READ) {
-        if (!arg) return -1;
+        if (!arg) return -EINVAL;
         struct binder_write_read bwr;
-        if (safe_copy_from_user(&bwr, arg, sizeof(bwr)) != 0) return -1;
+        if (safe_copy_from_user(&bwr, arg, sizeof(bwr)) != 0) return -EFAULT;
 
         /* Process Writes (Client -> Binder) */
         if (bwr.write_size > 0 && bwr.write_buffer) {
@@ -331,11 +331,11 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
             bwr.read_consumed = read_out;
         }
 
-        if (safe_copy_to_user(arg, &bwr, sizeof(bwr)) != 0) return -1;
+        if (safe_copy_to_user(arg, &bwr, sizeof(bwr)) != 0) return -EFAULT;
         return 0;
     }
 
-    return -1; /* ENOTTY */
+    return -ENOTTY; /* ENOTTY */
 }
 
 /* ========================================================================= */
@@ -886,7 +886,7 @@ static int dev_event_ioctl(fs_node_t *node, int request, void *arg) {
         *(int*)arg = input_pending() * (int)sizeof(input_event_t);
         return 0;
     }
-    return -1;
+    return -ENOTTY;
 }
 
 /* ========================================================================= */
@@ -922,7 +922,7 @@ static int dev_mouse_ioctl(fs_node_t *node, int request, void *arg) {
         *(int*)arg = input_mouse_pending() * (int)sizeof(input_event_t);
         return 0;
     }
-    return -1;
+    return -ENOTTY;
 }
 
 /* ========================================================================= */
@@ -1041,14 +1041,14 @@ static int dev_fb0_ioctl(fs_node_t *node, int request, void *arg) {
     (void)node;
     if (request == 0x4600) { /* FBIOGET_VSCREENINFO */
         uint32_t* info = (uint32_t*)arg;
-        if (!info) return -1;
+        if (!info) return -EINVAL;
         info[0] = framebuffer_get_width();
         info[1] = framebuffer_get_height();
         info[2] = framebuffer_get_bpp();
         info[3] = framebuffer_get_pitch();
         return 0;
     }
-    return -1;
+    return -ENOTTY;
 }
 
 /* ========================================================================= */
@@ -1067,7 +1067,7 @@ static uint32_t dev_ashmem_write(fs_node_t *node, uint32_t offset, uint32_t size
     return size;
 }
 static int dev_ashmem_ioctl(fs_node_t *node, int request, void *arg) {
-    if (!node || node->inode != 12) return -1;
+    if (!node || node->inode != 12) return -ENOTTY;
     if (request == ASHMEM_SET_NAME) {
         if (arg) {
             char temp_name[256];
