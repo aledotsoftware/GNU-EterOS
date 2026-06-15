@@ -91,6 +91,13 @@ int main() {
     assert(nvram_get_boot_partition() == before_part); // Should not change
     assert(nvram_get_update_state() == UPDATE_STATE_PENDING);
 
+    // Test 7: Rollback when not pending (should fail/no-op)
+    nvram_set_update_state(UPDATE_STATE_SUCCESS);
+    before_part = nvram_get_boot_partition();
+    simulate_rollback();
+    assert(nvram_get_boot_partition() == before_part);
+    assert(nvram_get_update_state() == UPDATE_STATE_SUCCESS);
+
     printf("All OTA state machine tests passed!\n");
     return 0;
 }

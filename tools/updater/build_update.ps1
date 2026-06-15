@@ -89,10 +89,21 @@ if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir }
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 Write-Host "Working in temporary directory: $tempDir" -ForegroundColor Gray
 
-# 4. Compress artifacts
-Write-Host "Compressing artifacts (Zstandard)..." -ForegroundColor Cyan
+# 4. Prepare OTA payloads and Compress artifacts
+Write-Host "Preparing payloads and compressing artifacts..." -ForegroundColor Cyan
 
 $filesToProcess = @()
+
+# First, package kernel for direct OTA updates
+$kernelOtaPath = "$tempDir\kernel.ota"
+Write-Host "  Packing payload $($kernelOtaPath)..."
+$packProc = Start-Process -FilePath "python3" -ArgumentList "tools\updater\pack_payload.py", "`"$kernelBin`"", "`"$kernelOtaPath`"" -PassThru -NoNewWindow -Wait
+if ($packProc.ExitCode -ne 0) {
+    Write-Host "Error: pack_payload.py exited with code $($packProc.ExitCode)" -ForegroundColor Red
+    exit 1
+}
+
+$filesToProcess += @{Src=$kernelOtaPath; Name="kernel.ota"; Dst="$tempDir\kernel.ota.zst"}
 $filesToProcess += @{Src=$kernelBin; Name="kernel"; Dst="$tempDir\kernel.zst"}
 
 if (Test-Path $initrdBin) {
@@ -194,7 +205,7 @@ try {
     }
 }
 
-$filesToUpload = @($manifestPath, $sigPath)
+$filesToUpload = @($manifestPath, $sigPath, $kernelOtaPath)
 foreach ($file in $filesToProcess) {
     $filesToUpload += $file.Dst
 }

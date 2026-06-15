@@ -79,26 +79,28 @@ void cmd_ota(const char* args) {
 
         fs_node_t *active_node = partition_get_active_root();
         terminal_write_string("    Slot Activo: ");
-        terminal_write_string(boot_part == 0 ? "A (0)" : (boot_part == 1 ? "B (1)" : "Desconocido"));
         if (active_node) {
+            terminal_write_string(active_node->impl == 0 ? "A (0)" : (active_node->impl == 1 ? "B (1)" : "Desconocido"));
             terminal_write_string(" [particion ");
             terminal_write_string(active_node->name);
             terminal_write_string("]");
             // Note: Since active_node is transiently allocated by create_partition_node,
             // we safely free the allocated wrapper node to prevent leaks without unlinking real VFS structures.
             kfree(active_node);
+        } else {
+            terminal_write_string("Desconocido (No disponible)");
         }
 
         fs_node_t *passive_node = partition_get_passive_root();
         terminal_write_string("\n    Slot Pendiente: ");
-        terminal_write_string(boot_part == 0 ? "B (1)" : (boot_part == 1 ? "A (0)" : "Desconocido"));
         if (passive_node) {
+            terminal_write_string(passive_node->impl == 0 ? "A (0)" : (passive_node->impl == 1 ? "B (1)" : "Desconocido"));
             terminal_write_string(" [particion ");
             terminal_write_string(passive_node->name);
             terminal_write_string("]");
             kfree(passive_node);
         } else {
-            terminal_write_string(" (No disponible)");
+            terminal_write_string("Desconocido (No disponible)");
         }
 
         uint8_t update_state = nvram_get_update_state();
@@ -333,21 +335,35 @@ receive:
             terminal_write_string("  [OTA] ADVERTENCIA: Instalando actualizacion SIN verificar firma.\n");
         }
 
-        uint8_t current_part = nvram_get_boot_partition();
-        uint8_t next_part = (current_part == 0) ? 1 : 0;
+        uint8_t next_part = passive_part->impl;
 
         terminal_write_string("  [OTA] Preparando para escribir nueva imagen.\n");
         terminal_write_string("  [OTA] ADVERTENCIA: El slot pasivo actual (Slot ");
-        terminal_write_string(next_part == 0 ? "A" : "B");
+        terminal_write_string(next_part == 0 ? "A" : (next_part == 1 ? "B" : "Desconocido"));
         terminal_write_string(", particion ");
         terminal_write_string(passive_part->name);
         terminal_write_string(") sera sobreescrito.\n");
-        terminal_write_string("  [OTA] Escribiendo imagen...\n");
 
         uint32_t write_offset = 0;
         uint32_t data_offset = ota_require_sig ? 64 : 0; // write the actual image without signature
+
+        if (payload_size < data_offset) {
+             terminal_write_string("  [OTA] ERROR: Payload muy pequeno para contener los datos de actualizacion.\n");
+             kfree(payload_data);
+             kfree(passive_part);
+             return;
+        }
+
         uint32_t write_size = payload_size - data_offset;
 
+        if (write_size > passive_part->length) {
+            terminal_write_string("  [OTA] ERROR: La actualizacion es mas grande que el tamano del slot.\n");
+            kfree(payload_data);
+            kfree(passive_part);
+            return;
+        }
+
+        terminal_write_string("  [OTA] Escribiendo imagen...\n");
         uint32_t written = write_fs(passive_part, write_offset, write_size, payload_data + data_offset);
 
         kfree(passive_part);
@@ -385,7 +401,7 @@ receive:
 
         terminal_write_string("  [OTA] Actualizacion completada con exito.\n");
         terminal_write_string("  [OTA] El sistema arrancara desde el Slot ");
-        terminal_write_string(next_part == 0 ? "A" : "B");
+        terminal_write_string(next_part == 0 ? "A" : (next_part == 1 ? "B" : "Desconocido"));
         terminal_write_string(" en el proximo reinicio.\n\n");
     } else if (strcmp(subcmd, "confirm") == 0) {
         if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
