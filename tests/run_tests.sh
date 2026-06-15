@@ -419,7 +419,7 @@ rm tests/bench_userspace_string
 
 echo "---------------------------------------------------"
 echo "Running bench_userspace_strlen..."
-gcc -D__ETEROS_HOST_TEST__ tests/bench_userspace_strlen.c kernel/string.c -o tests/bench_userspace_strlen
+gcc -D__ETEROS_HOST_TEST__ tests/bench_userspace_strlen.c -o tests/bench_userspace_strlen
 ./tests/bench_userspace_strlen
 rm tests/bench_userspace_strlen
 
