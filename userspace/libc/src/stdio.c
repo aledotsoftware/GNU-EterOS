@@ -726,6 +726,13 @@ int fputs(const char *s, FILE *stream) {
     return 1;
 }
 
+int puts(const char *s) {
+    if (!s) return EOF;
+    if (fputs(s, stdout) == EOF) return EOF;
+    if (fputc('\n', stdout) == EOF) return EOF;
+    return 1;
+}
+
 void perror(const char *s) {
     if (s && *s) {
         dprintf(2, "%s: %s\n", s, strerror(errno));

@@ -2342,6 +2342,8 @@ static void setup_sigcontext(struct syscall_regs* regs,
     uint32_t block_mask = (uint32_t)sa_mask;
     if (!(sa_flags & SA_NODEFER)) {
         block_mask |= (1u << (sig - 1));
+    } else {
+        current->signal_mask &= ~(1u << (sig - 1));
     }
     block_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
     current->signal_mask |= block_mask;

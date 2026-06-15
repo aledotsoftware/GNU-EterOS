@@ -1,4 +1,3 @@
-section .text
 global _start
 
 extern main
@@ -130,3 +129,9 @@ __auxv_random: resq 1
 %ifidn __OUTPUT_FORMAT__, elf64
 section .note.GNU-stack noalloc noexec nowrite progbits
 %endif
+
+global _start
+
+extern main
+extern exit
+extern __run_atexit

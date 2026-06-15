@@ -22,10 +22,9 @@ static inline long syscall4_sig(long n, long a1, long a2, long a3, long a4) {
     return ret;
 }
 
-/* Trampoline for signal restoration */
-static void __restore_rt(void) {
-    __asm__ volatile ("mov $15, %rax\nsyscall");
-}
+
+
+extern void __restore_rt(void) __attribute__((visibility("hidden")));
 
 sighandler_t signal(int sig, sighandler_t handler) {
     struct sigaction act, oldact;

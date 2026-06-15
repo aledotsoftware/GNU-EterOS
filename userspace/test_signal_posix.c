@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <errno.h>
 
 static volatile int g_usr1_basic = 0;
 static volatile int g_usr2_once = 0;

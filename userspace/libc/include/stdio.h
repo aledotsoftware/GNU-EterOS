@@ -148,6 +148,7 @@ int   putc(int c, FILE *stream);
 int   ungetc(int c, FILE *stream);
 char *fgets(char *s, int size, FILE *stream);
 int   fputs(const char *s, FILE *stream);
+int   puts(const char *s);
 
 /* Error */
 void perror(const char *s);
