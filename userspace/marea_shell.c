@@ -632,7 +632,7 @@ static void draw_menu(void) {
 
     /* Header */
     draw_text(menu_x + MENU_PADDING + 4, menu_y + MENU_PADDING + 4, "Marea Shell", COL_ACCENT, 0);
-    draw_text(menu_x + MENU_PADDING + 4, menu_y + MENU_PADDING + 22, "v0.2.0 - eterOS", COL_TEXT_SECONDARY, 0);
+    draw_text(menu_x + MENU_PADDING + 4, menu_y + MENU_PADDING + 22, "v0.2.0 Genesis SMP", COL_TEXT_SECONDARY, 0);
 
     /* Separator */
     int sep_y = menu_y + 40 + MENU_PADDING;
@@ -995,7 +995,7 @@ static void term_execute(marea_window_t* win) {
 
         if (strcmp(argv[0], "help") == 0) {
             term_print(win, "\n", COL_TERM_FG);
-            term_print(win, "Marea Shell Terminal v0.2.0\n", COL_ACCENT);
+            term_print(win, "Marea Shell Terminal v0.2.0 Genesis SMP\n", COL_ACCENT);
             term_print(win, "Comandos internos: help, clear, echo, uname, cd, pwd, exit\n", COL_TERM_FG);
             term_print(win, "Comandos externos: se resuelven en /gnu/bin, /bin y /\n", COL_TERM_FG);
         } else if (strcmp(argv[0], "clear") == 0) {
@@ -1005,7 +1005,7 @@ static void term_execute(marea_window_t* win) {
             return;
         } else if (strcmp(argv[0], "uname") == 0) {
             term_print(win, "\n", COL_TERM_FG);
-            term_print(win, "eterOS Marea Shell v0.2.0\n", COL_ACCENT);
+            term_print(win, "eterOS Marea Shell v0.2.0 Genesis SMP\n", COL_ACCENT);
             term_print(win, "Compositor: Wayland-like (SHM)\n", COL_TERM_FG);
             term_print(win, "Arch: x86_64 Long Mode\n", COL_TERM_FG);
         } else if (strcmp(argv[0], "echo") == 0) {
@@ -1655,7 +1655,7 @@ static void redraw_all(void) {
                       windows[i].w - 2, windows[i].h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
             windows[i].term_cx = 0;
             windows[i].term_cy = 0;
-            term_print(&windows[i], "eterOS Marea Shell v0.2.0\n", COL_ACCENT);
+            term_print(&windows[i], "eterOS Marea Shell v0.2.0 Genesis SMP\n", COL_ACCENT);
             term_print(&windows[i], "Compositor: Wayland-like (SHM zero-copy)\n", COL_TEXT_SECONDARY);
             term_print(&windows[i], "Escribe 'help' para lista de comandos.\n\n", COL_TEXT_SECONDARY);
             term_draw_prompt(&windows[i]);
@@ -1721,7 +1721,7 @@ int main(int argc, char* argv[]) {
         draw_window_chrome(win);
         fill_rect(win->x + 1, win->y + TITLEBAR_HEIGHT + 1,
                   win->w - 2, win->h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
-        term_print(win, "eterOS Marea Shell v0.2.0\n", COL_ACCENT);
+        term_print(win, "eterOS Marea Shell v0.2.0 Genesis SMP\n", COL_ACCENT);
         term_print(win, "Compositor: Wayland-like (SHM zero-copy)\n", COL_TEXT_SECONDARY);
         term_print(win, "Escribe 'help' para lista de comandos.\n\n", COL_TEXT_SECONDARY);
         term_draw_prompt(win);

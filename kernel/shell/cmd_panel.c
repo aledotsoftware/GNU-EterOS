@@ -54,9 +54,9 @@ static void panel_mouse_callback(int8_t dx, int8_t dy, uint8_t buttons) {
 static void draw_panel_menu(void) {
     cmd_clear("");
     terminal_write_string("\n");
-    terminal_write_colored("  +----------------------------------------+\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    terminal_write_colored("  |    Panel de Control - eterOS v0.2.0    |\n", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-    terminal_write_colored("  +----------------------------------------+\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_write_colored("  +----------------------------------------------+\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_write_colored("  | Panel de Control - eterOS v0.2.0 Genesis SMP |\n", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_write_colored("  +----------------------------------------------+\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
     // Items are roughly at lines 4, 5, 6, 7, 8, 9, 10
     terminal_write_string("    [1] Configurar Teclado (Layout & Typematic)\n"); // Y=4

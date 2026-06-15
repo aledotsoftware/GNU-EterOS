@@ -1176,7 +1176,7 @@ body {
 .splash-title {
     font-size: 24px;
     font-weight: 600;
-    color: #0f172a;
+    color: #f8fafc; opacity: 0.8;
     letter-spacing: -0.5px;
 }
 

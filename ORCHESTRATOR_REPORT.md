@@ -19,7 +19,7 @@
 - **Kernel Boot / Memoria:** `pmm.c`, `vmm.c` estables y testeados. Identidad paginada funciona correctamente, y el allocator soporta `kmalloc_aligned` e inicializaciones limpias de hardware (ACPI).
 - **Task Scheduler & IPC:** `smp.c` inicializa APs. La sincronización basada en VFS (binder prototipo) y futex (`FUTEX_WAIT_BITSET`, `FUTEX_WAKE_BITSET`) madura y validada mediante host tests robustos que simulan carga.
 - **VFS / Filesystems:** Montajes extensos probados (`/dev`, `/proc`, `/tmp`, `fat32`, `jfs`, `shmfs`). ELF loader validado mitigando vulnerabilidades y soportando carga dinámica (`PT_DYNAMIC`).
-- **Control Panel & UI:** Subsistemas gráficos de minimizar ventanas (`hit_minimize_button`), UI web debounced y reportes de estado unificados mostrando "0.2.0 Genesis SMP" consistentemente.
+- **Control Panel & UI:** Subsistemas gráficos de minimizar ventanas (`hit_minimize_button`), UI web debounced y reportes de estado unificados mostrando "v0.2.0 Genesis SMP" consistentemente.
 - **Testing & CI:** Entornos QEMU headless verificados, validaciones de código rigurosas (`run_tests.sh` y `run_integration.sh` OK). Integración continua robusta y fiable.
 - **Syscalls GNU/Linux:** Implementaciones básicas POSIX sólidas. PTY ioctls han sido completados en un subconjunto. El subsistema **ya cuenta con soporte para job control signals (`SIGSTOP`, `SIGCONT`, `SIGCHLD`, `SIGTTIN`, `SIGTTOU`)**, implementado exitosamente en `kernel/arch/x86_64/syscall.c`. Además, se verificó el parsing del segmento ELF `PT_DYNAMIC`.
 
