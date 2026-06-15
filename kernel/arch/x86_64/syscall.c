@@ -2912,14 +2912,9 @@ static int64_t sys_exit_group(int status) {
     __builtin_unreachable();
 }
 
-static int64_t sys_vfork_wrapper(struct syscall_regs* regs) {
-    return task_fork((void*)regs);
-}
 
-static int64_t sys_rt_sigreturn_wrapper(struct syscall_regs* regs) {
-    sys_rt_sigreturn(regs);
-    return regs->rax; // Should not return if sigreturn succeeds, but if it does we return rax
-}
+
+
 static int64_t sys_munmap(void* addr, size_t len) {
     if ((uint64_t)addr % PAGE_SIZE != 0) return -EINVAL;
     if (len == 0) return -EINVAL;
