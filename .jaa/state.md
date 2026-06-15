@@ -27,3 +27,4 @@
 - **Aether Android Subsystem**:
   - Implemented core memory mapping interceptors in `sys_mmap` for Android compatibility. `/dev/binder` and `/dev/__properties__` now allocate correctly sized anonymous virtual memory mappings.
   - Gap analysis documentation and strategy roadmap (`ANDROID_ROADMAP.md` and `android_compat_gap.md`) mapped successfully. `/dev/ashmem` now properly bypasses static file mapping, operating natively as shared anonymous memory.
+- [x] Reviewed and fixed userspace login, user addition, deletion, and robust /etc/ configuration.

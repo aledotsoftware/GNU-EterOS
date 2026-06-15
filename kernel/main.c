@@ -238,18 +238,33 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
                 /* Copy initrd /etc contents to volatile shmfs /etc */
                 fs_node_t* initrd_etc = vfs_lookup(fs_root, "/etc");
-                char passwd_buf[128] = {0};
-                char shadow_buf[128] = {0};
-                char autologin_buf[2] = {0};
+                uint8_t* passwd_buf = NULL;
+                uint8_t* shadow_buf = NULL;
+                uint8_t* autologin_buf = NULL;
                 int p_len = 0, s_len = 0, a_len = 0;
 
                 if (initrd_etc) {
                     fs_node_t* p_node = vfs_lookup(fs_root, "/etc/passwd");
-                    if (p_node) p_len = read_fs(p_node, 0, sizeof(passwd_buf) - 1, (uint8_t*)passwd_buf);
+                    if (p_node) {
+                        p_len = p_node->length;
+                        passwd_buf = kmalloc(p_len + 1);
+                        if (passwd_buf) read_fs(p_node, 0, p_len, passwd_buf);
+                        else p_len = 0;
+                    }
                     fs_node_t* s_node = vfs_lookup(fs_root, "/etc/shadow");
-                    if (s_node) s_len = read_fs(s_node, 0, sizeof(shadow_buf) - 1, (uint8_t*)shadow_buf);
+                    if (s_node) {
+                        s_len = s_node->length;
+                        shadow_buf = kmalloc(s_len + 1);
+                        if (shadow_buf) read_fs(s_node, 0, s_len, shadow_buf);
+                        else s_len = 0;
+                    }
                     fs_node_t* a_node = vfs_lookup(fs_root, "/etc/autologin");
-                    if (a_node) a_len = read_fs(a_node, 0, sizeof(autologin_buf), (uint8_t*)autologin_buf);
+                    if (a_node) {
+                        a_len = a_node->length;
+                        autologin_buf = kmalloc(a_len + 1);
+                        if (autologin_buf) read_fs(a_node, 0, a_len, autologin_buf);
+                        else a_len = 0;
+                    }
                 }
 
                 vfs_mkdir("/etc", 0);
@@ -257,28 +272,32 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
                 fs_node_t* etc_node = vfs_lookup(fs_root, "/etc");
                 if (etc_node) {
-                    if (a_len > 0) {
+                    if (a_len > 0 && autologin_buf) {
                         create_fs(etc_node, "autologin", 0644);
                         fs_node_t* a_n = vfs_lookup(fs_root, "/etc/autologin");
-                        if (a_n) write_fs(a_n, 0, a_len, (uint8_t*)autologin_buf);
+                        if (a_n) write_fs(a_n, 0, a_len, autologin_buf);
                     } else {
                         create_fs(etc_node, "autologin", 0644);
                         fs_node_t* a_n = vfs_lookup(fs_root, "/etc/autologin");
                         if (a_n) write_fs(a_n, 0, 2, (uint8_t*)"1\n");
                     }
 
-                    if (p_len > 0) {
+                    if (p_len > 0 && passwd_buf) {
                         create_fs(etc_node, "passwd", 0644);
                         fs_node_t* p_n = vfs_lookup(fs_root, "/etc/passwd");
-                        if (p_n) write_fs(p_n, 0, p_len, (uint8_t*)passwd_buf);
+                        if (p_n) write_fs(p_n, 0, p_len, passwd_buf);
                     }
 
-                    if (s_len > 0) {
+                    if (s_len > 0 && shadow_buf) {
                         create_fs(etc_node, "shadow", 0600);
                         fs_node_t* s_n = vfs_lookup(fs_root, "/etc/shadow");
-                        if (s_n) write_fs(s_n, 0, s_len, (uint8_t*)shadow_buf);
+                        if (s_n) write_fs(s_n, 0, s_len, shadow_buf);
                     }
                 }
+
+                if (passwd_buf) kfree(passwd_buf);
+                if (shadow_buf) kfree(shadow_buf);
+                if (autologin_buf) kfree(autologin_buf);
 
                 mkdir_fs(writable_fs, "bin", 0755);
                 mkdir_fs(writable_fs, "lib", 0755);

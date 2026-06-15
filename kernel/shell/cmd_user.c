@@ -182,7 +182,10 @@ static void remove_user_from_vfs_file(const char* filepath, const char* username
     }
     temp_name[len++] = '.'; temp_name[len++] = 't'; temp_name[len++] = 'm'; temp_name[len++] = 'p'; temp_name[len] = '\0';
 
-    create_fs(etc_node, temp_name, 0600);
+    int is_shadow = 0;
+    if (filepath[5] == 's' && filepath[6] == 'h') is_shadow = 1;
+
+    create_fs(etc_node, temp_name, is_shadow ? 0600 : 0644);
 
     char temp_path[64];
     len = 0;

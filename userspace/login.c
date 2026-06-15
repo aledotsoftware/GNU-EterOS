@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
         printf("eterOS login: ");
         fflush(stdout);
         int len = read(0, username, sizeof(username) - 1);
-        if (len <= 0) continue;
+        if (len <= 0) break; /* Cleanly handle EOF/closed stdin */
         username[len] = '\0';
         if (username[len-1] == '\n') username[len-1] = '\0';
         if (strlen(username) == 0) continue;
@@ -94,8 +94,9 @@ int main(int argc, char *argv[]) {
         printf("Password: ");
         fflush(stdout);
         len = read(0, password, sizeof(password) - 1);
-        if (len <= 0) {
-            len = 0;
+        if (len < 0) {
+            break; /* Cleanly exit on error */
+        } else if (len == 0) {
             password[0] = '\0';
         } else {
             password[len] = '\0';

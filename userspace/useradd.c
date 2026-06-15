@@ -125,8 +125,9 @@ int main(int argc, char *argv[]) {
     write(fd, shadow_entry, strlen(shadow_entry));
     close(fd);
 
-    /* Enforce shadow file permissions */
+    /* Enforce file permissions */
     chmod("/etc/shadow", 0600);
+    chmod("/etc/passwd", 0644);
 
     printf("User '%s' created successfully.\n", username);
     return 0;
