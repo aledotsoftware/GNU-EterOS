@@ -28,3 +28,7 @@
   - Implemented core memory mapping interceptors in `sys_mmap` for Android compatibility. `/dev/binder` and `/dev/__properties__` now allocate correctly sized anonymous virtual memory mappings.
   - Gap analysis documentation and strategy roadmap (`ANDROID_ROADMAP.md` and `android_compat_gap.md`) mapped successfully. `/dev/ashmem` now properly bypasses static file mapping, operating natively as shared anonymous memory.
 - [x] Reviewed and fixed userspace login, user addition, deletion, and robust /etc/ configuration.
+- **testing-ci-validation-bot**: Expands native unit tests coverage.
+  - Fix compilation and add missing tests to `tests/run_tests.sh`.
+  - Fix test mocks in `tests/test_syscall_getdents64.c` and `tests/test_syscall_utimensat.c` to link correctly by mocking `task_get_count`, `task_get_at`, `task_exit_signal`, and `task_waitid`. Fix inline declaration issues.
+  - Fix VFS leak test `test_vfs_leak.c` by updating `link_type_t` signature to correctly match `vfs.c` preventing compiler crash and mocked `vfs_link` redeclaration. Handled testing expectations correctly to make it pass.

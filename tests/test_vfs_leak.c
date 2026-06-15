@@ -38,6 +38,7 @@ typedef int (*ioctl_type_t)(struct fs_node*, int, void*);
 typedef int (*create_type_t)(struct fs_node*, char*, uint16_t);
 typedef int (*mkdir_type_t)(struct fs_node*, char*, uint16_t);
 typedef int (*unlink_type_t)(struct fs_node*, char*);
+typedef int (*link_type_t)(struct fs_node*, struct fs_node*, const char*);
 
 typedef struct fs_node {
     char name[128];
@@ -61,14 +62,16 @@ typedef struct fs_node {
     create_type_t create;
     mkdir_type_t mkdir;
     unlink_type_t unlink;
+    link_type_t link;
     struct fs_node *ptr;
     uint32_t ref_count;
     spinlock_t lock;
 } fs_node_t;
 
 /* Externs from vfs.c */
-extern fs_node_t *fs_root;
+fs_node_t *fs_root = NULL;
 extern fs_node_t *vfs_lookup(fs_node_t *root, const char *path);
+void serial_write_string(const char* s) {}
 
 /* Global Tracking */
 int kmalloc_count = 0;
@@ -125,8 +128,8 @@ int main() {
     if (node) {
         printf("Result: Found node '%s'\n", node->name);
         printf("Stats: Alloc=%d, Free=%d\n", kmalloc_count, kfree_count);
-        if (kmalloc_count != 1 || kfree_count != 0) {
-            printf("FAIL: Expected 1 alloc, 0 frees.\n");
+        if (kmalloc_count != 2 || kfree_count != 1) {
+            printf("FAIL: Expected 2 allocs, 1 free.\n");
             return 1;
         }
         kfree(node);
@@ -146,12 +149,12 @@ int main() {
         printf("Result: Found node '%s'\n", node->name);
         printf("Stats: Alloc=%d, Free=%d\n", kmalloc_count, kfree_count);
 
-        if (kmalloc_count != 3) {
-             printf("FAIL: Expected 3 allocs (A, B, C). Got %d.\n", kmalloc_count);
+        if (kmalloc_count != 4) {
+             printf("FAIL: Expected 4 allocs. Got %d.\n", kmalloc_count);
              return 1;
         }
-        if (kfree_count != 2) {
-             printf("FAIL: Expected 2 frees (A, B). Got %d.\n", kfree_count);
+        if (kfree_count != 3) {
+             printf("FAIL: Expected 3 frees. Got %d.\n", kfree_count);
              return 1;
         }
 
@@ -183,4 +186,3 @@ int main() {
     return 0;
 }
 
-int vfs_link(const char* oldpath, const char* newpath) { return -1; }

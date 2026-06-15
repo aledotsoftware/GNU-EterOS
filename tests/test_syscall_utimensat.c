@@ -43,10 +43,14 @@ int vfs_link(const char* oldpath, const char* newpath) { return -1; }
 task_t* task_get_current(void) { return &current_task_mock; }
 cpu_info_t* get_current_cpu(void) { return &cpus[0]; }
 int get_cpu_id(void) { return 0; }
+int task_get_count(void) { return 1; }
+task_t* task_get_at(int idx) { return NULL; }
+void task_exit_signal(int sig) {}
+int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { return -1; }
 void task_exit(int status) { exit(status); }
 void task_yield(void) {}
 void schedule(void) {}
-void context_switch(uint64_t* old, uint64_t new, void* fpu1, void* fpu2) {}
+void context_switch(uint64_t* old, uint64_t* new, void* fpu1, void* fpu2) {}
 void tss_set_rsp0(uint64_t rsp) {}
 void serial_write_string(const char* s) {}
 void* kmalloc(size_t size) { return malloc(size); }
