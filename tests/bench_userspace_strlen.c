@@ -1,4 +1,4 @@
-#define __ETEROS_HOST_TEST__
+// #define __ETEROS_HOST_TEST__
 
 /* Use absolute paths to avoid shadowing by -Iuserspace/libc/include */
 #include "/usr/include/stdio.h"

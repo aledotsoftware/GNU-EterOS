@@ -5,10 +5,10 @@ echo "Building and running tests..."
 
 # Test Heap
 echo "---------------------------------------------------"
-# echo "Running test_heap..."
-# gcc -D__ETEROS_HOST_TEST__ tests/test_heap.c -o tests/test_heap
-# ./tests/test_heap
-# rm tests/test_heap
+echo "Running test_heap..."
+gcc -D__ETEROS_HOST_TEST__ tests/test_heap.c -o tests/test_heap
+./tests/test_heap
+rm tests/test_heap
 
 # Test String
 echo "---------------------------------------------------"
@@ -392,3 +392,39 @@ echo "Running test_acpi_s5..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_acpi_s5.c kernel/string.c -o tests/test_acpi_s5
 ./tests/test_acpi_s5
 rm tests/test_acpi_s5
+
+echo "---------------------------------------------------"
+echo "Running test_strnlen_opt..."
+gcc -D__ETEROS_HOST_TEST__ tests/test_strnlen_opt.c kernel/string.c -o tests/test_strnlen_opt
+./tests/test_strnlen_opt
+rm tests/test_strnlen_opt
+
+echo "---------------------------------------------------"
+echo "Running bench_strchr..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_strchr.c kernel/string.c -o tests/bench_strchr
+./tests/bench_strchr
+rm tests/bench_strchr
+
+echo "---------------------------------------------------"
+echo "Running bench_userspace_strcmp..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_userspace_strcmp.c -o tests/bench_userspace_strcmp
+./tests/bench_userspace_strcmp
+rm tests/bench_userspace_strcmp
+
+echo "---------------------------------------------------"
+echo "Running bench_userspace_string..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_userspace_string.c -o tests/bench_userspace_string
+./tests/bench_userspace_string
+rm tests/bench_userspace_string
+
+echo "---------------------------------------------------"
+echo "Running bench_userspace_strlen..."
+gcc -D__ETEROS_HOST_TEST__ tests/bench_userspace_strlen.c -o tests/bench_userspace_strlen
+./tests/bench_userspace_strlen
+rm tests/bench_userspace_strlen
+
+echo "---------------------------------------------------"
+echo "Running test_clipping..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_clipping.c kernel/string.c -o tests/test_clipping
+./tests/test_clipping
+rm tests/test_clipping
