@@ -67,7 +67,5 @@ void sem_signal(sem_t* sem) {
     spin_unlock(&sem->lock);
 
     /* Restore interrupts if they were enabled */
-    if (rflags & 0x200) { /* IF bit is bit 9 (0x200) */
-        hal_interrupts_enable();
-    }
+    task_irq_restore(rflags);
 }

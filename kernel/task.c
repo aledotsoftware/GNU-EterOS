@@ -433,6 +433,7 @@ void task_init_ap(void) {
         strlcat(name, buf, 32);
 
         cpu->current_task = &tasks[slot];
+        cpu->idle_task = &tasks[slot];
         cpu->sched_ticks = 0;
         /* Set RSP0 in TSS for this AP (using its current stack top) */
         tss_set_rsp0(cpu->kernel_stack_top);
@@ -680,7 +681,7 @@ void schedule(void) {
     if (next_task == NULL) {
         cpu_idle_ticks++;
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
 
         /* Wait for interrupts and loop until a task is ready */
         for(;;) {
@@ -691,12 +692,16 @@ void schedule(void) {
         }
 
         /* Re-acquire lock and find the new task */
-        __asm__ volatile("cli");
+        irq_flags = task_irq_save();
         spin_lock(&sched_lock);
         next_task = find_next_task(current);
         if (next_task == NULL) {
              /* Fallback to kernel idle task to prevent running on a dead task's stack */
-             next_task = &tasks[0];
+             if (cpu->idle_task) {
+                 next_task = (task_t*)cpu->idle_task;
+             } else {
+                 next_task = &tasks[0];
+             }
         }
     }
 
@@ -709,7 +714,7 @@ void schedule(void) {
         dequeue_sleep(current);
         current->wake_tick = 0;
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return;
     }
 
@@ -718,7 +723,7 @@ void schedule(void) {
         cpu->sched_ticks++;
         if (cpu->sched_ticks < SCHEDULER_HZ) {
             spin_unlock(&sched_lock);
-            __asm__ volatile("sti");
+            task_irq_restore(irq_flags);
             return;
         }
     }
@@ -938,7 +943,7 @@ static void task_exit_internal(int status, int wait_status, int wait_code) {
         }
     }
 
-    __asm__ volatile("cli");
+    uint64_t irq_flags = task_irq_save();
     spin_lock(&sched_lock);
 
     serial_write_string("[SCHED] Tarea terminada: ");
@@ -959,12 +964,11 @@ static void task_exit_internal(int status, int wait_status, int wait_code) {
     task_wake_parent_waiter(current);
 
     spin_unlock(&sched_lock);
-    __asm__ volatile("sti");
+    task_irq_restore(irq_flags);
 
     /* Yield forever until switched out */
     schedule();
     
-    __asm__ volatile("sti");
     for (;;) { __asm__ volatile("hlt"); }
 }
 
@@ -997,7 +1001,7 @@ int task_get_count(void) {
 int task_kill(uint32_t pid) {
     if (pid == 0) return -1; /* No matar kernel */
     
-    __asm__ volatile("cli");
+    uint64_t irq_flags = task_irq_save();
     spin_lock(&sched_lock);
 
     task_t* current = task_get_current();
@@ -1028,7 +1032,7 @@ int task_kill(uint32_t pid) {
     }
 
     spin_unlock(&sched_lock);
-    __asm__ volatile("sti");
+    task_irq_restore(irq_flags);
 
     if (found) {
         if (killed_self) {
@@ -1081,19 +1085,19 @@ int task_get_cpu_load(void) {
 int task_fork(void* regs_ptr) {
     struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;
 
-    __asm__ volatile("cli");
+    uint64_t irq_flags = task_irq_save();
     spin_lock(&sched_lock);
 
     /* 1. Find slot */
     if (task_count >= MAX_TASKS) {
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
     int slot = find_free_slot();
     if (slot == -1) {
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
 
@@ -1102,7 +1106,7 @@ int task_fork(void* regs_ptr) {
     if (!stack) {
         task_bitmap &= ~(1ULL << slot);
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
     /* Note: alloc_kernel_stack already memsets to 0 */
@@ -1122,11 +1126,11 @@ int task_fork(void* regs_ptr) {
     /* 4. Clone Address Space (CoW) */
     /* Release lock to avoid deadlock during TLB shootdowns or heavy VM activity */
     spin_unlock(&sched_lock);
-    __asm__ volatile("sti");
+    task_irq_restore(irq_flags);
 
     uint64_t child_cr3 = vmm_clone_pml4(1);
 
-    __asm__ volatile("cli");
+    irq_flags = task_irq_save();
     spin_lock(&sched_lock);
     tasks[slot].cr3 = child_cr3;
 
@@ -1211,7 +1215,7 @@ int task_fork(void* regs_ptr) {
 
     enqueue_ready(&tasks[slot]);
     spin_unlock(&sched_lock);
-    __asm__ volatile("sti");
+    task_irq_restore(irq_flags);
 
     serial_write_string("[SCHED] Forked process PID ");
     /* ... log pid ... */
@@ -1237,18 +1241,18 @@ int task_fork(void* regs_ptr) {
 int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, uint32_t* child_tid, uint64_t tls, struct syscall_regs* regs_ptr) {
     struct syscall_regs* regs = (struct syscall_regs*)regs_ptr;
 
-    __asm__ volatile("cli");
+    uint64_t irq_flags = task_irq_save();
     spin_lock(&sched_lock);
 
     if (task_count >= MAX_TASKS) {
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
     int slot = find_free_slot();
     if (slot == -1) {
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
 
@@ -1256,7 +1260,7 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     if (!stack) {
         task_bitmap &= ~(1ULL << slot);
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         return -1;
     }
 
@@ -1292,11 +1296,11 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     } else {
         /* Release lock to avoid deadlock during TLB shootdowns or heavy VM activity */
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
 
         uint64_t child_cr3 = vmm_clone_pml4(1);
 
-        __asm__ volatile("cli");
+        irq_flags = task_irq_save();
         spin_lock(&sched_lock);
         tasks[slot].cr3 = child_cr3;
     }
@@ -1408,7 +1412,7 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
 
     enqueue_ready(&tasks[slot]);
     spin_unlock(&sched_lock);
-    __asm__ volatile("sti");
+    task_irq_restore(irq_flags);
 
     return tasks[slot].id;
 }
@@ -1479,7 +1483,7 @@ int task_waitpid(int pid, int* status, int options) {
         int event_status = 0;
         int event_slot = -1;
 
-        __asm__ volatile("cli");
+        uint64_t irq_flags = task_irq_save();
         spin_lock(&sched_lock);
 
         for (int i = 0; i < MAX_TASKS; i++) {
@@ -1519,7 +1523,7 @@ int task_waitpid(int pid, int* status, int options) {
                  }
                  if (is_active) {
                      spin_unlock(&sched_lock);
-                     __asm__ volatile("sti");
+                     task_irq_restore(irq_flags);
                      task_sleep(10);
                      continue;
                  }
@@ -1534,7 +1538,7 @@ int task_waitpid(int pid, int* status, int options) {
              }
 
              spin_unlock(&sched_lock);
-             __asm__ volatile("sti");
+             task_irq_restore(irq_flags);
 
              if (status) {
                  *status = event_status;
@@ -1544,19 +1548,19 @@ int task_waitpid(int pid, int* status, int options) {
 
         if (!found_child) {
              spin_unlock(&sched_lock);
-             __asm__ volatile("sti");
+             task_irq_restore(irq_flags);
              /* ECHILD = 10 */
              return -10;
         }
 
         if (options & WNOHANG) {
              spin_unlock(&sched_lock);
-             __asm__ volatile("sti");
+             task_irq_restore(irq_flags);
              return 0;
         }
 
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
 
         task_sleep(100); /* Poll every 100ms */
     }
@@ -1576,7 +1580,7 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
         int event_status = 0;
         int event_code = 0;
 
-        __asm__ volatile("cli");
+        uint64_t irq_flags = task_irq_save();
         spin_lock(&sched_lock);
 
         for (int i = 0; i < MAX_TASKS; i++) {
@@ -1595,7 +1599,7 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
                 if ((int)t->pgid != wanted) continue;
             } else if (idtype != P_ALL) {
                 spin_unlock(&sched_lock);
-                __asm__ volatile("sti");
+                task_irq_restore(irq_flags);
                 return -22; /* -EINVAL */
             }
 
@@ -1631,7 +1635,7 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
                 }
                 if (is_active) {
                     spin_unlock(&sched_lock);
-                    __asm__ volatile("sti");
+                    task_irq_restore(irq_flags);
                     task_sleep(10);
                     continue;
                 }
@@ -1644,7 +1648,7 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
                 }
             }
             spin_unlock(&sched_lock);
-            __asm__ volatile("sti");
+            task_irq_restore(irq_flags);
 
             if (out_pid) *out_pid = event_pid;
             if (out_status) *out_status = event_status;
@@ -1654,13 +1658,13 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
 
         if (!found_child) {
             spin_unlock(&sched_lock);
-            __asm__ volatile("sti");
+            task_irq_restore(irq_flags);
             return -10; /* -ECHILD */
         }
 
         if (options & WNOHANG) {
             spin_unlock(&sched_lock);
-            __asm__ volatile("sti");
+            task_irq_restore(irq_flags);
             if (out_pid) *out_pid = 0;
             if (out_status) *out_status = 0;
             if (out_code) *out_code = 0;
@@ -1668,7 +1672,7 @@ int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, 
         }
 
         spin_unlock(&sched_lock);
-        __asm__ volatile("sti");
+        task_irq_restore(irq_flags);
         task_sleep(100);
     }
 }
