@@ -38,7 +38,7 @@
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`testing-ci-validation-bot`**: Expandir la cobertura de tests unitarios nativos de host.
+1. **`vision-cli-agent`**: Mejoras visuales guiadas por CLI para UI/docs/código visible.
 
 ---
 
@@ -62,3 +62,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - **2026-06-12 (Update):** El Orchestrator Meta-Agent verificó el correcto funcionamiento de PT_DYNAMIC y mmap sobre DRM. El siguiente objetivo prioritario delegado es expandir soporte lwIP y syscalls de socket a cargo del `network-socket-api-bot`.
 - **2026-06-13 (Update):** El Orchestrator Meta-Agent auditó el avance de sys_recvmsg, sys_sendmsg y sys_shutdown usando syscalls a lwIP. Los tests pasan exitosamente y se procedió a marcar `network-socket-api-bot` como completado, designando a `vfs-posix-filesystem-bot` (Atomic Commits en JFS) como el siguiente bloqueante principal.
 - **2026-06-13 (Update 2):** El Orchestrator Meta-Agent auditó el driver JFS. El `vfs-posix-filesystem-bot` ha implementado satisfactoriamente los true atomic multi-block commits en `kernel/fs/jfs.c`. Build y tests nativos (`test_jfs.c`) pasan exitosamente. El objetivo principal se traslada ahora al `testing-ci-validation-bot` para expandir tests unitarios.
+- **2026-06-14 (Update):** El Orchestrator Meta-Agent verificó que el `testing-ci-validation-bot` expandió exitosamente la cobertura de tests unitarios nativos de host. Se resolvieron errores de compilación y mocks faltantes en varios tests como `test_syscall_getdents64.c`, `test_syscall_utimensat.c`, y `test_vfs_leak.c` y se incluyeron en el test runner. El objetivo crítico delegado es la implementación de pulido visual y documentación, a cargo del `vision-cli-agent`.

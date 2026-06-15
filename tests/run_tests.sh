@@ -428,3 +428,27 @@ echo "Running test_clipping..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_clipping.c kernel/string.c -o tests/test_clipping
 ./tests/test_clipping
 rm tests/test_clipping
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_getdents64..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_syscall_getdents64.c tests/mock_pmm.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_getdents64
+./tests/test_syscall_getdents64
+rm tests/test_syscall_getdents64
+
+echo "---------------------------------------------------"
+echo "Running test_syscall_utimensat..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_syscall_utimensat.c tests/mock_pmm.c -o tests/test_syscall_utimensat
+./tests/test_syscall_utimensat
+rm tests/test_syscall_utimensat
+
+echo "---------------------------------------------------"
+
+echo "---------------------------------------------------"
+
+echo "---------------------------------------------------"
+echo "Running test_vfs_leak..."
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_vfs_leak.c tests/mock_pmm.c kernel/string.c -o tests/test_vfs_leak
+if [ -f tests/test_vfs_leak ]; then
+    ./tests/test_vfs_leak
+    rm tests/test_vfs_leak
+fi
