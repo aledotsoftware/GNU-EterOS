@@ -24,3 +24,6 @@
   - Refactored Playwright verification scripts (`verification/verify_*.py`) to use portable, `__file__`-based relative paths, resolving directory execution dependency bugs and standardizing the automated QA pipeline for web-ui components.
 - **Vision CLI**: Applied visual polish to EterOS web_ui, Marea Shell, Eterland, and cmd_panel. Cleaned up web UI menu alignment (flexbox, padding), added basic icons, fixed CSS hover gradients. Updated README and ORCHESTRATOR_REPORT to reflect visual updates. Verified using Playwright screenshots.
 - **Orchestrator**: Verified true atomic multi-block commits in JFS. Assigned native test expansion to testing-ci-validation-bot.
+- **Aether Android Subsystem**:
+  - Implemented core memory mapping interceptors in `sys_mmap` for Android compatibility. `/dev/binder` and `/dev/__properties__` now allocate correctly sized anonymous virtual memory mappings.
+  - Gap analysis documentation and strategy roadmap (`ANDROID_ROADMAP.md` and `android_compat_gap.md`) mapped successfully. `/dev/ashmem` now properly bypasses static file mapping, operating natively as shared anonymous memory.

@@ -17,11 +17,13 @@ While EterOS currently maps a growing subset of x86_64 Linux syscalls, Android (
 - **Action:** Move basic Binder definitions into standard compatibility headers (`include/linux_compat.h`).
 - **Action:** Expose `/dev/ashmem` and `/dev/__properties__` character devices in `devfs` with stubbed behaviors.
 - **Action:** Implement `sys_prctl` with support for `PR_SET_NAME` and `PR_SET_VMA` to satisfy Bionic's linker and memory allocation routines.
+- **Action:** Implement basic memory mapping support for `/dev/binder`, `/dev/ashmem`, and `/dev/__properties__` in `sys_mmap`.
 
 ### 3.2. Phase 2: Memory & Threading
 - **Action:** Map the Bionic Thread Local Storage (TLS) expectations to EterOS's `sys_arch_prctl`.
 - **Action:** Expand `sys_clone` and `futex` implementations to strictly handle Bionic's synchronization and thread ID lifecycle.
 - **Action:** Emulate Android properties mapping in memory to allow Bionic to read `ro.*` properties safely.
+- **Action:** Upgrade the Binder routing mechanism from the basic static payload-copy shim to proper memory mapping for transaction data transfer.
 
 ### 3.3. Phase 3: Binder Routing & Native Binaries
 - **Action:** Transition the `/dev/binder` stub into a functional message router inside the kernel, allowing `servicemanager` to start and register services.

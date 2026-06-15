@@ -602,7 +602,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         } else if (is_shmfs && shm_obj) {
             /* Map shared physical pages */
             uint32_t page_idx = (offset + (v - start)) / PAGE_SIZE;
-            
+
             spin_lock(&shm_obj->lock);
             if (page_idx < shm_obj->page_count && shm_obj->pages[page_idx]) {
                 uint64_t phys = shm_obj->pages[page_idx];
@@ -622,26 +622,22 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
             hal_mem_map((uint64_t)phys, v, map_flags);
-#ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
-#endif
         } else if (is_properties) {
             /* __properties__ VMA - Map anonymous page and copy dummy properties */
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
             hal_mem_map((uint64_t)phys, v, map_flags);
-#ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
             if (v == start) {
                 const char* dummy_props = "ro.build.version.sdk=29\nro.debuggable=1\n";
                 memcpy((void*)v, dummy_props, strlen(dummy_props));
             }
-#endif
         } else {
             /* File-backed mapping or Anonymous */
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
-            
+
             hal_mem_map((uint64_t)phys, v, map_flags);
 #ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
@@ -864,10 +860,10 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
             if (!filename) { kfree(parent_path); kfree(kpath); return -ENOMEM; }
 
             if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
-            
+
             fs_node_t* parent = vfs_lookup(fs_root, parent_path);
             if (!parent) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENOENT; }
-            
+
             /* SECURITY FIX: Require Write & Execute permission on parent dir for node creation */
             if (!check_node_permission(parent, 2 | 1)) {
                 kfree(parent); kfree(filename); kfree(parent_path); kfree(kpath); return -EACCES;
@@ -978,7 +974,7 @@ static int64_t sys_mkdir(const char* path, int mode) {
 static int64_t sys_linkat(int olddirfd, const char* oldpath, int newdirfd, const char* newpath, int flags) {
     (void)flags;
     if (!vmm_verify_user_access(oldpath, 1, 0) || !vmm_verify_user_access(newpath, 1, 0)) return -EFAULT;
-    
+
     char* kold = (char*)kmalloc(256);
     char* knew = (char*)kmalloc(256);
     if (!kold || !knew) { kfree(kold); kfree(knew); return -ENOMEM; }
