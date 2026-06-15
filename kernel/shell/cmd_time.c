@@ -95,9 +95,10 @@ void cmd_ntp(const char* args) {
         // lwIP stack in our wrapper expects host byte order too for sin_addr
         addr.sin_addr = bswap_32(resolved_ip);
     } else {
-        terminal_write_string("  [NTP] Resolucion DNS fallo.\n");
-        sys_lwip_close(sock);
-        return;
+        terminal_write_string("  [NTP] Resolucion DNS fallo. Usando IP de respaldo (162.159.200.1)...\n");
+        // Fallback to pool.ntp.org IP (162.159.200.1) in network byte order
+        addr.sin_addr = ((162U << 24) | (159U << 16) | (200U << 8) | 1U);
+        addr.sin_addr = bswap_32(addr.sin_addr);
     }
 
     if (sys_lwip_connect(sock, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {

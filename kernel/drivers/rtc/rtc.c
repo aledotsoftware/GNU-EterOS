@@ -12,23 +12,44 @@
 static int8_t current_timezone = -3; // Default UTC-3 (Argentina)
 
 static int rtc_is_updating() {
+#ifndef __ETEROS_HOST_TEST__
+    uint64_t flags;
+    __asm__ volatile("pushfq; pop %0; cli" : "=r"(flags));
+#endif
     outb(CMOS_ADDRESS, 0x0A | 0x80); // Disable NMI
     int ret = (inb(CMOS_DATA) & 0x80);
     outb(CMOS_ADDRESS, 0x0A);        // Re-enable NMI
+#ifndef __ETEROS_HOST_TEST__
+    __asm__ volatile("push %0; popfq" :: "r"(flags));
+#endif
     return ret;
 }
 
 static unsigned char rtc_read_register(int reg) {
+#ifndef __ETEROS_HOST_TEST__
+    uint64_t flags;
+    __asm__ volatile("pushfq; pop %0; cli" : "=r"(flags));
+#endif
     outb(CMOS_ADDRESS, reg | 0x80); // Disable NMI
     unsigned char ret = inb(CMOS_DATA);
     outb(CMOS_ADDRESS, reg);        // Re-enable NMI
+#ifndef __ETEROS_HOST_TEST__
+    __asm__ volatile("push %0; popfq" :: "r"(flags));
+#endif
     return ret;
 }
 
 static void rtc_write_register(int reg, unsigned char val) {
+#ifndef __ETEROS_HOST_TEST__
+    uint64_t flags;
+    __asm__ volatile("pushfq; pop %0; cli" : "=r"(flags));
+#endif
     outb(CMOS_ADDRESS, reg | 0x80); // Disable NMI
     outb(CMOS_DATA, val);
     outb(CMOS_ADDRESS, reg);        // Re-enable NMI
+#ifndef __ETEROS_HOST_TEST__
+    __asm__ volatile("push %0; popfq" :: "r"(flags));
+#endif
 }
 
 void rtc_init(void) {

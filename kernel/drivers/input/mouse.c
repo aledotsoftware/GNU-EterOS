@@ -134,28 +134,23 @@ void mouse_process_byte(uint8_t byte) {
         static int32_t mouse_acc_x = 0;
         static int32_t mouse_acc_y = 0;
 
-        mouse_acc_x += dx;
-        mouse_acc_y += dy;
-
         // Apply sensitivity (default 5, lower is slower, higher is faster)
+        int32_t multiplier = 256;
         if (mouse_sensitivity < 5) {
-            dx = (mouse_acc_x * mouse_sensitivity) / 5;
-            dy = (mouse_acc_y * mouse_sensitivity) / 5;
-            mouse_acc_x -= (dx * 5) / mouse_sensitivity;
-            mouse_acc_y -= (dy * 5) / mouse_sensitivity;
+            multiplier = (mouse_sensitivity * 256) / 5;
         } else if (mouse_sensitivity > 5) {
             int32_t factor = mouse_sensitivity - 3;
-            dx = (mouse_acc_x * factor) / 2;
-            dy = (mouse_acc_y * factor) / 2;
-            // Only consume what was actually processed by the division
-            mouse_acc_x -= (dx * 2) / factor;
-            mouse_acc_y -= (dy * 2) / factor;
-        } else {
-            dx = mouse_acc_x;
-            dy = mouse_acc_y;
-            mouse_acc_x = 0;
-            mouse_acc_y = 0;
+            multiplier = (factor * 256) / 2;
         }
+
+        mouse_acc_x += dx * multiplier;
+        mouse_acc_y += dy * multiplier;
+
+        dx = mouse_acc_x / 256;
+        dy = mouse_acc_y / 256;
+
+        mouse_acc_x -= dx * 256;
+        mouse_acc_y -= dy * 256;
 
         // Apply handedness swap
         if (mouse_left_handed) {
