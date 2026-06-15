@@ -32,3 +32,4 @@
   - Fix compilation and add missing tests to `tests/run_tests.sh`.
   - Fix test mocks in `tests/test_syscall_getdents64.c` and `tests/test_syscall_utimensat.c` to link correctly by mocking `task_get_count`, `task_get_at`, `task_exit_signal`, and `task_waitid`. Fix inline declaration issues.
   - Fix VFS leak test `test_vfs_leak.c` by updating `link_type_t` signature to correctly match `vfs.c` preventing compiler crash and mocked `vfs_link` redeclaration. Handled testing expectations correctly to make it pass.
+- **Orchestrator**: Verified integration tests (`tests/run_integration.sh`) utilizing `qemu-system-x86` for Headless boot verification (64MB, 128MB, 512MB RAM). Updated `ORCHESTRATOR_REPORT.md` to reflect warning resolutions needed by the next assigned agent `vision-cli-agent`.

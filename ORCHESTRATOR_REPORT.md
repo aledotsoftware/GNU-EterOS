@@ -1,11 +1,17 @@
 # eterOS Orchestrator Meta-Agent Audit Report
 
 ## 1. Estado Actual de Compilación y Ejecución
-**Fecha:** 2026-06-12 (Auditado)
+**Fecha:** 2026-06-15 (Auditado)
 **Commit auditado:** HEAD
 **Versión Actualizada:** 0.2.0 Genesis SMP (UI Polished)
 
 ### ✅ Resultados de Verificación
+### ⚠️ Advertencias de Compilación
+Durante el build del kernel x86_64, se detectaron las siguientes advertencias menores:
+- Variables sin usar en `kernel/shell/cmd_ota.c` (`boot_part`) y `kernel/fs/initrd.c` (`virtual_dirs_count`).
+- Comparación de distintos signos en `kernel/fs/devfs.c` (`request == ASHMEM_GET_NAME`).
+- Comparación siempre verdadera en `kernel/fs/procfs.c` relacionada con la validación de arreglos en estructuras `task_t`.
+
 - **Make all (Build):** Éxito. Kernel compilado a `build/kernel.bin` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP.
 - **Make clean:** Éxito. Funciona correctamente eliminando artefactos (como `.o` y `build/`) sin borrar código fuente rastreado en git.
 - **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente. La remoción del uso de `|| true` del script de testeo ha sido comprobada, garantizando rigor total en el entorno de integración contínua (CI).
@@ -38,7 +44,8 @@
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`vision-cli-agent`**: Mejoras visuales guiadas por CLI para UI/docs/código visible.
+1. **`vision-cli-agent`**: Resolver warnings del compilador (variables sin uso, comparaciones de signo, punteros a arrays) para mantener clean build.
+2. Continuar con las mejoras visuales guiadas por CLI para UI/docs/código visible y pulido del shell/compositor (`test_compositor`, `shell_internal.h`).
 
 ---
 
@@ -63,3 +70,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - **2026-06-13 (Update):** El Orchestrator Meta-Agent auditó el avance de sys_recvmsg, sys_sendmsg y sys_shutdown usando syscalls a lwIP. Los tests pasan exitosamente y se procedió a marcar `network-socket-api-bot` como completado, designando a `vfs-posix-filesystem-bot` (Atomic Commits en JFS) como el siguiente bloqueante principal.
 - **2026-06-13 (Update 2):** El Orchestrator Meta-Agent auditó el driver JFS. El `vfs-posix-filesystem-bot` ha implementado satisfactoriamente los true atomic multi-block commits en `kernel/fs/jfs.c`. Build y tests nativos (`test_jfs.c`) pasan exitosamente. El objetivo principal se traslada ahora al `testing-ci-validation-bot` para expandir tests unitarios.
 - **2026-06-14 (Update):** El Orchestrator Meta-Agent verificó que el `testing-ci-validation-bot` expandió exitosamente la cobertura de tests unitarios nativos de host. Se resolvieron errores de compilación y mocks faltantes en varios tests como `test_syscall_getdents64.c`, `test_syscall_utimensat.c`, y `test_vfs_leak.c` y se incluyeron en el test runner. El objetivo crítico delegado es la implementación de pulido visual y documentación, a cargo del `vision-cli-agent`.
+- **2026-06-15 (Update):** El Orchestrator Meta-Agent verificó una compilación general y la correcta ejecución en el test runner nativo, así como en integración QEMU Headless (64MB, 128MB, 512MB RAM). Se detectaron advertencias menores del compilador GCC. El próximo ciclo asignado es al `vision-cli-agent` para depurar dichos warnings de `cmd_ota.c`, `devfs.c`, `initrd.c` y `procfs.c`, así como progresar en pulidos de UI y docs.

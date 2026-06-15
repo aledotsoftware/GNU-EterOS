@@ -7,7 +7,7 @@ UI/Docs
 Mejoras guiadas por CLI local para UI/docs/código visible.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Resolver warnings del compilador (variables sin uso en `cmd_ota.c`, `initrd.c`, comparaciones de signo en `devfs.c`, validación de arrays en `procfs.c`) para mantener un clean build. Continuar mejoras visuales guiadas por CLI para UI/docs/código visible y pulido del shell/compositor.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
