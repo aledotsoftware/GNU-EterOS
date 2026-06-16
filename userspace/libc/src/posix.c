@@ -576,3 +576,73 @@ int shm_unlink(const char *name) {
 
     return unlink(path);
 }
+
+/* -------------------------------------------------------------------------
+ * getopt Implementation
+ * ------------------------------------------------------------------------- */
+char *optarg = NULL;
+int optind = 1;
+int opterr = 1;
+int optopt = 0;
+
+int getopt(int argc, char * const argv[], const char *optstring) {
+    static char *nextchar = NULL;
+    char c;
+    char *cp;
+
+    if (optind == 0) {
+        optind = 1;
+        nextchar = NULL;
+    }
+
+    if (nextchar == NULL || *nextchar == '\0') {
+        if (optind >= argc || argv[optind] == NULL || argv[optind][0] != '-' || argv[optind][1] == '\0') {
+            return -1;
+        }
+        if (argv[optind][1] == '-' && argv[optind][2] == '\0') {
+            optind++;
+            return -1;
+        }
+        nextchar = argv[optind] + 1;
+    }
+
+    c = *nextchar++;
+    optopt = c;
+
+    if (c == ':' || (cp = strchr(optstring, c)) == NULL) {
+        if (opterr && *optstring != ':') {
+            /* Minimal error reporting */
+        }
+        if (*nextchar == '\0') {
+            optind++;
+        }
+        return '?';
+    }
+
+    if (cp[1] == ':') {
+        if (*nextchar != '\0') {
+            optarg = nextchar;
+            optind++;
+        } else {
+            if (optind + 1 >= argc) {
+                if (opterr && *optstring != ':') {
+                    /* Missing argument */
+                }
+                optarg = NULL;
+                optopt = c;
+                if (*optstring == ':') return ':';
+                return '?';
+            } else {
+                optarg = argv[++optind];
+                optind++;
+            }
+        }
+        nextchar = NULL;
+    } else {
+        if (*nextchar == '\0') {
+            optind++;
+        }
+        optarg = NULL;
+    }
+    return c;
+}
