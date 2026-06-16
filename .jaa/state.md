@@ -55,3 +55,5 @@
   - Implemented robust write-verification for OTA downloads: the payload is read back after writing to disk and strictly `memcmp`'d against the source, preventing corrupted updates from being flagged as pending.
   - Fixed the `rollback` command to properly compute the active slot dynamically via `partition_get_active_root()->impl` rather than relying solely on NVRAM fallbacks.
   - Ensured correct memory lifecycle (`kfree`) for allocated buffers and wrapper nodes upon success and failure paths.
+
+- **Orchestrator**: Verified a clean build globally following `vision-cli-agent` warning fixes and validated headless QEMU boot across RAM configurations. Delegated new critical blockers for GNU Coreutils: `sys_getcwd` and CWD management to `aether-linux-subsystem-bot` and `vfs-posix-filesystem-bot`, and `sys_fsync`/`sys_truncate` to `linux-syscall-compliance-bot`.

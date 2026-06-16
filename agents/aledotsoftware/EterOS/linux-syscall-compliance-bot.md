@@ -7,8 +7,7 @@ kernel/arch/x86_64/syscall.c
 Cobertura progresiva de syscalls Linux x86_64 con foco en GNU/Linux real.
 
 ## Current Goal
-*(Waiting for new assignment)*
-
+Implementar las syscalls `sys_fsync` y `sys_truncate` mapeándolas correctamente y reemplazando los retornos de `-ENOSYS`. Asegurar que deleguen la lógica real a las funciones de VFS subyacentes si es posible.
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
 - Antes de editar, lee los archivos reales del subsistema y confirma qué ya existe.

@@ -44,11 +44,10 @@ Durante el build del kernel x86_64, se detectaron las siguientes advertencias me
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. ~~**`vision-cli-agent`**: Resolver warnings del compilador (variables sin uso, comparaciones de signo, punteros a arrays) para mantener clean build.~~ **(COMPLETADO)**
-2. Continuar con las mejoras visuales guiadas por CLI para UI/docs/código visible y pulido del shell/compositor (`test_compositor`, `shell_internal.h`).
-
----
-
+1. **`aether-linux-subsystem-bot`**: Implementar sys_getcwd correctamente. Actualmente retorna -ENOSYS o un stub, impidiendo un soporte robusto para GNU coreutils.
+2. **`vfs-posix-filesystem-bot`**: Resolver paths y cwd correctamente dentro del VFS para apoyar a sys_getcwd y soporte general de paths relativos.
+3. **`linux-syscall-compliance-bot`**: Continuar mapeando syscalls faltantes identificadas que devuelven `-ENOSYS` (ej. fsync, truncate).
+4. **`graphics-power-panel-bot`**: Continuar con las mejoras visuales y prototipo del compositor (referencia `test_compositor`).
 ## 4. Hallazgos adicionales y Riesgos
 - Se comprobó la implementación inicial real de Binder IPC (Android compat) en `kernel/fs/devfs.c`, introducida por el `aether-droid-subsystem-bot`. Binder ahora rutéa peticiones reales (`BINDER_WRITE_READ`) hacia un `context_mgr` y hacia clientes en lugar de ser un mero stub estático, utilizando `kmalloc` e inicializando una cola de transacciones.
 - Se verificó que el `graphics-power-panel-bot` implementó el mapeo del framebuffer (Mmap sobre `/dev/dri/card0`) exitosamente en la capa DRM.
@@ -73,3 +72,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - **2026-06-15 (Update):** El Orchestrator Meta-Agent verificó una compilación general y la correcta ejecución en el test runner nativo, así como en integración QEMU Headless (64MB, 128MB, 512MB RAM). Se detectaron advertencias menores del compilador GCC. El próximo ciclo asignado es al `vision-cli-agent` para depurar dichos warnings de `cmd_ota.c`, `devfs.c`, `initrd.c` y `procfs.c`, así como progresar en pulidos de UI y docs.
 
 - **2026-06-16 (Update):** The `aether-droid-subsystem-bot` successfully unified the Ashmem and Memfd systems by dynamically routing `/dev/ashmem` to `shmfs_create_memfd` inside `sys_openat`, bypassing legacy, race-prone devfs character device limitations. The `ASHMEM_*` IOCTLs (`SET_NAME`, `GET_NAME`, `SET_SIZE`, `GET_SIZE`) are now directly processed via `shmfs_ioctl`, correctly utilizing true `fs_node_t` context isolation. In addition, an initial generic `sys_socketpair` implementation wrapping `sys_pipe2` was created to unblock Bionic libc thread initialization expectations. All tests passed, including `run_integration.sh` headless verification on QEMU.- **2026-06-16 (Update 2):** El Orchestrator Meta-Agent verificó que el `vision-cli-agent` ha completado con éxito la resolución de los últimos warnings de GCC, mejorando significativamente la UI web (alineación flexbox y estilos hover en menú y animaciones), y actualizando la consistencia del texto Genesis SMP v0.2.0 en toda la documentación y paneles gráficos del sistema, logrando un clean build completo.
+- **2026-06-16 (Update 3):** El Orchestrator Meta-Agent auditó el repositorio y confirmó la finalización exitosa del `vision-cli-agent`, logrando un build completamente libre de warnings y pruebas de integración QEMU headless exitosas. Se identificaron dependencias clave faltantes en la capa de emulación syscalls para avanzar hacia GNU coreutils: las syscalls `sys_getcwd`, `sys_fsync` y `sys_truncate` están stubbeadas (`-ENOSYS`). Se delegó la implementación del manejo de CWD al `aether-linux-subsystem-bot` y `vfs-posix-filesystem-bot`, y la expansión de syscalls al `linux-syscall-compliance-bot`.
