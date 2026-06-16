@@ -85,4 +85,11 @@ int usleep(unsigned int usec);
 char *getcwd(char *buf, size_t size);
 int reboot(int magic, int magic2, int cmd, void *arg);
 
+/* getopt */
+extern char *optarg;
+extern int optind;
+extern int opterr;
+extern int optopt;
+int getopt(int argc, char * const argv[], const char *optstring);
+
 #endif /* _UNISTD_H */

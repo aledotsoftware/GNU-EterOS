@@ -37,7 +37,9 @@
   - Replaced raw `cli`/`sti` instructions in `kernel/task.c` (`schedule()`, `task_fork`, `task_clone`, `task_exit_internal`, `task_kill`, `task_waitid`, `task_waitpid`) and `kernel/sem.c` with robust interrupt tracking via `task_irq_save()` and `task_irq_restore()`. This prevents premature interrupt re-enabling during nested critical sections, avoiding hangs and context corruption under load.
   - Fixed SMP idle task assignment in `task_init_ap()` to properly link the AP's idle task to `cpu->idle_task` instead of leaving it untracked.
   - Updated `schedule()` to correctly fallback to the core-specific `cpu->idle_task` instead of incorrectly routing all idling cores to the global BSP `tasks[0]`, eliminating a critical concurrent stack corruption bug.
-
 - **linux-syscall-compliance-bot**: Expanded Linux x86_64 syscall coverage by properly mapping `sys_fork`, `sys_vfork`, `sys_umask`, `sys_getegid`, `sys_getcwd_sys`, `sys_fdatasync`, `sys_mknod`, `sys_mknodat`, `sys_pause`, `sys_alarm`, `sys_getrusage`, `sys_times`, `sys_syslog`, `sys_getgroups`, and `sys_setgroups`. Prioritized functional implementations for GNU/Linux userland compatibility.
-
 - **aether-droid-subsystem-bot**: Unified Ashmem and Memfd by routing `/dev/ashmem` to `shmfs_create_memfd`. Implemented `ASHMEM_SET_NAME`, `ASHMEM_GET_NAME`, `ASHMEM_SET_SIZE`, and `ASHMEM_GET_SIZE` IOCTLs seamlessly in `shmfs_ioctl`, providing stateful per-FD memory scaling. Successfully tested the compilation and system stability under QEMU and headless run_tests.
+- **userspace-libc-posix-bot**: Hardened GNU LibC compatibility and runtime layers for EterOS userspace.
+  - Added robust global `getopt` implementation mapped to GNU specifications, exposing `optarg`, `optind`, `opterr`, and `optopt` across all userspace binaries (`unistd.h`).
+  - Implemented `strcasecmp` natively for dynamic case-insensitive text evaluation matching standard extensions.
+  - Stabilized global POSIX error handling (`errno`) by uniformly redirecting macros via `#define errno (*__errno_location())` inside `.c` files like `posix.c` and `syscall.c` directly ensuring thread-safe access to standard integer failures. All POSIX string functions, libc integrations, and stdlib memory mapping routines compile perfectly via `run_tests.sh` and QEMU integration suite.
