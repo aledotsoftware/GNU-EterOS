@@ -43,3 +43,7 @@
   - Added robust global `getopt` implementation mapped to GNU specifications, exposing `optarg`, `optind`, `opterr`, and `optopt` across all userspace binaries (`unistd.h`).
   - Implemented `strcasecmp` natively for dynamic case-insensitive text evaluation matching standard extensions.
   - Stabilized global POSIX error handling (`errno`) by uniformly redirecting macros via `#define errno (*__errno_location())` inside `.c` files like `posix.c` and `syscall.c` directly ensuring thread-safe access to standard integer failures. All POSIX string functions, libc integrations, and stdlib memory mapping routines compile perfectly via `run_tests.sh` and QEMU integration suite.
+- **devices-time-panel-bot**:
+  - Removed hardcoded fallback IP `162.159.200.1` from `cmd_ntp` (`kernel/shell/cmd_time.c`) so NTP properly aborts if DNS resolution fails.
+  - Reviewed Keyboard standard mapping bounds in `scancode_to_ascii_es`. Validated `hlt` instruction bounds on `cmd_panel.c` for UI responsiveness on `mouse_moved` events.
+  - Confirmed RTC `rtc_is_updating()` correctly disables NMI and loops appropriately across the CMOS data port ensuring synchronized and robust atomic date fetching.
