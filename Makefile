@@ -354,6 +354,8 @@ userspace:
 	cp userspace/test_malloc.elf $(INITRD_DIR)/
 	cp userspace/test_stdio.elf $(INITRD_DIR)/
 	cp userspace/test.elf $(INITRD_DIR)/
+	cp userspace/test_net.elf $(INITRD_DIR)/
+	cp userspace/test_net_echo.elf $(INITRD_DIR)/
 	cp userspace/exec_test.elf $(INITRD_DIR)/
 
 # ---- Initrd ----

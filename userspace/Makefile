@@ -7,7 +7,7 @@ LIBC_SRC = libc/src/crt0.o libc/src/restore_rt.o libc/src/syscall.c libc/src/std
 LIBC_SRC = libc/src/crt0.o libc/src/restore_rt.o libc/src/syscall.c libc/src/stdio.c libc/src/string.c libc/src/malloc.c libc/src/errno.c libc/src/network.c libc/src/posix.c libc/src/netdb.c libc/src/stdlib.c libc/src/signal.c libc/src/sha256.c libc/src/strtok.c libc/src/pthread.c libc/src/dirent.c libc/src/time.c libc/src/ctype.c
 LIBC_OBJ = $(LIBC_SRC:.c=.o)
 
-all: test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf test_stdio.elf test_malloc.elf test_pthread.elf login.elf passwd.elf useradd.elf userdel.elf sh.elf test_security.elf test_shm.elf marea_shell.elf eterland.elf apt-get.elf
+all: test_net_echo.elf test.elf test_net.elf exec_test.elf test_libc_advanced.elf test_signal.elf test_futex_security.elf test_stdio.elf test_malloc.elf test_pthread.elf login.elf passwd.elf useradd.elf userdel.elf sh.elf test_security.elf test_shm.elf marea_shell.elf eterland.elf apt-get.elf
 
 libc/src/%.o: libc/src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
