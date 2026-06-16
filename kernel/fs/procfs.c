@@ -289,7 +289,7 @@ static ssize_t proc_self_maps_read(fs_node_t *node, uint32_t offset, uint32_t si
     char start_str[32];
     char end_str[32];
     strlcpy(temp, "00400000-00800000 r-xp 00000000 00:00 0      ", sizeof(temp));
-    strlcat(temp, current->executable_path ? current->executable_path : "/proc/self/exe", sizeof(temp));
+    strlcat(temp, current->executable_path[0] != '\0' ? current->executable_path : "/proc/self/exe", sizeof(temp));
     strlcat(temp, "\n", sizeof(temp));
     strlcat(maps_str, temp, sizeof(maps_str));
     utoa_hex_s((uint64_t)(0x200000000ULL + 0x400000), start_str, sizeof(start_str));

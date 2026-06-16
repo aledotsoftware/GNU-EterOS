@@ -42,10 +42,12 @@ run_test() {
     fi
 
     # Check for shell prompt
-    if grep -q "eteros#" qemu_output.log || grep -q "sh#" qemu_output.log; then
+    if grep -q "eteros#" qemu_output.log || grep -q "sh#" qemu_output.log || grep -q -i "eteros>" qemu_output.log || grep -q -i "login:" qemu_output.log; then
         echo "[PASS] Shell prompt detected."
     else
-        echo "[WARN] Shell prompt not definitively detected, but boot succeeded."
+        echo "[FAIL] Shell prompt not definitively detected."
+        cat qemu_output.log
+        return 1
     fi
 
     echo "Integration Test with ${ram}MB RAM Passed!"

@@ -28,7 +28,6 @@ static initrd_file_header_t* file_headers = NULL;
 static fs_node_t *initrd_root = NULL;             /* The root directory node */
 
 static initrd_dir_t *virtual_dirs = NULL;
-static uint32_t virtual_dirs_count = 0;
 
 ssize_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer);
 int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry);
