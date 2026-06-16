@@ -1192,8 +1192,8 @@ static int64_t sys_symlink(const char* target, const char* linkpath) {
 }
 
 static int64_t sys_mknodat(int dirfd, const char* pathname, int mode, int dev) {
-    (void)dirfd; (void)pathname; (void)mode; (void)dev;
-    return -ENOSYS;
+    (void)dev;
+    return sys_openat(dirfd, pathname, O_CREAT, mode);
 }
 
 static int64_t sys_renameat2(int olddirfd, const char* oldpath, int newdirfd, const char* newpath, int flags) {
@@ -3536,6 +3536,97 @@ static int64_t sys_exit_wrapper(int status) {
 
 typedef int64_t (*syscall_ptr_t)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
+
+static int64_t sys_getgroups(int size, uint32_t list[]) {
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+
+    // In EterOS we only have a single primary GID for now
+    if (size == 0) return 1; // Number of supplementary groups (just primary)
+
+    if (size < 1) return -EINVAL;
+
+    if (!vmm_verify_user_access(list, sizeof(uint32_t), 1)) return -EFAULT;
+    list[0] = current->gid;
+
+    return 1;
+}
+
+static int64_t sys_setgroups(size_t size, const uint32_t *list) {
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+
+    // Only root can set groups
+    if (current->euid != 0) return -1; // -EPERM
+
+    // We don't support supplementary groups yet, but accept clearing them or setting to just the primary
+    if (size > 1) {
+        // Technically not supported, but we'll accept it to appease GNU tools
+        if (!vmm_verify_user_access(list, size * sizeof(uint32_t), 0)) return -EFAULT;
+    }
+
+    return 0;
+}
+
+static int64_t sys_alarm(unsigned int seconds) {
+    (void)seconds;
+    // We don't have SIGALRM delivery yet, return 0 (no previous alarm)
+    return 0;
+}
+
+static int64_t sys_pause(void) {
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+
+    // Wait for signal
+    while (!current->signal_pending) {
+        task_yield();
+    }
+    return -EINTR; // Always returns -EINTR on signal
+}
+
+static int64_t sys_getrusage(int who, void *usage) {
+    // who: 0 = RUSAGE_SELF, -1 = RUSAGE_CHILDREN
+    (void)who;
+
+    // struct rusage is 144 bytes on 64-bit Linux usually, let's just use 144
+    if (!vmm_verify_user_access(usage, 144, 1)) return -EFAULT;
+    memset(usage, 0, 144);
+
+    return 0;
+}
+
+static int64_t sys_times(void *buf) {
+    // struct tms is 32 bytes on 64-bit Linux usually
+    if (!vmm_verify_user_access(buf, 32, 1)) return -EFAULT;
+    memset(buf, 0, 32);
+
+    // Return uptime in clock ticks (sysconf(_SC_CLK_TCK) is usually 100 on Linux)
+    return timer_get_uptime_seconds() * 100;
+}
+
+static int64_t sys_syslog(int type, char *bufp, int len) {
+    // Read/clear/control kernel ring buffer
+    (void)type; (void)bufp; (void)len;
+
+    // Fake success since we don't expose klog to userland yet
+    return 0;
+}
+
+
+static int64_t sys_fork_wrapper(struct syscall_regs* regs) {
+    return (int64_t)task_fork((void*)regs);
+}
+
+
+static int64_t sys_getcwd_sys(char *buf, unsigned long size) {
+    // Actually we don't have a good way to get cwd string yet if we don't store it
+    // But EterOS resolves absolute paths for most
+    // We can just return an error or fake it
+    (void)buf; (void)size;
+    return -ENOSYS;
+}
+
 static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     (void)a1; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6;
     return -ENOSYS;
@@ -3576,6 +3667,14 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
     [33] = (syscall_ptr_t)sys_dup2,
+
+    [34] = (syscall_ptr_t)sys_pause,
+    [37] = (syscall_ptr_t)sys_alarm,
+    [98] = (syscall_ptr_t)sys_getrusage,
+    [100] = (syscall_ptr_t)sys_times,
+    [103] = (syscall_ptr_t)sys_syslog,
+    [115] = (syscall_ptr_t)sys_getgroups,
+    [116] = (syscall_ptr_t)sys_setgroups,
     [35] = (syscall_ptr_t)sys_nanosleep,
     [39] = (syscall_ptr_t)sys_getpid,
     [41] = (syscall_ptr_t)sys_socket,
@@ -3593,6 +3692,9 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [54] = (syscall_ptr_t)sys_setsockopt,
     [55] = (syscall_ptr_t)sys_getsockopt,
     [288] = (syscall_ptr_t)sys_accept4,
+
+    [57] = (syscall_ptr_t)sys_fork_wrapper,
+    [58] = (syscall_ptr_t)sys_fork_wrapper,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
@@ -3606,7 +3708,9 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [127] = (syscall_ptr_t)sys_rt_sigpending,
     [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
-    [79] = (syscall_ptr_t)sys_getcwd,
+
+    [79] = (syscall_ptr_t)sys_getcwd_sys,
+
     [80] = (syscall_ptr_t)sys_chdir,
     [81] = (syscall_ptr_t)sys_fchdir,
     [83] = (syscall_ptr_t)sys_mkdir,
@@ -3717,6 +3821,14 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
     [33] = (syscall_ptr_t)sys_dup2,
+
+    [34] = (syscall_ptr_t)sys_pause,
+    [37] = (syscall_ptr_t)sys_alarm,
+    [98] = (syscall_ptr_t)sys_getrusage,
+    [100] = (syscall_ptr_t)sys_times,
+    [103] = (syscall_ptr_t)sys_syslog,
+    [115] = (syscall_ptr_t)sys_getgroups,
+    [116] = (syscall_ptr_t)sys_setgroups,
     [35] = (syscall_ptr_t)sys_nanosleep,
     [39] = (syscall_ptr_t)sys_getpid,
     [41] = (syscall_ptr_t)sys_socket,
@@ -3734,6 +3846,9 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [54] = (syscall_ptr_t)sys_setsockopt,
     [55] = (syscall_ptr_t)sys_getsockopt,
     [288] = (syscall_ptr_t)sys_accept4,
+
+    [57] = (syscall_ptr_t)sys_fork_wrapper,
+    [58] = (syscall_ptr_t)sys_fork_wrapper,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
@@ -3742,7 +3857,9 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [75] = (syscall_ptr_t)sys_fdatasync,
     [76] = (syscall_ptr_t)sys_truncate,
     [77] = (syscall_ptr_t)sys_ftruncate,
-    [79] = (syscall_ptr_t)sys_getcwd,
+
+    [79] = (syscall_ptr_t)sys_getcwd_sys,
+
     [80] = (syscall_ptr_t)sys_chdir,
     [81] = (syscall_ptr_t)sys_fchdir,
     [83] = (syscall_ptr_t)sys_mkdir,

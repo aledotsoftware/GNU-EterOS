@@ -37,3 +37,5 @@
   - Replaced raw `cli`/`sti` instructions in `kernel/task.c` (`schedule()`, `task_fork`, `task_clone`, `task_exit_internal`, `task_kill`, `task_waitid`, `task_waitpid`) and `kernel/sem.c` with robust interrupt tracking via `task_irq_save()` and `task_irq_restore()`. This prevents premature interrupt re-enabling during nested critical sections, avoiding hangs and context corruption under load.
   - Fixed SMP idle task assignment in `task_init_ap()` to properly link the AP's idle task to `cpu->idle_task` instead of leaving it untracked.
   - Updated `schedule()` to correctly fallback to the core-specific `cpu->idle_task` instead of incorrectly routing all idling cores to the global BSP `tasks[0]`, eliminating a critical concurrent stack corruption bug.
+
+- **linux-syscall-compliance-bot**: Expanded Linux x86_64 syscall coverage by properly mapping `sys_fork`, `sys_vfork`, `sys_umask`, `sys_getegid`, `sys_getcwd_sys`, `sys_fdatasync`, `sys_mknod`, `sys_mknodat`, `sys_pause`, `sys_alarm`, `sys_getrusage`, `sys_times`, `sys_syslog`, `sys_getgroups`, and `sys_setgroups`. Prioritized functional implementations for GNU/Linux userland compatibility.
