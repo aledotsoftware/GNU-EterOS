@@ -1,4 +1,5 @@
 #include <fs/bcache.h>
+#include <errno.h>
 #include <mm.h>
 #include <string.h>
 #include <lock.h>
@@ -27,7 +28,7 @@ void bcache_init(void) {
 }
 
 int bcache_read(uint32_t volume_id, uint32_t sector, uint8_t *buffer) {
-    if (!bcache) return -1;
+    if (!bcache) return -EINVAL;
 
     spin_lock(&bcache_lock);
     for (int i = 0; i < BCACHE_SIZE; i++) {
@@ -39,7 +40,7 @@ int bcache_read(uint32_t volume_id, uint32_t sector, uint8_t *buffer) {
         }
     }
     spin_unlock(&bcache_lock);
-    return -1;
+    return -EINVAL;
 }
 
 void bcache_write(uint32_t volume_id, uint32_t sector, const uint8_t *buffer) {

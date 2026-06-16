@@ -4,6 +4,7 @@
 #include <string.h>
 #include <hal.h>
 #include <mm.h>
+#include <errno.h>
 
 #define FAT32_EOC 0x0FFFFFF8
 
@@ -71,7 +72,7 @@ static void fat32_to_dos_name(const char* name, char* dos_name) {
 }
 
 int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_sector_t write_func, uint32_t partition_offset) {
-    if (!vol || !read_func) return -1;
+    if (!vol || !read_func) return -EIO;
 
     vol->read_sector = read_func;
     vol->write_sector = write_func;
@@ -81,12 +82,12 @@ int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_s
 
     // Allocate 4096 to be safe for larger sector sizes during init
     uint8_t* buffer = kmalloc(4096);
-    if (!buffer) return -2;
+    if (!buffer) return -ENOMEM;
 
     // Read Boot Sector
     if (fat32_read_sector_cached(vol, vol->partition_lba, buffer) != 0) {
         kfree(buffer);
-        return -3;
+        return -ENOSPC;
     }
 
     fat32_boot_sector_t* bpb = (fat32_boot_sector_t*)buffer;
@@ -157,19 +158,19 @@ static uint32_t fat32_cluster_to_lba(fat32_volume_t* vol, uint32_t cluster) {
 
 /* Helper: Write to FAT Table */
 static int fat32_fat_set(fat32_volume_t* vol, uint32_t cluster, uint32_t value) {
-    if (!vol->write_sector) return -1;
+    if (!vol->write_sector) return -EIO;
 
     uint32_t fat_offset = cluster * 4;
     uint32_t fat_sector = vol->fat_start_lba + (fat_offset / vol->bytes_per_sector);
     uint32_t ent_offset = fat_offset % vol->bytes_per_sector;
 
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -2;
+    if (!buffer) return -ENOMEM;
 
     // Read sector first (RMW)
     if (fat32_read_sector_cached(vol, fat_sector, buffer) != 0) {
         kfree(buffer);
-        return -3;
+        return -ENOSPC;
     }
 
     // Update entry
@@ -188,7 +189,7 @@ static int fat32_fat_set(fat32_volume_t* vol, uint32_t cluster, uint32_t value) 
 /* Helper: Allocate a free cluster */
 static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -1;
+    if (!buffer) return -EIO;
 
     uint32_t current_fat_sector = vol->fat_start_lba;
     uint32_t entries_per_sector = vol->bytes_per_sector / 4;
@@ -198,7 +199,7 @@ static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
     for (uint32_t i = 0; i < vol->fat_size; i++) {
         if (fat32_read_sector_cached(vol, current_fat_sector + i, buffer) != 0) {
             kfree(buffer);
-            return -2;
+            return -ENOMEM;
         }
 
         uint32_t* entries = (uint32_t*)buffer;
@@ -217,7 +218,7 @@ static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
                 entries[j] = FAT32_EOC;
                 if (fat32_write_sector_cached(vol, current_fat_sector + i, buffer) != 0) {
                     kfree(buffer);
-                    return -3;
+                    return -ENOSPC;
                 }
 
                 // Zero out the cluster data
@@ -255,18 +256,18 @@ static void fat32_free_cluster_chain(fat32_volume_t* vol, uint32_t start_cluster
 /* Helper: Update or Create Directory Entry */
 static int fat32_update_dirent(fat32_volume_t* vol, uint32_t sector, uint32_t offset, fat32_dir_entry_t* value) {
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -1;
+    if (!buffer) return -EIO;
 
     if (fat32_read_sector_cached(vol, sector, buffer) != 0) {
         kfree(buffer);
-        return -2;
+        return -ENOMEM;
     }
 
     memcpy(buffer + offset, value, sizeof(fat32_dir_entry_t));
 
     if (fat32_write_sector_cached(vol, sector, buffer) != 0) {
         kfree(buffer);
-        return -3;
+        return -ENOSPC;
     }
 
     kfree(buffer);
@@ -280,7 +281,7 @@ typedef int (*fat32_dir_cb_t)(fat32_volume_t* vol, fat32_dir_entry_t* entry, uin
 static int fat32_iterate_dir(fat32_volume_t* vol, uint32_t start_cluster, fat32_dir_cb_t callback, void* ctx, uint32_t* last_cluster_out) {
     uint32_t current_cluster = start_cluster;
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -1;
+    if (!buffer) return -EIO;
 
     while (current_cluster < FAT32_EOC) {
         if (last_cluster_out) *last_cluster_out = current_cluster;
@@ -290,7 +291,7 @@ static int fat32_iterate_dir(fat32_volume_t* vol, uint32_t start_cluster, fat32_
         for (uint32_t i = 0; i < vol->sectors_per_cluster; i++) {
             if (fat32_read_sector_cached(vol, lba + i, buffer) != 0) {
                 kfree(buffer);
-                return -2;
+                return -ENOMEM;
             }
 
             fat32_dir_entry_t* entry = (fat32_dir_entry_t*)buffer;
@@ -343,7 +344,7 @@ static int fat32_find_free_dirent_in_chain(fat32_volume_t* vol, uint32_t start_c
 
     // If we are here, we reached EOC without finding a slot. Extend.
     uint32_t new_cluster;
-    if (fat32_alloc_cluster(vol, &new_cluster) != 0) return -3; // Disk full
+    if (fat32_alloc_cluster(vol, &new_cluster) != 0) return -ENOSPC; // Disk full
 
     fat32_fat_set(vol, last_cluster, new_cluster);
 
@@ -363,7 +364,7 @@ static int fat32_find_entry_cb(fat32_volume_t* vol, fat32_dir_entry_t* entry, ui
     (void)vol;
     struct find_entry_ctx* c = (struct find_entry_ctx*)ctx;
 
-    if (entry->name[0] == DIRENT_END) return -3; /* Not Found, stop iteration */
+    if (entry->name[0] == DIRENT_END) return -ENOSPC; /* Not Found, stop iteration */
     if (entry->name[0] == DIRENT_DELETED) return 0;
     if (entry->attr & ATTR_VOLUME_ID) return 0;
     if (entry->attr & ATTR_LONG_NAME) return 0;
@@ -386,8 +387,8 @@ static int fat32_find_dirent_in_chain(fat32_volume_t* vol, uint32_t start_cluste
     int res = fat32_iterate_dir(vol, start_cluster, fat32_find_entry_cb, &ctx, NULL);
 
     if (res == 1) return 0; // Success
-    if (res == -3) return -3; // Explicit Not Found
-    if (res == 0) return -3; // End of Chain, Not Found
+    if (res == -3) return -ENOSPC; // Explicit Not Found
+    if (res == 0) return -ENOSPC; // End of Chain, Not Found
     return res; // Error
 }
 
@@ -645,7 +646,7 @@ static int fat32_readdir_fs_impl(fs_node_t *node, uint32_t index, struct dirent 
     if (res == 2) return 0; /* Success */
     if (res == 1) return 1; /* EOF */
     if (res == 0) return 1; /* EOF (end of chain) */
-    return -1; /* Error */
+    return -EIO; /* Error */
 }
 
 int fat32_readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) {
@@ -715,10 +716,10 @@ static int fat32_create_fs_impl(fs_node_t *parent, char *name, uint16_t permissi
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -1;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EIO;
 
     uint32_t sector, offset;
-    if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -2;
+    if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOMEM;
 
     fat32_dir_entry_t entry;
     memset(&entry, 0, sizeof(entry));
@@ -743,13 +744,13 @@ static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permissio
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -1;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EIO;
 
     uint32_t sector, offset;
-    if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -2;
+    if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOMEM;
 
     uint32_t cluster;
-    if (fat32_alloc_cluster(vol, &cluster) != 0) return -3;
+    if (fat32_alloc_cluster(vol, &cluster) != 0) return -ENOSPC;
 
     fat32_dir_entry_t entry;
     memset(&entry, 0, sizeof(entry));
@@ -803,7 +804,7 @@ static int fat32_unlink_fs_impl(fs_node_t *parent, char *name) {
 
     fat32_dir_entry_t entry;
     uint32_t sector, offset;
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, &sector, &offset, &entry) != 0) return -1;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, &sector, &offset, &entry) != 0) return -EIO;
 
     uint32_t cluster = (entry.fst_clus_hi << 16) | entry.fst_clus_lo;
     if (cluster != 0) fat32_free_cluster_chain(vol, cluster);

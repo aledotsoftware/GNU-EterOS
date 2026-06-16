@@ -1,4 +1,5 @@
 #include <fs/jfs.h>
+#include <errno.h>
 #include <fs/vfs.h>
 #include <fs/bcache.h>
 #include <drivers/disk.h>
@@ -51,19 +52,19 @@ static int jfs_is_directory(uint32_t inode_idx) {
 }
 
 static int jfs_alloc_block(uint32_t* out_block) {
-    if (!out_block) return -1;
-    if (jfs_next_free_block >= sb->total_blocks) return -1;
+    if (!out_block) return -EINVAL;
+    if (jfs_next_free_block >= sb->total_blocks) return -ENOSPC;
     *out_block = jfs_next_free_block++;
     return 0;
 }
 
 static int jfs_alloc_inode(uint32_t flags, uint32_t* out_inode) {
     static uint32_t next_inode = 1;
-    if (!out_inode) return -1;
+    if (!out_inode) return -EINVAL;
 
     uint32_t free_inode = next_inode++;
     jfs_inode_t *new_node = get_inode(free_inode);
-    if (!new_node) return -1;
+    if (!new_node) return -ENOMEM;
     memset(new_node, 0, sizeof(jfs_inode_t));
     new_node->inode = free_inode;
     new_node->size = 0;
@@ -77,11 +78,11 @@ static int jfs_alloc_inode(uint32_t flags, uint32_t* out_inode) {
 }
 
 static int jfs_ensure_dir_block(jfs_inode_t *dir, uint32_t block_idx) {
-    if (!dir || block_idx >= 12) return -1;
+    if (!dir || block_idx >= 12) return -EINVAL;
     if (dir->blocks[block_idx] != 0) return 0;
 
     uint32_t new_block = 0;
-    if (jfs_alloc_block(&new_block) != 0) return -1;
+    if (jfs_alloc_block(&new_block) != 0) return -ENOSPC;
 
     dir->blocks[block_idx] = new_block;
     uint8_t zeroes[512];
@@ -92,8 +93,8 @@ static int jfs_ensure_dir_block(jfs_inode_t *dir, uint32_t block_idx) {
 
 static int jfs_find_entry(uint32_t dir_inode, const char *name, jfs_dirent_t *out_entry, uint32_t *out_block, uint32_t *out_index) {
     jfs_inode_t *dir = get_inode(dir_inode);
-    if (!dir) return -1;
-    if ((dir->flags & FS_DIRECTORY) != FS_DIRECTORY) { kfree(dir); return -1; }
+    if (!dir) return -EINVAL;
+    if ((dir->flags & FS_DIRECTORY) != FS_DIRECTORY) { kfree(dir); return -ENOTDIR; }
 
     for (uint32_t i = 0; i < 12; i++) {
         if (dir->blocks[i] == 0) continue;
@@ -115,17 +116,17 @@ static int jfs_find_entry(uint32_t dir_inode, const char *name, jfs_dirent_t *ou
     }
 
     kfree(dir);
-    return -1;
+    return -ENOENT;
 }
 
 static int jfs_add_entry(uint32_t dir_inode, const char *name, uint32_t child_inode) {
     jfs_inode_t *dir = get_inode(dir_inode);
-    if (!dir) return -1;
-    if ((dir->flags & FS_DIRECTORY) != FS_DIRECTORY) { kfree(dir); return -1; }
-    if (jfs_find_entry(dir_inode, name, NULL, NULL, NULL) == 0) { kfree(dir); return -1; }
+    if (!dir) return -EINVAL;
+    if ((dir->flags & FS_DIRECTORY) != FS_DIRECTORY) { kfree(dir); return -ENOTDIR; }
+    if (jfs_find_entry(dir_inode, name, NULL, NULL, NULL) == 0) { kfree(dir); return -EEXIST; }
 
     for (uint32_t i = 0; i < 12; i++) {
-        if (jfs_ensure_dir_block(dir, i) != 0) { kfree(dir); return -1; }
+        if (jfs_ensure_dir_block(dir, i) != 0) { kfree(dir); return -ENOSPC; }
         put_inode(dir, dir_inode);
 
         uint8_t sector[512];
@@ -147,13 +148,13 @@ static int jfs_add_entry(uint32_t dir_inode, const char *name, uint32_t child_in
     }
 
     kfree(dir);
-    return -1;
+    return -ENOENT;
 }
 
 static int jfs_remove_entry(uint32_t dir_inode, const char *name, uint32_t *out_deleted_inode) {
     jfs_inode_t *dir = get_inode(dir_inode);
-    if (!dir) return -1;
-    if ((dir->flags & FS_DIRECTORY) != FS_DIRECTORY) { kfree(dir); return -1; }
+    if (!dir) return -EINVAL;
+    if ((dir->flags & FS_DIRECTORY) != FS_DIRECTORY) { kfree(dir); return -ENOTDIR; }
 
     for (uint32_t i = 0; i < 12; i++) {
         if (dir->blocks[i] == 0) continue;
@@ -176,7 +177,7 @@ static int jfs_remove_entry(uint32_t dir_inode, const char *name, uint32_t *out_
     }
 
     kfree(dir);
-    return -1;
+    return -ENOENT;
 }
 
 static fs_node_t* jfs_make_node(uint32_t inode_idx, const char *name) {
@@ -387,8 +388,8 @@ static uint32_t jfs_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8
 
 static int jfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     jfs_inode_t *dir = get_inode(node->inode);
-    if (!dir) return -1;
-    if ((dir->flags & FS_DIRECTORY) != FS_DIRECTORY) { kfree(dir); return -1; }
+    if (!dir) return -EINVAL;
+    if ((dir->flags & FS_DIRECTORY) != FS_DIRECTORY) { kfree(dir); return -ENOTDIR; }
 
     uint32_t seen = 0;
     for (uint32_t i = 0; i < 12; i++) {
@@ -421,36 +422,36 @@ static fs_node_t* jfs_finddir(fs_node_t *node, char *name) {
 }
 
 static int jfs_create(fs_node_t *parent, char *name, uint16_t permission) {
-    if (!parent || !name || !*name) return -1;
-    if (!jfs_is_directory(parent->inode)) return -1;
+    if (!parent || !name || !*name) return -EINVAL;
+    if (!jfs_is_directory(parent->inode)) return -ENOTDIR;
 
     uint32_t free_inode = 0;
-    if (jfs_alloc_inode(FS_FILE, &free_inode) != 0) return -1;
+    if (jfs_alloc_inode(FS_FILE, &free_inode) != 0) return -ENOSPC;
     jfs_set_inode_metadata(free_inode, permission ? permission : 0644, parent->uid, parent->gid);
     return jfs_add_entry(parent->inode, name, free_inode);
 }
 
 static int jfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
-    if (!parent || !name || !*name) return -1;
-    if (!jfs_is_directory(parent->inode)) return -1;
+    if (!parent || !name || !*name) return -EINVAL;
+    if (!jfs_is_directory(parent->inode)) return -ENOTDIR;
 
     uint32_t free_inode = 0;
-    if (jfs_alloc_inode(FS_DIRECTORY, &free_inode) != 0) return -1;
+    if (jfs_alloc_inode(FS_DIRECTORY, &free_inode) != 0) return -ENOSPC;
     jfs_set_inode_metadata(free_inode, permission ? permission : 0755, parent->uid, parent->gid);
     jfs_inode_t* free_inode_ptr = get_inode(free_inode);
-    if (!free_inode_ptr) return -1;
-    if (jfs_ensure_dir_block(free_inode_ptr, 0) != 0) { kfree(free_inode_ptr); return -1; }
+    if (!free_inode_ptr) return -ENOMEM;
+    if (jfs_ensure_dir_block(free_inode_ptr, 0) != 0) { kfree(free_inode_ptr); return -ENOSPC; }
     put_inode(free_inode_ptr, free_inode);
     kfree(free_inode_ptr);
     return jfs_add_entry(parent->inode, name, free_inode);
 }
 
 static int jfs_link(fs_node_t *parent, fs_node_t *target, char *name) {
-    if (!parent || !target || !name || !*name) return -1;
-    if (!jfs_is_directory(parent->inode)) return -1;
+    if (!parent || !target || !name || !*name) return -EINVAL;
+    if (!jfs_is_directory(parent->inode)) return -ENOTDIR;
     
     jfs_inode_t *target_inode = get_inode(target->inode);
-    if (!target_inode) return -1;
+    if (!target_inode) return -EINVAL;
     target_inode->nlink++;
     put_inode(target_inode, target->inode);
     kfree(target_inode);
@@ -468,11 +469,11 @@ static int jfs_link(fs_node_t *parent, fs_node_t *target, char *name) {
 }
 
 static int jfs_unlink(fs_node_t *parent, char *name) {
-    if (!parent || !name || !*name) return -1;
-    if (!jfs_is_directory(parent->inode)) return -1;
+    if (!parent || !name || !*name) return -EINVAL;
+    if (!jfs_is_directory(parent->inode)) return -ENOTDIR;
     
     uint32_t deleted_inode_idx = 0;
-    if (jfs_remove_entry(parent->inode, name, &deleted_inode_idx) != 0) return -1;
+    if (jfs_remove_entry(parent->inode, name, &deleted_inode_idx) != 0) return -ENOENT;
     
     jfs_inode_t *inode = get_inode(deleted_inode_idx);
     if (inode) {

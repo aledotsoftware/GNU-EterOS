@@ -28,6 +28,10 @@
   - Implemented core memory mapping interceptors in `sys_mmap` for Android compatibility. `/dev/binder` and `/dev/__properties__` now allocate correctly sized anonymous virtual memory mappings.
   - Gap analysis documentation and strategy roadmap (`ANDROID_ROADMAP.md` and `android_compat_gap.md`) mapped successfully. `/dev/ashmem` now properly bypasses static file mapping, operating natively as shared anonymous memory.
 - [x] Reviewed and fixed userspace login, user addition, deletion, and robust /etc/ configuration.
+- **vfs-posix-filesystem-bot**: VFS, Initrd, ProcFS, and Loaders POSIX Compliance
+  - Replaced generic negative integers (-1, -2, -3) with specific POSIX error codes (-ENOENT, -ENOSPC, -ENOMEM, -ENOTDIR, -EINVAL) in `vfs.c`, `fat32.c`, `jfs.c`, `shmfs.c`, `procfs.c`, `devfs.c`, and `bcache.c`.
+  - Fixed `login.c` reading loop to safely terminate if `read` returns `<= 0` on standard input.
+  - Adjusted mock implementations and assertion handlers in `test_vfs_path_splitting.c`, `test_initrd_security.c`, `test_elf_truncation.c` to accurately match native prototypes and expect corrected POSIX semantics.
 - **testing-ci-validation-bot**: Expands native unit tests coverage.
   - Fix compilation and add missing tests to `tests/run_tests.sh`.
   - Fix test mocks in `tests/test_syscall_getdents64.c` and `tests/test_syscall_utimensat.c` to link correctly by mocking `task_get_count`, `task_get_at`, `task_exit_signal`, and `task_waitid`. Fix inline declaration issues.

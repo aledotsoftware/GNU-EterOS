@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
         printf("Password: ");
         fflush(stdout);
         len = read(0, password, sizeof(password) - 1);
-        if (len < 0) {
+        if (len <= 0) {
             break; /* Cleanly exit on error */
         } else if (len == 0) {
             password[0] = '\0';

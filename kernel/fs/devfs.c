@@ -1,5 +1,6 @@
 #include <fs/devfs.h>
 #include <fs/vfs.h>
+#include <errno.h>
 #include <string.h>
 #include <mm.h>
 #include <hal.h>
@@ -881,7 +882,7 @@ static ssize_t dev_event_read(fs_node_t *node, uint32_t offset, uint32_t size, u
 
 static int dev_event_ioctl(fs_node_t *node, int request, void *arg) {
     (void)node;
-    if (!arg) return -1;
+    if (!arg) return -EINVAL;
     if (request == FIONREAD) {
         *(int*)arg = input_pending() * (int)sizeof(input_event_t);
         return 0;
@@ -917,7 +918,7 @@ static ssize_t dev_mouse_read(fs_node_t *node, uint32_t offset, uint32_t size, u
 
 static int dev_mouse_ioctl(fs_node_t *node, int request, void *arg) {
     (void)node;
-    if (!arg) return -1;
+    if (!arg) return -EINVAL;
     if (request == FIONREAD) {
         *(int*)arg = input_mouse_pending() * (int)sizeof(input_event_t);
         return 0;

@@ -66,7 +66,7 @@ fs_node_t* vfs_lookup(fs_node_t *root, const char *path) {
     return node;
 }
 
-uint32_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+ssize_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     if (offset >= fake_elf_file_size) return 0;
     if (offset + size > fake_elf_file_size) size = fake_elf_file_size - offset;
 
@@ -233,4 +233,23 @@ void test_elf_truncation() {
 int main() {
     test_elf_truncation();
     return 0;
+}
+size_t eteros_strlcat(char *dst, const char *src, size_t dsize) {
+    const char *odst = dst;
+    const char *osrc = src;
+    size_t n = dsize;
+    size_t dlen;
+    while (n-- != 0 && *dst != '\0') dst++;
+    dlen = dst - odst;
+    n = dsize - dlen;
+    if (n == 0) return (dlen + strlen(src));
+    while (*src != '\0') {
+        if (n != 1) {
+            *dst++ = *src;
+            n--;
+        }
+        src++;
+    }
+    *dst = '\0';
+    return (dlen + (src - osrc));
 }

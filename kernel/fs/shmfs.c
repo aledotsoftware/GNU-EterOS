@@ -1,5 +1,6 @@
 #include <fs/shmfs.h>
 #include <fs/vfs.h>
+#include <errno.h>
 #include <mm.h>
 #include <pmm.h>
 #include <vmm.h>
@@ -120,14 +121,14 @@ int shmfs_truncate(fs_node_t *node, uint32_t length);
 #include <linux_compat.h>
 
 static int shmfs_ioctl(fs_node_t *node, int request, void *arg) {
-    if (!node || !node->impl) return -1;
+    if (!node || !node->impl) return -EINVAL;
 
     if ((uint32_t)request == ASHMEM_SET_NAME) {
         if (arg) {
             char temp_name[256];
             extern int vmm_strncpy_from_user(char*, const char*, size_t);
             if (vmm_strncpy_from_user(temp_name, (const char*)arg, sizeof(temp_name)) < 0) {
-                return -1; // -EFAULT
+                return -EFAULT;
             }
             strlcpy(node->name, temp_name, sizeof(node->name));
         }
@@ -137,7 +138,7 @@ static int shmfs_ioctl(fs_node_t *node, int request, void *arg) {
         if (arg) {
             extern int vmm_verify_user_access(const void*, size_t, int);
             if (!vmm_verify_user_access(arg, sizeof(node->name), 1)) {
-                return -1; // -EFAULT
+                return -EFAULT;
             }
             memcpy(arg, node->name, sizeof(node->name));
         }
@@ -150,7 +151,7 @@ static int shmfs_ioctl(fs_node_t *node, int request, void *arg) {
     if ((uint32_t)request == ASHMEM_GET_SIZE) {
         return node->length;
     }
-    return -1; // -ENOTTY
+    return -ENOTTY;
 }
 
 fs_node_t* shmfs_create_memfd(const char* name) {
@@ -187,9 +188,9 @@ fs_node_t* shmfs_create_memfd(const char* name) {
 }
 
 int shmfs_truncate(fs_node_t *node, uint32_t length) {
-    if (!node) return -1;
+    if (!node) return -EINVAL;
     shm_object_t* obj = (shm_object_t*)(uintptr_t)node->impl;
-    if (!obj) return -1;
+    if (!obj) return -EINVAL;
 
     spin_lock(&obj->lock);
     
@@ -200,7 +201,7 @@ int shmfs_truncate(fs_node_t *node, uint32_t length) {
         uint64_t* new_pages = (uint64_t*)kmalloc(new_page_count * sizeof(uint64_t));
         if (!new_pages) {
             spin_unlock(&obj->lock);
-            return -1; /* ENOMEM */
+            return -ENOMEM;
         }
         
         /* Copy old pages */
@@ -274,7 +275,7 @@ static fs_node_t *shmfs_finddir(fs_node_t *node, char *name) {
 
 static int shmfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     (void)parent; (void)permission;
-    if (!name) return -1;
+    if (!name) return -EINVAL;
     
     spin_lock(&shm_lock);
     shm_object_t* obj = shm_find_object(name);
@@ -291,13 +292,13 @@ static int shmfs_create(fs_node_t *parent, char *name, uint16_t permission) {
 
 static int shmfs_unlink(fs_node_t *parent, char *name) {
     (void)parent;
-    if (!name) return -1;
+    if (!name) return -EINVAL;
     
     spin_lock(&shm_lock);
     shm_object_t* obj = shm_find_object(name);
     if (!obj) {
         spin_unlock(&shm_lock);
-        return -1;
+        return -EINVAL;
     }
     
     /* For simplicity, free immediately. A true POSIX shm unlinks the name but 
@@ -311,13 +312,13 @@ static int shmfs_unlink(fs_node_t *parent, char *name) {
 static int shmfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
     (void)old_parent;
     (void)new_parent;
-    if (!old_name || !new_name) return -1;
+    if (!old_name || !new_name) return -EINVAL;
 
     spin_lock(&shm_lock);
     shm_object_t* obj = shm_find_object(old_name);
     if (!obj) {
         spin_unlock(&shm_lock);
-        return -1;
+        return -EINVAL;
     }
 
     if (shm_find_object(new_name)) {
