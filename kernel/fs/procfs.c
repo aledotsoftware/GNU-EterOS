@@ -1,6 +1,7 @@
 #include <fs/procfs.h>
 #include <errno.h>
 #include <fs/vfs.h>
+#include <errno.h>
 #include <string.h>
 #include <mm.h>
 #include <pmm.h>
@@ -18,7 +19,7 @@ static task_t* proc_node_task(fs_node_t *node) {
 }
 
 static int proc_node_fd(fs_node_t *node) {
-    if (!node || node->inode < 1000) return -1;
+    if (!node || node->inode < 1000) return -ENOENT;
     return (int)(node->inode - 1000);
 }
 

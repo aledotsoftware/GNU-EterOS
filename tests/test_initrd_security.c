@@ -72,11 +72,11 @@ void test_initrd_oob_read() {
     // Initialize
     // Pass size=4096
     fs_node_t* root = initialise_initrd((uint64_t)image, sizeof(image));
-    assert(root != NULL);
+    if(!root) exit(1);
 
     // Find the file
     fs_node_t* file = initrd_finddir(root, "exploit.txt");
-    assert(file != NULL);
+    if(!file) exit(1);
 
     // Try to read
     uint8_t buffer[100];
