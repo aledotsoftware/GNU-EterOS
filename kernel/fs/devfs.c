@@ -1058,45 +1058,9 @@ static int dev_fb0_ioctl(fs_node_t *node, int request, void *arg) {
 /* ========================================================================= */
 /* /dev/ashmem and /dev/__properties__ Stubs                                 */
 /* ========================================================================= */
-static ssize_t dev_ashmem_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset; (void)size; (void)buffer;
-    return 0;
-}
-static uint32_t dev_ashmem_write(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
-    (void)node; (void)offset; (void)size; (void)buffer;
-    return size;
-}
-static int dev_ashmem_ioctl(fs_node_t *node, int request, void *arg) {
-    if (!node || node->inode != 12) return -ENOTTY;
-    if (request == ASHMEM_SET_NAME) {
-        if (arg) {
-            char temp_name[256];
-            if (vmm_strncpy_from_user(temp_name, (const char*)arg, sizeof(temp_name)) < 0) {
-                return -EFAULT;
-            }
-            /* Only update the node's name for debugging purposes, since DevFS doesn't
-               support per-FD objects natively. */
-            strlcpy(node->name, temp_name, sizeof(node->name));
-        }
-        return 0;
-    }
-    if (request == ASHMEM_GET_NAME) {
-        if (arg) {
-            if (safe_copy_to_user(arg, node->name, sizeof(node->name)) < 0) {
-                return -EFAULT;
-            }
-        }
-        return 0;
-    }
-    if (request == ASHMEM_SET_SIZE) {
-        node->length = (uint32_t)(uintptr_t)arg;
-        return 0;
-    }
-    if (request == ASHMEM_GET_SIZE) {
-        return node->length;
-    }
-    return 0;
-}
+
+
+
 static ssize_t dev_properties_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node; (void)offset; (void)size; (void)buffer;
     const char* dummy_props = "ro.build.version.sdk=29\nro.debuggable=1\n";
@@ -1281,9 +1245,6 @@ static fs_node_t *devfs_finddir(fs_node_t *node, char *name) {
         strlcpy(fnode->name, "ashmem", sizeof(fnode->name));
         fnode->flags = FS_CHARDEVICE;
         fnode->mask = 0666;
-        fnode->read = dev_ashmem_read;
-        fnode->write = dev_ashmem_write;
-        fnode->ioctl = dev_ashmem_ioctl;
         fnode->inode = 12;
     } else if (strcmp(name, "__properties__") == 0) {
         strlcpy(fnode->name, "__properties__", sizeof(fnode->name));

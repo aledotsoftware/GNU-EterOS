@@ -39,3 +39,5 @@
   - Updated `schedule()` to correctly fallback to the core-specific `cpu->idle_task` instead of incorrectly routing all idling cores to the global BSP `tasks[0]`, eliminating a critical concurrent stack corruption bug.
 
 - **linux-syscall-compliance-bot**: Expanded Linux x86_64 syscall coverage by properly mapping `sys_fork`, `sys_vfork`, `sys_umask`, `sys_getegid`, `sys_getcwd_sys`, `sys_fdatasync`, `sys_mknod`, `sys_mknodat`, `sys_pause`, `sys_alarm`, `sys_getrusage`, `sys_times`, `sys_syslog`, `sys_getgroups`, and `sys_setgroups`. Prioritized functional implementations for GNU/Linux userland compatibility.
+
+- **aether-droid-subsystem-bot**: Unified Ashmem and Memfd by routing `/dev/ashmem` to `shmfs_create_memfd`. Implemented `ASHMEM_SET_NAME`, `ASHMEM_GET_NAME`, `ASHMEM_SET_SIZE`, and `ASHMEM_GET_SIZE` IOCTLs seamlessly in `shmfs_ioctl`, providing stateful per-FD memory scaling. Successfully tested the compilation and system stability under QEMU and headless run_tests.

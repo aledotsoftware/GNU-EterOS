@@ -11,7 +11,7 @@ EterOS has a growing Linux ABI compatibility layer capable of running standard x
 **Strategy:** Implement a `/dev/binder` driver in `devfs.c` that handles basic `ioctl` commands (`BINDER_VERSION`, `BINDER_WRITE_READ`, `BINDER_SET_CONTEXT_MGR`), `mmap`, and thread management to support `servicemanager`.
 
 ### 2.2 Memory Management: Ashmem / Memfd
-**Current State:** Basic `shmfs` and `mmap(MAP_ANONYMOUS | MAP_SHARED)`.
+**Current State:** `shmfs` handles both `memfd_create` and legacy `/dev/ashmem` mappings dynamically via `sys_openat` interception.
 **Android Need:** Historically used `ashmem` (`/dev/ashmem`), but modern Android (API 29+) relies heavily on `memfd_create`.
 **Strategy:** Implement `sys_memfd_create` natively, backing it with the existing `shmfs` infrastructure, providing seamless anonymous file-backed memory sharing. Support sealing (`MFD_ALLOW_SEALING`) progressively.
 

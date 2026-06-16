@@ -117,6 +117,42 @@ static void shmfs_close(fs_node_t *node) {
 
 int shmfs_truncate(fs_node_t *node, uint32_t length);
 
+#include <linux_compat.h>
+
+static int shmfs_ioctl(fs_node_t *node, int request, void *arg) {
+    if (!node || !node->impl) return -1;
+
+    if ((uint32_t)request == ASHMEM_SET_NAME) {
+        if (arg) {
+            char temp_name[256];
+            extern int vmm_strncpy_from_user(char*, const char*, size_t);
+            if (vmm_strncpy_from_user(temp_name, (const char*)arg, sizeof(temp_name)) < 0) {
+                return -1; // -EFAULT
+            }
+            strlcpy(node->name, temp_name, sizeof(node->name));
+        }
+        return 0;
+    }
+    if ((uint32_t)request == ASHMEM_GET_NAME) {
+        if (arg) {
+            extern int vmm_verify_user_access(const void*, size_t, int);
+            if (!vmm_verify_user_access(arg, sizeof(node->name), 1)) {
+                return -1; // -EFAULT
+            }
+            memcpy(arg, node->name, sizeof(node->name));
+        }
+        return 0;
+    }
+    if ((uint32_t)request == ASHMEM_SET_SIZE) {
+        shmfs_truncate(node, (uint32_t)(uintptr_t)arg);
+        return 0;
+    }
+    if ((uint32_t)request == ASHMEM_GET_SIZE) {
+        return node->length;
+    }
+    return -1; // -ENOTTY
+}
+
 fs_node_t* shmfs_create_memfd(const char* name) {
     shm_object_t* obj = shm_create_object(""); /* Empty name = anonymous */
     if (!obj) return NULL;
@@ -138,6 +174,7 @@ fs_node_t* shmfs_create_memfd(const char* name) {
     fnode->impl = (uintptr_t)obj;
     fnode->length = obj->size;
 
+    fnode->ioctl = shmfs_ioctl;
     fnode->read = shmfs_read;
     fnode->write = shmfs_write;
     fnode->open = shmfs_open;

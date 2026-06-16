@@ -15,7 +15,7 @@ While EterOS currently maps a growing subset of x86_64 Linux syscalls, Android (
 
 ### 3.1. Phase 1: IPC Base & Stubs (Current Focus)
 - **Action:** Move basic Binder definitions into standard compatibility headers (`include/linux_compat.h`).
-- **Action:** Expose `/dev/ashmem` and `/dev/__properties__` character devices in `devfs` with stubbed behaviors.
+- **Action:** Route `/dev/ashmem` to `shmfs_create_memfd` and `/dev/__properties__` to `devfs` with anonymous mappings for Android properties compatibility.
 - **Action:** Implement `sys_prctl` with support for `PR_SET_NAME` and `PR_SET_VMA` to satisfy Bionic's linker and memory allocation routines.
 - **Action:** Implement basic memory mapping support for `/dev/binder`, `/dev/ashmem`, and `/dev/__properties__` in `sys_mmap`.
 

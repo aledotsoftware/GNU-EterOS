@@ -476,6 +476,7 @@ static int64_t sys_memfd_create(const char *name, unsigned int flags) {
     task_t* current = task_get_current();
     if (!current) return -ENOSYS;
 
+    extern fs_node_t* shmfs_create_memfd(const char* name);
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
@@ -663,6 +664,8 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     return (int64_t)virt;
 }
 
+
+
 static int64_t sys_socket(int domain, int type, int protocol) {
     return sys_lwip_socket(domain, type, protocol);
 }
@@ -724,6 +727,11 @@ static int64_t sys_pipe2(int* pipefd, int flags) {
 
 static int64_t sys_pipe(int* pipefd) {
     return sys_pipe2(pipefd, 0);
+}
+
+static int64_t sys_socketpair(int domain, int type, int protocol, int sv[2]) {
+    (void)domain; (void)type; (void)protocol;
+    return sys_pipe2(sv, 0); // Simplified stub for Bionic threading
 }
 
 struct utsname {
@@ -811,6 +819,7 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     if ((flags & O_ACCMODE) > O_RDWR) { kfree(kpath); return -EINVAL; }
 
     task_t* current = task_get_current();
+    extern fs_node_t* shmfs_create_memfd(const char* name);
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
@@ -820,7 +829,12 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     }
     if (fd == -1) { kfree(kpath); return -EMFILE; }
 
-    fs_node_t* node = vfs_lookup_ext(fs_root, kpath, (flags & O_NOFOLLOW) ? 0 : 1);
+    fs_node_t* node = NULL;
+    if (strcmp(kpath, "/dev/ashmem") == 0) {
+        node = shmfs_create_memfd("ashmem");
+    } else {
+        node = vfs_lookup_ext(fs_root, kpath, (flags & O_NOFOLLOW) ? 0 : 1);
+    }
 
     if (node && (flags & O_NOFOLLOW) && ((node->flags & 0x7) == FS_SYMLINK)) {
         if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
@@ -2842,6 +2856,7 @@ static int64_t sys_epoll_wait(int epfd, struct epoll_event* events, int maxevent
 static int64_t sys_eventfd2(unsigned int initval, int flags) {
     (void)initval; (void)flags;
     task_t* current = task_get_current();
+    extern fs_node_t* shmfs_create_memfd(const char* name);
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
@@ -3663,6 +3678,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [21] = (syscall_ptr_t)sys_access,
     [22] = (syscall_ptr_t)sys_pipe,
     [23] = (syscall_ptr_t)sys_select,
+    [53] = (syscall_ptr_t)sys_socketpair,
     [25] = (syscall_ptr_t)sys_mremap,
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
@@ -3817,6 +3833,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [21] = (syscall_ptr_t)sys_access,
     [22] = (syscall_ptr_t)sys_pipe,
     [23] = (syscall_ptr_t)sys_select,
+    [53] = (syscall_ptr_t)sys_socketpair,
     [25] = (syscall_ptr_t)sys_mremap,
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
