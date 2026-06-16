@@ -37,9 +37,7 @@ syscall_entry:
     mov rdi, rsp
     
     cld
-    sti
     call syscall_handler
-    cli
 
     ; 6. Restore Registers
     POP_ALL

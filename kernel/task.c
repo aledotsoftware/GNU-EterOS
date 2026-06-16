@@ -680,28 +680,10 @@ void schedule(void) {
     /* Si no hay tareas listas y la actual esta muerta/durmiendo */
     if (next_task == NULL) {
         cpu_idle_ticks++;
-        spin_unlock(&sched_lock);
-        task_irq_restore(irq_flags);
-
-        /* Wait for interrupts and loop until a task is ready */
-        for(;;) {
-            __asm__ volatile("hlt");
-            if (cpu->local_ready_head) {
-                break;
-            }
-        }
-
-        /* Re-acquire lock and find the new task */
-        irq_flags = task_irq_save();
-        spin_lock(&sched_lock);
-        next_task = find_next_task(current);
-        if (next_task == NULL) {
-             /* Fallback to kernel idle task to prevent running on a dead task's stack */
-             if (cpu->idle_task) {
-                 next_task = (task_t*)cpu->idle_task;
-             } else {
-                 next_task = &tasks[0];
-             }
+        if (cpu->idle_task) {
+            next_task = (task_t*)cpu->idle_task;
+        } else {
+            next_task = &tasks[0];
         }
     }
 
