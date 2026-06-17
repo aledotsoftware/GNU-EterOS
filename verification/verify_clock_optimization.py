@@ -4,7 +4,6 @@ from playwright.sync_api import sync_playwright
 
 def verify_clock(page):
     # Load index.html
-    cwd = os.getcwd()
     page.goto(f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}")
 
     # Wait for boot splash to disappear
