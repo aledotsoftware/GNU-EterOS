@@ -64,7 +64,12 @@ void shell_run(void) {
             }
 
             /* Dormir hasta la próxima interrupción */
-            __asm__ volatile("hlt");
+            __asm__ volatile("cli");
+            if (!keyboard_has_input() && !serial_received()) {
+                __asm__ volatile("sti; hlt");
+            } else {
+                __asm__ volatile("sti");
+            }
         }
 
         if (c == '\n') {
