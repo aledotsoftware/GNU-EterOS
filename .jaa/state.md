@@ -64,3 +64,5 @@
   - Implemented `sys_fchdir` to use the tracked absolute path string from the process's file descriptor table `file_descriptor_t`, appropriately updating the internal current working directory node and string values.
   - Aligned `sys_getcwd` with the standard Linux x86_64 ABI specification by accurately returning the path string length instead of a memory pointer.
   - Successfully mapped `sys_getcwd` correctly to system call number 79 in Linux compatibility tables, removing old placeholders.
+In EterOS kernel space (e.g., `kernel/shell/cmd_user.c`), when generating or modifying sensitive VFS files like `/etc/shadow` via temporary files, explicitly set the VFS node's `mask` property (e.g., `tmp_node->mask = 0600;`) to enforce permissions, as userspace `chmod` is unavailable.
+In EterOS `userspace/login.c`, reading passwords via `read` from stdin must cleanly distinguish between actual errors (`len < 0`) and EOF (`len == 0`), correctly null-terminating the buffer and breaking the loop gracefully instead of continuing, which would cause an infinite loop if standard input is closed.

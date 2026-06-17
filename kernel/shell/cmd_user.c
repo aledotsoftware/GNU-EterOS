@@ -194,13 +194,13 @@ static void remove_user_from_vfs_file(const char* filepath, const char* username
     temp_path[len] = '\0';
 
     fs_node_t* tmp_node = vfs_lookup(fs_root, temp_path);
-    if (tmp_node && tmp_node->truncate) tmp_node->truncate(tmp_node, 0);
-    else if (tmp_node) tmp_node->length = 0;
-
     if (!tmp_node) {
         kfree(buffer);
         return;
     }
+    if (tmp_node->truncate) tmp_node->truncate(tmp_node, 0);
+    else tmp_node->length = 0;
+    tmp_node->mask = is_shadow ? 0600 : 0644;
 
     char* ptr = (char*)buffer;
     int found = 0;
@@ -314,8 +314,11 @@ static void cmd_passwd(const char* args) {
     fs_node_t* etc_node = vfs_lookup(fs_root, "/etc");
     create_fs(etc_node, "shadow.tmp", 0600);
     fs_node_t* tmp_node = vfs_lookup(fs_root, "/etc/shadow.tmp");
-    if (tmp_node->truncate) tmp_node->truncate(tmp_node, 0);
-    else tmp_node->length = 0;
+    if (tmp_node) {
+        if (tmp_node->truncate) tmp_node->truncate(tmp_node, 0);
+        else tmp_node->length = 0;
+        tmp_node->mask = 0600;
+    }
 
     char* tptr = (char*)buffer;
     int found = 0;
