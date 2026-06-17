@@ -8,6 +8,7 @@ Comandos/panel de red y superficies de configuración.
 
 ## Current Goal
 *(Waiting for new assignment)*
+**Status: COMPLETED**
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
