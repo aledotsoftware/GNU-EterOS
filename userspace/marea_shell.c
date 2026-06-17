@@ -672,7 +672,7 @@ static void draw_menu(void) {
 /* Check if click is on a window's minimize button */
 static int hit_minimize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + 14 + btn_spacing;
+    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -681,7 +681,7 @@ static int hit_minimize_button(marea_window_t* win, int mx, int my) {
 /* Check if click is on a window's maximize button */
 static int hit_maximize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + 14 + btn_spacing * 2;
+    int btn_cx = win->x + win->w - 14 - btn_spacing;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -689,7 +689,7 @@ static int hit_maximize_button(marea_window_t* win, int mx, int my) {
 
 /* Check if click is on a window's close button */
 static int hit_close_button(marea_window_t* win, int mx, int my) {
-    int btn_cx = win->x + 14;
+    int btn_cx = win->x + win->w - 14;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -717,10 +717,10 @@ static void draw_window_chrome(marea_window_t* win) {
     uint32_t border_col = is_focused ? COL_ACCENT_GLOW : COL_BORDER;
     stroke_rect(x, y, w, h, border_col);
 
-    /* Traffic light buttons (macOS-style) */
+    /* Traffic light buttons (Right-aligned, Windows/GNOME style) */
     int btn_r = 6;
     int btn_spacing = 20;
-    int btn_base_x = x + 14;
+    int btn_base_x = x + w - 14;
     int btn_base_y = y + TITLEBAR_HEIGHT / 2;
 
     /* Check hover states */
@@ -728,7 +728,7 @@ static void draw_window_chrome(marea_window_t* win) {
     int hover_min = hit_minimize_button(win, mouse_x, mouse_y);
     int hover_max = hit_maximize_button(win, mouse_x, mouse_y);
 
-    /* Close (red) */
+    /* Close (red) - Rightmost */
     for (int dy = -btn_r; dy <= btn_r; dy++) {
         for (int dx = -btn_r; dx <= btn_r; dx++) {
             if (dx*dx + dy*dy <= btn_r*btn_r) {
@@ -744,39 +744,39 @@ static void draw_window_chrome(marea_window_t* win) {
         }
     }
 
-    /* Minimize (yellow) */
+    /* Maximize (green) - Middle */
     for (int dy = -btn_r; dy <= btn_r; dy++) {
         for (int dx = -btn_r; dx <= btn_r; dx++) {
             if (dx*dx + dy*dy <= btn_r*btn_r) {
-                put_pixel(btn_base_x + btn_spacing + dx, btn_base_y + dy, COL_WARNING);
-            }
-        }
-    }
-    if (hover_min) {
-        /* Draw '-' inside minimize button */
-        for (int i = -2; i <= 2; i++) {
-            put_pixel(btn_base_x + btn_spacing + i, btn_base_y, 0xFF4C4C00);
-        }
-    }
-
-    /* Maximize (green) */
-    for (int dy = -btn_r; dy <= btn_r; dy++) {
-        for (int dx = -btn_r; dx <= btn_r; dx++) {
-            if (dx*dx + dy*dy <= btn_r*btn_r) {
-                put_pixel(btn_base_x + btn_spacing * 2 + dx, btn_base_y + dy, COL_SUCCESS);
+                put_pixel(btn_base_x - btn_spacing + dx, btn_base_y + dy, COL_SUCCESS);
             }
         }
     }
     if (hover_max) {
         /* Draw '+' inside maximize button */
         for (int i = -2; i <= 2; i++) {
-            put_pixel(btn_base_x + btn_spacing * 2 + i, btn_base_y, 0xFF004C00);
-            put_pixel(btn_base_x + btn_spacing * 2, btn_base_y + i, 0xFF004C00);
+            put_pixel(btn_base_x - btn_spacing + i, btn_base_y, 0xFF004C00);
+            put_pixel(btn_base_x - btn_spacing, btn_base_y + i, 0xFF004C00);
+        }
+    }
+
+    /* Minimize (yellow) - Leftmost */
+    for (int dy = -btn_r; dy <= btn_r; dy++) {
+        for (int dx = -btn_r; dx <= btn_r; dx++) {
+            if (dx*dx + dy*dy <= btn_r*btn_r) {
+                put_pixel(btn_base_x - btn_spacing * 2 + dx, btn_base_y + dy, COL_WARNING);
+            }
+        }
+    }
+    if (hover_min) {
+        /* Draw '-' inside minimize button */
+        for (int i = -2; i <= 2; i++) {
+            put_pixel(btn_base_x - btn_spacing * 2 + i, btn_base_y, 0xFF4C4C00);
         }
     }
 
     /* Window title */
-    int title_x = btn_base_x + btn_spacing * 3 + 8;
+    int title_x = x + 14;
     uint32_t title_color = is_focused ? COL_TEXT_PRIMARY : COL_TEXT_SECONDARY;
     draw_text(title_x, y + (TITLEBAR_HEIGHT - 16) / 2, win->title, title_color, 0);
 }
@@ -1327,7 +1327,7 @@ static void handle_mouse_event(const input_event_t* ev) {
         int old_x = mouse_x;
         int old_y = mouse_y;
 
-        cursor_restore_bg(mouse_x, mouse_y);
+        cursor_restore_bg(old_x, old_y);
         mark_dirty_rect(old_x, old_y, CURSOR_W, CURSOR_H);
 
         if (ev->code == REL_X) mouse_x += delta;
@@ -1511,7 +1511,7 @@ static void handle_keyboard_char(char c) {
     }
 
     marea_window_t* win = &windows[focused_window];
-    cursor_restore_bg(mouse_x, mouse_y);
+    cursor_restore_bg(old_x, old_y);
     mark_dirty_rect(old_x, old_y, CURSOR_W, CURSOR_H);
 
     if (win->kind == WINDOW_KIND_EDITOR) {

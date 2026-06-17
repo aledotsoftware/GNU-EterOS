@@ -12,7 +12,7 @@ def run():
 
         # 1. Click the calculator icon to open a window
         page.locator("#boot-splash").wait_for(state="detached")
-        page.evaluate("spawnApp('Calculator', 'linux')")
+        page.evaluate("spawnApp('Terminal', 'linux')")
 
         # 2. Wait for window to appear
         page.wait_for_selector(".window")

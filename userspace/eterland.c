@@ -142,8 +142,8 @@ void draw_window() {
     draw_rect(win_x, win_y, win_w, 24, title_bg);
     draw_string(win_x + 8, win_y + 4, "Terminal", title_fg, 0xFFFFFFFF);
     draw_rect(win_x + win_w - 24, win_y + 4, 16, 16, 0xE74C3C);
-    draw_rect(win_x + win_w - 44, win_y + 4, 16, 16, 0xF1C40F);
-    draw_rect(win_x + win_w - 64, win_y + 4, 16, 16, 0x2ECC71);
+    draw_rect(win_x + win_w - 44, win_y + 4, 16, 16, 0x2ECC71);
+    draw_rect(win_x + win_w - 64, win_y + 4, 16, 16, 0xF1C40F);
     draw_rect(win_x, win_y + 24, win_w, win_h - 24, term_bg);
 }
 
