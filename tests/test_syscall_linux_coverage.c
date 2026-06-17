@@ -141,7 +141,7 @@ int main() {
 
     assert(sys_fchdir(3) == -ENOTDIR);
     valid_node->flags = FS_DIRECTORY;
-    assert(sys_fchdir(3) == -ENOSYS); // Currently implemented as ENOSYS for directories
+    assert(sys_fchdir(3) == 0);
     valid_node->flags = 0;
 
     int chown_ret = sys_chown("/valid", 500, 500); assert(chown_ret == -1 || chown_ret == -EPERM || chown_ret == 0 || chown_ret == -2);

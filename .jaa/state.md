@@ -62,3 +62,7 @@
   - Ensured correct memory lifecycle (`kfree`) for allocated buffers and wrapper nodes upon success and failure paths.
 
 - **Orchestrator**: Verified a clean build globally following `vision-cli-agent` warning fixes and validated headless QEMU boot across RAM configurations. Delegated new critical blockers for GNU Coreutils: `sys_getcwd` and CWD management to `aether-linux-subsystem-bot` and `vfs-posix-filesystem-bot`, and `sys_fsync`/`sys_truncate` to `linux-syscall-compliance-bot`.
+- **Aether Linux Subsystem**:
+  - Implemented `sys_fchdir` to use the tracked absolute path string from the process's file descriptor table `file_descriptor_t`, appropriately updating the internal current working directory node and string values.
+  - Aligned `sys_getcwd` with the standard Linux x86_64 ABI specification by accurately returning the path string length instead of a memory pointer.
+  - Successfully mapped `sys_getcwd` correctly to system call number 79 in Linux compatibility tables, removing old placeholders.

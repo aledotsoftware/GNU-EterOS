@@ -1434,13 +1434,15 @@ static int64_t sys_fchdir(int fd) {
     if ((node->flags & 0x7) != FS_DIRECTORY) return -ENOTDIR;
     if (!check_node_permission(node, 1)) return -EACCES;
 
-    // In EterOS, cwd is a string, but an FD doesn't store its resolved path easily.
-    // However, we can map some cases or just return -ENOSYS if we can't resolve it.
-    // For now, we will simply set cwd to the root if we can't figure it out, but ideally we need reverse lookup.
-    // Actually, vfs_lookup doesn't save names. Let's return -ENOSYS since it's hard to get path from FD.
-    // Wait, let's just make it a stub that sets cwd to "/" for now to satisfy basic tests if needed, or return ENOSYS.
-    // Let's implement a dummy one.
-    return -ENOSYS;
+    current->cwd_node = node;
+    const char* path = current->fd_table[fd].path;
+    if (path && path[0] == '/') {
+        strlcpy(current->cwd, path, sizeof(current->cwd));
+    } else {
+        /* Fallback if path is missing or not absolute */
+        strlcpy(current->cwd, "/", sizeof(current->cwd));
+    }
+    return 0;
 }
 
 static int64_t sys_chown(const char* path, uint32_t owner, uint32_t group) {
@@ -3376,7 +3378,7 @@ static int64_t sys_getcwd(char* buf, size_t size) {
         kfree(temp_path);
         if (size < 2) return -ERANGE;
         strlcpy(buf, "/", size);
-        return (int64_t)buf;
+        return 2;
     }
 
     /* We need to ascend to root */
@@ -3432,8 +3434,9 @@ static int64_t sys_getcwd(char* buf, size_t size) {
 
     if (strlen(temp_path) >= size) { kfree(temp_path); return -ERANGE; }
     strlcpy(buf, temp_path, size);
+    int64_t ret_len = strlen(temp_path) + 1;
     kfree(temp_path);
-    return (int64_t)buf;
+    return ret_len;
 }
 
 static int64_t sys_chdir(const char* path) {
@@ -3634,14 +3637,6 @@ static int64_t sys_fork_wrapper(struct syscall_regs* regs) {
 }
 
 
-static int64_t sys_getcwd_sys(char *buf, unsigned long size) {
-    // Actually we don't have a good way to get cwd string yet if we don't store it
-    // But EterOS resolves absolute paths for most
-    // We can just return an error or fake it
-    (void)buf; (void)size;
-    return -ENOSYS;
-}
-
 static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     (void)a1; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6;
     return -ENOSYS;
@@ -3725,7 +3720,7 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
 
-    [79] = (syscall_ptr_t)sys_getcwd_sys,
+    [79] = (syscall_ptr_t)sys_getcwd,
 
     [80] = (syscall_ptr_t)sys_chdir,
     [81] = (syscall_ptr_t)sys_fchdir,
@@ -3875,7 +3870,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [76] = (syscall_ptr_t)sys_truncate,
     [77] = (syscall_ptr_t)sys_ftruncate,
 
-    [79] = (syscall_ptr_t)sys_getcwd_sys,
+    [79] = (syscall_ptr_t)sys_getcwd,
 
     [80] = (syscall_ptr_t)sys_chdir,
     [81] = (syscall_ptr_t)sys_fchdir,
