@@ -130,12 +130,6 @@ void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096
 #endif
-#ifndef PAGE_ALIGN_DOWN
-#define PAGE_ALIGN_DOWN(x) ((x) & ~(PAGE_SIZE - 1))
-#endif
-#ifndef PAGE_ALIGN_UP
-#define PAGE_ALIGN_UP(x) (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
-#endif
 
 #ifndef EI_CLASS
 #define EI_CLASS 4
@@ -161,6 +155,7 @@ void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
 #ifndef SHN_UNDEF
 #define SHN_UNDEF 0
 #endif
+#define USER_BASE 0x200000000ULL
 
 #include "../kernel/fs/elf.c"
 
