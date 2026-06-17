@@ -32,6 +32,7 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 #define ETEROS_SERIAL_H
 /* ETEROS_STRING_H and ETEROS_STDIO_H are already defined by includes above */
 
+
 /* Mock Macros usually in headers */
 #define PAGE_SIZE 4096
 #define HAL_MEM_READ 1

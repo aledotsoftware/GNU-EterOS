@@ -10,7 +10,8 @@ static int read_line(int fd, char *buf, int max_len) {
     char c;
     while (i < max_len - 1) {
         int r = read(fd, &c, 1);
-        if (r <= 0) break;
+        if (r < 0) { if (i == 0) return -1; break; }
+        if (r == 0) break;
         buf[i++] = c;
         if (c == '\n') break;
     }
