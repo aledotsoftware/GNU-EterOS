@@ -238,7 +238,7 @@ fs_node_t *partition_get_active_root(void) {
     int active_idx = active_partition_index;
     uint8_t nvram_part = nvram_get_boot_partition();
 
-    if (nvram_part < partition_count) {
+    if (nvram_part != 0xFF && nvram_part < partition_count) {
         active_idx = nvram_part;
     }
 
@@ -253,7 +253,7 @@ fs_node_t *partition_get_passive_root(void) {
     int active_idx = active_partition_index;
     uint8_t nvram_part = nvram_get_boot_partition();
 
-    if (nvram_part < partition_count) {
+    if (nvram_part != 0xFF && nvram_part < partition_count) {
         active_idx = nvram_part;
     }
 

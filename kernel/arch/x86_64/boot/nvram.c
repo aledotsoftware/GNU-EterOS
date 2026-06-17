@@ -27,7 +27,11 @@ void nvram_set_boot_partition(uint8_t partition_id) {
 }
 
 uint8_t nvram_get_boot_partition(void) {
-    return nvram_read(NVRAM_BOOT_PARTITION_REG);
+    uint8_t val = nvram_read(NVRAM_BOOT_PARTITION_REG);
+    if (val != 0 && val != 1) {
+        return 0xFF;
+    }
+    return val;
 }
 
 void nvram_set_update_state(uint8_t state) {
@@ -35,5 +39,9 @@ void nvram_set_update_state(uint8_t state) {
 }
 
 uint8_t nvram_get_update_state(void) {
-    return nvram_read(NVRAM_UPDATE_STATE_REG);
+    uint8_t val = nvram_read(NVRAM_UPDATE_STATE_REG);
+    if (val > UPDATE_STATE_FAILED) {
+        return UPDATE_STATE_NONE;
+    }
+    return val;
 }

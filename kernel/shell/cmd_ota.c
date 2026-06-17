@@ -16,7 +16,6 @@
 #define OTA_COMMIT_HASH "5715f15ae4c99ca17e6d3d5a6eb61faaddd05d6c"
 
 static char ota_repo_url[OTA_MAX_URL] = "http://repo.eteros.org/updates";
-static int ota_require_sig = 1;
 
 static uint16_t parse_url(const char* url, char* host, size_t host_size, char* path, size_t path_size) {
     uint16_t port = 80;
@@ -45,7 +44,7 @@ static uint16_t parse_url(const char* url, char* host, size_t host_size, char* p
 
 void cmd_ota(const char* args) {
     if (!args || !*args) {
-        terminal_write_string("Uso: ota [info | seturl <url> | update | checksig <on|off> | confirm | rollback]\n");
+        terminal_write_string("Uso: ota [info | seturl <url> | update | confirm | rollback]\n");
         return;
     }
 
@@ -63,8 +62,7 @@ void cmd_ota(const char* args) {
         terminal_write_string("\n  [OTA] Información del Sistema de Actualizaciones:\n");
         terminal_write_string("    Repositorio: ");
         terminal_write_string(ota_repo_url);
-        terminal_write_string("\n    Verificación Ed25519: ");
-        terminal_write_string(ota_require_sig ? "Activa" : "Inactiva");
+        terminal_write_string("\n    Verificación Ed25519: Activa (Mandatoria)");
 
         terminal_write_string("\n\n  [Sistema] Versión actual:\n");
         terminal_write_string("    Commit: ");
@@ -127,16 +125,6 @@ void cmd_ota(const char* args) {
         terminal_write_string("URL del repositorio actualizada a: ");
         terminal_write_string(ota_repo_url);
         terminal_write_string("\n");
-    } else if (strcmp(subcmd, "checksig") == 0) {
-        if (strcmp(p, "on") == 0) {
-            ota_require_sig = 1;
-            terminal_write_string("Verificación de firmas Ed25519 ACTIVADA.\n");
-        } else if (strcmp(p, "off") == 0) {
-            ota_require_sig = 0;
-            terminal_write_string("Verificación de firmas Ed25519 DESACTIVADA.\n");
-        } else {
-            terminal_write_string("Uso: ota checksig <on|off>\n");
-        }
     } else if (strcmp(subcmd, "update") == 0) {
         if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
              terminal_write_string("  [OTA] ERROR: Hay una actualizacion pendiente. Confirme o haga rollback antes de actualizar.\n");
@@ -308,39 +296,35 @@ receive:
         terminal_write_string(size_buf);
         terminal_write_string(" bytes).\n");
 
-        if (ota_require_sig) {
-            terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
+        terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
 
-            // Assume the first 64 bytes of payload are the signature, rest is actual image.
-            if (payload_size <= 64) {
-                terminal_write_string("  [OTA] ERROR: Payload demasiado pequeno para contener firma.\n");
-                kfree(payload_data);
-                kfree(passive_part);
-                return;
-            }
-
-            unsigned char sig[64];
-            memcpy(sig, payload_data, 64);
-
-            // Definir una clave publica real (hardcodeada para este build) en lugar de una de ceros.
-            // Esto es una semilla/clave valida en formato binario para propósitos de update signing
-            unsigned char pk[32] = {
-                0x7A, 0x1B, 0x2C, 0x3D, 0x4E, 0x5F, 0x6A, 0x7B,
-                0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3,
-                0x04, 0x15, 0x26, 0x37, 0x48, 0x59, 0x6A, 0x7B,
-                0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3
-            };
-
-            if (!ed25519_verify(sig, payload_data + 64, payload_size - 64, pk)) {
-                terminal_write_string("  [OTA] ERROR: Fallo la validacion de la firma Ed25519.\n");
-                kfree(payload_data);
-                kfree(passive_part);
-                return;
-            }
-            terminal_write_string("  [OTA] Firma verificada correctamente.\n");
-        } else {
-            terminal_write_string("  [OTA] ADVERTENCIA: Instalando actualizacion SIN verificar firma.\n");
+        // Assume the first 64 bytes of payload are the signature, rest is actual image.
+        if (payload_size <= 64) {
+            terminal_write_string("  [OTA] ERROR: Payload demasiado pequeno para contener firma.\n");
+            kfree(payload_data);
+            kfree(passive_part);
+            return;
         }
+
+        unsigned char sig[64];
+        memcpy(sig, payload_data, 64);
+
+        // Definir una clave publica real (hardcodeada para este build) en lugar de una de ceros.
+        // Esto es una semilla/clave valida en formato binario para propósitos de update signing
+        unsigned char pk[32] = {
+            0x7A, 0x1B, 0x2C, 0x3D, 0x4E, 0x5F, 0x6A, 0x7B,
+            0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3,
+            0x04, 0x15, 0x26, 0x37, 0x48, 0x59, 0x6A, 0x7B,
+            0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3
+        };
+
+        if (!ed25519_verify(sig, payload_data + 64, payload_size - 64, pk)) {
+            terminal_write_string("  [OTA] ERROR: Fallo la validacion de la firma Ed25519.\n");
+            kfree(payload_data);
+            kfree(passive_part);
+            return;
+        }
+        terminal_write_string("  [OTA] Firma verificada correctamente.\n");
 
         uint8_t next_part = passive_part->impl;
 
@@ -352,7 +336,7 @@ receive:
         terminal_write_string(") sera sobreescrito.\n");
 
         uint32_t write_offset = 0;
-        uint32_t data_offset = ota_require_sig ? 64 : 0; // write the actual image without signature
+        uint32_t data_offset = 64; // write the actual image without signature
 
         if (payload_size < data_offset) {
              terminal_write_string("  [OTA] ERROR: Payload muy pequeno para contener los datos de actualizacion.\n");
@@ -454,6 +438,6 @@ receive:
             terminal_write_string("  [OTA] No hay ninguna actualizacion pendiente de la cual hacer rollback.\n");
         }
     } else {
-        terminal_write_string("Comando OTA desconocido. Uso: ota [info | seturl <url> | update | checksig <on|off> | confirm | rollback]\n");
+        terminal_write_string("Comando OTA desconocido. Uso: ota [info | seturl <url> | update | confirm | rollback]\n");
     }
 }

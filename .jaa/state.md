@@ -57,6 +57,7 @@
   - Confirmed RTC `rtc_is_updating()` correctly disables NMI and loops appropriately across the CMOS data port ensuring synchronized and robust atomic date fetching.
 
 - **ota-update-panel-bot**: OTA logic hardened and verified.
+  - Hardened OTA verification by strictly enforcing Ed25519 payload signatures, removing bypass toggles, and adding bounds-validation to NVRAM state readers to prevent fallback loops when NVRAM is uninitialized.
   - Improved `cmd_ota.c` update diagnostics by including partition size in KB within the `info` command and removing unused boot variables.
   - Implemented robust write-verification for OTA downloads: the payload is read back after writing to disk and strictly `memcmp`'d against the source, preventing corrupted updates from being flagged as pending.
   - Fixed the `rollback` command to properly compute the active slot dynamically via `partition_get_active_root()->impl` rather than relying solely on NVRAM fallbacks.

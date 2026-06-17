@@ -17,6 +17,9 @@ void nvram_set_boot_partition(uint8_t partition_id) {
 }
 
 uint8_t nvram_get_boot_partition(void) {
+    if (mock_nvram_boot_partition != 0 && mock_nvram_boot_partition != 1) {
+        return 0xFF;
+    }
     return mock_nvram_boot_partition;
 }
 
@@ -25,6 +28,9 @@ void nvram_set_update_state(uint8_t state) {
 }
 
 uint8_t nvram_get_update_state(void) {
+    if (mock_nvram_update_state > UPDATE_STATE_FAILED) {
+        return UPDATE_STATE_NONE;
+    }
     return mock_nvram_update_state;
 }
 
@@ -47,12 +53,30 @@ void simulate_confirm() {
     }
 }
 
+// Simulates partition_get_active_root logic
+typedef struct {
+    uint8_t impl;
+} fs_node_t;
+
+fs_node_t* partition_get_active_root() {
+    fs_node_t *node = malloc(sizeof(fs_node_t));
+    uint8_t nvram_part = nvram_get_boot_partition();
+    if (nvram_part != 0xFF) {
+        node->impl = nvram_part;
+    } else {
+        node->impl = 0; // Default active
+    }
+    return node;
+}
+
 void simulate_rollback() {
     if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
-        uint8_t current = nvram_get_boot_partition();
+        fs_node_t *active = partition_get_active_root();
+        uint8_t current = active->impl;
         uint8_t next = (current == 0) ? 1 : 0;
         nvram_set_boot_partition(next);
         nvram_set_update_state(UPDATE_STATE_FAILED);
+        free(active);
     }
 }
 
@@ -97,6 +121,19 @@ int main() {
     simulate_rollback();
     assert(nvram_get_boot_partition() == before_part);
     assert(nvram_get_update_state() == UPDATE_STATE_SUCCESS);
+
+    // Test 8: Uninitialized NVRAM values
+    mock_nvram_boot_partition = 0xAA;
+    mock_nvram_update_state = 0xBB;
+    assert(nvram_get_boot_partition() == 0xFF);
+    assert(nvram_get_update_state() == UPDATE_STATE_NONE);
+
+    // Rollback with uninitialized boot partition
+    nvram_set_update_state(UPDATE_STATE_PENDING);
+    simulate_rollback();
+    // Default active root impl is 0, so next should be 1
+    assert(nvram_get_boot_partition() == 1);
+    assert(nvram_get_update_state() == UPDATE_STATE_FAILED);
 
     printf("All OTA state machine tests passed!\n");
     return 0;
