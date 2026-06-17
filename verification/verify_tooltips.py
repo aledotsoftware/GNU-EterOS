@@ -9,7 +9,6 @@ def verify_tooltips():
         page = browser.new_page()
 
         # specific to the environment, get absolute path
-        cwd = os.getcwd()
         file_path = f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}"
 
         print(f"Navigating to {file_path}")
@@ -54,7 +53,7 @@ def verify_tooltips():
         # Capture the whole window to be safe
         window_el = page.locator('.window')
 
-        output_path = f"{cwd}/verification/verify_tooltip.png"
+        output_path = f"{os.path.dirname(__file__)}/verify_tooltip.png"
         print(f"Taking screenshot to {output_path}")
         window_el.screenshot(path=output_path)
 

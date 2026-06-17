@@ -7,7 +7,6 @@ def run():
         page = browser.new_page()
 
         # Get absolute path to index.html
-        cwd = os.getcwd()
         file_path = f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}"
 
         print(f"Navigating to: {file_path}")

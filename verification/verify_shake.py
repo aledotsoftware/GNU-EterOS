@@ -9,7 +9,6 @@ def run():
         page = context.new_page()
 
         # Load the local HTML file
-        cwd = os.getcwd()
         page.goto(f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}")
 
         print("Waiting for boot splash...")

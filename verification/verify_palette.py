@@ -7,7 +7,6 @@ def verify_palette():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        cwd = os.getcwd()
         file_path = f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}"
         print(f"Loading {file_path}")
         page.goto(file_path)
