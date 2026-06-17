@@ -57,19 +57,19 @@ int clock_gettime(int clock_id, struct timespec *tp) {
                 long tv_usec;
              } tv;
              long ret2 = _time_syscall2(96, (long)&tv, 0); // gettimeofday
-             if (ret2 < 0) { errno = (int)-ret2; return -1; }
+             if ((unsigned long)ret2 >= (unsigned long)-4095) { errno = (int)(-ret2); return -1; }
              tp->tv_sec = tv.tv_sec;
              tp->tv_nsec = tv.tv_usec * 1000;
              return 0;
         }
-        errno = (int)-ret; return -1;
+        errno = (int)(-ret); return -1;
     }
     return 0;
 }
 
 int nanosleep(const struct timespec *req, struct timespec *rem) {
     long ret = _time_syscall2(SYS_nanosleep, (long)req, (long)rem);
-    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)-ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return 0;
 }
 
@@ -151,7 +151,7 @@ struct tm *localtime(const time_t *timep) {
 
 int gettimeofday(struct timeval *tv, struct timezone *tz) {
     long ret = _time_syscall2(96, (long)tv, (long)tz); // SYS_gettimeofday
-    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)-ret; return -1; }
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return 0;
 }
 

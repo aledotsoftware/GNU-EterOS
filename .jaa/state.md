@@ -47,9 +47,7 @@
 - **linux-syscall-compliance-bot**: Expanded Linux x86_64 syscall coverage by properly mapping `sys_fork`, `sys_vfork`, `sys_umask`, `sys_getegid`, `sys_getcwd_sys`, `sys_fdatasync`, `sys_mknod`, `sys_mknodat`, `sys_pause`, `sys_alarm`, `sys_getrusage`, `sys_times`, `sys_syslog`, `sys_getgroups`, and `sys_setgroups`. Prioritized functional implementations for GNU/Linux userland compatibility.
 - **aether-droid-subsystem-bot**: Unified Ashmem and Memfd by routing `/dev/ashmem` to `shmfs_create_memfd`. Implemented `ASHMEM_SET_NAME`, `ASHMEM_GET_NAME`, `ASHMEM_SET_SIZE`, and `ASHMEM_GET_SIZE` IOCTLs seamlessly in `shmfs_ioctl`, providing stateful per-FD memory scaling. Successfully tested the compilation and system stability under QEMU and headless run_tests.
 - **userspace-libc-posix-bot**: Hardened GNU LibC compatibility and runtime layers for EterOS userspace.
-  - Added robust global `getopt` implementation mapped to GNU specifications, exposing `optarg`, `optind`, `opterr`, and `optopt` across all userspace binaries (`unistd.h`).
-  - Implemented `strcasecmp` natively for dynamic case-insensitive text evaluation matching standard extensions.
-  - Stabilized global POSIX error handling (`errno`) by uniformly redirecting macros via `#define errno (*__errno_location())` inside `.c` files like `posix.c` and `syscall.c` directly ensuring thread-safe access to standard integer failures. All POSIX string functions, libc integrations, and stdlib memory mapping routines compile perfectly via `run_tests.sh` and QEMU integration suite.
+  - Fixed `errno` setting in `epoll_wait` and `epoll_create1` inside `userspace/libc/src/posix.c` to properly return -1 and set `errno` using `_set_errno()` when a system call fails.
 - **devices-time-panel-bot**:
   - Removed hardcoded fallback IP `162.159.200.1` from `cmd_ntp` (`kernel/shell/cmd_time.c`) so NTP properly aborts if DNS resolution fails.
   - Reviewed Keyboard standard mapping bounds in `scancode_to_ascii_es`. Validated `hlt` instruction bounds on `cmd_panel.c` for UI responsiveness on `mouse_moved` events.

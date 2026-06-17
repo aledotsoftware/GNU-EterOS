@@ -390,20 +390,17 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 
 int epoll_create1(int flags) {
     long ret = _syscall1(SYS_epoll_create1, flags);
-    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
-    return (int)ret;
+    return _set_errno(ret) == 0 ? (int)ret : -1;
 }
 
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event) {
     long ret = _syscall4(SYS_epoll_ctl, epfd, op, fd, (long)event);
-    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
-    return (int)ret;
+    return _set_errno(ret);
 }
 
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout) {
     long ret = _syscall4(SYS_epoll_wait, epfd, (long)events, maxevents, timeout);
-    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
-    return (int)ret;
+    return _set_errno(ret) == 0 ? (int)ret : -1;
 }
 
 /* Memory */
