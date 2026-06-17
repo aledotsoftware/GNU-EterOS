@@ -7,7 +7,7 @@ kernel/arch/x86_64/syscall.c, kernel/fs/elf.c
 ABI Linux práctico para userland GNU y metas inmediatas de compatibilidad.
 
 ## Current Goal
-Implementar de forma robusta `sys_getcwd` y `sys_getcwd_sys` para soporte real de `getcwd()`. Co-trabajar asunciones de VFS si es necesario. Eliminar `-ENOSYS` de estas syscalls.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

@@ -7,7 +7,7 @@ kernel/fs/
 VFS, initrd, procfs, shmfs, FAT32/JFS, ELF loader.
 
 ## Current Goal
-Proveer soporte al kernel y `task_t` para almacenar y actualizar adecuadamente el `cwd` (Current Working Directory) de modo que `sys_getcwd` pueda leerlo sin stubbear, fortaleciendo el manejo de paths absolutos/relativos.
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

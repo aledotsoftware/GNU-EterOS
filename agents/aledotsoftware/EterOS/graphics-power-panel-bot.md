@@ -7,7 +7,7 @@ kernel/gfx/, kernel/drivers/video/
 Framebuffer/gfx/window/UI shell y panel gráfico.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Migrar el compositor de userspace (`eterland.c`) para usar la nueva capa de abstracción DRM (`/dev/dri/card0`) en lugar del nodo legacy `/dev/fb0`. Continuar con las mejoras visuales y el prototipo del compositor.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
