@@ -271,8 +271,8 @@ static void panel_time(void) {
             // "4. Sincronizacion Manual"
             if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
                 // Approximate mapping based on typical cmd_time length
-                if (panel_mouse_y >= 8 && panel_mouse_y <= 13) {
-                    c = '1' + (panel_mouse_y - 8);
+                if (panel_mouse_y >= 6 && panel_mouse_y <= 9) {
+                    c = '1' + (panel_mouse_y - 6);
                     if (c > '4') c = '4'; // Clamping
                     break;
                 } else {
@@ -533,8 +533,8 @@ void cmd_panel(const char* args) {
                     if (panel_mouse_clicked) {
                         panel_mouse_clicked = false;
                         if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                            if (panel_mouse_y >= 7 && panel_mouse_y <= 9) { // rough estimate
-                                c = '1' + (panel_mouse_y - 7);
+                            if (panel_mouse_y >= 9 && panel_mouse_y <= 10) { // rough estimate
+                                c = '1' + (panel_mouse_y - 9);
                                 if (c > '2') c = '2';
                                 break;
                             } else {

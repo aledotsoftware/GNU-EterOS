@@ -35,6 +35,7 @@ void cmd_net(const char* args) {
         terminal_write_string(buf);
     } else {
         terminal_write_string("State: DOWN (Link or DHCP pending)\n");
+        terminal_write_string("\n\n\n");
     }
 }
 
