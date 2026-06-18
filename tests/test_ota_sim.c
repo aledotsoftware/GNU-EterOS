@@ -61,8 +61,14 @@ typedef struct {
 fs_node_t* partition_get_active_root() {
     fs_node_t *node = malloc(sizeof(fs_node_t));
     uint8_t nvram_part = nvram_get_boot_partition();
+    uint8_t update_state = nvram_get_update_state();
+
     if (nvram_part != 0xFF) {
-        node->impl = nvram_part;
+        if (update_state == UPDATE_STATE_PENDING) {
+            node->impl = (nvram_part == 0) ? 1 : 0;
+        } else {
+            node->impl = nvram_part;
+        }
     } else {
         node->impl = 0; // Default active
     }
@@ -73,8 +79,7 @@ void simulate_rollback() {
     if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
         fs_node_t *active = partition_get_active_root();
         uint8_t current = active->impl;
-        uint8_t next = (current == 0) ? 1 : 0;
-        nvram_set_boot_partition(next);
+        nvram_set_boot_partition(current); // Rollback correctly switches to the currently booted active slot
         nvram_set_update_state(UPDATE_STATE_FAILED);
         free(active);
     }
@@ -131,8 +136,8 @@ int main() {
     // Rollback with uninitialized boot partition
     nvram_set_update_state(UPDATE_STATE_PENDING);
     simulate_rollback();
-    // Default active root impl is 0, so next should be 1
-    assert(nvram_get_boot_partition() == 1);
+    // Default active root impl is 0, so rollback should revert to 0
+    assert(nvram_get_boot_partition() == 0);
     assert(nvram_get_update_state() == UPDATE_STATE_FAILED);
 
     printf("All OTA state machine tests passed!\n");

@@ -361,6 +361,12 @@ gcc -D__ETEROS_HOST_TEST__ tests/test_ota.c -o tests/test_ota
 rm tests/test_ota
 
 echo "---------------------------------------------------"
+echo "Running test_ota_sim..."
+gcc -D__ETEROS_HOST_TEST__ tests/test_ota_sim.c -o tests/test_ota_sim
+./tests/test_ota_sim
+rm tests/test_ota_sim
+
+echo "---------------------------------------------------"
 echo "Running test_syscall_linux_coverage..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_syscall_linux_coverage.c kernel/string.c tests/vmm_map_page_mock.c -o tests/test_syscall_linux_coverage
 ./tests/test_syscall_linux_coverage

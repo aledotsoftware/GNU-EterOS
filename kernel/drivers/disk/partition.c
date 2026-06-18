@@ -237,9 +237,16 @@ static fs_node_t *create_partition_node(int index) {
 fs_node_t *partition_get_active_root(void) {
     int active_idx = active_partition_index;
     uint8_t nvram_part = nvram_get_boot_partition();
+    uint8_t update_state = nvram_get_update_state();
 
     if (nvram_part != 0xFF && nvram_part < partition_count) {
-        active_idx = nvram_part;
+        if (update_state == UPDATE_STATE_PENDING) {
+            // If an update is pending, NVRAM holds the *next* boot partition.
+            // The currently active partition (the one we booted from) is the other one.
+            active_idx = (nvram_part == 0) ? 1 : 0;
+        } else {
+            active_idx = nvram_part;
+        }
     }
 
     if (active_idx < 0 || active_idx >= partition_count) return NULL;
@@ -252,9 +259,14 @@ fs_node_t *partition_get_passive_root(void) {
 
     int active_idx = active_partition_index;
     uint8_t nvram_part = nvram_get_boot_partition();
+    uint8_t update_state = nvram_get_update_state();
 
     if (nvram_part != 0xFF && nvram_part < partition_count) {
-        active_idx = nvram_part;
+        if (update_state == UPDATE_STATE_PENDING) {
+            active_idx = (nvram_part == 0) ? 1 : 0;
+        } else {
+            active_idx = nvram_part;
+        }
     }
 
     // Simple A/B logic: Flip between 0 and 1
