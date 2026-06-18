@@ -160,6 +160,7 @@ body {
     transform: translateY(-8px) scale(1.1);
     background: rgba(255, 255, 255, 0.2);
     border-color: var(--glass-border);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 
 .dock-item.running::after {
@@ -978,6 +979,7 @@ body {
 #launcher-search:focus {
     border-color: var(--accent);
     background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 10px var(--accent);
 }
 
 #search-clear {
