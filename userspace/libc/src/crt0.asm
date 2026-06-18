@@ -21,6 +21,11 @@ _start:
     ; rsp + (argc + 1) * 8 will point to envp.
     lea rdx, [rsp + rdi*8 + 8] ; envp
 
+    ; Save them to non-volatile registers so they survive loops
+    mov r13, rdi
+    mov r14, rsi
+    mov r15, rdx
+
     ; Save envp in the global 'environ' variable
     mov [rel environ], rdx
 
@@ -93,6 +98,12 @@ _start:
     ; Let's just make sure we align stack perfectly.
     mov rbp, rsp
     and rsp, ~15
+
+    ; Restore argc, argv, envp for main
+    mov rdi, r13
+    mov rsi, r14
+    mov rdx, r15
+
     call main
     mov rsp, rbp
 

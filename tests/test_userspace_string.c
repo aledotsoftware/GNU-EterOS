@@ -43,7 +43,15 @@
 #define strcoll eteros_strcoll
 #define strxfrm eteros_strxfrm
 
-#include "../userspace/libc/src/string.c"
+void *eteros_malloc(size_t size) {
+    #undef malloc
+    return malloc(size);
+}
+
+void eteros_free(void *ptr) {
+    #undef free
+    free(ptr);
+}
 
 void test_strlen() {
     assert(strlen("") == 0);

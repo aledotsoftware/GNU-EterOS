@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -19,10 +20,53 @@
 #define strrchr my_strrchr
 #define strstr my_strstr
 
-// Include the source file directly
-#include "../userspace/libc/src/string.c"
+// Ensure the compiler links against string.c
+
+// Provide definitions for the tested functions so it can compile without string.c included natively
+// but we just map them back to the eteros_ versions since that's what string.c will compile as due to HOST_TEST
 
 #undef strlen
+#define my_strlen eteros_strlen
+#define my_memset eteros_memset
+#define my_strlcpy eteros_strlcpy
+#define my_strcmp eteros_strcmp
+#define my_strlcat eteros_strlcat
+#define my_strchr eteros_strchr
+
+void *eteros_malloc(size_t size) {
+    #undef malloc
+    return malloc(size);
+}
+
+void eteros_free(void *ptr) {
+    #undef free
+    free(ptr);
+}
+
+int eteros_printf(const char *format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    // Just forward to host vprintf
+    int ret = vprintf(format, ap);
+    va_end(ap);
+    return ret;
+}
+
+int eteros_vprintf(const char *format, va_list ap) {
+    #undef vprintf
+    return vprintf(format, ap);
+}
+
+void eteros_assert_fail(const char *expr, const char *file, int line, const char *func) {
+    // Just use host fprintf and stderr directly since this is a test compiled on host
+    #undef fprintf
+    #undef stderr
+    #undef exit
+    extern struct _IO_FILE *stderr;
+    fprintf(stderr, "Assertion failed: %s at %s:%d in %s\n", expr, file, line, func);
+    exit(1);
+}
+
 
 void test_strlen_correctness() {
     printf("Testing userspace strlen correctness...\n");

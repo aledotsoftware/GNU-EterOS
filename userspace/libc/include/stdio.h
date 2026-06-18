@@ -41,6 +41,21 @@
 #define fputc eteros_fputc
 #undef fgetc
 #define fgetc eteros_fgetc
+#undef fileno
+#define fileno eteros_fileno
+#undef feof
+#define feof eteros_feof
+#undef ferror
+#define ferror eteros_ferror
+#undef putc
+#define putc eteros_putc
+#undef getc
+#define getc eteros_getc
+#undef ungetc
+#define ungetc eteros_ungetc
+#undef puts
+#define puts eteros_puts
+
 #undef fgets
 #define fgets eteros_fgets
 #undef fputs
@@ -108,6 +123,13 @@ int   eteros_fputc(int c, FILE *stream);
 int   eteros_fgetc(FILE *stream);
 char *eteros_fgets(char *s, int size, FILE *stream);
 int   eteros_fputs(const char *s, FILE *stream);
+int   eteros_puts(const char *s);
+int   eteros_putc(int c, FILE *stream);
+int   eteros_getc(FILE *stream);
+int   eteros_ungetc(int c, FILE *stream);
+int   eteros_fileno(FILE *stream);
+int   eteros_feof(FILE *stream);
+int   eteros_ferror(FILE *stream);
 
 /* Error */
 void eteros_perror(const char *s);

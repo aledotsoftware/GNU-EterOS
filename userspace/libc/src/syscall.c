@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <stdarg.h>
 
-static inline long syscall0(long n) {
+long syscall0(long n) {
     long ret;
     __asm__ volatile ("syscall" : "=a"(ret) : "a"(n) : "rcx", "r11", "memory");
     return ret;
