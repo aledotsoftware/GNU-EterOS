@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 
 #include "font.h"
 
@@ -302,33 +303,9 @@ void draw_cursor(int cx, int cy) {
     }
 }
 
-void execute_mouse_loop() {
-    int mfd = open("/dev/input/mouse0", O_RDONLY);
-    if (mfd < 0) return; 
+int mx, my;
 
-    int mx = fb_info.width / 2;
-    int my = fb_info.height / 2;
-    
-    save_cursor_bg(mx, my);
-    draw_cursor(mx, my);
-    
-    input_event_t ev;
-    while (read(mfd, &ev, sizeof(ev)) > 0) {
-        if (ev.type == EV_REL) {
-            restore_cursor_bg(mx, my);
-            if (ev.code == REL_X) mx += ev.value;
-            if (ev.code == REL_Y) my += ev.value;
-            
-            if (mx < 0) mx = 0;
-            if (my < 0) my = 0;
-            if (mx >= (int)fb_info.width - CURSOR_W) mx = (int)fb_info.width - CURSOR_W;
-            if (my >= (int)fb_info.height - CURSOR_H) my = (int)fb_info.height - CURSOR_H;
-            
-            save_cursor_bg(mx, my);
-            draw_cursor(mx, my);
-        }
-    }
-}
+
 
 int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
@@ -343,7 +320,7 @@ int main(int argc, char* argv[]) {
     fb_ptr = mmap(NULL, fb_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_fd, 0);
     if (fb_ptr == MAP_FAILED) return 1;
 
-    int pid = fork();
+
 
     // Center window
     win_w = fb_info.width > 640 ? 640 : fb_info.width - 40;
@@ -353,14 +330,6 @@ int main(int argc, char* argv[]) {
 
     term_cols = (win_w - margin_l*2) / 8;
     term_rows = (win_h - margin_t - 8) / 16;
-
-    if (pid == 0) {
-        /* Child: Mouse Server */
-        /* Wait to allow parent to draw GUI first so we don't save black background */
-        sleep(1); 
-        execute_mouse_loop();
-        exit(0);
-    }
 
     draw_desktop();
     draw_window();
@@ -373,20 +342,59 @@ int main(int argc, char* argv[]) {
     int tfd = open("/dev/tty", O_RDWR);
     if (tfd < 0) return 1;
 
+    int mfd = open("/dev/input/mouse0", O_RDONLY);
+
+    mx = fb_info.width / 2;
+    my = fb_info.height / 2;
+
+    save_cursor_bg(mx, my);
+    draw_cursor(mx, my);
+
+    struct pollfd fds[2];
+    fds[0].fd = tfd;
+    fds[0].events = POLLIN;
+    fds[1].fd = mfd;
+    fds[1].events = POLLIN;
+
     while (1) {
-        char c;
-        if (read(tfd, &c, 1) > 0) {
-            if (c == '\r' || c == '\n') {
-                execute_command();
-            } else if (c == '\b' || c == 0x08 || c == 0x7F) {
-                if (input_len > 0) {
-                    input_len--;
-                    term_print_char('\b', term_fg);
+        if (poll(fds, 2, -1) > 0) {
+            if (mfd >= 0 && (fds[1].revents & POLLIN)) {
+                input_event_t ev;
+                if (read(mfd, &ev, sizeof(ev)) == sizeof(ev)) {
+                    if (ev.type == EV_REL) {
+                        restore_cursor_bg(mx, my);
+                        if (ev.code == REL_X) mx += ev.value;
+                        if (ev.code == REL_Y) my += ev.value;
+
+                        if (mx < 0) mx = 0;
+                        if (my < 0) my = 0;
+                        if (mx >= (int)fb_info.width - CURSOR_W) mx = (int)fb_info.width - CURSOR_W;
+                        if (my >= (int)fb_info.height - CURSOR_H) my = (int)fb_info.height - CURSOR_H;
+
+                        save_cursor_bg(mx, my);
+                        draw_cursor(mx, my);
+                    }
                 }
-            } else if (c >= 32 && c <= 126) {
-                if (input_len < (int)sizeof(input_buffer)-1) {
-                    input_buffer[input_len++] = c;
-                    term_print_char(c, term_fg);
+            }
+            if (fds[0].revents & POLLIN) {
+                char c;
+                if (read(tfd, &c, 1) > 0) {
+                    restore_cursor_bg(mx, my);
+                    if (c == '\r' || c == '\n') {
+                        execute_command();
+                    } else if (c == '\b' || c == 0x08 || c == 0x7F) {
+                        if (input_len > 0) {
+                            input_len--;
+                            term_print_char('\b', term_fg);
+                        }
+                    } else if (c >= 32 && c <= 126) {
+                        if (input_len < (int)sizeof(input_buffer)-1) {
+                            input_buffer[input_len++] = c;
+                            term_print_char(c, term_fg);
+                        }
+                    }
+                    save_cursor_bg(mx, my);
+                    draw_cursor(mx, my);
                 }
             }
         }
