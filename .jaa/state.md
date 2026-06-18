@@ -76,3 +76,4 @@ In EterOS `userspace/login.c`, reading passwords via `read` from stdin must clea
 - **testing-ci-validation-bot**: Fixed `test_vmm_unmap` compilation and integrated `tests/run_integration.sh` success to enforce reliable CI regressions verification for all targets. Fixed inline mock assembly issue.
 
 - **graphics-power-panel-bot**: Fixed window Z-ordering (bring_to_front), restricted hover states to topmost windows, and synchronized mouse cursor loops via `poll()` in `eterland.c` to eliminate cursor trailing glitches.
+- **aether-linux-subsystem-bot**: Fixed `sys_getcwd` implementation in `kernel/arch/x86_64/syscall.c`. The syscall now returns the length of the copied path string (including the null terminator), directly utilizing the `cwd` field of the current process descriptor (`task_get_current()`), successfully removing the `-ENOSYS` stub. Tested against integration scripts.

@@ -3364,79 +3364,16 @@ static int64_t sys_gethostbyname(const char* name, uint32_t* out_ip) {
 static int64_t sys_getcwd(char* buf, size_t size) {
     if (!buf || size == 0) return -EINVAL;
     if (!vmm_verify_user_access(buf, size, 1)) return -EFAULT;
+
     task_t* current = task_get_current();
-    if (strlen(current->cwd) + 1 > size) return -ERANGE;
+    if (!current) return -EFAULT;
+
+    size_t len = strlen(current->cwd) + 1;
+    if (len > size) return -ERANGE;
+
     strlcpy(buf, current->cwd, size);
 
-    char* temp_path = (char*)kmalloc(256);
-    if (!temp_path) return -ENOMEM;
-    temp_path[0] = '\0';
-
-    fs_node_t* node = current->cwd_node;
-    if (!node) {
-        /* Fallback */
-        kfree(temp_path);
-        if (size < 2) return -ERANGE;
-        strlcpy(buf, "/", size);
-        return 2;
-    }
-
-    /* We need to ascend to root */
-    /* Note: Since we don't have a reliable back-link, we'll implement a simple
-       VFS traversal upwards. We clone the node so we can safely traverse. */
-    fs_node_t* curr_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    if (!curr_node) { kfree(temp_path); return -ENOMEM; }
-    memcpy(curr_node, node, sizeof(fs_node_t));
-
-    while (curr_node->inode != fs_root->inode) {
-        fs_node_t* parent = vfs_lookup(curr_node, "..");
-        if (!parent) {
-            /* Error traversing up, break */
-            break;
-        }
-
-        /* Now find the name of curr_node in parent */
-        struct dirent direntry;
-        int i = 0;
-        int found = 0;
-        while (readdir_fs(parent, i, &direntry) != -1) {
-            if (direntry.inode == curr_node->inode) {
-                found = 1;
-                break;
-            }
-            i++;
-        }
-
-        if (found) {
-            /* Prepend to temp_path */
-            char* segment = (char*)kmalloc(130);
-            if (!segment) { kfree(curr_node); kfree(temp_path); return -ENOMEM; }
-            strlcpy(segment, "/", 130);
-            strlcat(segment, direntry.name, 130);
-            char* new_temp = (char*)kmalloc(256);
-            if (!new_temp) { kfree(segment); kfree(curr_node); kfree(temp_path); return -ENOMEM; }
-            strlcpy(new_temp, segment, 256);
-            strlcat(new_temp, temp_path, 256);
-            strlcpy(temp_path, new_temp, 256);
-            kfree(new_temp);
-            kfree(segment);
-        }
-
-        kfree(curr_node);
-        curr_node = parent;
-    }
-
-    kfree(curr_node);
-
-    if (temp_path[0] == '\0') {
-        strlcpy(temp_path, "/", 256);
-    }
-
-    if (strlen(temp_path) >= size) { kfree(temp_path); return -ERANGE; }
-    strlcpy(buf, temp_path, size);
-    int64_t ret_len = strlen(temp_path) + 1;
-    kfree(temp_path);
-    return ret_len;
+    return len;
 }
 
 static int64_t sys_chdir(const char* path) {
