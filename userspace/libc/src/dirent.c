@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/syscall.h>
+#include <sys/stat.h>
 
 extern long syscall(long nr, ...);
 
@@ -16,6 +17,13 @@ DIR *opendir(const char *name) {
     int fd = syscall(SYS_open, name, O_RDONLY, 0);
     if (fd < 0) {
         errno = (int)(-fd);
+        return NULL;
+    }
+
+    struct stat st;
+    if (syscall(SYS_fstat, fd, &st) < 0 || !S_ISDIR(st.st_mode)) {
+        syscall(SYS_close, fd);
+        errno = ENOTDIR;
         return NULL;
     }
 

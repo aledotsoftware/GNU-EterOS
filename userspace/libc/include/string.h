@@ -53,6 +53,16 @@
 #define strerror eteros_strerror
 #undef strcoll
 #define strcoll eteros_strcoll
+#undef strsep
+#define strsep eteros_strsep
+#undef strcasecmp
+#define strcasecmp eteros_strcasecmp
+#undef strncasecmp
+#define strncasecmp eteros_strncasecmp
+#undef memrchr
+#define memrchr eteros_memrchr
+#undef memchr
+#define memchr eteros_memchr
 #undef strxfrm
 #define strxfrm eteros_strxfrm
 #endif
@@ -84,6 +94,12 @@ char  *strndup(const char *s, size_t n);
 size_t strspn(const char *s, const char *accept);
 size_t strcspn(const char *s, const char *reject);
 char  *strpbrk(const char *s, const char *accept);
+char  *eteros_strsep(char **stringp, const char *delim);
+int    eteros_strcasecmp(const char *s1, const char *s2);
+int    eteros_strncasecmp(const char *s1, const char *s2, size_t n);
+void  *eteros_memrchr(const void *s, int c, size_t n);
+void  *eteros_memchr(const void *s, int c, size_t n);
+char  *eteros_strerror(int errnum);
 char  *strsep(char **stringp, const char *delim);
 int    strcasecmp(const char *s1, const char *s2);
 int    strncasecmp(const char *s1, const char *s2, size_t n);
