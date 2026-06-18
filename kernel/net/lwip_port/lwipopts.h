@@ -30,6 +30,7 @@
 
 /* DHCP */
 #define LWIP_DHCP               1
+#define LWIP_DHCP_DOES_ACD_CHECK  0
 #define LWIP_DHCP_AUTOIP_COOP   0
 #define LWIP_DHCP_BOOTP_FILE    0
 

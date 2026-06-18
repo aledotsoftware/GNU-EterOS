@@ -48,27 +48,38 @@ void cmd_dhcp(const char* args) {
         terminal_write_string("Error: Network adapter not active or not detected.\n");
         return;
     }
-    terminal_write_string("Requesting DHCP...\n");
-    net_dhcp_renew();
 
     terminal_write_string("Waiting for IP address...\n");
-    uint64_t start = timer_get_ticks();
 
-    /* Polling until network is ready or timeout (5 seconds) */
-    while (!network_ready && (timer_get_ticks() - start < (5 * TIMER_HZ))) {
+    for (int i = 0; i < 50; i++) {
+        if (network_ready && my_ip != 0) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "DHCP Bound! IP Address: %d.%d.%d.%d\n",
+                (my_ip >> 24) & 0xFF, (my_ip >> 16) & 0xFF, (my_ip >> 8) & 0xFF, my_ip & 0xFF);
+            terminal_write_string(buf);
+            return;
+        }
         task_yield();
+        task_sleep(100);
     }
 
-    if (network_ready) {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "DHCP Bound! IP Address: %d.%d.%d.%d\n",
-            (my_ip >> 24) & 0xFF, (my_ip >> 16) & 0xFF, (my_ip >> 8) & 0xFF, my_ip & 0xFF);
-        terminal_write_string(buf);
-    } else {
-        terminal_write_string("Timeout waiting for DHCP response.\n");
+    terminal_write_string("Requesting new DHCP lease...\n");
+    net_dhcp_renew();
+
+    for (int i = 0; i < 50; i++) {
+        if (network_ready && my_ip != 0) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "DHCP Bound! IP Address: %d.%d.%d.%d\n",
+                (my_ip >> 24) & 0xFF, (my_ip >> 16) & 0xFF, (my_ip >> 8) & 0xFF, my_ip & 0xFF);
+            terminal_write_string(buf);
+            return;
+        }
+        task_yield();
+        task_sleep(100);
     }
+
+    terminal_write_string("DHCP timeout.\n");
 }
-
 void cmd_wget(const char* args) {
     if (!current_nic) {
         terminal_write_string("Error: Network adapter not active or not detected.\n");

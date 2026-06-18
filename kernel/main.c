@@ -79,7 +79,7 @@ static void network_task(void) {
             hal_console_write("  [NET]  DHCP Bound! IP assigned.\n");
         }
 
-        timer_sleep(10);
+        task_yield();
     }
 }
 

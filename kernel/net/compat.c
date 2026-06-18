@@ -41,7 +41,7 @@ void net_init(void) {
 
     serial_write_string("[NET] Adding netif...\n");
     /* Add network interface */
-    if (netif_add(&main_netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, ethernet_input) == NULL) {
+    if (netif_add(&main_netif, &ipaddr, &netmask, &gw, NULL, ethernetif_init, tcpip_input) == NULL) {
         serial_write_string("[NET] Failed to add netif\n");
         return;
     }
@@ -70,9 +70,9 @@ void net_poll(void) {
     sys_check_timeouts();
 
     /* Update global status */
-    if (netif_is_up(&main_netif) && !ip_addr_isany(&main_netif.ip_addr)) {
-        my_ip = ip4_addr_get_u32(&main_netif.ip_addr);
-        gateway_ip = ip4_addr_get_u32(&main_netif.gw);
+    if (netif_is_up(&main_netif) && !ip4_addr_isany_val(*netif_ip4_addr(&main_netif))) {
+        my_ip = ip4_addr_get_u32(netif_ip4_addr(&main_netif));
+        gateway_ip = ip4_addr_get_u32(netif_ip4_gw(&main_netif));
         const ip_addr_t *dns = dns_getserver(0);
         if (dns) {
             dns_ip = ip4_addr_get_u32(dns);
@@ -268,7 +268,10 @@ int raw_tcp_get(const char* host, const char* path, char* response_buf, size_t m
 
 void net_dhcp_renew(void) {
     if (!netif_is_up(&main_netif)) return;
-    dhcp_renew(&main_netif);
+    LOCK_TCPIP_CORE();
+    dhcp_release_and_stop(&main_netif);
+    dhcp_start(&main_netif);
+    UNLOCK_TCPIP_CORE();
 }
 
 typedef struct {
