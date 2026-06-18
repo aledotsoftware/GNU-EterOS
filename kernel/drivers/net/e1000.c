@@ -253,7 +253,7 @@ int e1000_init(pci_device_t* pci_dev_ptr) {
     e1000_write_reg(E1000_CTRL, ctrl | E1000_CTRL_SLU);
     
     /* VirtualBox resulta mas estable en polling puro que con IRQ legacy. */
-    e1000_write_reg(E1000_IMC, 0xFFFFFFFF);
+    // e1000_write_reg(E1000_IMC, 0xFFFFFFFF);
 
     nic_register_driver(&e1000_driver);
 

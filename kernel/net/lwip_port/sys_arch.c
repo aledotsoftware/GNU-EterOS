@@ -80,7 +80,7 @@ u32_t sys_arch_sem_wait(sys_sem_t *sem, u32_t timeout) {
             hal_interrupts_enable();
 
             if(sys_now() - start_time >= timeout) return SYS_ARCH_TIMEOUT;
-            task_sleep(1);
+            task_sleep(10);
         }
     }
 }
@@ -136,7 +136,7 @@ void sys_mbox_post(sys_mbox_t *mbox, void *msg) {
             return;
         }
         sem_signal(&(m->mutex));
-        task_sleep(1);
+        task_sleep(10);
     }
 }
 err_t sys_mbox_trypost(sys_mbox_t *mbox, void *msg) {
@@ -179,7 +179,7 @@ u32_t sys_arch_mbox_fetch(sys_mbox_t *mbox, void **msg, u32_t timeout) {
             hal_interrupts_enable();
 
             if(sys_now() - start_time >= timeout) return SYS_ARCH_TIMEOUT;
-            task_sleep(1);
+            task_sleep(10);
         }
     }
 
