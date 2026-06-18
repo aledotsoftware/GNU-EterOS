@@ -80,7 +80,6 @@ LWIP_CORE_SRCS = $(LWIP_DIR)/src/core/init.c \
 
 LWIP_IPV4_SRCS = $(LWIP_DIR)/src/core/ipv4/acd.c \
                  $(LWIP_DIR)/src/core/ipv4/autoip.c \
-                 $(LWIP_DIR)/src/core/ipv4/dhcp.c \
                  $(LWIP_DIR)/src/core/ipv4/etharp.c \
                  $(LWIP_DIR)/src/core/ipv4/icmp.c \
                  $(LWIP_DIR)/src/core/ipv4/igmp.c \
@@ -93,7 +92,8 @@ LWIP_NETIF_SRCS = $(LWIP_DIR)/src/netif/ethernet.c
 LWIP_PORT_SRCS = $(LWIP_PORT_DIR)/ethernetif.c \
                  $(LWIP_PORT_DIR)/sys_arch.c
 
-LWIP_SRCS = $(LWIP_CORE_SRCS) $(LWIP_IPV4_SRCS) $(LWIP_NETIF_SRCS) $(LWIP_PORT_SRCS)
+LWIP_SRCS = \
+                $(KERNEL_DIR)/net/lwip/src/core/ipv4/dhcp.c $(LWIP_CORE_SRCS) $(LWIP_IPV4_SRCS) $(LWIP_NETIF_SRCS) $(LWIP_PORT_SRCS)
 
 # ---- Doomgeneric Sources ----
 DOOM_ROOT = kernel/apps/doomgeneric
@@ -192,8 +192,6 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/net/compat.c
 
 NET_CORE_SRCS = $(KERNEL_DIR)/net/core/ip_utils.c \
-                $(KERNEL_DIR)/net/core/dhcp.c \
-                $(KERNEL_DIR)/net/core/lwip_stubs.c \
                 $(KERNEL_DIR)/net/core/nic.c \
                 $(KERNEL_DIR)/net/mock.c \
                 $(LWIP_SRCS) \

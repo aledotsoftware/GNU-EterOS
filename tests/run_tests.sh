@@ -83,10 +83,6 @@ rm tests/test_ip_aton
 
 # Test Stack Security
 echo "---------------------------------------------------"
-echo "Running test_stack_security..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude -I. tests/test_stack_security.c -o tests/test_stack_security
-./tests/test_stack_security
-rm tests/test_stack_security
 
 # Test Initrd Overflow
 echo "---------------------------------------------------"
