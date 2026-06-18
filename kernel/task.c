@@ -12,6 +12,7 @@
  *   - Context switch guarda/restaura registros callee-saved + RSP
  *   - Spinlock protege el estado global para SMP
  */
+#include <hal.h>
 
 #include "../include/task.h"
 #include "../include/mm.h"
@@ -279,7 +280,7 @@ static void task_entry_wrapper(void) {
 
     /* Habilitar interrupciones (estamos en una tarea nueva, el context_switch
        no las habilita automáticamente como haría iretq) */
-    __asm__ volatile("sti");
+    hal_interrupts_enable();
 
     task_t* self = task_get_current();
     if (self && self->entry) {
@@ -395,7 +396,7 @@ void scheduler_init(void) {
  */
 void task_init_ap(void) {
     /* Inicializar la tarea "Idle" para este AP */
-    __asm__ volatile("cli");
+    hal_interrupts_disable();
     spin_lock(&sched_lock);
 
     int slot = find_free_slot();

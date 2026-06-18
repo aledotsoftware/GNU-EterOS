@@ -8,6 +8,7 @@
 #include <msr.h>
 #include <string.h>
 #include <serial.h>
+#include <hal.h>
 #include <mm.h>
 #include <apic.h>
 #include <vmm.h>
@@ -154,7 +155,7 @@ void smp_init(void) {
 
 void cpu_init_ap(int index) {
     /* Deshabilitar interrupciones locales temporalmente */
-    __asm__ volatile("cli");
+    hal_interrupts_disable();
     
     cpu_info_t* cpu = &cpus[index];
 
@@ -182,7 +183,7 @@ void cpu_init_ap(int index) {
     task_init_ap();
     
     /* Habilitar interrupciones globales y esperar */
-    __asm__ volatile("sti");
+    hal_interrupts_enable();
 
     /* Señalizar que estamos listos SÓLO después de activar interrupciones,
        así el BSP no espera IPI ACKs de un CPU que tiene interrupts OFF. */
