@@ -54,10 +54,10 @@
 
 - **ota-update-panel-bot**: OTA logic hardened and verified.
   - Hardened OTA verification by strictly enforcing Ed25519 payload signatures, removing bypass toggles, and adding bounds-validation to NVRAM state readers to prevent fallback loops when NVRAM is uninitialized.
-  - Improved `cmd_ota.c` update diagnostics by including partition size in KB within the `info` command and removing unused boot variables.
+  - Improved `cmd_ota.c` update diagnostics by including partition size in KB within the `info` command and removing unused boot variables. Also logs resolved IP address instead of failing silently with generic errors.
   - Implemented robust write-verification for OTA downloads: the payload is read back after writing to disk and strictly `memcmp`'d against the source, preventing corrupted updates from being flagged as pending.
-  - Fixed the `rollback` command to properly compute the active slot dynamically via `partition_get_active_root()->impl` rather than relying solely on NVRAM fallbacks.
-  - Ensured correct memory lifecycle (`kfree`) for allocated buffers and wrapper nodes upon success and failure paths.
+  - Fixed `partition_get_active_root` and `partition_get_passive_root` to reflect the actual runtime active partition when a new OTA is downloaded but not rebooted yet (`UPDATE_STATE_PENDING`). The `rollback` command now uses the current slot dynamically and reliably.
+  - Ensured correct memory lifecycle (`kfree`) for allocated buffers and wrapper nodes upon success and failure paths. Included robust simulator `test_ota_sim` within the automated tests pipeline.
 
 - **Orchestrator**: Verified a clean build globally following `vision-cli-agent` warning fixes and validated headless QEMU boot across RAM configurations. Delegated new critical blockers for GNU Coreutils: `sys_getcwd` and CWD management to `aether-linux-subsystem-bot` and `vfs-posix-filesystem-bot`, and `sys_fsync`/`sys_truncate` to `linux-syscall-compliance-bot`.
 - **Aether Linux Subsystem**:

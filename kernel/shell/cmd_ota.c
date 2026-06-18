@@ -176,9 +176,21 @@ void cmd_ota(const char* args) {
         addr.sin_port = htons(port);
         addr.sin_addr = ip;
 
-        terminal_write_string("  [OTA] Conectando a repositorio...\n");
+        terminal_write_string("  [OTA] Conectando a ");
+        terminal_write_string(host);
+        terminal_write_string(" (");
+
+        uint8_t *ip_bytes = (uint8_t*)&ip;
+        for (int i = 0; i < 4; i++) {
+            char ip_buf[4];
+            itoa_s(ip_bytes[i], ip_buf, sizeof(ip_buf), 10);
+            terminal_write_string(ip_buf);
+            if (i < 3) terminal_write_string(".");
+        }
+        terminal_write_string(")...\n");
+
         if (sys_lwip_connect(sock, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
-            terminal_write_string("  [OTA] Conexion fallida.\n");
+            terminal_write_string("  [OTA] Error: Conexion TCP fallida. El repositorio podria estar caido o inaccesible.\n");
             sys_lwip_close(sock);
             kfree(passive_part);
             return;
@@ -426,8 +438,7 @@ receive:
             fs_node_t *active_node = partition_get_active_root();
             if (active_node) {
                 uint8_t current_part = active_node->impl;
-                uint8_t next_part = (current_part == 0) ? 1 : 0;
-                nvram_set_boot_partition(next_part);
+                nvram_set_boot_partition(current_part);
                 nvram_set_update_state(UPDATE_STATE_FAILED);
                 terminal_write_string("  [OTA] Rollback solicitado. El sistema regresara al slot anterior en el proximo reinicio.\n");
                 kfree(active_node);
