@@ -78,7 +78,7 @@ int total_cpus = 1;
 cpu_info_t cpus[MAX_CPUS];
 
 /* Include modified source file directly */
-#include "vmm_mock.c"
+#include "../kernel/mm/vmm.c"
 
 /* Helper to setup VMM */
 void setup_vmm() {

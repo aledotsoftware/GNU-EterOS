@@ -21,7 +21,11 @@
 typedef uint64_t pt_entry_t;
 
 /* Puntero a la tabla PML4 activa */
+#ifndef __ETEROS_HOST_TEST__
 static pt_entry_t* pml4 = (pt_entry_t*)BOOT_PML4_ADDR;
+#else
+pt_entry_t* pml4 = NULL;
+#endif
 
 bool vmm_initialized_flag = false;
 
@@ -35,7 +39,10 @@ static inline void invlpg(uint64_t addr) {
 #ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("invlpg (%0)" : : "r" (addr) : "memory");
 #else
-    (void)addr;
+    extern bool flush_tlb_local_called;
+    extern uint64_t flush_tlb_addr;
+    flush_tlb_local_called = true;
+    flush_tlb_addr = addr;
 #endif
 }
 
@@ -412,7 +419,7 @@ uint64_t vmm_clone_pml4(int cow) {
         __asm__ volatile("mov %%cr3, %0" : "=r"(current_cr3));
         __asm__ volatile("mov %0, %%cr3" : : "r"(current_cr3) : "memory");
 #else
-        current_cr3 = (uint64_t)pml4;
+        current_cr3 = (uint64_t)(uintptr_t)pml4;
         (void)current_cr3;
 #endif
     }
@@ -498,7 +505,7 @@ int vmm_verify_user_access(const void* addr, size_t size, int write) {
 #ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
 #else
-    cr3 = (uint64_t)pml4;
+    cr3 = (uint64_t)(uintptr_t)pml4;
 #endif
     pt_entry_t* pml4_table = (pt_entry_t*)(cr3 & PAGE_ADDR_MASK);
 
@@ -541,7 +548,7 @@ int vmm_is_user_page(uint64_t virt_addr) {
 #ifndef __ETEROS_HOST_TEST__
     __asm__ volatile("mov %%cr3, %0" : "=r"(cr3));
 #else
-    cr3 = (uint64_t)pml4;
+    cr3 = (uint64_t)(uintptr_t)pml4;
 #endif
 
     /* In Identity Mapping, Phys == Virt */

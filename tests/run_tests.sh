@@ -109,20 +109,9 @@ rm tests/test_mmap_fixed
 echo "---------------------------------------------------"
 echo "Running test_vmm_unmap..."
 # Need to mock the inline assembly for ASAN/Host execution
-cp kernel/mm/vmm.c tests/vmm_mock.c
-sed -i 's/__asm__ volatile("invlpg (%0)" : : "r" (addr) : "memory");/flush_tlb_local_called = true; flush_tlb_addr = addr;/g' tests/vmm_mock.c
-sed -i 's/(void)addr;/flush_tlb_local_called = true; flush_tlb_addr = addr;/g' tests/vmm_mock.c
-sed -i 's/__asm__ volatile("pause");//g' tests/vmm_mock.c
-sed -i 's/__asm__ volatile("mov %0, %%cr3" : : "r" (pml4_addr) : "memory");//g' tests/vmm_mock.c
-sed -i 's/__asm__ volatile("mov %%cr3, %0" : "=r"(current_cr3));//g' tests/vmm_mock.c
-sed -i 's/__asm__ volatile("mov %0, %%cr3" : : "r"(current_cr3) : "memory");//g' tests/vmm_mock.c
-sed -i 's/__asm__ volatile("mov %%cr3, %0" : "=r"(cr3));//g' tests/vmm_mock.c
-sed -i 's/static pt_entry_t\* pml4 = (pt_entry_t\*)BOOT_PML4_ADDR;/pt_entry_t* pml4 = NULL;/g' tests/vmm_mock.c
-sed -i 's|../../include/|../include/|g' tests/vmm_mock.c
 gcc -g -O0 -D__ETEROS_HOST_TEST__ -Iinclude tests/test_vmm_unmap.c -o tests/test_vmm_unmap
 ./tests/test_vmm_unmap
 rm tests/test_vmm_unmap
-rm tests/vmm_mock.c
 
 # Test Reclaimer (Disabled - File Missing)
 
