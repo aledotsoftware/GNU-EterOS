@@ -44,10 +44,8 @@ Durante el build del kernel x86_64, se detectaron las siguientes advertencias me
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`aether-linux-subsystem-bot`**: Implementar sys_getcwd correctamente. Actualmente retorna -ENOSYS o un stub, impidiendo un soporte robusto para GNU coreutils.
-2. **`vfs-posix-filesystem-bot`**: Resolver paths y cwd correctamente dentro del VFS para apoyar a sys_getcwd y soporte general de paths relativos.
-3. **`linux-syscall-compliance-bot`**: Continuar mapeando syscalls faltantes identificadas que devuelven `-ENOSYS` (ej. fsync, truncate).
-4. **`graphics-power-panel-bot`**: Continuar con las mejoras visuales y prototipo del compositor (referencia `test_compositor`).
+1. **`linux-syscall-compliance-bot`**: Continuar mapeando syscalls faltantes identificadas que devuelven `-ENOSYS`. La meta principal inmediata es implementar un manejo funcional (retorno seguro o soporte parcial a VFS) de `sys_fsync` y las variantes `sys_truncate`/`sys_ftruncate` en la capa de sistema.
+2. **`graphics-power-panel-bot`**: Continuar con las mejoras visuales y prototipo del compositor (referencia `test_compositor`).
 ## 4. Hallazgos adicionales y Riesgos
 - Se comprobó la implementación inicial real de Binder IPC (Android compat) en `kernel/fs/devfs.c`, introducida por el `aether-droid-subsystem-bot`. Binder ahora rutéa peticiones reales (`BINDER_WRITE_READ`) hacia un `context_mgr` y hacia clientes en lugar de ser un mero stub estático, utilizando `kmalloc` e inicializando una cola de transacciones.
 - Se verificó que el `graphics-power-panel-bot` implementó el mapeo del framebuffer (Mmap sobre `/dev/dri/card0`) exitosamente en la capa DRM.
@@ -76,3 +74,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 - **2026-06-16 (Update 4):** El `vision-cli-agent` aplicó mejoras de UI/UX, incluyendo tooltips de hover en `web_ui/style.css`, unificó la nomenclatura a `eterOS Marea UI v0.2.0 Genesis SMP` en `marea_shell.c`, y estandarizó el banner del panel de control.
 
 - **2026-06-16 (Update 5):** El `aether-linux-subsystem-bot` implementó de forma robusta `sys_getcwd` para proveer soporte real a GNU coreutils, devolviendo la longitud correcta del string copiado desde `current->cwd`.
+- **2026-06-16 (Update 6):** El Orchestrator Meta-Agent auditó los cambios relacionados a `sys_getcwd`. El build y todos los tests nativos de integración (`run_tests.sh`, `run_integration.sh` de 64MB a 512MB RAM) fueron verificados de forma exitosa. Queda pendiente erradicar los retornos de `-ENOSYS` en `sys_fsync`, `sys_truncate` y `sys_ftruncate`. Se asigna este ciclo bloqueante de completitud POSIX al `linux-syscall-compliance-bot`.
