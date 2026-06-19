@@ -6,9 +6,12 @@
 #include <stdbool.h>
 
 #define __ETEROS_HOST_TEST__
+#include <assert.h>
+#define ASSERT(x) do {} while(0)
 
 /* Mock IRQ functions for spinlock support */
 uint64_t irq_save(void) { return 0; }
+void pmm_mark_region_used(uint64_t addr, size_t count) {}
 void irq_restore(uint64_t flags) { (void)flags; }
 
 /* Mock for _kernel_end */
@@ -38,6 +41,7 @@ void utoa_hex_s(uint64_t value, char* buffer, size_t buffer_size) {
 }
 
 /* We need to implement eteros_ functions because string.h renames them */
+void* eteros_memcpy(void* dest, const void* src, size_t n) { return memcpy(dest, src, n); }
 void* eteros_memset(void* s, int c, size_t n) {
     return memset(s, c, n);
 }
@@ -53,6 +57,7 @@ uint8_t test_heap_memory[TEST_HEAP_SIZE];
 
 /* Setup function to initialize heap manually for testing */
 void setup_test_heap() {
+    mm_initialized = true;
     heap_start = (block_header_t*)test_heap_memory;
     memory_total = TEST_HEAP_SIZE;
     memory_used = 0;
@@ -61,6 +66,8 @@ void setup_test_heap() {
     heap_start->size = memory_total - sizeof(block_header_t);
     heap_start->is_free = 1;
     heap_start->next = NULL;
+    heap_start->prev = NULL;
+    add_to_free_list(heap_start);
     /* We expect magic to be set here in the fix */
 #ifdef HEAP_MAGIC
     heap_start->magic = HEAP_MAGIC;
@@ -129,12 +136,14 @@ void test_kfree_checks_magic() {
     /* Wait, if magic check fails, it returns early. So is_free remains 0. */
     assert(block->is_free == 0);
     printf("  Invalid magic detected (block not freed).\n");
+
 #endif
 }
 
 int main() {
     test_kmalloc_sets_magic();
     test_kfree_checks_magic();
+
 
     printf("All tests passed!\n");
     return 0;

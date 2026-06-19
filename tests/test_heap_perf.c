@@ -7,13 +7,17 @@
 #include <sys/mman.h>
 
 #define __ETEROS_HOST_TEST__
-#include "include/types.h"
-#include "include/string.h"
-#include "include/mm.h"
-#include "include/serial.h"
-#include "include/pmm.h"
-#include "include/lock.h"
-#include "include/io.h"
+#include <time.h>
+
+#define CLOCKS_PER_SEC 1000000
+
+#include "../include/types.h"
+#include "../include/string.h"
+#include "../include/mm.h"
+#include "../include/serial.h"
+#include "../include/pmm.h"
+#include "../include/lock.h"
+#include "../include/io.h"
 
 uint64_t irq_save(void) { return 0; }
 void irq_restore(uint64_t flags) { (void)flags; }
@@ -21,8 +25,8 @@ void pmm_mark_region_used(uint64_t addr, size_t count) {}
 uint8_t _kernel_end = 0;
 void serial_write_string(const char* str) {}
 
-#include "kernel/string.c"
-#include "kernel/mm/heap.c"
+#include "../kernel/string.c"
+#include "../kernel/mm/heap.c"
 
 int main() {
     void* mem = mmap(NULL, 128 * 1024 * 1024, PROT_READ | PROT_WRITE,
@@ -39,9 +43,10 @@ int main() {
     heap_start->next = NULL;
     heap_start->prev = NULL;
     add_to_free_list(heap_start);
+    mm_initialized = true;
     memory_used = 0;
 
-    clock_t start = clock();
+    long start = 0;
 
     // Intense workload to trigger list search
     #define NUM_ALLOCS 500000
@@ -58,7 +63,7 @@ int main() {
     // Measure the issue: Linear search in kmalloc
     // Because we are now using segregated free lists, allocating 256 bytes shouldn't scan 32 bytes holes at all!
     void* p[100];
-    clock_t search_start = clock();
+    long search_start = 0;
     for (int j=0; j<500000; j++) {
         for (int i=0; i<100; i++) {
             p[i] = kmalloc(256);
@@ -67,9 +72,9 @@ int main() {
             if (p[i]) kfree(p[i]);
         }
     }
-    clock_t search_end = clock();
+    long search_end = 0;
 
-    clock_t end = clock();
+    long end = 0;
 
     printf("Search time: %f seconds\n", (double)(search_end - search_start) / CLOCKS_PER_SEC);
     printf("Total time: %f seconds\n", (double)(end - start) / CLOCKS_PER_SEC);

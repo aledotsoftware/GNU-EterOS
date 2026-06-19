@@ -74,6 +74,7 @@ void pmm_mark_region_used(uint64_t base, size_t size) {
 static uint8_t heap_memory[HEAP_SIZE] __attribute__((aligned(16)));
 
 void reset_heap() {
+    mm_initialized = true;
     // Clear memory
     memset(heap_memory, 0, HEAP_SIZE);
 
