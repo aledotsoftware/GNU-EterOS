@@ -947,11 +947,12 @@ static void task_exit_internal(int status, int wait_status, int wait_code) {
     task_wake_parent_waiter(current);
 
     spin_unlock(&sched_lock);
-    task_irq_restore(irq_flags);
 
     /* Yield forever until switched out */
     schedule();
     
+    task_irq_restore(irq_flags);
+
     for (;;) { __asm__ volatile("hlt"); }
 }
 

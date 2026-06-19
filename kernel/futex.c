@@ -114,10 +114,10 @@ int futex_wait(uint32_t *uaddr, uint32_t val, const void *timeout, int op, uint3
 
     spin_unlock(&b->lock);
 
-    task_irq_restore(irq_flags);
-
     /* 5. Yield CPU */
     schedule();
+
+    task_irq_restore(irq_flags);
 
     /* 6. We are back. Check why. */
     int timed_out = 0;
