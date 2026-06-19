@@ -367,11 +367,21 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         }
     }
 
-    /* Pass 3: Parse PT_DYNAMIC to load shared libraries (.so) */
+    /* Pass 3: Parse PT_DYNAMIC and PT_TLS */
     for (int i = 0; i < header.e_phnum; i++) {
         Elf64_Phdr phdr;
         uint64_t offset = header.e_phoff + (i * header.e_phentsize);
         read_fs(node, offset, sizeof(Elf64_Phdr), (uint8_t*)&phdr);
+
+        if (phdr.p_type == PT_TLS) {
+            task_t* current = task_get_current();
+            if (current) {
+                current->tls_vaddr  = phdr.p_vaddr + load_offset;
+                current->tls_memsz  = phdr.p_memsz;
+                current->tls_filesz = phdr.p_filesz;
+                current->tls_align  = phdr.p_align;
+            }
+        }
 
         if (phdr.p_type == PT_DYNAMIC) {
             uint64_t dyn_vaddr = phdr.p_vaddr + load_offset;

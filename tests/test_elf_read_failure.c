@@ -76,6 +76,10 @@ typedef struct {
     uint32_t euid;
     uint32_t egid;
     uint64_t mmap_base;
+    uint64_t tls_vaddr;
+    uint64_t tls_memsz;
+    uint64_t tls_filesz;
+    uint64_t tls_align;
 } task_t;
 /* Types from fs/vfs.h */
 typedef struct fs_node {
@@ -105,6 +109,7 @@ typedef uint64_t Elf64_Addr;
 #define EM_X86_64 62
 #define PT_LOAD 1
 #define PT_DYNAMIC 2
+#define PT_TLS 7
 #define PT_INTERP 3
 #define PT_PHDR 6
 #define PF_R 0x4

@@ -96,6 +96,11 @@ typedef struct task {
     struct semaphore* waiting_sem;          /* Semaphore waiting on (if blocked) */
     char           name[32];                /* Nombre descriptivo */
     char           executable_path[256];    /* Absolute path to the loaded ELF */
+    /* TLS Tracking */
+    uint64_t       tls_vaddr;               /* Original TLS virtual address */
+    uint64_t       tls_memsz;               /* TLS segment memory size */
+    uint64_t       tls_filesz;              /* TLS segment file size */
+    uint64_t       tls_align;               /* TLS segment alignment */
 
     struct task*   next_ready;              /* Next task in ready queue */
     struct task*   prev_ready;              /* Previous task in ready queue */
