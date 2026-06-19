@@ -85,7 +85,7 @@ static void wait_for_enter(void) {
             break;
         }
         __asm__ volatile("cli");
-        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
+        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
             __asm__ volatile("sti; hlt");
         } else {
             __asm__ volatile("sti");
@@ -123,7 +123,7 @@ static void panel_keyboard(void) {
             if (c) break;
         }
         __asm__ volatile("cli");
-        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
+        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
             __asm__ volatile("sti; hlt");
         } else {
             __asm__ volatile("sti");
@@ -182,7 +182,7 @@ static void panel_mouse_cfg(void) {
             }
         }
         __asm__ volatile("cli");
-        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
+        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
             __asm__ volatile("sti; hlt");
         } else {
             __asm__ volatile("sti");
@@ -285,7 +285,7 @@ static void panel_time(void) {
             }
         }
         __asm__ volatile("cli");
-        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
+        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
             __asm__ volatile("sti; hlt");
         } else {
             __asm__ volatile("sti");
@@ -327,7 +327,7 @@ static void panel_time(void) {
                 }
             }
             __asm__ volatile("cli");
-            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
+            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
                 __asm__ volatile("sti; hlt");
             } else {
                 __asm__ volatile("sti");
@@ -358,7 +358,7 @@ static void panel_time(void) {
                 }
             }
             __asm__ volatile("cli");
-            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
+            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
                 __asm__ volatile("sti; hlt");
             } else {
                 __asm__ volatile("sti");
@@ -388,7 +388,7 @@ static void panel_time(void) {
                 }
             }
             __asm__ volatile("cli");
-            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
+            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
                 __asm__ volatile("sti; hlt");
             } else {
                 __asm__ volatile("sti");
@@ -490,7 +490,7 @@ void cmd_panel(const char* args) {
                         }
                     }
                     __asm__ volatile("cli");
-                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) __asm__ volatile("sti; hlt");
+                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) __asm__ volatile("sti; hlt");
                     else __asm__ volatile("sti");
                 }
                 terminal_write_string("\n");
@@ -547,7 +547,7 @@ void cmd_panel(const char* args) {
                         }
                     }
                     __asm__ volatile("cli");
-                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
+                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
                         __asm__ volatile("sti; hlt");
                     } else {
                         __asm__ volatile("sti");

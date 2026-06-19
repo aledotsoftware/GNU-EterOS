@@ -200,5 +200,5 @@ void cmd_time(const char* args) {
     itoa_s(utc.seconds, buf, sizeof(buf), 10);
     if(utc.seconds < 10) terminal_write_string("0");
     terminal_write_string(buf);
-    terminal_write_string("\n\n");
+    terminal_write_string("\n\n\n");
 }
