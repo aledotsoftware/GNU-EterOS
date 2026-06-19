@@ -476,6 +476,7 @@ static int64_t sys_memfd_create(const char *name, unsigned int flags) {
     task_t* current = task_get_current();
     if (!current) return -ENOSYS;
 
+    extern fs_node_t* shmfs_create_memfd(const char* name);
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
@@ -622,17 +623,21 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
             hal_mem_map((uint64_t)phys, v, map_flags);
+#ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
+#endif
         } else if (is_properties) {
             /* __properties__ VMA - Map anonymous page and copy dummy properties */
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
             hal_mem_map((uint64_t)phys, v, map_flags);
+#ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
             if (v == start) {
                 const char* dummy_props = "ro.build.version.sdk=29\nro.debuggable=1\n";
                 memcpy((void*)v, dummy_props, strlen(dummy_props));
             }
+#endif
         } else {
             /* File-backed mapping or Anonymous */
             void* phys = pmm_alloc_page();
@@ -658,6 +663,8 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
     }
     return (int64_t)virt;
 }
+
+
 
 static int64_t sys_socket(int domain, int type, int protocol) {
     return sys_lwip_socket(domain, type, protocol);
@@ -720,6 +727,11 @@ static int64_t sys_pipe2(int* pipefd, int flags) {
 
 static int64_t sys_pipe(int* pipefd) {
     return sys_pipe2(pipefd, 0);
+}
+
+static int64_t sys_socketpair(int domain, int type, int protocol, int sv[2]) {
+    (void)domain; (void)type; (void)protocol;
+    return sys_pipe2(sv, 0); // Simplified stub for Bionic threading
 }
 
 struct utsname {
@@ -807,6 +819,7 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     if ((flags & O_ACCMODE) > O_RDWR) { kfree(kpath); return -EINVAL; }
 
     task_t* current = task_get_current();
+    extern fs_node_t* shmfs_create_memfd(const char* name);
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
@@ -816,7 +829,12 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
     }
     if (fd == -1) { kfree(kpath); return -EMFILE; }
 
-    fs_node_t* node = vfs_lookup_ext(fs_root, kpath, (flags & O_NOFOLLOW) ? 0 : 1);
+    fs_node_t* node = NULL;
+    if (strcmp(kpath, "/dev/ashmem") == 0) {
+        node = shmfs_create_memfd("ashmem");
+    } else {
+        node = vfs_lookup_ext(fs_root, kpath, (flags & O_NOFOLLOW) ? 0 : 1);
+    }
 
     if (node && (flags & O_NOFOLLOW) && ((node->flags & 0x7) == FS_SYMLINK)) {
         if (__atomic_sub_fetch(&node->ref_count, 1, __ATOMIC_SEQ_CST) == 0) {
@@ -1188,8 +1206,8 @@ static int64_t sys_symlink(const char* target, const char* linkpath) {
 }
 
 static int64_t sys_mknodat(int dirfd, const char* pathname, int mode, int dev) {
-    (void)dirfd; (void)pathname; (void)mode; (void)dev;
-    return -ENOSYS;
+    (void)dev;
+    return sys_openat(dirfd, pathname, O_CREAT, mode);
 }
 
 static int64_t sys_renameat2(int olddirfd, const char* oldpath, int newdirfd, const char* newpath, int flags) {
@@ -1416,13 +1434,15 @@ static int64_t sys_fchdir(int fd) {
     if ((node->flags & 0x7) != FS_DIRECTORY) return -ENOTDIR;
     if (!check_node_permission(node, 1)) return -EACCES;
 
-    // In EterOS, cwd is a string, but an FD doesn't store its resolved path easily.
-    // However, we can map some cases or just return -ENOSYS if we can't resolve it.
-    // For now, we will simply set cwd to the root if we can't figure it out, but ideally we need reverse lookup.
-    // Actually, vfs_lookup doesn't save names. Let's return -ENOSYS since it's hard to get path from FD.
-    // Wait, let's just make it a stub that sets cwd to "/" for now to satisfy basic tests if needed, or return ENOSYS.
-    // Let's implement a dummy one.
-    return -ENOSYS;
+    current->cwd_node = node;
+    const char* path = current->fd_table[fd].path;
+    if (path && path[0] == '/') {
+        strlcpy(current->cwd, path, sizeof(current->cwd));
+    } else {
+        /* Fallback if path is missing or not absolute */
+        strlcpy(current->cwd, "/", sizeof(current->cwd));
+    }
+    return 0;
 }
 
 static int64_t sys_chown(const char* path, uint32_t owner, uint32_t group) {
@@ -2338,6 +2358,8 @@ static void setup_sigcontext(struct syscall_regs* regs,
     uint32_t block_mask = (uint32_t)sa_mask;
     if (!(sa_flags & SA_NODEFER)) {
         block_mask |= (1u << (sig - 1));
+    } else {
+        current->signal_mask &= ~(1u << (sig - 1));
     }
     block_mask &= ~((1u << (SIGKILL - 1)) | (1u << (SIGSTOP - 1)));
     current->signal_mask |= block_mask;
@@ -2836,6 +2858,7 @@ static int64_t sys_epoll_wait(int epfd, struct epoll_event* events, int maxevent
 static int64_t sys_eventfd2(unsigned int initval, int flags) {
     (void)initval; (void)flags;
     task_t* current = task_get_current();
+    extern fs_node_t* shmfs_create_memfd(const char* name);
     int fd = -1;
     for (int i = 3; i < MAX_FD; i++) {
         if (current->fd_table[i].node == NULL) {
@@ -3341,78 +3364,16 @@ static int64_t sys_gethostbyname(const char* name, uint32_t* out_ip) {
 static int64_t sys_getcwd(char* buf, size_t size) {
     if (!buf || size == 0) return -EINVAL;
     if (!vmm_verify_user_access(buf, size, 1)) return -EFAULT;
+
     task_t* current = task_get_current();
-    if (strlen(current->cwd) + 1 > size) return -ERANGE;
-    strlcpy(buf, current->cwd, size);
+    if (!current) return -EFAULT;
 
-    char* temp_path = (char*)kmalloc(256);
-    if (!temp_path) return -ENOMEM;
-    temp_path[0] = '\0';
+    size_t len = strlen(current->cwd) + 1;
+    if (len > size) return -ERANGE;
 
-    fs_node_t* node = current->cwd_node;
-    if (!node) {
-        /* Fallback */
-        kfree(temp_path);
-        if (size < 2) return -ERANGE;
-        strlcpy(buf, "/", size);
-        return (int64_t)buf;
-    }
+    vmm_safe_copy_to_user(buf, current->cwd, len);
 
-    /* We need to ascend to root */
-    /* Note: Since we don't have a reliable back-link, we'll implement a simple
-       VFS traversal upwards. We clone the node so we can safely traverse. */
-    fs_node_t* curr_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    if (!curr_node) { kfree(temp_path); return -ENOMEM; }
-    memcpy(curr_node, node, sizeof(fs_node_t));
-
-    while (curr_node->inode != fs_root->inode) {
-        fs_node_t* parent = vfs_lookup(curr_node, "..");
-        if (!parent) {
-            /* Error traversing up, break */
-            break;
-        }
-
-        /* Now find the name of curr_node in parent */
-        struct dirent direntry;
-        int i = 0;
-        int found = 0;
-        while (readdir_fs(parent, i, &direntry) != -1) {
-            if (direntry.inode == curr_node->inode) {
-                found = 1;
-                break;
-            }
-            i++;
-        }
-
-        if (found) {
-            /* Prepend to temp_path */
-            char* segment = (char*)kmalloc(130);
-            if (!segment) { kfree(curr_node); kfree(temp_path); return -ENOMEM; }
-            strlcpy(segment, "/", 130);
-            strlcat(segment, direntry.name, 130);
-            char* new_temp = (char*)kmalloc(256);
-            if (!new_temp) { kfree(segment); kfree(curr_node); kfree(temp_path); return -ENOMEM; }
-            strlcpy(new_temp, segment, 256);
-            strlcat(new_temp, temp_path, 256);
-            strlcpy(temp_path, new_temp, 256);
-            kfree(new_temp);
-            kfree(segment);
-        }
-
-        kfree(curr_node);
-        curr_node = parent;
-    }
-
-    kfree(curr_node);
-
-    if (temp_path[0] == '\0') {
-        strlcpy(temp_path, "/", 256);
-    }
-
-    if (strlen(temp_path) >= size) { kfree(temp_path); return -ERANGE; }
-    strlcpy(buf, temp_path, size);
-    kfree(temp_path);
-    return (int64_t)buf;
+    return len;
 }
 
 static int64_t sys_chdir(const char* path) {
@@ -3530,6 +3491,89 @@ static int64_t sys_exit_wrapper(int status) {
 
 typedef int64_t (*syscall_ptr_t)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
+
+static int64_t sys_getgroups(int size, uint32_t list[]) {
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+
+    // In EterOS we only have a single primary GID for now
+    if (size == 0) return 1; // Number of supplementary groups (just primary)
+
+    if (size < 1) return -EINVAL;
+
+    if (!vmm_verify_user_access(list, sizeof(uint32_t), 1)) return -EFAULT;
+    list[0] = current->gid;
+
+    return 1;
+}
+
+static int64_t sys_setgroups(size_t size, const uint32_t *list) {
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+
+    // Only root can set groups
+    if (current->euid != 0) return -1; // -EPERM
+
+    // We don't support supplementary groups yet, but accept clearing them or setting to just the primary
+    if (size > 1) {
+        // Technically not supported, but we'll accept it to appease GNU tools
+        if (!vmm_verify_user_access(list, size * sizeof(uint32_t), 0)) return -EFAULT;
+    }
+
+    return 0;
+}
+
+static int64_t sys_alarm(unsigned int seconds) {
+    (void)seconds;
+    // We don't have SIGALRM delivery yet, return 0 (no previous alarm)
+    return 0;
+}
+
+static int64_t sys_pause(void) {
+    task_t* current = task_get_current();
+    if (!current) return -ENOSYS;
+
+    // Wait for signal
+    while (!current->signal_pending) {
+        task_yield();
+    }
+    return -EINTR; // Always returns -EINTR on signal
+}
+
+static int64_t sys_getrusage(int who, void *usage) {
+    // who: 0 = RUSAGE_SELF, -1 = RUSAGE_CHILDREN
+    (void)who;
+
+    // struct rusage is 144 bytes on 64-bit Linux usually, let's just use 144
+    if (!vmm_verify_user_access(usage, 144, 1)) return -EFAULT;
+    memset(usage, 0, 144);
+
+    return 0;
+}
+
+static int64_t sys_times(void *buf) {
+    // struct tms is 32 bytes on 64-bit Linux usually
+    if (!vmm_verify_user_access(buf, 32, 1)) return -EFAULT;
+    memset(buf, 0, 32);
+
+    // Return uptime in clock ticks (sysconf(_SC_CLK_TCK) is usually 100 on Linux)
+    return timer_get_uptime_seconds() * 100;
+}
+
+static int64_t sys_syslog(int type, char *bufp, int len) {
+    // Read/clear/control kernel ring buffer
+    (void)type; (void)bufp; (void)len;
+
+    // Fake success since we don't expose klog to userland yet
+    return 0;
+}
+
+
+static int64_t sys_fork_wrapper(struct syscall_regs* regs) {
+    return (int64_t)task_fork((void*)regs);
+}
+
+
 static int64_t sys_ni_syscall(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6) {
     (void)a1; (void)a2; (void)a3; (void)a4; (void)a5; (void)a6;
     return -ENOSYS;
@@ -3566,10 +3610,19 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [21] = (syscall_ptr_t)sys_access,
     [22] = (syscall_ptr_t)sys_pipe,
     [23] = (syscall_ptr_t)sys_select,
+    [53] = (syscall_ptr_t)sys_socketpair,
     [25] = (syscall_ptr_t)sys_mremap,
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
     [33] = (syscall_ptr_t)sys_dup2,
+
+    [34] = (syscall_ptr_t)sys_pause,
+    [37] = (syscall_ptr_t)sys_alarm,
+    [98] = (syscall_ptr_t)sys_getrusage,
+    [100] = (syscall_ptr_t)sys_times,
+    [103] = (syscall_ptr_t)sys_syslog,
+    [115] = (syscall_ptr_t)sys_getgroups,
+    [116] = (syscall_ptr_t)sys_setgroups,
     [35] = (syscall_ptr_t)sys_nanosleep,
     [39] = (syscall_ptr_t)sys_getpid,
     [41] = (syscall_ptr_t)sys_socket,
@@ -3587,6 +3640,9 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [54] = (syscall_ptr_t)sys_setsockopt,
     [55] = (syscall_ptr_t)sys_getsockopt,
     [288] = (syscall_ptr_t)sys_accept4,
+
+    [57] = (syscall_ptr_t)sys_fork_wrapper,
+    [58] = (syscall_ptr_t)sys_fork_wrapper,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
@@ -3600,7 +3656,9 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [127] = (syscall_ptr_t)sys_rt_sigpending,
     [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
+
     [79] = (syscall_ptr_t)sys_getcwd,
+
     [80] = (syscall_ptr_t)sys_chdir,
     [81] = (syscall_ptr_t)sys_fchdir,
     [83] = (syscall_ptr_t)sys_mkdir,
@@ -3707,10 +3765,19 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [21] = (syscall_ptr_t)sys_access,
     [22] = (syscall_ptr_t)sys_pipe,
     [23] = (syscall_ptr_t)sys_select,
+    [53] = (syscall_ptr_t)sys_socketpair,
     [25] = (syscall_ptr_t)sys_mremap,
     [28] = (syscall_ptr_t)sys_madvise,
     [32] = (syscall_ptr_t)sys_dup,
     [33] = (syscall_ptr_t)sys_dup2,
+
+    [34] = (syscall_ptr_t)sys_pause,
+    [37] = (syscall_ptr_t)sys_alarm,
+    [98] = (syscall_ptr_t)sys_getrusage,
+    [100] = (syscall_ptr_t)sys_times,
+    [103] = (syscall_ptr_t)sys_syslog,
+    [115] = (syscall_ptr_t)sys_getgroups,
+    [116] = (syscall_ptr_t)sys_setgroups,
     [35] = (syscall_ptr_t)sys_nanosleep,
     [39] = (syscall_ptr_t)sys_getpid,
     [41] = (syscall_ptr_t)sys_socket,
@@ -3728,6 +3795,9 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [54] = (syscall_ptr_t)sys_setsockopt,
     [55] = (syscall_ptr_t)sys_getsockopt,
     [288] = (syscall_ptr_t)sys_accept4,
+
+    [57] = (syscall_ptr_t)sys_fork_wrapper,
+    [58] = (syscall_ptr_t)sys_fork_wrapper,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
@@ -3736,7 +3806,9 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [75] = (syscall_ptr_t)sys_fdatasync,
     [76] = (syscall_ptr_t)sys_truncate,
     [77] = (syscall_ptr_t)sys_ftruncate,
+
     [79] = (syscall_ptr_t)sys_getcwd,
+
     [80] = (syscall_ptr_t)sys_chdir,
     [81] = (syscall_ptr_t)sys_fchdir,
     [83] = (syscall_ptr_t)sys_mkdir,

@@ -157,7 +157,7 @@ int vfs_mkdir(const char *path, uint16_t permission) {
     serial_write_string(path);
     serial_write_string("\n");
 
-    char parent_path[128];
+    char parent_path[256];
     char name[128];
     int len = strlen(path);
     int last_slash = -1;
@@ -219,7 +219,7 @@ int vfs_link(const char *oldpath, const char *newpath) {
     fs_node_t *target = vfs_lookup(fs_root, oldpath);
     if (!target) return -ENOENT;
 
-    char parent_path[128];
+    char parent_path[256];
     char name[128];
     int len = strlen(newpath);
     int last_slash = -1;
@@ -249,7 +249,7 @@ int vfs_link(const char *oldpath, const char *newpath) {
 
 int vfs_unlink(const char *path) {
     if (!path) return -ENOENT;
-    char parent_path[128];
+    char parent_path[256];
     char name[128];
     int len = strlen(path);
     int last_slash = -1;
@@ -279,7 +279,7 @@ int vfs_unlink(const char *path) {
 int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir) {
     if (!out_path || !path || size <= 0) return -ENOENT;
 
-    char temp[512];
+    char temp[1024];
     temp[0] = '\0';
 
     if (path[0] != '/') {
@@ -394,18 +394,18 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
     current->ref_count = 1;
     current->lock = 0;
 
-    char segment[128];
+    char segment[256];
     while (*p) {
         int i = 0;
-        while (*p && *p != '/' && i < 127) {
+        while (*p && *p != '/' && i < 255) {
             segment[i++] = *p++;
         }
-        segment[i] = 0;
 
-        if (i == 127 && *p && *p != '/') {
+        if (i == 255 && *p && *p != '/') {
             kfree(current);
             return 0;
         }
+        segment[i] = 0;
 
         if (*p == '/') p++;
         if (i == 0) continue;

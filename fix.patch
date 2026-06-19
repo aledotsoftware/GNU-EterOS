@@ -1,0 +1,9 @@
+--- kernel/arch/x86_64/syscall.c
++++ kernel/arch/x86_64/syscall.c
+@@ -3373,7 +3373,7 @@
+
+-    vmm_safe_copy_to_user(buf, current->cwd, len);
++    memcpy(buf, current->cwd, len);
+
+     return len;
+ }

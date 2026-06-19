@@ -143,4 +143,3 @@ int main() {
 void serial_write_string(const char* s) {}
 fs_node_t* fs_root = NULL;
 
-int vfs_link(const char* oldpath, const char* newpath) { return -1; }

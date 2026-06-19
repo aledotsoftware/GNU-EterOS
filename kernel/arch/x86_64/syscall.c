@@ -3371,7 +3371,7 @@ static int64_t sys_getcwd(char* buf, size_t size) {
     size_t len = strlen(current->cwd) + 1;
     if (len > size) return -ERANGE;
 
-    strlcpy(buf, current->cwd, size);
+    memcpy(buf, current->cwd, len);
 
     return len;
 }
