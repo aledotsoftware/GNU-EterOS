@@ -26,6 +26,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (getuid() != 0) {
+        printf("Error: Only root can add users.\n");
+        return 1;
+    }
+
     const char* username = argv[1];
     const char* password = argv[2];
 

@@ -1,8 +1,4 @@
-1. **Move `task_irq_restore(irq_flags)` to after `schedule()` in `futex_wait`:** This fixes a critical race condition where a timer interrupt can wake up a blocked task before it voluntarily yields the CPU, causing it to be scheduled immediately but bypassing the `schedule()` call entirely, and then when `schedule()` is eventually called, it's not marked for wake up anymore, causing it to hang.
-
-2. **Move `task_irq_restore(irq_flags)` to after `schedule()` in `sem_wait`:** Same race condition as `futex_wait`. By restoring interrupts after `schedule()`, we ensure that the task correctly switches out while interrupts are disabled, and timer interrupts are queued until it resumes.
-
-3. **Move `task_irq_restore(irq_flags)` to after `schedule()` in `task_exit_internal`:** This aligns with the rest of the scheduler design.
-
-4. **Run `pre_commit_instructions`** to complete verification and testing.
-5. **Submit changes** with `submit`.
+1. **Fix `userspace/login.c`**: Update `execve` calls to explicitly pass `envp` with `USER`, `HOME`, `PATH`, and `TERM` instead of `NULL`.
+2. **Fix `kernel/shell/cmd_user.c`**: Add `vfs_unlink` for temporary files (`shadow.tmp` and `passwd.tmp`) after they are processed to prevent memory leaks in RAM-backed FS.
+3. **Pre-commit checks**: Complete pre-commit steps to ensure proper testing, verification, review, and reflections are done.
+4. **Submit**: Submit the changes.

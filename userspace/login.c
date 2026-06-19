@@ -75,7 +75,14 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             char *args[] = {(char*)preferred_shell, NULL};
-            execve(preferred_shell, args, NULL);
+            char *envp[] = {
+                "USER=root",
+                "HOME=/root",
+                "PATH=/bin:/usr/bin",
+                "TERM=xterm",
+                NULL
+            };
+            execve(preferred_shell, args, envp);
             return 1;
         }
     }
@@ -222,7 +229,24 @@ int main(int argc, char *argv[]) {
                         exit(1);
                     }
                     char *args[] = {(char*)preferred_shell, NULL};
-                    execve(preferred_shell, args, NULL);
+
+                    char env_user[64];
+                    snprintf(env_user, sizeof(env_user), "USER=%s", username);
+                    char env_home[64];
+                    if (target_uid == 0) {
+                        snprintf(env_home, sizeof(env_home), "HOME=/root");
+                    } else {
+                        snprintf(env_home, sizeof(env_home), "HOME=/home/%s", username);
+                    }
+
+                    char *envp[] = {
+                        env_user,
+                        env_home,
+                        "PATH=/bin:/usr/bin",
+                        "TERM=xterm",
+                        NULL
+                    };
+                    execve(preferred_shell, args, envp);
 
                     /* Should not return */
                     printf("Failed to execute shell.\n");

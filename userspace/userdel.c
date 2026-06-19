@@ -79,6 +79,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (getuid() != 0) {
+        printf("Error: Only root can delete users.\n");
+        return 1;
+    }
+
     const char* username = argv[1];
 
     if (strcmp(username, "root") == 0) {

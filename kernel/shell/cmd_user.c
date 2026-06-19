@@ -237,6 +237,7 @@ static void remove_user_from_vfs_file(const char* filepath, const char* username
         write_fs(node, 0, tmp_node->length, new_buf);
         kfree(new_buf);
     }
+    vfs_unlink(temp_path);
 }
 
 
@@ -387,6 +388,7 @@ static void cmd_passwd(const char* args) {
     } else {
         terminal_write_string("  Error: Usuario no encontrado.\n");
     }
+    vfs_unlink("/etc/shadow.tmp");
 }
 
 void cmd_user(const char* args) {
