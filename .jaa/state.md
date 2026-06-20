@@ -9,3 +9,9 @@
   - Hardened `handle_exception` in `kernel/arch/x86_64/idt.c` to output full register traces unconditionally on unhandled exceptions.
   - Hardened architectural boundaries in `smp.c` and `task.c` by substituting raw `cli`/`sti` instructions with cross-platform `hal_interrupts_disable`/`hal_interrupts_enable` abstractions.
 No changes were needed for the task as network integration is fully functional
+
+- **vision-cli-agent**:
+  - Wired "EterStore" placeholder natively in `userspace/marea_shell.c` native UI to spawn a fallback terminal.
+  - Added "EterStore" graphical prototype to Web UI (`web_ui/index.html`, `web_ui/app.js`) to display an app store mock window.
+  - Verified functionality via Jest tests and Playwright end-to-end screenshots (`verification/verify_app_store.py`).
+  - Improved UI polish and consistency across interfaces.

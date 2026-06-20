@@ -41,7 +41,7 @@
                     <div class="menu-item" role="menuitem" tabindex="0" onkeydown="handleMenuKey(event, this)" onclick="spawnAbout()">ℹ️ Acerca de eterOS</div>
                     <div class="menu-divider" role="separator"></div>
                     <div class="menu-item" role="menuitem" tabindex="0" onkeydown="handleMenuKey(event, this)" onclick="spawnSettings()">⚙️ Configuración del Sistema...</div>
-                    <div class="menu-item" role="menuitem" tabindex="0" onkeydown="handleMenuKey(event, this)">🛍️ App Store...</div>
+                    <div class="menu-item" role="menuitem" tabindex="0" onkeydown="if(event.key==='Enter') spawnStore(); handleMenuKey(event, this)" onclick="spawnStore()">🛍️ App Store...</div>
                     <div class="menu-divider" role="separator"></div>
                     <div class="menu-item" role="menuitem" tabindex="0" onkeydown="handleMenuKey(event, this)">🔄 Reiniciar</div>
                     <div class="menu-item" role="menuitem" tabindex="0" onkeydown="handleMenuKey(event, this)">⏻ Apagar</div>

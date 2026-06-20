@@ -76,6 +76,17 @@ function spawnAbout() {
     document.getElementById('eter-menu').classList.remove('active');
 }
 
+function spawnStore() {
+    spawnApp("App Store", "native", `
+        <div style="padding: 20px; text-align: center;">
+            <h3>EterStore (Prototipo)</h3>
+            <p style="opacity: 0.7;">Instalador de paquetes en fase de desarrollo.</p>
+            <button style="margin-top: 10px; padding: 8px 16px; border-radius: 6px; border: none; background: var(--accent); color: white; cursor: pointer;">Actualizar repositorios</button>
+        </div>
+    `);
+    document.getElementById('eter-menu').classList.remove('active');
+}
+
 function spawnSettings() {
     spawnApp("Configuración del Sistema", "native", `
         <div class="settings-container">
@@ -831,6 +842,7 @@ if (typeof module !== 'undefined') {
         toggleControlCenter,
         filterApps,
         spawnApp,
+        spawnStore,
         closeWindow,
         maximizeWindow,
         minimizeWindow,

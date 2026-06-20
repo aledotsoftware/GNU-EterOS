@@ -270,6 +270,7 @@ static const menu_item_t menu_items[] = {
     { "Archivos",       "D" },
     { "Configuracion",  "S" },
     { "Acerca de",      "i" },
+    { "EterStore",      "E" },
     { "",               ""  },       /* separator */
     { "Reiniciar",      "R" },
     { "Apagar",         "P" },
@@ -1403,6 +1404,8 @@ static void handle_mouse_event(const input_event_t* ev) {
                         create_terminal_window();
                     } else if (strcmp(menu_items[item].label, "Archivos") == 0) {
                         create_editor_window();
+                    } else if (strcmp(menu_items[item].label, "EterStore") == 0) {
+                        create_terminal_window();
                     }
                     menu_open = 0;
                     redraw_all();
