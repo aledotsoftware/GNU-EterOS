@@ -362,7 +362,10 @@ int main(int argc, char* argv[]) {
                 input_event_t ev;
                 if (read(mfd, &ev, sizeof(ev)) == sizeof(ev)) {
                     if (ev.type == EV_REL) {
-                        restore_cursor_bg(mx, my);
+                        int old_x = mx;
+                        int old_y = my;
+                        restore_cursor_bg(old_x, old_y);
+
                         if (ev.code == REL_X) mx += ev.value;
                         if (ev.code == REL_Y) my += ev.value;
 

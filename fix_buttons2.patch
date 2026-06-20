@@ -1,0 +1,48 @@
+--- userspace/marea_shell.c
++++ userspace/marea_shell.c
+@@ -746,47 +746,47 @@
+         hover_max = hit_maximize_button(win, mouse_x, mouse_y);
+     }
+
+-    /* Close (red) - Rightmost */
++    /* Minimize (yellow) - Rightmost */
+     for (int dy = -btn_r; dy <= btn_r; dy++) {
+         for (int dx = -btn_r; dx <= btn_r; dx++) {
+             if (dx*dx + dy*dy <= btn_r*btn_r) {
+-                put_pixel(btn_base_x + dx, btn_base_y + dy, COL_DANGER);
++                put_pixel(btn_base_x + dx, btn_base_y + dy, COL_WARNING);
+             }
+         }
+     }
+-    if (hover_close) {
+-        /* Draw 'x' inside close button */
++    if (hover_min) {
++        /* Draw '-' inside minimize button */
+         for (int i = -2; i <= 2; i++) {
+-            put_pixel(btn_base_x + i, btn_base_y + i, 0xFF4C0000);
+-            put_pixel(btn_base_x + i, btn_base_y - i, 0xFF4C0000);
++            put_pixel(btn_base_x + i, btn_base_y, 0xFF4C4C00);
+         }
+     }
+
+-    /* Maximize (green) - Middle */
++    /* Minimize (yellow) - Leftmost -> Now Close (red) - Leftmost */
+     for (int dy = -btn_r; dy <= btn_r; dy++) {
+         for (int dx = -btn_r; dx <= btn_r; dx++) {
+             if (dx*dx + dy*dy <= btn_r*btn_r) {
+-                put_pixel(btn_base_x - btn_spacing + dx, btn_base_y + dy, COL_SUCCESS);
++                put_pixel(btn_base_x - btn_spacing * 2 + dx, btn_base_y + dy, COL_DANGER);
+             }
+         }
+     }
+-    if (hover_max) {
+-        /* Draw '+' inside maximize button */
++    if (hover_close) {
++        /* Draw 'x' inside close button */
+         for (int i = -2; i <= 2; i++) {
+-            put_pixel(btn_base_x - btn_spacing + i, btn_base_y, 0xFF004C00);
+-            put_pixel(btn_base_x - btn_spacing, btn_base_y + i, 0xFF004C00);
++            put_pixel(btn_base_x - btn_spacing * 2 + i, btn_base_y + i, 0xFF4C0000);
++            put_pixel(btn_base_x - btn_spacing * 2 + i, btn_base_y - i, 0xFF4C0000);
+         }
+     }

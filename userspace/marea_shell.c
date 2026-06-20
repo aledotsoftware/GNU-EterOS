@@ -687,7 +687,7 @@ static void draw_menu(void) {
 /* Check if click is on a window's minimize button */
 static int hit_minimize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
+    int btn_cx = win->x + win->w - 14 - btn_spacing;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -696,7 +696,7 @@ static int hit_minimize_button(marea_window_t* win, int mx, int my) {
 /* Check if click is on a window's maximize button */
 static int hit_maximize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + win->w - 14 - btn_spacing;
+    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -762,34 +762,34 @@ static void draw_window_chrome(marea_window_t* win) {
         }
     }
 
-    /* Maximize (green) - Middle */
+    /* Minimize (yellow) - Middle */
     for (int dy = -btn_r; dy <= btn_r; dy++) {
         for (int dx = -btn_r; dx <= btn_r; dx++) {
             if (dx*dx + dy*dy <= btn_r*btn_r) {
-                put_pixel(btn_base_x - btn_spacing + dx, btn_base_y + dy, COL_SUCCESS);
-            }
-        }
-    }
-    if (hover_max) {
-        /* Draw '+' inside maximize button */
-        for (int i = -2; i <= 2; i++) {
-            put_pixel(btn_base_x - btn_spacing + i, btn_base_y, 0xFF004C00);
-            put_pixel(btn_base_x - btn_spacing, btn_base_y + i, 0xFF004C00);
-        }
-    }
-
-    /* Minimize (yellow) - Leftmost */
-    for (int dy = -btn_r; dy <= btn_r; dy++) {
-        for (int dx = -btn_r; dx <= btn_r; dx++) {
-            if (dx*dx + dy*dy <= btn_r*btn_r) {
-                put_pixel(btn_base_x - btn_spacing * 2 + dx, btn_base_y + dy, COL_WARNING);
+                put_pixel(btn_base_x - btn_spacing + dx, btn_base_y + dy, COL_WARNING);
             }
         }
     }
     if (hover_min) {
         /* Draw '-' inside minimize button */
         for (int i = -2; i <= 2; i++) {
-            put_pixel(btn_base_x - btn_spacing * 2 + i, btn_base_y, 0xFF4C4C00);
+            put_pixel(btn_base_x - btn_spacing + i, btn_base_y, 0xFF4C4C00);
+        }
+    }
+
+    /* Maximize (green) - Leftmost */
+    for (int dy = -btn_r; dy <= btn_r; dy++) {
+        for (int dx = -btn_r; dx <= btn_r; dx++) {
+            if (dx*dx + dy*dy <= btn_r*btn_r) {
+                put_pixel(btn_base_x - btn_spacing * 2 + dx, btn_base_y + dy, COL_SUCCESS);
+            }
+        }
+    }
+    if (hover_max) {
+        /* Draw '+' inside maximize button */
+        for (int i = -2; i <= 2; i++) {
+            put_pixel(btn_base_x - btn_spacing * 2 + i, btn_base_y, 0xFF004C00);
+            put_pixel(btn_base_x - btn_spacing * 2, btn_base_y + i, 0xFF004C00);
         }
     }
 
