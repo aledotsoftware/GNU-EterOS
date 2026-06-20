@@ -1642,7 +1642,7 @@ static int64_t sys_prlimit64(int pid, int resource, const struct rlimit* new_lim
     if (new_limit) {
         if (!vmm_verify_user_access(new_limit, sizeof(struct rlimit), 0)) return -EFAULT;
     }
-    return 0;
+    return -ENOSYS;
 }
 
 static int64_t sys_sigaltstack(const stack_t* ss, stack_t* old_ss) {
@@ -3552,7 +3552,7 @@ static int64_t sys_getrusage(int who, void *usage) {
     if (!vmm_verify_user_access(usage, 144, 1)) return -EFAULT;
     memset(usage, 0, 144);
 
-    return 0;
+    return -ENOSYS;
 }
 
 static int64_t sys_times(void *buf) {
@@ -3568,8 +3568,8 @@ static int64_t sys_syslog(int type, char *bufp, int len) {
     // Read/clear/control kernel ring buffer
     (void)type; (void)bufp; (void)len;
 
-    // Fake success since we don't expose klog to userland yet
-    return 0;
+    // Not implemented yet
+    return -ENOSYS;
 }
 
 
