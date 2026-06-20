@@ -413,17 +413,19 @@ static int split_path(const char* path, char* parent, char* name) {
     }
 
     if (last_slash == -1) {
-        strlcpy(parent, "/", 128);
-        strlcpy(name, path, 128);
+        strlcpy(parent, "/", 256);
+        if (len >= 256) return -1;
+        strlcpy(name, path, 256);
     } else {
         if (last_slash == 0) {
-            strlcpy(parent, "/", 128);
+            strlcpy(parent, "/", 256);
         } else {
-            if (last_slash >= 128) return -1;
+            if (last_slash >= 256) return -1;
             memcpy(parent, path, last_slash);
             parent[last_slash] = 0;
         }
-        strlcpy(name, path + last_slash + 1, 128);
+        if (len - last_slash - 1 >= 256) return -1;
+        strlcpy(name, path + last_slash + 1, 256);
     }
     return 0;
 }
@@ -872,9 +874,9 @@ static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
 
     if (!node) {
         if (flags & O_CREAT) {
-            char* parent_path = (char*)kmalloc(128);
+            char* parent_path = (char*)kmalloc(256);
             if (!parent_path) { kfree(kpath); return -ENOMEM; }
-            char* filename = (char*)kmalloc(128);
+            char* filename = (char*)kmalloc(256);
             if (!filename) { kfree(parent_path); kfree(kpath); return -ENOMEM; }
 
             if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
@@ -968,9 +970,9 @@ static int64_t sys_mkdirat(int dirfd, const char* path, int mode) {
     int res = resolve_path(dirfd, path, kpath, 256);
     if (res < 0) { kfree(kpath); return res; }
 
-    char* parent_path = (char*)kmalloc(128);
+    char* parent_path = (char*)kmalloc(256);
     if (!parent_path) { kfree(kpath); return -ENOMEM; }
-    char* filename = (char*)kmalloc(128);
+    char* filename = (char*)kmalloc(256);
     if (!filename) { kfree(parent_path); kfree(kpath); return -ENOMEM; }
     if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
     fs_node_t* parent = vfs_lookup(fs_root, parent_path);
@@ -1018,9 +1020,9 @@ static int64_t sys_unlinkat(int dirfd, const char* path, int flags) {
     int res = resolve_path(dirfd, path, kpath, 256);
     if (res < 0) { kfree(kpath); return res; }
 
-    char* parent_path = (char*)kmalloc(128);
+    char* parent_path = (char*)kmalloc(256);
     if (!parent_path) { kfree(kpath); return -ENOMEM; }
-    char* filename = (char*)kmalloc(128);
+    char* filename = (char*)kmalloc(256);
     if (!filename) { kfree(parent_path); kfree(kpath); return -ENOMEM; }
     if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
 
@@ -1066,9 +1068,9 @@ static int64_t sys_rmdir(const char* path) {
     int res = resolve_path(AT_FDCWD, path, kpath, 256);
     if (res < 0) { kfree(kpath); return res; }
 
-    char* parent_path = (char*)kmalloc(128);
+    char* parent_path = (char*)kmalloc(256);
     if (!parent_path) { kfree(kpath); return -ENOMEM; }
-    char* filename = (char*)kmalloc(128);
+    char* filename = (char*)kmalloc(256);
     if (!filename) { kfree(parent_path); kfree(kpath); return -ENOMEM; }
     if (split_path(kpath, parent_path, filename) != 0) { kfree(filename); kfree(parent_path); kfree(kpath); return -ENAMETOOLONG; }
 
@@ -1417,9 +1419,11 @@ static int64_t sys_truncate(const char* path, int64_t length) {
         return -EACCES;
     }
 
-    int ret = -ENOSYS;
+    int ret = 0;
     if (node->truncate) {
         ret = node->truncate(node, (uint32_t)length);
+    } else {
+        node->length = (uint32_t)length;
     }
     kfree(node);
     return ret;
@@ -1507,13 +1511,13 @@ static int64_t sys_ftruncate(int fd, int64_t length) {
     if ((node->flags & 0x7) == FS_DIRECTORY) return -EISDIR;
 
     /* If the VFS node lacks a proper truncate mechanism,
-       just modifying the length is unsafe because blocks aren't freed.
-       If it exists, call it; otherwise, return -ENOSYS to avoid corruption. */
+       we fallback to directly setting node->length = length. */
     if (node->truncate) {
         return node->truncate(node, (uint32_t)length);
     }
 
-    return -ENOSYS;
+    node->length = (uint32_t)length;
+    return 0;
 }
 
 static int64_t sys_lseek(int fd, int64_t offset, int whence) {

@@ -158,7 +158,7 @@ int vfs_mkdir(const char *path, uint16_t permission) {
     serial_write_string("\n");
 
     char parent_path[256];
-    char name[128];
+    char name[256];
     int len = strlen(path);
     int last_slash = -1;
 
@@ -182,7 +182,7 @@ int vfs_mkdir(const char *path, uint16_t permission) {
         strlcpy(name, path + 1, sizeof(name));
     } else {
         /* "/path/to/name" */
-        if (last_slash >= 127) return -ENOENT;
+        if (last_slash >= 255) return -ENOENT;
         memcpy(parent_path, path, last_slash);
         parent_path[last_slash] = '\0';
         strlcpy(name, path + last_slash + 1, sizeof(name));
@@ -220,7 +220,7 @@ int vfs_link(const char *oldpath, const char *newpath) {
     if (!target) return -ENOENT;
 
     char parent_path[256];
-    char name[128];
+    char name[256];
     int len = strlen(newpath);
     int last_slash = -1;
 
@@ -250,7 +250,7 @@ int vfs_link(const char *oldpath, const char *newpath) {
 int vfs_unlink(const char *path) {
     if (!path) return -ENOENT;
     char parent_path[256];
-    char name[128];
+    char name[256];
     int len = strlen(path);
     int last_slash = -1;
 
@@ -262,7 +262,7 @@ int vfs_unlink(const char *path) {
         strlcpy(parent_path, "/", sizeof(parent_path));
         strlcpy(name, path + 1, sizeof(name));
     } else {
-        if (last_slash >= 127) return -ENOENT;
+        if (last_slash >= 255) return -ENOENT;
         memcpy(parent_path, path, last_slash);
         parent_path[last_slash] = '\0';
         strlcpy(name, path + last_slash + 1, sizeof(name));
