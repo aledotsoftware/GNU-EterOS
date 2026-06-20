@@ -3742,6 +3742,8 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [267] = (syscall_ptr_t)sys_readlinkat,
     [319] = (syscall_ptr_t)sys_memfd_create,
 
+    [327] = (syscall_ptr_t)sys_preadv2,
+    [328] = (syscall_ptr_t)sys_pwritev2,
 };
 
 static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
@@ -3899,6 +3901,8 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [94] = (syscall_ptr_t)sys_lchown,
     [95] = (syscall_ptr_t)sys_umask,
     [267] = (syscall_ptr_t)sys_readlinkat,
+    [322] = (syscall_ptr_t)sys_execveat,
+    [59] = (syscall_ptr_t)sys_execve,
 };
 
 
