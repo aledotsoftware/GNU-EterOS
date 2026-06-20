@@ -7,7 +7,7 @@ kernel/net/, kernel/drivers/net/
 Sockets, lwIP bridge, e1000, DHCP, integración syscall.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Implementar/expandir opciones de socket y control avanzando integrándolo con lwIP y compat.c.
 
 
 ## Guidelines

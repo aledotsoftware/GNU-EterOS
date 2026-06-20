@@ -134,10 +134,11 @@ int main() {
     printf("Testing fsync\n");
     assert(sys_fsync(3) == 0);
     assert(sys_fdatasync(3) == 0);
+    assert(sys_ftruncate(3, 200) == 0 && valid_node->length == 200);
 
     printf("Testing truncate\n");
     printf("truncate returned %ld\n", sys_truncate("/invalid", 100)); assert(sys_truncate("/invalid", 100) == -2); // resolve_path in mock returns -ENOENT (-2)
-    printf("truncate valid returned %ld\n", sys_truncate("/valid", 100)); assert(sys_truncate("/valid", 100) == -1 || sys_truncate("/valid", 100) == -2); // no truncate op on node
+    printf("truncate valid returned %ld\n", sys_truncate("/valid", 100)); assert(sys_truncate("/valid", 100) == 0);
 
     assert(sys_fchdir(3) == -ENOTDIR);
     valid_node->flags = FS_DIRECTORY;

@@ -7,7 +7,7 @@ kernel/gfx/, kernel/drivers/video/
 Framebuffer/gfx/window/UI shell y panel gráfico.
 
 ## Current Goal
-*(Waiting for new assignment)*
+Completado: se implementó `compositor_bring_to_front` para la gestión de Z-order en el compositor.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

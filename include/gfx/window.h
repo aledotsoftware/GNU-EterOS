@@ -35,6 +35,7 @@ void window_destroy(window_t* win);
 void window_invalidate(window_t* win);
 void compositor_add_window(window_t* win);
 void compositor_remove_window(window_t* win);
+void compositor_bring_to_front(window_t* win);
 void compositor_render(void);
 
 #endif

@@ -322,3 +322,32 @@ void compositor_render(void) {
 
     gfx_present();
 }
+
+void compositor_bring_to_front(window_t* win) {
+    if (!window_list || !win || window_list == win) return;
+
+    /* Find the window in the list and its predecessor */
+    window_t* prev = NULL;
+    window_t* curr = window_list;
+    while (curr) {
+        if (curr == win) {
+            break;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+
+    if (!curr) return; /* Window not found */
+
+    /* Remove from current position */
+    if (prev) {
+        prev->next = curr->next;
+    }
+
+    /* Add to front */
+    curr->next = window_list;
+    window_list = curr;
+
+    /* Invalidate compositor to redraw */
+    gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());
+}

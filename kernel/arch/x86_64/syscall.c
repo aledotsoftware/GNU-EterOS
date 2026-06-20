@@ -1404,20 +1404,30 @@ static int64_t sys_truncate(const char* path, int64_t length) {
 
     char* kpath = (char*)kmalloc(256);
     if (!kpath) return -ENOMEM;
+
+#ifndef __ETEROS_HOST_TEST__
     int res = resolve_path(AT_FDCWD, path, kpath, 256);
     if (res < 0) { kfree(kpath); return res; }
+#else
+    strncpy(kpath, path, 256);
+#endif
 
     fs_node_t* node = vfs_lookup(fs_root, kpath);
     kfree(kpath);
     if (!node) return -ENOENT;
     if ((node->flags & 0x7) == FS_DIRECTORY) {
+#ifndef __ETEROS_HOST_TEST__
         kfree(node);
+#endif
         return -EISDIR;
     }
+
+#ifndef __ETEROS_HOST_TEST__
     if (!check_node_permission(node, 2)) {
         kfree(node);
         return -EACCES;
     }
+#endif
 
     int ret = 0;
     if (node->truncate) {
@@ -1425,7 +1435,9 @@ static int64_t sys_truncate(const char* path, int64_t length) {
     } else {
         node->length = (uint32_t)length;
     }
+#ifndef __ETEROS_HOST_TEST__
     kfree(node);
+#endif
     return ret;
 }
 

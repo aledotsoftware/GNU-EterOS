@@ -89,6 +89,9 @@ void cmd_test_compositor(const char* args) {
 
     compositor_add_window(w2); /* w2 is now on top */
 
+    /* Test Z-order API */
+    compositor_bring_to_front(w1); /* w1 is now on top */
+
     /* Create Window 3 (Blue with transparency hole) */
     window_t* w3 = window_create(100, 200, 100, 100, WIN_VISIBLE);
     if (!w3) {
