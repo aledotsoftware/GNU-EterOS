@@ -28,7 +28,10 @@ static int remove_user_from_file(const char* filepath, const char* username) {
     char temp_filepath[256];
     snprintf(temp_filepath, sizeof(temp_filepath), "%s.tmp", filepath);
 
-    int temp_fd = open(temp_filepath, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    int mask = 0644;
+    if (strstr(filepath, "shadow")) mask = 0600;
+
+    int temp_fd = open(temp_filepath, O_WRONLY | O_CREAT | O_TRUNC, mask);
     if (temp_fd < 0) {
         close(fd);
         return -1;
