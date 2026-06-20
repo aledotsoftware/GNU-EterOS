@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <termios.h>
 #include "sha256.h"
 
 #define MAX_LINE 256
@@ -99,9 +100,18 @@ int main(int argc, char *argv[]) {
         if (username[len-1] == '\n') username[len-1] = '\0';
         if (strlen(username) == 0) continue;
 
+        struct termios term, term_orig;
+        tcgetattr(0, &term_orig);
+        term = term_orig;
+        term.c_lflag &= ~ECHO;
+        tcsetattr(0, TCSANOW, &term);
+
         printf("Password: ");
         fflush(stdout);
         len = read(0, password, sizeof(password) - 1);
+
+        tcsetattr(0, TCSANOW, &term_orig);
+        printf("\n");
         if (len < 0) {
             break; /* Cleanly exit on error */
         } else if (len == 0) {

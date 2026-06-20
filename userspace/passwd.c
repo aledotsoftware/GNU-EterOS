@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <termios.h>
+#include <fcntl.h>
 #include "sha256.h"
 
 #define MAX_LINE 256
@@ -21,8 +23,8 @@ static int read_line(int fd, char *buf, int max_len) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        printf("Usage: %s <username> <new_password>\n", argv[0]);
+    if (argc != 2) {
+        printf("Usage: %s <username>\n", argv[0]);
         return 1;
     }
 
@@ -32,7 +34,24 @@ int main(int argc, char *argv[]) {
     }
 
     const char* username = argv[1];
-    const char* password = argv[2];
+
+    struct termios term, term_orig;
+    tcgetattr(0, &term_orig);
+    term = term_orig;
+    term.c_lflag &= ~ECHO;
+    tcsetattr(0, TCSANOW, &term);
+
+    printf("New password: ");
+    fflush(stdout);
+    char password[32];
+    int len = read(0, password, sizeof(password) - 1);
+
+    tcsetattr(0, TCSANOW, &term_orig);
+    printf("\n");
+
+    if (len <= 0) return 1;
+    password[len] = '\0';
+    if (password[len-1] == '\n') password[len-1] = '\0';
 
     /* Calculate SHA256 */
     uint8_t hash[SHA256_BLOCK_SIZE];
@@ -55,7 +74,6 @@ int main(int argc, char *argv[]) {
         close(fd);
         return 1;
     }
-
 
     int found = 0;
     char line[MAX_LINE];
