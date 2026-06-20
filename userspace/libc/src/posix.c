@@ -20,7 +20,7 @@
 #include <stdarg.h>
 
 
-extern char **environ;
+extern char **environ; // Ensure environ is extern here
 
 /* Syscall primitives (self-contained to avoid cross-TU dependencies). */
 static inline long _syscall0(long n) {
@@ -452,7 +452,7 @@ void *sbrk(int64_t increment) {
     if (increment == 0) return (void*)current;
     long requested = current + increment;
     long new_brk = _syscall1(SYS_brk, requested);
-    if (new_brk != requested) {
+    if (new_brk < requested) { // Kernel may return more, but not less, or just current if failed
         errno = ENOMEM;
         return (void*)-1;
     }

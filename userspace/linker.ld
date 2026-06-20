@@ -30,4 +30,8 @@ SECTIONS
     .bss : {
         *(.bss)
     } :data
+
+    .note.GNU-stack : {
+        *(.note.GNU-stack)
+    }
 }

@@ -107,14 +107,8 @@ _start:
     call main
     mov rsp, rbp
 
-
-
-
-
-    ; 6. Run atexit handlers and exit
-    mov r12, rax     ; Save main's return value
-    call __run_atexit
-    mov rdi, r12     ; Pass main's return value to exit
+    ; Run exit(main())
+    mov rdi, rax
     call exit
 
     ; Should never reach here
