@@ -37,6 +37,11 @@ void cmd_net(const char* args) {
         terminal_write_string("State: DOWN (Link or DHCP pending)\n");
         terminal_write_string("\n\n\n");
     }
+    // Pad output to always be exactly 6 lines after the title
+    if (!network_ready) {
+        // Output already has 1 line (MAC) + 1 line (State) + 3 newlines = 5 lines. Add 1 more.
+        terminal_write_string("\n");
+    }
 }
 
 #include "../../include/timer.h"

@@ -271,8 +271,8 @@ static void panel_time(void) {
             // "4. Sincronizacion Manual"
             if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
                 // Approximate mapping based on typical cmd_time length
-                if (panel_mouse_y >= 6 && panel_mouse_y <= 9) {
-                    c = '1' + (panel_mouse_y - 6);
+                if (panel_mouse_y >= 10 && panel_mouse_y <= 13) { // 6 lines from cmd_time + title
+                    c = '1' + (panel_mouse_y - 10);
                     if (c > '4') c = '4'; // Clamping
                     break;
                 } else {
@@ -490,8 +490,8 @@ void cmd_panel(const char* args) {
                         }
                     }
                     __asm__ volatile("cli");
-                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) __asm__ volatile("sti; hlt");
-                    else __asm__ volatile("sti");
+                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) { __asm__ volatile("sti; hlt"); }
+                    else { __asm__ volatile("sti"); }
                 }
                 terminal_write_string("\n");
                 if (c == '1') cmd_user("autologin on");
@@ -519,7 +519,7 @@ void cmd_panel(const char* args) {
                 cmd_clear("");
                 terminal_write_string("\n  -- Red y Conectividad --\n");
                 cmd_net("");
-                // cmd_net outputs ~4-5 lines, so options start roughly at y=7 or y=8
+                // cmd_net outputs exactly 7 lines everywhere, so options start at y=10
                 terminal_write_string("\n  1. Renovar DHCP\n");
                 terminal_write_string("  2. Probar conexion (wget tudexgames.com)\n");
                 terminal_write_string("\n  Elija [1-2] o ESC para volver.\n");
@@ -533,8 +533,8 @@ void cmd_panel(const char* args) {
                     if (panel_mouse_clicked) {
                         panel_mouse_clicked = false;
                         if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                            if (panel_mouse_y >= 9 && panel_mouse_y <= 10) { // rough estimate
-                                c = '1' + (panel_mouse_y - 9);
+                            if (panel_mouse_y >= 10 && panel_mouse_y <= 11) { // 7 lines from cmd_net + title
+                                c = '1' + (panel_mouse_y - 10);
                                 if (c > '2') c = '2';
                                 break;
                             } else {

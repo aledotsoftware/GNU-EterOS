@@ -215,10 +215,6 @@ static uint8_t get_days_in_month(uint8_t month, uint16_t year) {
     return 30; // Fallback
 }
 
-void rtc_to_argentina(const rtc_time_t* utc, rtc_time_t* local) {
-    rtc_get_local_time(utc, local);
-}
-
 void rtc_get_local_time(const rtc_time_t* utc, rtc_time_t* local) {
     *local = *utc;
 

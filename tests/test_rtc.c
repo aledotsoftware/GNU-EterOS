@@ -124,26 +124,26 @@ void test_argentina_conversion() {
 
     // Normal case
     utc.hours = 10; utc.day = 10; utc.month = 5; utc.year = 2023;
-    rtc_to_argentina(&utc, &local);
+    rtc_get_local_time(&utc, &local);
     assert(local.hours == 7);
     assert(local.day == 10);
 
     // Day rollover
     utc.hours = 2; utc.day = 10; utc.month = 5; utc.year = 2023;
-    rtc_to_argentina(&utc, &local);
+    rtc_get_local_time(&utc, &local);
     assert(local.hours == 23);
     assert(local.day == 9);
 
     // Month rollover
     utc.hours = 1; utc.day = 1; utc.month = 3; utc.year = 2023;
-    rtc_to_argentina(&utc, &local);
+    rtc_get_local_time(&utc, &local);
     assert(local.hours == 22);
     assert(local.day == 28); // Feb 28 non-leap
     assert(local.month == 2);
 
     // Year rollover
     utc.hours = 0; utc.day = 1; utc.month = 1; utc.year = 2024;
-    rtc_to_argentina(&utc, &local);
+    rtc_get_local_time(&utc, &local);
     assert(local.hours == 21);
     assert(local.day == 31);
     assert(local.month == 12);
@@ -151,7 +151,7 @@ void test_argentina_conversion() {
 
     // Leap year
     utc.hours = 1; utc.day = 1; utc.month = 3; utc.year = 2024; // 2024 is leap
-    rtc_to_argentina(&utc, &local);
+    rtc_get_local_time(&utc, &local);
     assert(local.day == 29); // Feb 29
     assert(local.month == 2);
 

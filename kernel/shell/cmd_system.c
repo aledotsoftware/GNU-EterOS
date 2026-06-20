@@ -291,11 +291,11 @@ void cmd_date(const char* args) {
     rtc_time_t utc, local;
 
     rtc_get_time(&utc);
-    rtc_to_argentina(&utc, &local);
+    rtc_get_local_time(&utc, &local);
 
     terminal_write_string("\n");
     print_time(&utc,   "  UTC:       ");
-    print_time(&local, "  Argentina: ");
+    print_time(&local, "  Local:     ");
     terminal_write_string("\n");
 }
 
