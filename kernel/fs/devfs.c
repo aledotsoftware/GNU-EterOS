@@ -159,6 +159,10 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
         spin_unlock(&binder_lock);
         return 0;
     }
+    if (request == BINDER_SET_MAX_THREADS) {
+        /* Stub: accept max threads setting */
+        return 0;
+    }
     if (request == BINDER_WRITE_READ) {
         if (!arg) return -EINVAL;
         struct binder_write_read bwr;

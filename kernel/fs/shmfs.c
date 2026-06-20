@@ -151,6 +151,26 @@ static int shmfs_ioctl(fs_node_t *node, int request, void *arg) {
     if ((uint32_t)request == ASHMEM_GET_SIZE) {
         return node->length;
     }
+    if ((uint32_t)request == ASHMEM_SET_PROT_MASK) {
+        /* Stub: accept protection mask */
+        return 0;
+    }
+    if ((uint32_t)request == ASHMEM_GET_PROT_MASK) {
+        /* Stub: return read/write by default */
+        return 0x3; /* PROT_READ | PROT_WRITE */
+    }
+    if ((uint32_t)request == ASHMEM_PIN) {
+        /* Stub: memory is always pinned in this shim */
+        return ASHMEM_IS_UNPINNED; /* Return old status */
+    }
+    if ((uint32_t)request == ASHMEM_UNPIN) {
+        /* Stub: memory is always pinned in this shim */
+        return ASHMEM_IS_PINNED; /* Return old status */
+    }
+    if ((uint32_t)request == ASHMEM_GET_PIN_STATUS) {
+        /* Stub: memory is always pinned in this shim */
+        return ASHMEM_IS_PINNED;
+    }
     return -ENOTTY;
 }
 
