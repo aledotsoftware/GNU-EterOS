@@ -23,7 +23,9 @@
 #define ASHMEM_GET_SIZE 0x7704
 #define ASHMEM_SET_PROT_MASK 0x40087705
 #define ASHMEM_GET_PROT_MASK 0x7706
-#define ASHMEM_ISPINNED 0x7707
+#define ASHMEM_GET_PIN_STATUS 0x7707
+#define ASHMEM_IS_UNPINNED 0
+#define ASHMEM_IS_PINNED 1
 #define ASHMEM_PIN 0x40087708
 #define ASHMEM_UNPIN 0x40087709
 
@@ -36,6 +38,7 @@ struct ashmem_pin {
 #define BINDER_VERSION_IOWR (int)0xc0046209
 #define BINDER_WRITE_READ (int)0xc0306201
 #define BINDER_SET_CONTEXT_MGR (int)0x40046207
+#define BINDER_SET_MAX_THREADS (int)0x40046205
 
 struct binder_version {
     int32_t protocol_version;

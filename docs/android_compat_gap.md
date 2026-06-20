@@ -1,17 +1,16 @@
 # Android Compatibility Gap Analysis
 
 ## 1. Binder IPC
-- **Current State**: Initial Binder IPC implementation (`BINDER_WRITE_READ`) is present in `kernel/fs/devfs.c`. It routes requests to a context manager and queues transactions.
+- **Current State**: Initial Binder IPC implementation (`BINDER_WRITE_READ`) is present in `kernel/fs/devfs.c`. It routes requests to a context manager and queues transactions. `BINDER_SET_MAX_THREADS` stubbed.
 - **Gaps**:
   - Requires further hardening, possibly memory-mapping support (`mmap` on `/dev/binder`).
-  - Need support for BINDER_SET_MAX_THREADS and other ioctls.
   - Proper fd handling and process death notifications (`BR_DEAD_REPLY`).
 
 ## 2. Memory Management (Ashmem / Memfd)
-- **Current State**: `/dev/ashmem` is redirected to `shmfs_create_memfd` in `sys_openat`. `ASHMEM_*` ioctls are implemented in `shmfs_ioctl`.
+- **Current State**: `/dev/ashmem` is redirected to `shmfs_create_memfd` in `sys_openat`. `ASHMEM_*` ioctls are implemented in `shmfs_ioctl`, including pin/unpin/prot masks stubs.
 - **Gaps**:
-  - `ashmem` usually requires pin/unpin support (currently stubbed or unhandled in shmfs).
-  - Need to verify mapping behavior (MAP_SHARED).
+  - `ashmem` usually requires true pin/unpin memory logic support instead of just a shim in shmfs.
+  - Real `MAP_SHARED` mapping behavior logic for ashmem when shared across processes.
 
 ## 3. Linker & Threading (Bionic)
 - **Current State**:
