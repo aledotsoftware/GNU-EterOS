@@ -44,7 +44,7 @@ Durante el build del kernel x86_64, se detectaron las siguientes advertencias me
 
 Basado en las brechas observables en la arquitectura actual, se priorizan los hitos siguientes:
 
-1. **`linux-syscall-compliance-bot`**: Continuar mapeando syscalls faltantes identificadas que devuelven `-ENOSYS`. La meta principal inmediata es implementar un manejo funcional (retorno seguro o soporte parcial a VFS) de `sys_fsync` y las variantes `sys_truncate`/`sys_ftruncate` en la capa de sistema.
+1. **`linux-syscall-compliance-bot`**: COMPLETADO. Continuar con `graphics-power-panel-bot` y mejoras adicionales de compatibilidad.
 2. **`graphics-power-panel-bot`**: Continuar con las mejoras visuales y prototipo del compositor (referencia `test_compositor`).
 ## 4. Hallazgos adicionales y Riesgos
 - Se comprobó la implementación inicial real de Binder IPC (Android compat) en `kernel/fs/devfs.c`, introducida por el `aether-droid-subsystem-bot`. Binder ahora rutéa peticiones reales (`BINDER_WRITE_READ`) hacia un `context_mgr` y hacia clientes en lugar de ser un mero stub estático, utilizando `kmalloc` e inicializando una cola de transacciones.
@@ -75,3 +75,4 @@ Basado en las brechas observables en la arquitectura actual, se priorizan los hi
 
 - **2026-06-16 (Update 5):** El `aether-linux-subsystem-bot` implementó de forma robusta `sys_getcwd` para proveer soporte real a GNU coreutils, devolviendo la longitud correcta del string copiado desde `current->cwd`.
 - **2026-06-16 (Update 6):** El Orchestrator Meta-Agent auditó los cambios relacionados a `sys_getcwd`. El build y todos los tests nativos de integración (`run_tests.sh`, `run_integration.sh` de 64MB a 512MB RAM) fueron verificados de forma exitosa. Queda pendiente erradicar los retornos de `-ENOSYS` en `sys_fsync`, `sys_truncate` y `sys_ftruncate`. Se asigna este ciclo bloqueante de completitud POSIX al `linux-syscall-compliance-bot`.
+- **2026-06-16 (Update 7):** El Orchestrator Meta-Agent auditó los cambios relacionados a `sys_truncate`, `sys_ftruncate`, `sys_fsync` y `sys_fdatasync`. El `linux-syscall-compliance-bot` implementó estas syscalls correctamente, previniendo los errores `-ENOSYS`. Tests en host adaptados y verificados. El objetivo de este ciclo está completo.
