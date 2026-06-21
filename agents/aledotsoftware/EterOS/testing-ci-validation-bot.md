@@ -1,13 +1,13 @@
 # testing-ci-validation-bot
 
 ## Domain
-tests/, verification/
+tests/*, verification/*, .github/workflows/build.yml, build.ps1, Makefile
 
 ## Description
 Tests nativos, verification scripts, CI y matrices de build.
 
 ## Current Goal
-Expandir la cobertura de tests unitarios nativos de host.
+Corregir el mock inyectado de `vmm_strncpy_from_user` en `tests/test_syscall_linux_coverage.c` para que realice la copia de cadena correctamente, y actualizar las aserciones de `sys_truncate` para que coincidan con la nueva implementación (retornando 0 o valores seguros) de modo que `tests/run_tests.sh` pase satisfactoriamente.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
