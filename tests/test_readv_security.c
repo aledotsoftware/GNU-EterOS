@@ -188,6 +188,7 @@ void task_wakeup(task_t* task) {}
 
 /* Stub task functions */
 int task_fork(void* regs) { return 0; }
+void task_stop_signal(int sig) {}
 
 /* Stub framebuffer functions needed by window.c which might be linked or included */
 uint32_t* framebuffer_get_buffer(void) { return NULL; }

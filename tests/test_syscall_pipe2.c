@@ -187,6 +187,7 @@ void task_wakeup(task_t* task) {}
 
 /* Stub task functions */
 int task_fork(void* regs) { return 0; }
+void task_stop_signal(int sig) {}
 int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) { return 0; }
 int task_waitpid(int pid, int* status, int options) { return 0; }
 task_t* task_get_by_id(uint32_t id) { return NULL; }

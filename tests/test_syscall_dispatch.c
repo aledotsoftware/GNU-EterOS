@@ -120,6 +120,7 @@ __attribute__((weak)) int task_kill(uint32_t pid) { return -1; }
 __attribute__((weak)) void task_wakeup(task_t* t) {}
 __attribute__((weak)) void task_sleep(uint64_t ms) {}
 __attribute__((weak)) int task_fork(void* regs) { return -1; }
+void task_stop_signal(int sig) {}
 __attribute__((weak)) int task_exec(const char* path, char* const argv[], char* const envp[], struct syscall_regs* regs) { return -1; }
 __attribute__((weak)) int task_waitpid(int pid, int* status, int options) { return -1; }
 

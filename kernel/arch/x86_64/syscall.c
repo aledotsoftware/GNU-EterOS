@@ -2430,13 +2430,7 @@ static void handle_signal(struct syscall_regs* regs) {
                     continue;
                 }
                 if (sig == SIGSTOP || sig == SIGTSTP || sig == SIGTTIN || sig == SIGTTOU) {
-                    current->wait_status = ((sig & 0xFF) << 8) | 0x7F;
-                    current->wait_code = CLD_STOPPED;
-                    current->wait_pending = 1;
-                    current->state = TASK_STOPPED;
-                    task_t* parent = task_get_by_id(current->parent_id);
-                    if (parent) task_wakeup(parent);
-                    schedule();
+                    task_stop_signal(sig);
                     return;
                 }
                 serial_write_string("[SIGNAL] Terminating process due to signal\n");
