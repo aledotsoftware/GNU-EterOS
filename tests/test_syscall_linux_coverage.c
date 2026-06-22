@@ -79,7 +79,7 @@ void pmm_unref_page(void* addr) {}
 void vmm_unmap_page(uint64_t virt_addr) {}
 int vmm_validate_user_ptr(const void* addr, size_t size) { return 1; }
 int vmm_check_user_string(const char* str, size_t max_len) { return 1; }
-int vmm_strncpy_from_user(char* dst, const char* src, size_t max) { return 0; }
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max) { strncpy(dst, src, max); return 0; }
 int net_socket(int domain, int type, int protocol) { return 0; }
 int net_close(int sock) { return 0; }
 int net_connect(int sock, const struct sockaddr_in_old* addr, int addrlen) { return 0; }
@@ -136,8 +136,8 @@ int main() {
     assert(sys_fdatasync(3) == 0);
 
     printf("Testing truncate\n");
-    printf("truncate returned %ld\n", sys_truncate("/invalid", 100)); assert(sys_truncate("/invalid", 100) == -2); // resolve_path in mock returns -ENOENT (-2)
-    printf("truncate valid returned %ld\n", sys_truncate("/valid", 100)); assert(sys_truncate("/valid", 100) == -1 || sys_truncate("/valid", 100) == -2); // no truncate op on node
+    printf("truncate returned %ld\n", sys_truncate("/invalid", 100)); assert(sys_truncate("/invalid", 100) == -1); // vfs_normalize_path in mock returns -1
+    printf("truncate valid returned %ld\n", sys_truncate("/valid", 100)); assert(sys_truncate("/valid", 100) == 0); // node->length is set and returns 0
 
     assert(sys_fchdir(3) == -ENOTDIR);
     valid_node->flags = FS_DIRECTORY;
