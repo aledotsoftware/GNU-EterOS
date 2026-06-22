@@ -82,6 +82,8 @@ void exit(int status) __attribute__((noreturn));
 void *malloc(size_t size);
 void  free(void *ptr);
 void *calloc(size_t nmemb, size_t size);
+int mkstemp(char *template);
+char *mkdtemp(char *template);
 void *realloc(void *ptr, size_t size);
 
 /* String conversion */
