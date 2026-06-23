@@ -141,7 +141,7 @@ ssize_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *bu
 
 int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
     const char* prefix = initrd_dir_prefix(node);
-    char child[128];
+    char child[1024];
     uint32_t seen = 0;
     if (!prefix) return -ENOENT;
 
@@ -150,7 +150,7 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
         if (!initrd_extract_child(cur->name, prefix, child, sizeof(child))) continue;
         int duplicate = 0;
         for (initrd_dir_t* p = virtual_dirs; p != cur; p = p->next) {
-            char prev_child[128];
+            char prev_child[1024];
             if (initrd_extract_child(p->name, prefix, prev_child, sizeof(prev_child)) &&
                 strcmp(prev_child, child) == 0) {
                 duplicate = 1;
@@ -159,7 +159,7 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
         }
         if (!duplicate) {
             for (uint32_t i = 0; i < file_count; i++) {
-                char prev_child[128];
+                char prev_child[1024];
                 size_t name_len = strnlen(file_headers[i].name, sizeof(file_headers[i].name));
                 char safe_name[65];
                 if (name_len > 64) name_len = 64;
@@ -191,7 +191,7 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
         if (!initrd_extract_child(safe_name, prefix, child, sizeof(child))) continue;
         int duplicate = 0;
         for (uint32_t j = 0; j < i; j++) {
-            char prev_child[128];
+            char prev_child[1024];
             size_t prev_name_len = strnlen(file_headers[j].name, sizeof(file_headers[j].name));
             char prev_safe_name[65];
             if (prev_name_len > 64) prev_name_len = 64;
@@ -206,7 +206,7 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
         }
         if (!duplicate) {
             for (initrd_dir_t* p = virtual_dirs; p; p = p->next) {
-                char prev_child[128];
+                char prev_child[1024];
                 if (initrd_extract_child(p->name, prefix, prev_child, sizeof(prev_child)) &&
                     strcmp(prev_child, child) == 0) {
                     duplicate = 1;
@@ -238,7 +238,7 @@ int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
 
 fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
     const char* prefix = initrd_dir_prefix(node);
-    char target[256];
+    char target[1024];
     if (!prefix || !name || !*name) return 0;
 
     if (prefix[0] == '\0') {

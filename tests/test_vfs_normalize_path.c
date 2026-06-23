@@ -117,19 +117,19 @@ void test_edge_cases() {
     res = vfs_normalize_path(out, 0, "/abc", NULL);
     if (res != -ENOENT) { printf("FAILED: size 0 should return -ENOENT\n"); exit(1); }
 
-    // Test: too many segments (> 64)
-    char long_path[512] = "";
-    for (int i = 0; i < 65; i++) {
+    // Test: too many segments (> 256)
+    char long_path[2048] = "";
+    for (int i = 0; i < 257; i++) {
         eteros_strlcat(long_path, "/a", sizeof(long_path));
     }
     res = vfs_normalize_path(out, sizeof(out), long_path, NULL);
-    if (res != -ENAMETOOLONG) { printf("FAILED: > 64 segments should return -ENAMETOOLONG (returned %d instead)\n", res); exit(1); }
+    if (res != -ENAMETOOLONG) { printf("FAILED: > 256 segments should return -ENAMETOOLONG (returned %d instead)\n", res); exit(1); }
 
-    // Test: path that exceeds temp buffer size in vfs_normalize_path (temp[512])
-    char very_long_path[1024];
-    eteros_memset(very_long_path, 'x', 1000);
+    // Test: path that exceeds temp buffer size in vfs_normalize_path (temp[1024])
+    char very_long_path[2048];
+    eteros_memset(very_long_path, 'x', 2000);
     very_long_path[0] = '/';
-    very_long_path[1000] = '\0';
+    very_long_path[2000] = '\0';
     res = vfs_normalize_path(out, sizeof(out), very_long_path, NULL);
     // Should be truncated but handled gracefully
     if (res != 0) { printf("FAILED: very long path returned %d\n", res); exit(1); }

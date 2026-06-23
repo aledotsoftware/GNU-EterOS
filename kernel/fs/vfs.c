@@ -157,8 +157,13 @@ int vfs_mkdir(const char *path, uint16_t permission) {
     serial_write_string(path);
     serial_write_string("\n");
 
-    char parent_path[256];
-    char name[256];
+    char* parent_path = (char*)kmalloc(1024);
+    if (!parent_path) return -ENOMEM;
+    char* name = (char*)kmalloc(1024);
+    if (!name) {
+        kfree(parent_path);
+        return -ENOMEM;
+    }
     int len = strlen(path);
     int last_slash = -1;
 
@@ -172,20 +177,21 @@ int vfs_mkdir(const char *path, uint16_t permission) {
            But if we assume relative to root if only name given?
            Usually syscalls handle CWD. VFS here seems absolute.
            Lets assume invalid if no slash for now unless we default to root. */
+           kfree(parent_path); kfree(name);
            return -ENOENT;
     }
 
     /* Split path */
     if (last_slash == 0) {
         /* "/name" */
-        strlcpy(parent_path, "/", sizeof(parent_path));
-        strlcpy(name, path + 1, sizeof(name));
+        strlcpy(parent_path, "/", 1024);
+        strlcpy(name, path + 1, 1024);
     } else {
         /* "/path/to/name" */
-        if (last_slash >= 255) return -ENOENT;
+        if (last_slash >= 1023) { kfree(parent_path); kfree(name); return -ENOENT; }
         memcpy(parent_path, path, last_slash);
         parent_path[last_slash] = '\0';
-        strlcpy(name, path + last_slash + 1, sizeof(name));
+        strlcpy(name, path + last_slash + 1, 1024);
     }
 
     serial_write_string("      Parent: "); serial_write_string(parent_path);
@@ -219,60 +225,68 @@ int vfs_link(const char *oldpath, const char *newpath) {
     fs_node_t *target = vfs_lookup(fs_root, oldpath);
     if (!target) return -ENOENT;
 
-    char parent_path[256];
-    char name[256];
+    char* parent_path = (char*)kmalloc(1024);
+    if (!parent_path) { kfree(target); return -ENOMEM; }
+    char* name = (char*)kmalloc(1024);
+    if (!name) { kfree(target); kfree(parent_path); return -ENOMEM; }
     int len = strlen(newpath);
     int last_slash = -1;
 
     for (int i = 0; i < len; i++) if (newpath[i] == '/') last_slash = i;
 
-    if (last_slash == -1) { kfree(target); return -ENOENT; }
+    if (last_slash == -1) { kfree(target); kfree(parent_path); kfree(name); return -ENOENT; }
 
     if (last_slash == 0) {
-        strlcpy(parent_path, "/", sizeof(parent_path));
-        strlcpy(name, newpath + 1, sizeof(name));
+        strlcpy(parent_path, "/", 1024);
+        strlcpy(name, newpath + 1, 1024);
     } else {
-        if (last_slash >= 127) { kfree(target); return -ENOENT; }
+        if (last_slash >= 1023) { kfree(target); kfree(parent_path); kfree(name); return -ENOENT; }
         memcpy(parent_path, newpath, last_slash);
         parent_path[last_slash] = '\0';
-        strlcpy(name, newpath + last_slash + 1, sizeof(name));
+        strlcpy(name, newpath + last_slash + 1, 1024);
     }
 
     fs_node_t *parent = vfs_lookup(fs_root, parent_path);
-    if (!parent) { kfree(target); return -ENOENT; }
+    if (!parent) { kfree(target); kfree(parent_path); kfree(name); return -ENOENT; }
 
     int ret = link_fs(parent, target, name);
     kfree(parent);
     kfree(target);
+    kfree(parent_path);
+    kfree(name);
     return ret;
 }
 
 int vfs_unlink(const char *path) {
     if (!path) return -ENOENT;
-    char parent_path[256];
-    char name[256];
+    char* parent_path = (char*)kmalloc(1024);
+    if (!parent_path) return -ENOMEM;
+    char* name = (char*)kmalloc(1024);
+    if (!name) { kfree(parent_path); return -ENOMEM; }
     int len = strlen(path);
     int last_slash = -1;
 
     for (int i = 0; i < len; i++) if (path[i] == '/') last_slash = i;
 
-    if (last_slash == -1) return -ENOENT;
+    if (last_slash == -1) { kfree(parent_path); kfree(name); return -ENOENT; }
 
     if (last_slash == 0) {
-        strlcpy(parent_path, "/", sizeof(parent_path));
-        strlcpy(name, path + 1, sizeof(name));
+        strlcpy(parent_path, "/", 1024);
+        strlcpy(name, path + 1, 1024);
     } else {
-        if (last_slash >= 255) return -ENOENT;
+        if (last_slash >= 1023) { kfree(parent_path); kfree(name); return -ENOENT; }
         memcpy(parent_path, path, last_slash);
         parent_path[last_slash] = '\0';
-        strlcpy(name, path + last_slash + 1, sizeof(name));
+        strlcpy(name, path + last_slash + 1, 1024);
     }
 
     fs_node_t *parent = vfs_lookup(fs_root, parent_path);
-    if (!parent) return -ENOENT;
+    if (!parent) { kfree(parent_path); kfree(name); return -ENOENT; }
 
     int ret = unlink_fs(parent, name);
     kfree(parent);
+    kfree(parent_path);
+    kfree(name);
     return ret;
 }
 
@@ -394,15 +408,17 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
     current->ref_count = 1;
     current->lock = 0;
 
-    char segment[256];
+    char* segment = (char*)kmalloc(1024);
+    if (!segment) { kfree(current); return 0; }
     while (*p) {
         int i = 0;
-        while (*p && *p != '/' && i < 255) {
+        while (*p && *p != '/' && i < 1023) {
             segment[i++] = *p++;
         }
 
-        if (i == 255 && *p && *p != '/') {
+        if (i == 1023 && *p && *p != '/') {
             kfree(current);
+            kfree(segment);
             return 0;
         }
         segment[i] = 0;
@@ -424,9 +440,11 @@ fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink)
 
         if ((current->flags & 0x7) != FS_DIRECTORY && *p) {
             kfree(current);
+            kfree(segment);
             return 0;
         }
     }
 
+    kfree(segment);
     return current;
 }
