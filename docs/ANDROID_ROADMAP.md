@@ -23,7 +23,7 @@ While EterOS currently maps a growing subset of x86_64 Linux syscalls, Android (
 - **Action (Completed):** Map the Bionic Thread Local Storage (TLS) expectations to EterOS's `sys_arch_prctl` and support `PT_TLS` segment.
 - **Action (Completed):** Expand `sys_clone` and `futex` implementations to strictly handle Bionic's synchronization and thread ID lifecycle.
 - **Action (Completed):** Emulate Android properties mapping in memory to allow Bionic to read `ro.*` properties safely.
-- **Action (Pending):** Upgrade the Binder routing mechanism from the basic static payload-copy shim to proper memory mapping for transaction data transfer.
+- **Action (Completed):** Upgrade the Binder routing mechanism from the basic static payload-copy shim to proper memory mapping for transaction data transfer.
 
 ### 3.3. Phase 3: Binder Routing & Native Binaries
 - **Action:** Transition the `/dev/binder` stub into a functional message router inside the kernel, allowing `servicemanager` to start and register services.

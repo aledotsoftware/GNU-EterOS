@@ -19,6 +19,7 @@ int task_get_max(void) { return 0; }
 task_t* task_get_at(int i) { (void)i; return NULL; }
 void task_wakeup(task_t* t) { (void)t; }
 task_t* task_get_current(void) { return &mock_task; }
+task_t* task_get_by_id(uint32_t id) { return &mock_task; }
 bool keyboard_has_input(void) { return false; }
 void task_yield(void) {}
 
