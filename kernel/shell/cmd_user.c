@@ -36,27 +36,31 @@ static void cmd_useradd(const char* args) {
         }
     }
 
-    if (username[0] == '\0' || password[0] == '\0') {
-        terminal_write_string("  Uso: user add <usuario> <password>\n");
+    if (username[0] == '\0') {
+        terminal_write_string("  Uso: user add <usuario> [password]\n");
         return;
     }
 
-    /* SHA256 */
-    uint8_t hash[SHA256_BLOCK_SIZE];
-    sha256((const uint8_t*)password, strlen(password), hash);
     char hash_str[SHA256_BLOCK_SIZE * 2 + 1];
-    for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-        char hex[3];
-        utoa_hex_s(hash[i], hex, sizeof(hex));
-        if (hash[i] < 16) {
-            hash_str[i*2] = '0';
-            hash_str[i*2+1] = hex[0];
-        } else {
-            hash_str[i*2] = hex[0];
-            hash_str[i*2+1] = hex[1];
+    if (password[0] != '\0') {
+        /* SHA256 */
+        uint8_t hash[SHA256_BLOCK_SIZE];
+        sha256((const uint8_t*)password, strlen(password), hash);
+        for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+            char hex[3];
+            utoa_hex_s(hash[i], hex, sizeof(hex));
+            if (hash[i] < 16) {
+                hash_str[i*2] = '0';
+                hash_str[i*2+1] = hex[0];
+            } else {
+                hash_str[i*2] = hex[0];
+                hash_str[i*2+1] = hex[1];
+            }
         }
+        hash_str[SHA256_BLOCK_SIZE * 2] = '\0';
+    } else {
+        hash_str[0] = '\0';
     }
-    hash_str[SHA256_BLOCK_SIZE * 2] = '\0';
 
     int next_uid = 1000;
     fs_node_t* passwd_node = vfs_lookup(fs_root, "/etc/passwd");
@@ -280,8 +284,8 @@ static void cmd_passwd(const char* args) {
         }
     }
 
-    if (username[0] == '\0' || password[0] == '\0') {
-        terminal_write_string("  Uso: user passwd <usuario> <nuevo_password>\n");
+    if (username[0] == '\0') {
+        terminal_write_string("  Uso: user passwd <usuario> [nuevo_password]\n");
         return;
     }
 
@@ -291,22 +295,26 @@ static void cmd_passwd(const char* args) {
         return;
     }
 
-    /* SHA256 */
-    uint8_t hash[SHA256_BLOCK_SIZE];
-    sha256((const uint8_t*)password, strlen(password), hash);
     char hash_str[SHA256_BLOCK_SIZE * 2 + 1];
-    for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-        char hex[3];
-        utoa_hex_s(hash[i], hex, sizeof(hex));
-        if (hash[i] < 16) {
-            hash_str[i*2] = '0';
-            hash_str[i*2+1] = hex[0];
-        } else {
-            hash_str[i*2] = hex[0];
-            hash_str[i*2+1] = hex[1];
+    if (password[0] != '\0') {
+        /* SHA256 */
+        uint8_t hash[SHA256_BLOCK_SIZE];
+        sha256((const uint8_t*)password, strlen(password), hash);
+        for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+            char hex[3];
+            utoa_hex_s(hash[i], hex, sizeof(hex));
+            if (hash[i] < 16) {
+                hash_str[i*2] = '0';
+                hash_str[i*2+1] = hex[0];
+            } else {
+                hash_str[i*2] = hex[0];
+                hash_str[i*2+1] = hex[1];
+            }
         }
+        hash_str[SHA256_BLOCK_SIZE * 2] = '\0';
+    } else {
+        hash_str[0] = '\0';
     }
-    hash_str[SHA256_BLOCK_SIZE * 2] = '\0';
 
     uint8_t* buffer = kmalloc(shadow_node->length + 1);
     read_fs(shadow_node, 0, shadow_node->length, buffer);
