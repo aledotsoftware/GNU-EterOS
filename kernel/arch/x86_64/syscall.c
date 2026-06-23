@@ -1636,8 +1636,8 @@ static int64_t sys_prlimit64(int pid, int resource, const struct rlimit* new_lim
     (void)pid; (void)resource;
     if (old_limit) {
         if (!vmm_verify_user_access(old_limit, sizeof(struct rlimit), 1)) return -EFAULT;
-        old_limit->rlim_cur = RLIM_INFINITY;
-        old_limit->rlim_max = RLIM_INFINITY;
+        // old_limit->rlim_cur = RLIM_INFINITY; // DO NOT modify memory for unimplemented syscall returning -ENOSYS
+        // old_limit->rlim_max = RLIM_INFINITY; // DO NOT modify memory for unimplemented syscall returning -ENOSYS
     }
     if (new_limit) {
         if (!vmm_verify_user_access(new_limit, sizeof(struct rlimit), 0)) return -EFAULT;
@@ -3550,7 +3550,7 @@ static int64_t sys_getrusage(int who, void *usage) {
 
     // struct rusage is 144 bytes on 64-bit Linux usually, let's just use 144
     if (!vmm_verify_user_access(usage, 144, 1)) return -EFAULT;
-    memset(usage, 0, 144);
+    // memset(usage, 0, 144); // DO NOT memset for unimplemented syscall returning -ENOSYS
 
     return -ENOSYS;
 }
