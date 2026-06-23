@@ -49,17 +49,24 @@ int main(int argc, char *argv[]) {
     tcsetattr(0, TCSANOW, &term_orig);
     printf("\n");
 
-    if (len <= 0) return 1;
-    password[len] = '\0';
-    if (password[len-1] == '\n') password[len-1] = '\0';
-
-    /* Calculate SHA256 */
-    uint8_t hash[SHA256_BLOCK_SIZE];
-    sha256((const uint8_t*)password, strlen(password), hash);
+    if (len < 0) return 1;
+    if (len > 0) {
+        password[len] = '\0';
+        if (password[len-1] == '\n') password[len-1] = '\0';
+    } else {
+        password[0] = '\0';
+    }
 
     char hash_str[SHA256_BLOCK_SIZE * 2 + 1];
-    for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-        snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
+    if (strlen(password) > 0) {
+        /* Calculate SHA256 */
+        uint8_t hash[SHA256_BLOCK_SIZE];
+        sha256((const uint8_t*)password, strlen(password), hash);
+        for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+            snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
+        }
+    } else {
+        hash_str[0] = '\0';
     }
 
     int fd = open("/etc/shadow", O_RDONLY);
@@ -132,7 +139,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    unlink("/etc/shadow");
     rename("/etc/shadow.tmp", "/etc/shadow");
 
     /* Enforce shadow file permissions */
