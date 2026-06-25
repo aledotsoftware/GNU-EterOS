@@ -5,6 +5,7 @@
 
 #include "rtc.h"
 #include "io.h"
+#include <hal.h>
 
 #define CMOS_ADDRESS 0x70
 #define CMOS_DATA    0x71
@@ -62,7 +63,8 @@ void rtc_get_time(rtc_time_t* time) {
     unsigned char registerB;
 
     // Wait until update is not in progress
-    while (rtc_is_updating());
+    uint64_t start_ticks1 = hal_timer_ticks();
+    while (rtc_is_updating() && (hal_timer_ticks() - start_ticks1 < 100)); // 100ms roughly
 
     second = rtc_read_register(0x00);
     minute = rtc_read_register(0x02);
@@ -79,7 +81,8 @@ void rtc_get_time(rtc_time_t* time) {
         last_month = month;
         last_year = year;
 
-        while (rtc_is_updating());
+        uint64_t start_ticks2 = hal_timer_ticks();
+        while (rtc_is_updating() && (hal_timer_ticks() - start_ticks2 < 100));
         second = rtc_read_register(0x00);
         minute = rtc_read_register(0x02);
         hour   = rtc_read_register(0x04);
@@ -141,7 +144,8 @@ void rtc_set_time(rtc_time_t* time) {
     unsigned char registerB;
     unsigned char second, minute, hour, day, month, year;
 
-    while (rtc_is_updating());
+    uint64_t start_ticks = hal_timer_ticks();
+    while (rtc_is_updating() && (hal_timer_ticks() - start_ticks < 100));
 
     registerB = rtc_read_register(0x0B);
 
