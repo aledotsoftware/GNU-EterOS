@@ -77,7 +77,7 @@ static int _set_errno(long ret) {
         errno = (int)(-ret);
         return -1;
     }
-    return 0;
+    return (int)ret;
 }
 
 static const char* _find_path_in_envp(char *const envp[]) {

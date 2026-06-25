@@ -27,7 +27,7 @@ static inline long syscall2(long n, long a1, long a2) {
     return ret;
 }
 
-#define SYSCALL_RETURN(ret); \
+#define SYSCALL_RETURN(ret) \
     if ((unsigned long)(ret) >= (unsigned long)-4095) { \
         errno = (int)(-(ret)); \
         return -1; \
@@ -124,7 +124,7 @@ int open(const char *pathname, int flags, ...) {
     }
 
     long ret = syscall3(SYS_open, (long)pathname, flags, mode);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
@@ -135,13 +135,13 @@ int creat(const char *pathname, mode_t mode) {
 
 int wait(int *wstatus) {
     long ret = syscall3(SYS_wait4, -1, (long)wstatus, 0);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
 int ioctl(int fd, int request, void *arg) {
     long ret = syscall3(SYS_ioctl, fd, request, (long)arg);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
@@ -175,49 +175,49 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 
 int close(int fd) {
     long ret = syscall1(SYS_close, fd);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
 ssize_t read(int fd, void *buf, size_t count) {
     long ret = syscall3(SYS_read, fd, (long)buf, count);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {
     long ret = syscall3(SYS_write, fd, (long)buf, count);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 int64_t lseek(int fd, int64_t offset, int whence) {
     long ret = syscall3(SYS_lseek, fd, offset, whence);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int64_t)ret;
 }
 
 int stat(const char *pathname, struct stat *buf) {
     long ret = syscall2(SYS_stat, (long)pathname, (long)buf);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int fstat(int fd, struct stat *buf) {
     long ret = syscall2(SYS_fstat, fd, (long)buf);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int mkdir(const char *pathname, mode_t mode) {
     long ret = syscall2(SYS_mkdir, (long)pathname, mode);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int unlink(const char *pathname) {
     long ret = syscall1(SYS_unlink, (long)pathname);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
@@ -234,13 +234,13 @@ int sysinfo(struct sysinfo *info) {
 
 int rmdir(const char *pathname) {
     long ret = syscall1(SYS_rmdir, (long)pathname);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int chdir(const char *pathname) {
     long ret = syscall1(SYS_chdir, (long)pathname);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
@@ -250,19 +250,19 @@ int getpid(void) {
 
 int setuid(int uid) {
     long ret = syscall1(SYS_setuid, uid);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int setgid(int gid) {
     long ret = syscall1(SYS_setgid, gid);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int kill(int pid, int sig) {
     long ret = syscall2(SYS_kill, pid, sig);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
@@ -270,88 +270,88 @@ int kill(int pid, int sig) {
 
 int socket(int domain, int type, int protocol) {
     long ret = syscall3(SYS_socket, domain, type, protocol);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
     long ret = syscall3(SYS_connect, sockfd, (long)addr, addrlen);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
     long ret = syscall3(SYS_bind, sockfd, (long)addr, addrlen);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
 int listen(int sockfd, int backlog) {
     long ret = syscall2(SYS_listen, sockfd, backlog);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
 int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen) {
     long ret = syscall3(SYS_accept, sockfd, (long)addr, (long)addrlen);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (int)ret;
 }
 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
     /* Use SYS_sendto with NULL dest address and 0 addrlen */
     long ret = syscall6(SYS_sendto, sockfd, (long)buf, len, flags, 0, 0);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
     /* Use SYS_recvfrom with NULL src address and NULL addrlen */
     long ret = syscall6(SYS_recvfrom, sockfd, (long)buf, len, flags, 0, 0);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen) {
     long ret = syscall6(SYS_sendto, sockfd, (long)buf, len, flags, (long)dest_addr, addrlen);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen) {
     long ret = syscall6(SYS_recvfrom, sockfd, (long)buf, len, flags, (long)src_addr, (long)addrlen);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 
 int fsync(int fd) {
     long ret = syscall1(SYS_fsync, fd);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int fdatasync(int fd) {
     long ret = syscall1(SYS_fdatasync, fd);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int chown(const char *pathname, uid_t owner, gid_t group) {
     long ret = syscall3(SYS_chown, (long)pathname, owner, group);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int fchown(int fd, uid_t owner, gid_t group) {
     long ret = syscall3(SYS_fchown, fd, owner, group);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int lchown(const char *pathname, uid_t owner, gid_t group) {
     long ret = syscall3(SYS_lchown, (long)pathname, owner, group);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
@@ -359,48 +359,48 @@ int lchown(const char *pathname, uid_t owner, gid_t group) {
 
 int fchdir(int fd) {
     long ret = syscall1(SYS_fchdir, fd);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 int truncate(const char *path, int64_t length) {
     long ret = syscall2(SYS_truncate, (long)path, length);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }
 
 ssize_t pread(int fd, void *buf, size_t count, int64_t offset) {
     long ret = syscall4(SYS_pread64, fd, (long)buf, count, offset);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 ssize_t pwrite(int fd, const void *buf, size_t count, int64_t offset) {
     long ret = syscall4(SYS_pwrite64, fd, (long)buf, count, offset);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, int64_t offset) {
     long ret = syscall4(SYS_preadv, fd, (long)iov, iovcnt, offset);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, int64_t offset) {
     long ret = syscall4(SYS_pwritev, fd, (long)iov, iovcnt, offset);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (ssize_t)ret;
 }
 
 pid_t vfork(void) {
     long ret = syscall0(SYS_vfork);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return (pid_t)ret;
 }
 
 int reboot(int magic, int magic2, int cmd, void *arg) {
     long ret = syscall4(SYS_reboot, magic, magic2, cmd, (long)arg);
-    SYSCALL_RETURN(ret);;
+    SYSCALL_RETURN(ret);
     return 0;
 }

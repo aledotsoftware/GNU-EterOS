@@ -9,3 +9,8 @@
   - Hardened `handle_exception` in `kernel/arch/x86_64/idt.c` to output full register traces unconditionally on unhandled exceptions.
   - Hardened architectural boundaries in `smp.c` and `task.c` by substituting raw `cli`/`sti` instructions with cross-platform `hal_interrupts_disable`/`hal_interrupts_enable` abstractions.
 No changes were needed for the task as network integration is fully functional
+- **userspace-libc-posix-bot**: Fixed critical libc bugs and stabilized the userspace runtime.
+  - Removed `__thread` from `global_errno` in `errno.c`. `crt0.asm` / loader currently lack TLS block allocation and FS base setup required to resolve thread-local storage correctly without dynamic linking. This prevents immediate segment violations (Page Faults at `%fs:0`).
+  - Fixed `_set_errno` to correctly return `-1` to propagate POSIX compliant errors.
+  - Fixed `SYSCALL_RETURN` macro.
+  - Verified `crt0.asm` fully populates `argc`, `argv`, `envp`, and `auxv`, matching the stack layout injected by `task_exec`.
