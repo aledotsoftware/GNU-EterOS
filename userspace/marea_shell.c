@@ -1703,6 +1703,31 @@ static void redraw_all(void) {
 
     draw_taskbar();
     draw_menu();
+
+    /* Draw tooltips if hovering over a window button */
+    int hover_btn = get_hovered_button(mouse_x, mouse_y);
+    if (hover_btn > 0) {
+        const char* tooltip_str = "";
+        if (hover_btn == 1) tooltip_str = "Cerrar";
+        else if (hover_btn == 2) tooltip_str = "Minimizar";
+        else if (hover_btn == 3) tooltip_str = "Maximizar";
+
+        if (tooltip_str[0] != '\0') {
+            int tw = text_width(tooltip_str) + 12;
+            int th = 24;
+            int tx = mouse_x;
+            int ty = mouse_y + CURSOR_H + 4;
+
+            /* Prevent tooltip from going off-screen */
+            if (tx + tw > (int)fb_info.width) tx = fb_info.width - tw;
+            if (ty + th > (int)fb_info.height) ty = mouse_y - th - 4;
+
+            fill_rect(tx, ty, tw, th, 0xFF10182A); /* Dark background */
+            stroke_rect(tx, ty, tw, th, 0xFF38BDF8); /* Border */
+            draw_text(tx + 6, ty + (th - 16) / 2, tooltip_str, 0xFFFFFFFF, 0);
+        }
+    }
+
     mark_dirty_rect(0, 0, (int)fb_info.width, (int)fb_info.height);
 }
 

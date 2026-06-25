@@ -81,6 +81,27 @@ void compositor_remove_window(window_t* win) {
     }
 }
 
+void window_bring_to_front(window_t* win) {
+    if (!window_list || !win || window_list == win) return;
+
+    /* Detach from current position */
+    window_t* curr = window_list;
+    while (curr->next) {
+        if (curr->next == win) {
+            curr->next = win->next;
+            break;
+        }
+        curr = curr->next;
+    }
+
+    /* Prepend to head */
+    win->next = window_list;
+    window_list = win;
+
+    /* Trigger a full redraw of the compositor by invalidating the screen */
+    gfx_add_dirty_rect(0, 0, framebuffer_get_width(), framebuffer_get_height());
+}
+
 void window_invalidate(window_t* win) {
     if (!win) return;
     gfx_add_dirty_rect(win->x, win->y, win->width, win->height);
