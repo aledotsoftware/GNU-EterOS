@@ -9,3 +9,4 @@
   - Hardened `handle_exception` in `kernel/arch/x86_64/idt.c` to output full register traces unconditionally on unhandled exceptions.
   - Hardened architectural boundaries in `smp.c` and `task.c` by substituting raw `cli`/`sti` instructions with cross-platform `hal_interrupts_disable`/`hal_interrupts_enable` abstractions.
 No changes were needed for the task as network integration is fully functional
+- **linux-syscall-compliance-bot**: Checked `sys_fsync`, `sys_fdatasync`, `sys_truncate`, and `sys_ftruncate` implementations. They were already compliant. Fixed their tests in `test_syscall_linux_coverage.c` to prevent false failures.
