@@ -64,7 +64,7 @@ void gfx_present(void) {}
 int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir) { if (strcmp(path, "/invalid") == 0) return -1; strncpy(out_path, path, size); return 0; }
 int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) { return 0; }
 fs_node_t *finddir_fs(fs_node_t *node, char *name) { return NULL; }
-fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) { return NULL; }
+fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) { return vfs_lookup(root, path); }
 task_t* task_get_at(int i) { return NULL; }
 void task_exit_signal(int sig) {}
 int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { return 0; }
@@ -79,7 +79,7 @@ void pmm_unref_page(void* addr) {}
 void vmm_unmap_page(uint64_t virt_addr) {}
 int vmm_validate_user_ptr(const void* addr, size_t size) { return 1; }
 int vmm_check_user_string(const char* str, size_t max_len) { return 1; }
-int vmm_strncpy_from_user(char* dst, const char* src, size_t max) { return 0; }
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max) { strncpy(dst, src, max); return 0; }
 int net_socket(int domain, int type, int protocol) { return 0; }
 int net_close(int sock) { return 0; }
 int net_connect(int sock, const struct sockaddr_in_old* addr, int addrlen) { return 0; }
@@ -136,8 +136,11 @@ int main() {
     assert(sys_fdatasync(3) == 0);
 
     printf("Testing truncate\n");
-    printf("truncate returned %ld\n", sys_truncate("/invalid", 100)); assert(sys_truncate("/invalid", 100) == -2); // resolve_path in mock returns -ENOENT (-2)
-    printf("truncate valid returned %ld\n", sys_truncate("/valid", 100)); assert(sys_truncate("/valid", 100) == -1 || sys_truncate("/valid", 100) == -2); // no truncate op on node
+    printf("truncate returned %ld\n", sys_truncate("/invalid", 100)); assert(sys_truncate("/invalid", 100) == -1 || sys_truncate("/invalid", 100) == -2);
+    printf("truncate valid returned %ld\n", sys_truncate("/valid", 100)); assert(sys_truncate("/valid", 100) == 0);
+
+    printf("Testing ftruncate\n");
+    assert(sys_ftruncate(3, 100) == 0);
 
     assert(sys_fchdir(3) == -ENOTDIR);
     valid_node->flags = FS_DIRECTORY;
