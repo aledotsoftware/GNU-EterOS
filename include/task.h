@@ -219,6 +219,7 @@ void task_wakeup(task_t* t);
  */
 void task_exit(int status);
 void task_exit_signal(int sig);
+void task_stop_signal(int sig);
 
 /**
  * Obtiene la tarea actual.

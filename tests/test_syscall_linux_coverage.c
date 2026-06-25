@@ -175,3 +175,4 @@ int main() {
     free(valid_node);
     return 0;
 }
+void task_stop_signal(int sig) {}

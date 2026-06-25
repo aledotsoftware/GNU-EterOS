@@ -964,6 +964,28 @@ void task_exit_signal(int sig) {
     task_exit_internal(128 + (sig & 0x7F), (sig & 0x7F), CLD_KILLED);
 }
 
+void task_stop_signal(int sig) {
+    task_t* current = task_get_current();
+    if (!current) return;
+
+    uint64_t irq_flags = task_irq_save();
+    spin_lock(&sched_lock);
+
+    current->wait_status = ((sig & 0xFF) << 8) | 0x7F;
+    current->wait_code = CLD_STOPPED;
+    current->wait_pending = 1;
+    current->state = TASK_STOPPED;
+
+    task_t* parent = task_get_by_id(current->parent_id);
+
+    spin_unlock(&sched_lock);
+    task_irq_restore(irq_flags);
+
+    if (parent) {
+        task_wakeup(parent);
+    }
+}
+
 task_t* task_get_current(void) {
     cpu_info_t* cpu = get_current_cpu();
     if (cpu && cpu->current_task) {

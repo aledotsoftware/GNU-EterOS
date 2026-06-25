@@ -124,3 +124,4 @@ int main() {
     printf("sys_sysinfo test passed!\n");
     return 0;
 }
+void task_stop_signal(int sig) {}
