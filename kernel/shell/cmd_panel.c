@@ -1,4 +1,3 @@
-#include <hal.h>
 #include "shell_internal.h"
 #include "../../include/keyboard.h"
 #include "../../include/net/defs.h"
@@ -85,11 +84,11 @@ static void wait_for_enter(void) {
             panel_mouse_clicked = false;
             break;
         }
-        hal_interrupts_disable();
+        __asm__ volatile("cli");
         if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-            hal_cpu_enable_interrupts_and_halt();
+            __asm__ volatile("sti; hlt");
         } else {
-            hal_interrupts_enable();
+            __asm__ volatile("sti");
         }
     }
 }
@@ -123,11 +122,11 @@ static void panel_keyboard(void) {
             }
             if (c) break;
         }
-        hal_interrupts_disable();
+        __asm__ volatile("cli");
         if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-            hal_cpu_enable_interrupts_and_halt();
+            __asm__ volatile("sti; hlt");
         } else {
-            hal_interrupts_enable();
+            __asm__ volatile("sti");
         }
     }
 
@@ -182,11 +181,11 @@ static void panel_mouse_cfg(void) {
                 break;
             }
         }
-        hal_interrupts_disable();
+        __asm__ volatile("cli");
         if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-            hal_cpu_enable_interrupts_and_halt();
+            __asm__ volatile("sti; hlt");
         } else {
-            hal_interrupts_enable();
+            __asm__ volatile("sti");
         }
     }
 
@@ -285,11 +284,11 @@ static void panel_time(void) {
                 break;
             }
         }
-        hal_interrupts_disable();
+        __asm__ volatile("cli");
         if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-            hal_cpu_enable_interrupts_and_halt();
+            __asm__ volatile("sti; hlt");
         } else {
-            hal_interrupts_enable();
+            __asm__ volatile("sti");
         }
     }
 
@@ -327,11 +326,11 @@ static void panel_time(void) {
                     terminal_putchar(k);
                 }
             }
-            hal_interrupts_disable();
+            __asm__ volatile("cli");
             if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-                hal_cpu_enable_interrupts_and_halt();
+                __asm__ volatile("sti; hlt");
             } else {
-                hal_interrupts_enable();
+                __asm__ volatile("sti");
             }
         }
         terminal_write_string("\n");
@@ -358,11 +357,11 @@ static void panel_time(void) {
                     terminal_putchar(k);
                 }
             }
-            hal_interrupts_disable();
+            __asm__ volatile("cli");
             if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-                hal_cpu_enable_interrupts_and_halt();
+                __asm__ volatile("sti; hlt");
             } else {
-                hal_interrupts_enable();
+                __asm__ volatile("sti");
             }
         }
         terminal_write_string("\n");
@@ -388,11 +387,11 @@ static void panel_time(void) {
                     terminal_putchar(k);
                 }
             }
-            hal_interrupts_disable();
+            __asm__ volatile("cli");
             if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-                hal_cpu_enable_interrupts_and_halt();
+                __asm__ volatile("sti; hlt");
             } else {
-                hal_interrupts_enable();
+                __asm__ volatile("sti");
             }
         }
         terminal_write_string("\n");
@@ -490,9 +489,9 @@ void cmd_panel(const char* args) {
                             break;
                         }
                     }
-                    hal_interrupts_disable();
-                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) { hal_cpu_enable_interrupts_and_halt(); }
-                    else { hal_interrupts_enable(); }
+                    __asm__ volatile("cli");
+                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) { __asm__ volatile("sti; hlt"); }
+                    else { __asm__ volatile("sti"); }
                 }
                 terminal_write_string("\n");
                 if (c == '1') cmd_user("autologin on");
@@ -547,11 +546,11 @@ void cmd_panel(const char* args) {
                             break;
                         }
                     }
-                    hal_interrupts_disable();
+                    __asm__ volatile("cli");
                     if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-                        hal_cpu_enable_interrupts_and_halt();
+                        __asm__ volatile("sti; hlt");
                     } else {
-                        hal_interrupts_enable();
+                        __asm__ volatile("sti");
                     }
                 }
                 terminal_write_string("\n");
@@ -573,11 +572,11 @@ void cmd_panel(const char* args) {
             }
         }
 
-        hal_interrupts_disable();
+        __asm__ volatile("cli");
         if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-            hal_cpu_enable_interrupts_and_halt();
+            __asm__ volatile("sti; hlt");
         } else {
-            hal_interrupts_enable();
+            __asm__ volatile("sti");
         }
     }
 

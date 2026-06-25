@@ -9,3 +9,9 @@
   - Hardened `handle_exception` in `kernel/arch/x86_64/idt.c` to output full register traces unconditionally on unhandled exceptions.
   - Hardened architectural boundaries in `smp.c` and `task.c` by substituting raw `cli`/`sti` instructions with cross-platform `hal_interrupts_disable`/`hal_interrupts_enable` abstractions.
 No changes were needed for the task as network integration is fully functional
+
+- **devices-time-panel-bot**: Control panel and hardware interactions hardened.
+  - Replaced indefinite `rtc_is_updating()` loops in `rtc.c` with a 100ms timeout based on `hal_timer_ticks()` to prevent hardware hangs.
+  - Replaced non-atomic `sti; hlt` polling loops with the atomic `hal_cpu_enable_interrupts_and_halt()` cross-platform abstraction in `cmd_panel.c`.
+  - Updated raw inline assembly for disabling/enabling interrupts (`cli`/`sti`) with `hal_interrupts_disable()` and `hal_interrupts_enable()`.
+  - Recompiled and executed all verification scripts successfully.

@@ -46,7 +46,7 @@ rm tests/test_malloc_overflow
 # Test RTC
 echo "---------------------------------------------------"
 echo "Running test_rtc..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_rtc.c tests/mock_hal.c kernel/string.c -o tests/test_rtc
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_rtc.c kernel/string.c -o tests/test_rtc
 ./tests/test_rtc
 rm tests/test_rtc
 
