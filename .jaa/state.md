@@ -10,3 +10,4 @@
   - Hardened architectural boundaries in `smp.c` and `task.c` by substituting raw `cli`/`sti` instructions with cross-platform `hal_interrupts_disable`/`hal_interrupts_enable` abstractions.
 No changes were needed for the task as network integration is fully functional
 - **linux-syscall-compliance-bot**: Checked `sys_fsync`, `sys_fdatasync`, `sys_truncate`, and `sys_ftruncate` implementations. They were already compliant. Fixed their tests in `test_syscall_linux_coverage.c` to prevent false failures.
+- **vfs-posix-filesystem-bot**: Checked VFS stack POSIX compliance (`vfs.c`, `fat32.c`, `jfs.c`, etc.). Replaced generic `-EIO` with specific error codes (`-EEXIST`, `-ENOENT`, `-ENOTDIR`, etc.) in `fat32.c` and validated `vfs.c` path operations.

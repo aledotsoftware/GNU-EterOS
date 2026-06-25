@@ -387,8 +387,8 @@ static int fat32_find_dirent_in_chain(fat32_volume_t* vol, uint32_t start_cluste
     int res = fat32_iterate_dir(vol, start_cluster, fat32_find_entry_cb, &ctx, NULL);
 
     if (res == 1) return 0; // Success
-    if (res == -3) return -ENOSPC; // Explicit Not Found
-    if (res == 0) return -ENOSPC; // End of Chain, Not Found
+    if (res == -3) return -ENOENT; // Explicit Not Found
+    if (res == 0) return -ENOENT; // End of Chain, Not Found
     return res; // Error
 }
 
@@ -716,7 +716,7 @@ static int fat32_create_fs_impl(fs_node_t *parent, char *name, uint16_t permissi
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EIO;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EEXIST;
 
     uint32_t sector, offset;
     if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOMEM;
@@ -744,7 +744,7 @@ static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permissio
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EIO;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EEXIST;
 
     uint32_t sector, offset;
     if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOMEM;
@@ -804,7 +804,7 @@ static int fat32_unlink_fs_impl(fs_node_t *parent, char *name) {
 
     fat32_dir_entry_t entry;
     uint32_t sector, offset;
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, &sector, &offset, &entry) != 0) return -EIO;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, &sector, &offset, &entry) != 0) return -ENOENT;
 
     uint32_t cluster = (entry.fst_clus_hi << 16) | entry.fst_clus_lo;
     if (cluster != 0) fat32_free_cluster_chain(vol, cluster);
