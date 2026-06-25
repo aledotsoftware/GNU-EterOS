@@ -269,12 +269,16 @@ fs_node_t *partition_get_passive_root(void) {
         }
     }
 
+    // Ensure active_idx is strictly 0 or 1 before flipping
+    if (active_idx != 0 && active_idx != 1) {
+        return NULL; // Prevent overwriting data partitions
+    }
+
     // Simple A/B logic: Flip between 0 and 1
     // If active is 0, passive is 1. If active is 1, passive is 0.
-    // If active is > 1, this logic fails, but for standard A/B usually it's slot 0 and 1.
     int passive_index = (active_idx == 0) ? 1 : 0;
 
-    if (passive_index < 0 || passive_index >= partition_count) return NULL;
+    if (passive_index >= partition_count) return NULL;
 
     return create_partition_node(passive_index);
 }
