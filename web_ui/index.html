@@ -26,7 +26,6 @@
                 <text x="60" y="80" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="white" text-anchor="middle">E</text>
             </svg>
 
-            <div class="splash-title">v0.2.0 Genesis SMP</div>
             <div class="splash-loader" aria-label="Loading system" role="status"></div>
         </div>
     </div>
@@ -115,21 +114,21 @@
         <nav class="dock-container">
             <div class="dock" id="dock">
                 <div class="dock-item" id="launcher-trigger" role="button" aria-label="Lanzador de aplicaciones" aria-haspopup="true" aria-expanded="false" tabindex="0"
-                    onclick="toggleLauncher()" onkeydown="if(event.key==='Enter') toggleLauncher()" data-tooltip="Lanzador">
+                    onclick="toggleLauncher()" onkeydown="if(event.key==='Enter') toggleLauncher()" title="Lanzador">
                     <img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/menu--v1.png" class="dock-icon">
                 </div>
                 <div class="dock-item running" role="button" aria-label="Abrir GIMP" tabindex="0"
-                    onclick="spawnApp('GIMP', 'linux')" onkeydown="if(event.key==='Enter') spawnApp('GIMP', 'linux')" data-tooltip="GIMP">
+                    onclick="spawnApp('GIMP', 'linux')" onkeydown="if(event.key==='Enter') spawnApp('GIMP', 'linux')" title="GIMP">
                     <img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/gimp.png" class="dock-icon">
                 </div>
                 <div class="dock-item" role="button" aria-label="Abrir Play Store" tabindex="0"
                     onclick="spawnApp('Play Store', 'android')"
-                    onkeydown="if(event.key==='Enter') spawnApp('Play Store', 'android')" data-tooltip="Play Store">
+                    onkeydown="if(event.key==='Enter') spawnApp('Play Store', 'android')" title="Play Store">
                     <img alt="" src="https://img.icons8.com/color/48/000000/google-play.png" class="dock-icon">
                 </div>
                 <div class="dock-item" role="button" aria-label="Abrir Terminal" tabindex="0"
                     onclick="spawnApp('Terminal', 'linux')"
-                    onkeydown="if(event.key==='Enter') spawnApp('Terminal', 'linux')" data-tooltip="Terminal">
+                    onkeydown="if(event.key==='Enter') spawnApp('Terminal', 'linux')" title="Terminal">
                     <img alt="" src="https://img.icons8.com/ios-filled/50/ffffff/console.png" class="dock-icon">
                 </div>
             </div>

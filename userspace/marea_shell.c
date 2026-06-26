@@ -1703,6 +1703,23 @@ static void redraw_all(void) {
 
     draw_taskbar();
     draw_menu();
+
+    /* Tooltips dynamically rendered during redraw_all() after windows are drawn */
+    int win_idx = find_window_at(mouse_x, mouse_y);
+    if (win_idx >= 0 && win_idx == window_count - 1) {
+        marea_window_t* win = &windows[win_idx];
+        if (hit_close_button(win, mouse_x, mouse_y)) {
+            fill_rounded_rect(mouse_x - 30, mouse_y - 25, 65, 20, 4, 0xD0000000);
+            draw_text(mouse_x - 22, mouse_y - 21, "Cerrar", 0xFFFFFFFF, 0);
+        } else if (hit_minimize_button(win, mouse_x, mouse_y)) {
+            fill_rounded_rect(mouse_x - 40, mouse_y - 25, 80, 20, 4, 0xD0000000);
+            draw_text(mouse_x - 32, mouse_y - 21, "Minimizar", 0xFFFFFFFF, 0);
+        } else if (hit_maximize_button(win, mouse_x, mouse_y)) {
+            fill_rounded_rect(mouse_x - 40, mouse_y - 25, 80, 20, 4, 0xD0000000);
+            draw_text(mouse_x - 32, mouse_y - 21, "Maximizar", 0xFFFFFFFF, 0);
+        }
+    }
+
     mark_dirty_rect(0, 0, (int)fb_info.width, (int)fb_info.height);
 }
 

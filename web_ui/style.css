@@ -176,7 +176,7 @@ body {
 
 /* Tooltip implementation */
 .dock-item::before {
-    content: attr(data-tooltip);
+    content: attr(title);
     position: absolute;
     bottom: 100%;
     left: 50%;
@@ -1175,12 +1175,6 @@ body {
     filter: drop-shadow(0 10px 20px rgba(56, 189, 248, 0.3));
 }
 
-.splash-title {
-    font-size: 24px;
-    font-weight: 600;
-    color: #f8fafc; opacity: 0.8;
-    letter-spacing: -0.5px;
-}
 
 .splash-loader {
     width: 40px;
@@ -1205,4 +1199,29 @@ body {
         opacity: 1;
         transform: translateY(0);
     }
+}
+.control::before {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(0) scale(0.9);
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    font-size: 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+}
+
+.control:hover::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(-12px) scale(1);
 }

@@ -10,3 +10,7 @@
   - Hardened architectural boundaries in `smp.c` and `task.c` by substituting raw `cli`/`sti` instructions with cross-platform `hal_interrupts_disable`/`hal_interrupts_enable` abstractions.
 No changes were needed for the task as network integration is fully functional
 - **linux-syscall-compliance-bot**: Checked `sys_fsync`, `sys_fdatasync`, `sys_truncate`, and `sys_ftruncate` implementations. They were already compliant. Fixed their tests in `test_syscall_linux_coverage.c` to prevent false failures.
+- **vision-cli-agent**: Polished UI and docs.
+  - Removed textual title from boot splash screen (`web_ui/index.html`) to ensure a clean UX relying solely on the SVG logo's aria-label, passing the accessibility tests.
+  - Replaced custom `data-tooltip` with standard `title` attributes in `web_ui` to ensure standard compatibility and implemented `attr(title)` based tooltips in `web_ui/style.css`.
+  - Added dynamic tooltip rendering inside `redraw_all()` for window controls in `userspace/marea_shell.c`.
