@@ -62,6 +62,10 @@ void net_init(void) {
     serial_write_string("[NET] Init done.\n");
 }
 
+uint8_t* net_get_mac(void) {
+    return main_netif.hwaddr;
+}
+
 void net_poll(void) {
     /* Poll the driver */
     ethernetif_poll(&main_netif);
