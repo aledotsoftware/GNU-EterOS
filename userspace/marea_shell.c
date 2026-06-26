@@ -793,6 +793,21 @@ static void draw_window_chrome(marea_window_t* win) {
         }
     }
 
+    /* Draw tooltips if hovering */
+    if (hover_close) {
+        fill_rounded_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - 6, btn_base_y - btn_r - 26, "Cerrar", COL_TEXT_PRIMARY, 0);
+    } else if (hover_max) {
+        fill_rounded_rect(btn_base_x - btn_spacing - 24, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - btn_spacing - 24, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - btn_spacing - 18, btn_base_y - btn_r - 26, "Maximizar", COL_TEXT_PRIMARY, 0);
+    } else if (hover_min) {
+        fill_rounded_rect(btn_base_x - btn_spacing * 2 - 24, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - btn_spacing * 2 - 24, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - btn_spacing * 2 - 18, btn_base_y - btn_r - 26, "Minimizar", COL_TEXT_PRIMARY, 0);
+    }
+
     /* Window title */
     int title_x = x + 14;
     uint32_t title_color = is_focused ? COL_TEXT_PRIMARY : COL_TEXT_SECONDARY;

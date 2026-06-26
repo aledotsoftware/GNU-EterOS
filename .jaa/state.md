@@ -1,5 +1,9 @@
 # JAA Global System State - Agent Update
 
+- **graphics-power-panel-bot**: Graphical UI and Window Controls Tooltips updated.
+  - Implemented CSS tooltips using `::before` pseudo-element for `.control` class in `web_ui/style.css` (Cerrar, Minimizar, Maximizar window controls) providing consistency across the web UI.
+  - Aligned native C `marea_shell.c` by drawing hover tooltips directly in `draw_window_chrome()` based on hit detection logic (`hit_minimize_button`, etc.), matching web UI tooltips logic in the native stack.
+
 - **kernel-stability-boot-bot**: Boot, memory, and initialization hardened and verified.
   - Verified PMM bitmap is safely pinned at `0x1A000`.
   - Confirmed `total_pages` boundary constraints are active in `pmm_mark_region_used`.
