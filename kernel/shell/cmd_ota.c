@@ -116,10 +116,10 @@ void cmd_ota(const char* args) {
 
         uint8_t update_state = nvram_get_update_state();
         terminal_write_string("\n\n  [Estado de Actualizacion]: ");
-        if (update_state == UPDATE_STATE_PENDING) terminal_write_string("Pendiente (Reinicio requerido)");
-        else if (update_state == UPDATE_STATE_SUCCESS) terminal_write_string("Exitoso (Arranque confirmado)");
-        else if (update_state == UPDATE_STATE_FAILED) terminal_write_string("Fallido (Rollback)");
-        else terminal_write_string("Ninguno/Limpio");
+        if (update_state == UPDATE_STATE_PENDING) terminal_write_string("Pendiente (Reinicio requerido para aplicar la actualización)");
+        else if (update_state == UPDATE_STATE_SUCCESS) terminal_write_string("Exitoso (Arranque confirmado post-actualización)");
+        else if (update_state == UPDATE_STATE_FAILED) terminal_write_string("Fallido (Rollback detectado por fallo de arranque)");
+        else terminal_write_string("Ninguno/Limpio (Sistema estable, sin actualizaciones pendientes)");
 
         terminal_write_string("\n\n");
     } else if (strcmp(subcmd, "seturl") == 0) {
@@ -303,16 +303,18 @@ receive_checksig:
 
         if (payload_size < 1024) {
              terminal_write_string("  [OTA] Error: El archivo descargado esta incompleto o es muy pequeno.\n");
+             terminal_write_string("  [OTA] Sugerencia: Verifique la URL y compruebe si el servidor retornó un 404 o archivo vacío.\n");
              kfree(payload_data);
              if (passive_part) kfree(passive_part);
              return;
         }
 
-        terminal_write_string("  [OTA] Payload descargado (");
+        terminal_write_string("  [OTA] Descarga completada exitosamente.\n");
+        terminal_write_string("  [OTA] Tamano de payload descargado: ");
         char size_buf[16];
         itoa_s((int)payload_size, size_buf, sizeof(size_buf), 10);
         terminal_write_string(size_buf);
-        terminal_write_string(" bytes).\n");
+        terminal_write_string(" bytes.\n");
 
         terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
 
@@ -330,10 +332,10 @@ receive_checksig:
         // Definir una clave publica real (hardcodeada para este build) en lugar de una de ceros.
         // Esto es una semilla/clave valida en formato binario para propósitos de update signing
         unsigned char pk[32] = {
-            0x7A, 0x1B, 0x2C, 0x3D, 0x4E, 0x5F, 0x6A, 0x7B,
-            0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3,
-            0x04, 0x15, 0x26, 0x37, 0x48, 0x59, 0x6A, 0x7B,
-            0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3
+            0x20, 0x7a, 0x06, 0x78, 0x92, 0x82, 0x1e, 0x25,
+            0xd7, 0x70, 0xf1, 0xfb, 0xa0, 0xc4, 0x7c, 0x11,
+            0xff, 0x4b, 0x81, 0x3e, 0x54, 0x16, 0x2e, 0xce,
+            0x9e, 0xb8, 0x39, 0xe0, 0x76, 0x23, 0x1a, 0xb6
         };
 
         if (!ed25519_verify(sig, payload_data + 64, payload_size - 64, pk)) {
@@ -519,16 +521,18 @@ receive:
 
         if (payload_size < 1024) {
              terminal_write_string("  [OTA] Error: El archivo descargado esta incompleto o es muy pequeno.\n");
+             terminal_write_string("  [OTA] Sugerencia: Verifique la URL y compruebe si el servidor retornó un 404 o archivo vacío.\n");
              kfree(payload_data);
              if (passive_part) kfree(passive_part);
              return;
         }
 
-        terminal_write_string("  [OTA] Payload descargado (");
+        terminal_write_string("  [OTA] Descarga completada exitosamente.\n");
+        terminal_write_string("  [OTA] Tamano de payload descargado: ");
         char size_buf[16];
         itoa_s((int)payload_size, size_buf, sizeof(size_buf), 10);
         terminal_write_string(size_buf);
-        terminal_write_string(" bytes).\n");
+        terminal_write_string(" bytes.\n");
 
         terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
 
@@ -546,10 +550,10 @@ receive:
         // Definir una clave publica real (hardcodeada para este build) en lugar de una de ceros.
         // Esto es una semilla/clave valida en formato binario para propósitos de update signing
         unsigned char pk[32] = {
-            0x7A, 0x1B, 0x2C, 0x3D, 0x4E, 0x5F, 0x6A, 0x7B,
-            0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3,
-            0x04, 0x15, 0x26, 0x37, 0x48, 0x59, 0x6A, 0x7B,
-            0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3
+            0x20, 0x7a, 0x06, 0x78, 0x92, 0x82, 0x1e, 0x25,
+            0xd7, 0x70, 0xf1, 0xfb, 0xa0, 0xc4, 0x7c, 0x11,
+            0xff, 0x4b, 0x81, 0x3e, 0x54, 0x16, 0x2e, 0xce,
+            0x9e, 0xb8, 0x39, 0xe0, 0x76, 0x23, 0x1a, 0xb6
         };
 
         if (!ed25519_verify(sig, payload_data + 64, payload_size - 64, pk)) {
@@ -599,7 +603,8 @@ receive:
         }
 
         terminal_write_string("  [OTA] Verificando escritura...\n");
-        uint8_t *verify_buf = kmalloc(write_size);
+        uint32_t chunk_size = 65536; // 64KB chunks
+        uint8_t *verify_buf = kmalloc(chunk_size);
         if (!verify_buf) {
             terminal_write_string("  [OTA] ERROR: Sin memoria para verificar escritura.\n");
             kfree(passive_part);
@@ -607,13 +612,20 @@ receive:
             return;
         }
 
-        uint32_t verified_read = read_fs(passive_part, write_offset, write_size, verify_buf);
-        if (verified_read != write_size || memcmp(payload_data + data_offset, verify_buf, write_size) != 0) {
-            terminal_write_string("  [OTA] ERROR: Fallo la verificacion de escritura (corrupcion o fallo en lectura).\n");
-            kfree(verify_buf);
-            kfree(passive_part);
-            kfree(payload_data);
-            return;
+        uint32_t verified = 0;
+        while (verified < write_size) {
+            uint32_t to_read = write_size - verified;
+            if (to_read > chunk_size) to_read = chunk_size;
+
+            uint32_t verified_read = read_fs(passive_part, write_offset + verified, to_read, verify_buf);
+            if (verified_read != to_read || memcmp(payload_data + data_offset + verified, verify_buf, to_read) != 0) {
+                terminal_write_string("  [OTA] ERROR: Fallo la verificacion de escritura (corrupcion o fallo en lectura).\n");
+                kfree(verify_buf);
+                kfree(passive_part);
+                kfree(payload_data);
+                return;
+            }
+            verified += to_read;
         }
         kfree(verify_buf);
         kfree(passive_part);

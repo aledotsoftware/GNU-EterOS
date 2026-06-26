@@ -5,7 +5,7 @@ To ensure zero-friction testing and building, here is the documented Ed25519 key
 that matches the hardcoded public key in `kernel/shell/cmd_ota.c`.
 
 ## Public Key (Hex)
-`7A1B2C3D4E5F6A7B8C9DAEbfc0d1e2f30415263748596a7b8c9daebfc0d1e2f3`
+`207a067892821e25d770f1fba0c47c11ff4b813e54162ece9eb839e076231ab6`
 
 ## Private Key (Hex)
 *(For testing purposes only, this is a dummy private key. In a real environment, this should be kept secure.)*
