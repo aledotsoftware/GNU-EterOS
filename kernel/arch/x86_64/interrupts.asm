@@ -17,6 +17,7 @@ extern irq_serial_handler
 extern irq_mouse_handler
 extern irq_network_handler
 extern lapic_timer_handler
+extern handle_signal_if_needed
 
 %include "kernel/arch/x86_64/asm_macros.inc"
 
@@ -37,6 +38,16 @@ isr_stub_timer:
     PUSH_ALL
     cld                         ; Clear Direction Flag (System V ABI)
     call irq_timer_handler
+
+    ; CS is in the iret frame. The frame consists of:
+    ; SS, RSP, RFLAGS, CS, RIP
+    ; After PUSH_ALL (15 regs * 8 bytes = 120 bytes), CS is at [rsp + 120 + 8] = [rsp + 128]
+    test qword [rsp + 128], 3
+    jz .skip_sig_timer
+    mov rdi, rsp
+    call handle_signal_if_needed
+.skip_sig_timer:
+
     POP_ALL
     
     ; Check if we are returning to User Mode
@@ -57,6 +68,13 @@ isr_stub_keyboard:
     PUSH_ALL
     cld
     call irq_keyboard_handler
+
+    test qword [rsp + 128], 3
+    jz .skip_sig_kb
+    mov rdi, rsp
+    call handle_signal_if_needed
+.skip_sig_kb:
+
     POP_ALL
     test qword [rsp + 8], 3
     jz .k2
@@ -75,6 +93,13 @@ isr_stub_serial:
     PUSH_ALL
     cld
     call irq_serial_handler
+
+    test qword [rsp + 128], 3
+    jz .skip_sig_ser
+    mov rdi, rsp
+    call handle_signal_if_needed
+.skip_sig_ser:
+
     POP_ALL
     test qword [rsp + 8], 3
     jz .s2
@@ -93,6 +118,13 @@ isr_stub_mouse:
     PUSH_ALL
     cld
     call irq_mouse_handler
+
+    test qword [rsp + 128], 3
+    jz .skip_sig_mouse
+    mov rdi, rsp
+    call handle_signal_if_needed
+.skip_sig_mouse:
+
     POP_ALL
     test qword [rsp + 8], 3
     jz .m2
@@ -111,6 +143,13 @@ isr_stub_network:
     PUSH_ALL
     cld
     call irq_network_handler
+
+    test qword [rsp + 128], 3
+    jz .skip_sig_net
+    mov rdi, rsp
+    call handle_signal_if_needed
+.skip_sig_net:
+
     POP_ALL
     test qword [rsp + 8], 3
     jz .n2
@@ -129,6 +168,13 @@ isr_stub_lapic_timer:
     PUSH_ALL
     cld
     call lapic_timer_handler
+
+    test qword [rsp + 128], 3
+    jz .skip_sig_lt
+    mov rdi, rsp
+    call handle_signal_if_needed
+.skip_sig_lt:
+
     POP_ALL
     test qword [rsp + 8], 3
     jz .lt2
