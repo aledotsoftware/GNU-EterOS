@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <stdbool.h>
 
-#define __ETEROS_HOST_TEST__
 #include <assert.h>
 #define ASSERT(x) do {} while(0)
 

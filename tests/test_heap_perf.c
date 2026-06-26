@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#define __ETEROS_HOST_TEST__
 #include <time.h>
 
 #define CLOCKS_PER_SEC 1000000

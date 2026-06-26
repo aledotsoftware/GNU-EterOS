@@ -12,13 +12,13 @@ rm tests/test_heap
 
 echo "---------------------------------------------------"
 echo "Running test_heap_perf..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_heap_perf.c -o tests/test_heap_perf 2>/dev/null
+gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_heap_perf.c -o tests/test_heap_perf
 ./tests/test_heap_perf
 rm tests/test_heap_perf
 
 echo "---------------------------------------------------"
 echo "Running test_heap_security..."
-gcc -D__ETEROS_HOST_TEST__ tests/test_heap_security.c -o tests/test_heap_security 2>/dev/null
+gcc -D__ETEROS_HOST_TEST__ tests/test_heap_security.c -o tests/test_heap_security
 ./tests/test_heap_security
 rm tests/test_heap_security
 
@@ -435,7 +435,5 @@ echo "---------------------------------------------------"
 echo "---------------------------------------------------"
 echo "Running test_vfs_leak..."
 gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/mock_net.c tests/test_vfs_leak.c tests/mock_pmm.c kernel/string.c -o tests/test_vfs_leak
-if [ -f tests/test_vfs_leak ]; then
-    ./tests/test_vfs_leak
+./tests/test_vfs_leak
     rm tests/test_vfs_leak
-fi
