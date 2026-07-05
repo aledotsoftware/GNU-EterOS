@@ -70,11 +70,17 @@ context_switch:
 ;   La tarea hija "despierta" aquí con RSP apuntando a los registros guardados.
 ; -----------------------------------------------------------------------------
 extern sched_lock
+extern handle_signal_if_needed
 
 global fork_return
 fork_return:
     ; Release sched_lock held by the scheduler before returning to userspace
     mov dword [sched_lock], 0
+
+    ; `rsp` currently points exactly to the 15 pushed registers from `struct syscall_regs`
+    ; since sysret is used, we know it will return to user space.
+    mov rdi, rsp
+    call handle_signal_if_needed
 
     pop r15
     pop r14

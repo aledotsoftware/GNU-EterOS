@@ -167,6 +167,12 @@ int main() {
     assert(sys_arch_prctl(ARCH_SET_FS, 0x12345678) == 0);
     assert(current_task_mock.fs_base == 0x12345678);
 
+    printf("Testing sys_getrusage\n");
+    assert(sys_getrusage(0, NULL) == -ENOSYS);
+
+    printf("Testing sys_prlimit64\n");
+    assert(sys_prlimit64(0, 0, NULL, NULL) == -ENOSYS);
+
 
     printf("Testing sys_reboot\n");
     assert(sys_reboot(1, 2, 3, NULL) == 0);

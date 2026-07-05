@@ -1,6 +1,7 @@
 [BITS 64]
 global syscall_entry
 extern syscall_handler
+extern handle_signal_if_needed
 
 %include "kernel/arch/x86_64/asm_macros.inc"
 
@@ -38,6 +39,9 @@ syscall_entry:
     
     cld
     call syscall_handler
+
+    mov rdi, rsp
+    call handle_signal_if_needed
 
     ; 6. Restore Registers
     POP_ALL
