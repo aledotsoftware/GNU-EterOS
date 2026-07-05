@@ -404,3 +404,15 @@ int reboot(int magic, int magic2, int cmd, void *arg) {
     SYSCALL_RETURN(ret);;
     return 0;
 }
+
+int execveat(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags) {
+    long ret = syscall5(SYS_execveat, dirfd, (long)pathname, (long)argv, (long)envp, flags);
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
+    return (int)ret;
+}
+
+int preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags) {
+    long ret = syscall5(SYS_preadv2, fd, (long)iov, iovcnt, offset, flags);
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
+    return (int)ret;
+}

@@ -141,3 +141,6 @@
 long syscall(long nr, ...);
 
 #endif /* _SYS_SYSCALL_H */
+#define SYS_execveat             322
+#define SYS_preadv2              327
+#define SYS_pwritev2             328

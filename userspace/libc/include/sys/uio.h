@@ -14,4 +14,6 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, int64_t offset);
 ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, int64_t offset);
 
+int preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags);
+
 #endif /* _SYS_UIO_H */

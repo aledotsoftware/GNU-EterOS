@@ -174,8 +174,16 @@ int main() {
     assert(sys_prlimit64(0, 0, NULL, NULL) == -ENOSYS);
 
 
+
     printf("Testing sys_reboot\n");
     assert(sys_reboot(1, 2, 3, NULL) == 0);
+
+
+    printf("Testing execve wrapper defaults\n");
+    assert(sys_execve(NULL, NULL, NULL, NULL) == -EFAULT);
+    assert(sys_execveat(0, NULL, NULL, NULL, 0, NULL) == -EFAULT);
+
+
 
     printf("Tests passed!\n");
     free(valid_node);

@@ -92,4 +92,6 @@ extern int opterr;
 extern int optopt;
 int getopt(int argc, char * const argv[], const char *optstring);
 
+int execveat(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags);
+
 #endif /* _UNISTD_H */
