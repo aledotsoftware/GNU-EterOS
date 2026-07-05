@@ -145,6 +145,10 @@ typedef struct task {
     uint8_t        is_linux;                /* Linux Compatibility Flag */                  /* ABI (0=SysV/Native, 3=Linux) */
     uint64_t       user_rsp;                /* User Stack Pointer (saved during syscall) */
     uint64_t       mmap_base;               /* Base address for mmap allocator */
+    uint64_t       binder_mmap_base;
+    uint64_t       binder_mmap_size;
+    uint64_t       binder_mmap_offset;
+    void*          binder_mmap_kptr;
 
     /* FPU Context (512 bytes, aligned to 16 bytes for FXSAVE/FXRSTOR) */
     uint8_t        fpu_state[512] __attribute__((aligned(16)));

@@ -1,0 +1,78 @@
+--- kernel/fs/devfs.c
++++ kernel/fs/devfs.c
+@@ -193,10 +193,18 @@
+                         /* Real allocation instead of a static buffer, capped at 1MB to prevent OOM */
+                         if (tr.data_size <= 1024 * 1024) {
+-                            temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
+-                            if (temp_payload) {
+-                                if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
+-                                    kfree(temp_payload);
+-                                    temp_payload = NULL;
+-                                    tr.data_size = 0;
+-                                }
+-                            } else {
+-                                tr.data_size = 0;
++                            if (target_task && target_task->binder_mmap_kptr && (target_task->binder_mmap_offset + tr.data_size <= target_task->binder_mmap_size)) {
++                                /* Copy directly into receivers mapped memory area */
++                                uint64_t target_vaddr = target_task->binder_mmap_base + target_task->binder_mmap_offset;
++                                uint8_t *kptr = (uint8_t*)target_task->binder_mmap_kptr + target_task->binder_mmap_offset;
++
++                                if (safe_copy_from_user(kptr, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) == 0) {
++                                    temp_payload = (uint8_t*)(uintptr_t)target_vaddr; /* Store the receivers VADDR so they can access it directly */
++                                    target_task->binder_mmap_offset += PAGE_ALIGN_UP(tr.data_size);
++                                } else {
++                                    tr.data_size = 0;
++                                }
++                            } else {
++                                /* Fallback to legacy kmalloc if no mmap or full */
++                                temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
++                                if (temp_payload) {
++                                    if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
++                                        kfree(temp_payload);
++                                        temp_payload = NULL;
++                                        tr.data_size = 0;
++                                    }
++                                } else {
++                                    tr.data_size = 0;
++                                }
+                             }
+                         } else {
+@@ -259,6 +267,8 @@
+                      spin_lock(&binder_lock);
+                      for (int i = 0; i < BINDER_MAX_QUEUED; i++) {
+                          if (payload_buffers[i] == (uint8_t*)buffer_to_free && buffer_to_free != 0) {
+-                             kfree((void*)buffer_to_free);
++                             if (buffer_to_free < current->binder_mmap_base || buffer_to_free >= current->binder_mmap_base + current->binder_mmap_size) {
++                                 kfree((void*)buffer_to_free);
++                             }
+                              payload_buffers[i] = NULL;
+                              break;
+                          }
+                          if (cl_queues[i].payload == (uint8_t*)buffer_to_free && buffer_to_free != 0) {
+-                             kfree((void*)buffer_to_free);
++                             if (buffer_to_free < current->binder_mmap_base || buffer_to_free >= current->binder_mmap_base + current->binder_mmap_size) {
++                                 kfree((void*)buffer_to_free);
++                             }
+                              cl_queues[i].payload = NULL;
+                              break;
+                          }
+@@ -318,10 +328,14 @@
+                     /* Basic shim copies data to the user provided buffer instead of mmaps, to avoid passing kernel pointers */
+                     if (payload_ptr && tr_copy.data.ptr.buffer) {
+-                        /* In this shim, we assume the reader provided a valid buffer in tr_copy.data.ptr.buffer
+-                           to copy the payload into. This is not strictly Android compliant but safe for our baremetal shim. */
+-                        if (safe_copy_to_user((void*)(uintptr_t)tr_copy.data.ptr.buffer, payload_ptr, tr_copy.data_size) != 0) {
+-                           /* Copy failed */
+-                        }
+-                        /* We don't free payload_ptr here, BC_FREE_BUFFER must handle it based on the tracking logic */
++                        if ((uintptr_t)payload_ptr >= current->binder_mmap_base && (uintptr_t)payload_ptr < current->binder_mmap_base + current->binder_mmap_size) {
++                            /* It's already in their mapped memory, just give them the pointer */
++                            tr_copy.data.ptr.buffer = (uint64_t)(uintptr_t)payload_ptr;
++                        } else {
++                            /* Legacy copy */
++                            if (safe_copy_to_user((void*)(uintptr_t)tr_copy.data.ptr.buffer, payload_ptr, tr_copy.data_size) != 0) {
++                               /* Copy failed */
++                            }
++                        }
+                     } else {
+                         tr_copy.data.ptr.buffer = 0;

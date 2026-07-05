@@ -621,13 +621,19 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
             }
             spin_unlock(&shm_obj->lock);
         } else if (is_binder) {
-            /* Binder VMA - Allocate anonymous page for receive buffer */
+            /* Binder VMA - Allocate mapped page and record in task_t */
             void* phys = pmm_alloc_page();
             if (!phys) return -ENOMEM;
             hal_mem_map((uint64_t)phys, v, map_flags);
 #ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
 #endif
+            if (v == start) {
+                current->binder_mmap_base = start;
+                current->binder_mmap_size = len;
+                current->binder_mmap_offset = 0;
+                current->binder_mmap_kptr = (void*)phys;
+            }
         } else if (is_properties) {
             /* __properties__ VMA - Map anonymous page and copy dummy properties */
             void* phys = pmm_alloc_page();

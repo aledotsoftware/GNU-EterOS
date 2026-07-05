@@ -188,6 +188,25 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                     if (tr.data.ptr.buffer && tr.data_size > 0) {
                         /* Real allocation instead of a static buffer, capped at 1MB to prevent OOM */
                         if (tr.data_size <= 1024 * 1024) {
+                            task_t *target_task = NULL;
+                            if (tr.target.handle == 0 && cmd != BC_REPLY) {
+                                target_task = task_get_by_id((uint32_t)binder_context_mgr_pid);
+                            } else if (cmd == BC_REPLY) {
+                                target_task = task_get_by_id(tr.target.handle);
+                            }
+                            if (target_task && target_task->binder_mmap_kptr && (target_task->binder_mmap_offset + tr.data_size <= target_task->binder_mmap_size)) {
+                                /* Copy directly into receivers mapped memory area */
+                                uint64_t target_vaddr = target_task->binder_mmap_base + target_task->binder_mmap_offset;
+                                uint8_t *kptr = (uint8_t*)target_task->binder_mmap_kptr + target_task->binder_mmap_offset;
+
+                                if (safe_copy_from_user(kptr, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) == 0) {
+                                    temp_payload = (uint8_t*)(uintptr_t)target_vaddr; /* Store the offset within the binder VMA so receiver knows where it is */
+                                    target_task->binder_mmap_offset += (((tr.data_size) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1));
+                                } else {
+                                    tr.data_size = 0;
+                                }
+                            } else {
+                                /* Fallback to legacy kmalloc if no mmap or full */
                             temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
                             if (temp_payload) {
                                 if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
@@ -196,6 +215,7 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                                     tr.data_size = 0;
                                 }
                             } else {
+                            }
                                 tr.data_size = 0;
                             }
                         } else {
@@ -249,12 +269,16 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                      spin_lock(&binder_lock);
                      for (int i = 0; i < BINDER_MAX_QUEUED; i++) {
                          if (payload_buffers[i] == (uint8_t*)buffer_to_free && buffer_to_free != 0) {
+                             if ((uintptr_t)buffer_to_free < current->binder_mmap_base || (uintptr_t)buffer_to_free >= current->binder_mmap_base + current->binder_mmap_size) {
                              kfree((void*)buffer_to_free);
+                             }
                              payload_buffers[i] = NULL;
                              break;
                          }
                          if (cl_queues[i].payload == (uint8_t*)buffer_to_free && buffer_to_free != 0) {
+                             if ((uintptr_t)buffer_to_free < current->binder_mmap_base || (uintptr_t)buffer_to_free >= current->binder_mmap_base + current->binder_mmap_size) {
                              kfree((void*)buffer_to_free);
+                             }
                              cl_queues[i].payload = NULL;
                              break;
                          }
@@ -307,8 +331,14 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                     if (payload_ptr && tr_copy.data.ptr.buffer) {
                         /* In this shim, we assume the reader provided a valid buffer in tr_copy.data.ptr.buffer
                            to copy the payload into. This is not strictly Android compliant but safe for our baremetal shim. */
+                        if ((uintptr_t)payload_ptr >= current->binder_mmap_base && (uintptr_t)payload_ptr < current->binder_mmap_base + current->binder_mmap_size) {
+                            /* It is already in their mapped memory, just give them the pointer */
+                            tr_copy.data.ptr.buffer = (uint64_t)(uintptr_t)payload_ptr;
+                        } else {
+                            /* Legacy copy */
                         if (safe_copy_to_user((void*)(uintptr_t)tr_copy.data.ptr.buffer, payload_ptr, tr_copy.data_size) != 0) {
                            /* Copy failed */
+                        }
                         }
                         /* We don't free payload_ptr here, BC_FREE_BUFFER must handle it based on the tracking logic */
                     } else {
