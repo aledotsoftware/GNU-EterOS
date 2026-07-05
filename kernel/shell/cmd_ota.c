@@ -599,7 +599,9 @@ receive:
         }
 
         terminal_write_string("  [OTA] Verificando escritura...\n");
-        uint8_t *verify_buf = kmalloc(write_size);
+
+        uint32_t chunk_size = 64 * 1024;
+        uint8_t *verify_buf = kmalloc(chunk_size);
         if (!verify_buf) {
             terminal_write_string("  [OTA] ERROR: Sin memoria para verificar escritura.\n");
             kfree(passive_part);
@@ -607,14 +609,24 @@ receive:
             return;
         }
 
-        uint32_t verified_read = read_fs(passive_part, write_offset, write_size, verify_buf);
-        if (verified_read != write_size || memcmp(payload_data + data_offset, verify_buf, write_size) != 0) {
-            terminal_write_string("  [OTA] ERROR: Fallo la verificacion de escritura (corrupcion o fallo en lectura).\n");
-            kfree(verify_buf);
-            kfree(passive_part);
-            kfree(payload_data);
-            return;
+        uint32_t bytes_verified = 0;
+        while (bytes_verified < write_size) {
+            uint32_t read_size = write_size - bytes_verified;
+            if (read_size > chunk_size) {
+                read_size = chunk_size;
+            }
+
+            uint32_t verified_read = read_fs(passive_part, write_offset + bytes_verified, read_size, verify_buf);
+            if (verified_read != read_size || memcmp(payload_data + data_offset + bytes_verified, verify_buf, read_size) != 0) {
+                terminal_write_string("  [OTA] ERROR: Fallo la verificacion de escritura (corrupcion o fallo en lectura).\n");
+                kfree(verify_buf);
+                kfree(passive_part);
+                kfree(payload_data);
+                return;
+            }
+            bytes_verified += read_size;
         }
+
         kfree(verify_buf);
         kfree(passive_part);
         terminal_write_string("  [OTA] Verificacion de escritura exitosa.\n");
