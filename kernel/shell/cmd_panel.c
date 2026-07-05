@@ -508,14 +508,6 @@ void cmd_panel(const char* args) {
                 if (c != KB_KEY_ESCAPE) wait_for_enter();
                 draw_panel_menu();
             } else if (opt == '6') {
-                if (!current_nic) {
-                    cmd_clear("");
-                    terminal_write_string("\n  -- Red y Conectividad --\n");
-                    terminal_write_string("  Error: Adaptador de red no activo o no detectado.\n");
-                    wait_for_enter();
-                    draw_panel_menu();
-                    continue;
-                }
                 cmd_clear("");
                 terminal_write_string("\n  -- Red y Conectividad --\n");
                 cmd_net("");
