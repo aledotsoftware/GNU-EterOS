@@ -24,6 +24,8 @@
 #include "../../../include/task.h"
 #include "../../../include/vmm.h"
 #include "../../../include/apic.h"
+#include "../../../include/syscall.h"
+#include "../../../include/hal.h"
 
 /* ========================================================================= */
 /* Tabla IDT (256 entradas × 16 bytes = 4 KB)                               */
@@ -188,7 +190,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
 
         /* Just in case we return (e.g. error killing task), loop forever or schedule */
         schedule();
-        for(;;) __asm__ volatile("hlt");
+        for(;;) hal_cpu_halt();
         return;
     }
 
@@ -313,11 +315,12 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     serial_write_string("\n");
 
     /* Halt forever */
-    __asm__ volatile ("cli");
-    for (;;) { __asm__ volatile ("hlt"); }
+    hal_interrupts_disable();
+    for (;;) { hal_cpu_halt(); }
 }
 
 extern void syscall_int80_handler(struct syscall_regs* regs);
+extern void handle_signal_if_needed(struct syscall_regs* regs);
 
 void exception_handler_c(struct int_regs *regs) {
     if (regs->int_no == 128) {
@@ -333,6 +336,42 @@ void exception_handler_c(struct int_regs *regs) {
         .ss = regs->ss
     };
     handle_exception(regs->int_no, &frame, regs->err_code, regs);
+
+    if ((regs->cs & 3) != 0) {
+        struct syscall_regs sregs;
+        sregs.r15 = regs->r15;
+        sregs.r14 = regs->r14;
+        sregs.r13 = regs->r13;
+        sregs.r12 = regs->r12;
+        sregs.r11 = regs->rflags;
+        sregs.r10 = regs->r10;
+        sregs.r9  = regs->r9;
+        sregs.r8  = regs->r8;
+        sregs.rbp = regs->rbp;
+        sregs.rdi = regs->rdi;
+        sregs.rsi = regs->rsi;
+        sregs.rdx = regs->rdx;
+        sregs.rcx = regs->rip;
+        sregs.rbx = regs->rbx;
+        sregs.rax = regs->rax;
+        handle_signal_if_needed(&sregs);
+
+        regs->r15 = sregs.r15;
+        regs->r14 = sregs.r14;
+        regs->r13 = sregs.r13;
+        regs->r12 = sregs.r12;
+        regs->rflags = sregs.r11;
+        regs->r10 = sregs.r10;
+        regs->r9  = sregs.r9;
+        regs->r8  = sregs.r8;
+        regs->rbp = sregs.rbp;
+        regs->rdi = sregs.rdi;
+        regs->rsi = sregs.rsi;
+        regs->rdx = sregs.rdx;
+        regs->rip = sregs.rcx;
+        regs->rbx = sregs.rbx;
+        regs->rax = sregs.rax;
+    }
 }
 
 /* Stubs definidos en exceptions.asm */

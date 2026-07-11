@@ -81,6 +81,11 @@ void hal_cpu_halt(void) {
 #endif
 }
 
+void hal_cpu_enable_interrupts_and_halt(void) {
+    hal_interrupts_enable();
+    hal_cpu_halt();
+}
+
 void hal_cpu_reset(void) {
     /*
      * Reset por software via RTC controller o Watchdog.

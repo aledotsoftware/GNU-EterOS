@@ -13,6 +13,7 @@
 #include "../../include/fs/bcache.h"
 #include "../../include/lock.h"
 #include <assert.h>
+#include <hal.h>
 
 /* ========================================================================= */
 /* Variables Globales                                                        */
@@ -398,8 +399,8 @@ check_wrap:
 void* pmm_alloc_page(void) {
     if (!pmm_bitmap) {
         serial_write_string("[PMM] FATAL: pmm_alloc_page called before pmm_init!\n");
-        __asm__ volatile("cli");
-        for(;;) __asm__ volatile("hlt");
+        hal_interrupts_disable();
+        for(;;) hal_cpu_halt();
     }
 
     spin_lock(&pmm_lock);

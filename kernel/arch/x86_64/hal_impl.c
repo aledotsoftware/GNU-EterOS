@@ -84,6 +84,10 @@ void hal_cpu_halt(void) {
     __asm__ volatile ("hlt");
 }
 
+void hal_cpu_enable_interrupts_and_halt(void) {
+    __asm__ volatile ("sti; hlt");
+}
+
 void hal_cpu_reset(void) {
     /* Method 1: Keyboard Controller Pulse */
     uint8_t good = 0x02;

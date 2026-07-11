@@ -237,6 +237,11 @@ void hal_cpu_halt(void) {
     __asm__ volatile ("wfi");
 }
 
+void hal_cpu_enable_interrupts_and_halt(void) {
+    hal_interrupts_enable();
+    hal_cpu_halt();
+}
+
 void hal_cpu_reset(void) {
     /* SBI Shutdown (EID 0x08) */
     sbi_call(SBI_EID_SHUTDOWN, 0, 0, 0, 0, 0, 0, 0);

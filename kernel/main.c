@@ -517,6 +517,6 @@ static void show_splash(void) {
     /* Wait ~2 seconds (busy wait on timer ticks to keep scheduler running) */
     uint64_t end_ticks = timer_get_ticks() + (2 * TIMER_HZ);
     while (timer_get_ticks() < end_ticks) {
-        __asm__ volatile("hlt");
+        hal_cpu_halt();
     }
 }

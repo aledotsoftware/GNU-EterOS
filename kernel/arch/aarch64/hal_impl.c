@@ -55,8 +55,17 @@ void hal_interrupts_disable(void) {
     __asm__ volatile("msr daifset, #2"); /* Disable IRQ */
 }
 
+void hal_cpu_halt(void) {
+    __asm__ volatile("wfi");
+}
+
+void hal_cpu_enable_interrupts_and_halt(void) {
+    hal_interrupts_enable();
+    hal_cpu_halt();
+}
+
 void hal_halt(void) {
-    for(;;) { __asm__ volatile("wfi"); }
+    for(;;) { hal_cpu_halt(); }
 }
 
 void hal_debug_write(const char* str) {

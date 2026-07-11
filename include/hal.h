@@ -150,6 +150,11 @@ void hal_irq_install(uint8_t vector, irq_handler_t handler);
 void hal_cpu_halt(void);
 
 /**
+ * Habilita interrupciones y detiene la CPU de forma atómica.
+ */
+void hal_cpu_enable_interrupts_and_halt(void);
+
+/**
  * Reinicia el sistema.
  * x86: triple fault | ARM: NVIC_SystemReset | RISC-V: write to reset reg
  */

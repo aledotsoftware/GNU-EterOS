@@ -286,29 +286,30 @@ int vfs_unlink(const char *path) {
 int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir) {
     if (!out_path || !path || size <= 0) return -ENOENT;
 
-    char temp[1024];
+    char *temp = kmalloc(1024);
+    if (!temp) return -ENOMEM;
     temp[0] = '\0';
 
     if (path[0] != '/') {
 #ifndef __ETEROS_HOST_TEST__
         if (base_dir) {
-            strlcpy(temp, base_dir, sizeof(temp));
+            strlcpy(temp, base_dir, 1024);
         } else {
             task_t* current = task_get_current();
-            if (current) strlcpy(temp, current->cwd, sizeof(temp));
-            else strlcpy(temp, "/", sizeof(temp));
+            if (current) strlcpy(temp, current->cwd, 1024);
+            else strlcpy(temp, "/", 1024);
         }
 #else
         if (base_dir) {
-            strlcpy(temp, base_dir, sizeof(temp));
+            strlcpy(temp, base_dir, 1024);
         } else {
-            strlcpy(temp, "/", sizeof(temp));
+            strlcpy(temp, "/", 1024);
         }
 #endif
-        if (temp[strlen(temp) - 1] != '/') strlcat(temp, "/", sizeof(temp));
-        strlcat(temp, path, sizeof(temp));
+        if (temp[strlen(temp) - 1] != '/') strlcat(temp, "/", 1024);
+        strlcat(temp, path, 1024);
     } else {
-        strlcpy(temp, path, sizeof(temp));
+        strlcpy(temp, path, 1024);
     }
 
     char* segments[64];
@@ -335,6 +336,7 @@ int vfs_normalize_path(char* out_path, int size, const char* path, const char* b
             if (count < 64) {
                 segments[count++] = start;
             } else {
+                kfree(temp);
                 return -ENAMETOOLONG; // Too many segments
             }
         }
@@ -343,6 +345,7 @@ int vfs_normalize_path(char* out_path, int size, const char* path, const char* b
     out_path[0] = '\0';
     if (count == 0) {
         strlcpy(out_path, "/", size);
+        kfree(temp);
         return 0;
     }
 
@@ -351,6 +354,7 @@ int vfs_normalize_path(char* out_path, int size, const char* path, const char* b
         strlcat(out_path, segments[i], size);
     }
 
+    kfree(temp);
     return 0;
 }
 
