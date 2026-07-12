@@ -407,6 +407,7 @@ fs_node_t *fat32_finddir_fs(fs_node_t *node, char *name);
 int fat32_create_fs(fs_node_t *parent, char *name, uint16_t permission);
 int fat32_mkdir_fs(fs_node_t *parent, char *name, uint16_t permission);
 int fat32_unlink_fs(fs_node_t *parent, char *name);
+int fat32_rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name);
 
 static uint32_t fat32_seek_cluster(fat32_volume_t* vol, uint32_t first_cluster, uint32_t offset, uint32_t* offset_within_cluster) {
     uint32_t cluster_size = vol->bytes_per_sector * vol->sectors_per_cluster;
@@ -690,6 +691,7 @@ static fs_node_t *fat32_finddir_fs_impl(fs_node_t *node, char *name) {
         child->create = fat32_create_fs;
         child->mkdir = fat32_mkdir_fs;
         child->unlink = fat32_unlink_fs;
+        child->rename = fat32_rename_fs;
     } else {
         child->flags = FS_FILE;
         child->mask = 0666;
@@ -716,7 +718,7 @@ static int fat32_create_fs_impl(fs_node_t *parent, char *name, uint16_t permissi
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EIO;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EEXIST;
 
     uint32_t sector, offset;
     if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOMEM;
@@ -744,7 +746,7 @@ static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permissio
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EIO;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EEXIST;
 
     uint32_t sector, offset;
     if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOMEM;
@@ -813,6 +815,44 @@ static int fat32_unlink_fs_impl(fs_node_t *parent, char *name) {
     return fat32_update_dirent(vol, sector, offset, &entry);
 }
 
+
+static int fat32_rename_fs_impl(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    fat32_volume_t* vol = (fat32_volume_t*)old_parent->ptr;
+
+    fat32_dir_entry_t entry;
+    uint32_t old_sector, old_offset;
+    if (fat32_find_dirent_in_chain(vol, old_parent->inode, old_name, &old_sector, &old_offset, &entry) != 0) return -ENOENT;
+
+    /* If new exists, remove it */
+    fat32_dir_entry_t new_entry;
+    uint32_t exist_sector, exist_offset;
+    if (fat32_find_dirent_in_chain(vol, new_parent->inode, new_name, &exist_sector, &exist_offset, &new_entry) == 0) {
+        new_entry.name[0] = DIRENT_DELETED;
+        fat32_update_dirent(vol, exist_sector, exist_offset, &new_entry);
+    }
+
+    uint32_t new_sector, new_offset;
+    if (fat32_find_free_dirent_in_chain(vol, new_parent->inode, &new_sector, &new_offset) != 0) return -ENOMEM;
+
+    fat32_to_dos_name(new_name, (char*)entry.name);
+
+    if (fat32_update_dirent(vol, new_sector, new_offset, &entry) != 0) return -EIO;
+
+    /* Delete old */
+    entry.name[0] = DIRENT_DELETED;
+    fat32_update_dirent(vol, old_sector, old_offset, &entry);
+
+    return 0;
+}
+
+int fat32_rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    fat32_volume_t* vol = (fat32_volume_t*)old_parent->ptr;
+    spin_lock(&vol->lock);
+    int res = fat32_rename_fs_impl(old_parent, old_name, new_parent, new_name);
+    spin_unlock(&vol->lock);
+    return res;
+}
+
 int fat32_unlink_fs(fs_node_t *parent, char *name) {
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
     spin_lock(&vol->lock);
@@ -844,6 +884,7 @@ fs_node_t* fat32_mount(fat32_volume_t* vol) {
     root->create = fat32_create_fs;
     root->mkdir = fat32_mkdir_fs;
     root->unlink = fat32_unlink_fs;
+    root->rename = fat32_rename_fs;
 
     return root;
 }
