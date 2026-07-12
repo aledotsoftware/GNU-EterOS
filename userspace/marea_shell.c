@@ -793,21 +793,6 @@ static void draw_window_chrome(marea_window_t* win) {
         }
     }
 
-    /* Draw tooltips if hovering */
-    if (hover_close) {
-        fill_rounded_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 6, 0xE60F172A);
-        stroke_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 0x1AFFFFFF);
-        draw_text(btn_base_x - 6, btn_base_y - btn_r - 26, "Cerrar", COL_TEXT_PRIMARY, 0);
-    } else if (hover_max) {
-        fill_rounded_rect(btn_base_x - btn_spacing - 24, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
-        stroke_rect(btn_base_x - btn_spacing - 24, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
-        draw_text(btn_base_x - btn_spacing - 18, btn_base_y - btn_r - 26, "Maximizar", COL_TEXT_PRIMARY, 0);
-    } else if (hover_min) {
-        fill_rounded_rect(btn_base_x - btn_spacing * 2 - 24, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
-        stroke_rect(btn_base_x - btn_spacing * 2 - 24, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
-        draw_text(btn_base_x - btn_spacing * 2 - 18, btn_base_y - btn_r - 26, "Minimizar", COL_TEXT_PRIMARY, 0);
-    }
-
     /* Window title */
     int title_x = x + 14;
     uint32_t title_color = is_focused ? COL_TEXT_PRIMARY : COL_TEXT_SECONDARY;
@@ -1695,6 +1680,35 @@ static int hit_menu_item(int mx, int my) {
 /* Full Screen Redraw                                                        */
 /* ========================================================================= */
 
+static void draw_tooltips(void) {
+    int win_idx = find_window_at(mouse_x, mouse_y);
+    if (win_idx < 0) return;
+
+    marea_window_t* win = &windows[win_idx];
+    int btn_r = 6;
+    int btn_spacing = 20;
+    int btn_base_x = win->x + win->w - 14;
+    int btn_base_y = win->y + TITLEBAR_HEIGHT / 2;
+
+    int hover_close = hit_close_button(win, mouse_x, mouse_y);
+    int hover_min = hit_minimize_button(win, mouse_x, mouse_y);
+    int hover_max = hit_maximize_button(win, mouse_x, mouse_y);
+
+    if (hover_close) {
+        fill_rounded_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - 6, btn_base_y - btn_r - 26, "Cerrar", COL_TEXT_PRIMARY, 0);
+    } else if (hover_max) {
+        fill_rounded_rect(btn_base_x - btn_spacing - 24, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - btn_spacing - 24, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - btn_spacing - 18, btn_base_y - btn_r - 26, "Maximizar", COL_TEXT_PRIMARY, 0);
+    } else if (hover_min) {
+        fill_rounded_rect(btn_base_x - btn_spacing * 2 - 24, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - btn_spacing * 2 - 24, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - btn_spacing * 2 - 18, btn_base_y - btn_r - 26, "Minimizar", COL_TEXT_PRIMARY, 0);
+    }
+}
+
 static void redraw_all(void) {
     draw_desktop_gradient();
 
@@ -1718,6 +1732,7 @@ static void redraw_all(void) {
 
     draw_taskbar();
     draw_menu();
+    draw_tooltips();
     mark_dirty_rect(0, 0, (int)fb_info.width, (int)fb_info.height);
 }
 
