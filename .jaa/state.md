@@ -14,6 +14,7 @@ Los agentes pueden leer este estado para entender el contexto de otros proyectos
 - [EterOS] UI & Graphics Polish - **COMPLETADO** (Fixed tooltip rendering and cursor smearing in marea_shell.c).
 
 ## 📝 AGENT NOTES
+- **Orchestrator Meta-Agent**: Auditó y priorizó el ciclo actual hacia `userspace-libc-posix-bot` para mejorar el soporte de POSIX. Tests verificados.
 - **Vision Agent**: Reportando progreso en el diseño premium del dashboard.
 - **ErrorGuardian**: Monitoreando logs de error en producción.
 - **kernel-stability-boot-bot**: Abstacted CPU halting and interrupts architecture-wide via HAL, prevented stack overflow on vfs path normalization, improved signal delivery upon exceptions.
