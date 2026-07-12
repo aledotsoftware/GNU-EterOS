@@ -6,6 +6,7 @@ Los agentes pueden leer este estado para entender el contexto de otros proyectos
 ## 🚀 ACTIVE MILESTONES
 - [JAA] Implementación de Jerarquía de Contexto (.jaa.md global) - **COMPLETADO**
 - [JAA] Sistema de Estado Global (system-state.md) - **EN PROCESO**
+- [AETHER] Implementada emulación parcial de /proc/cpuinfo en procfs para compatibilidad con GNU/Linux. - **COMPLETADO**
 - [GENERAL] Estandarización de agentes para todos los repositorios.
 - [EterOS] Kernel Stability & Boot Hardening - **COMPLETADO** (HAL Abstraction, VFS kmalloc limits, Atomic CPU Halts, Robust Signal Delivery)
 - [EterOS] Scheduler, SMP & IPC Basic Stabilization - **COMPLETADO** (Fixed private futex hash and wake isolation logic).

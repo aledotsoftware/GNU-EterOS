@@ -486,6 +486,47 @@ static ssize_t proc_self_symlink_read(fs_node_t *node, uint32_t offset, uint32_t
 }
 
 /* ========================================================================= */
+/* /proc/cpuinfo implementation                                              */
+/* ========================================================================= */
+static ssize_t proc_cpuinfo_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node;
+    const char *cpuinfo =
+        "processor\t: 0\n"
+        "vendor_id\t: GenuineIntel\n"
+        "cpu family\t: 6\n"
+        "model\t\t: 158\n"
+        "model name\t: EterOS Virtual CPU\n"
+        "stepping\t: 9\n"
+        "microcode\t: 0x1\n"
+        "cpu MHz\t\t: 2000.000\n"
+        "cache size\t: 16384 KB\n"
+        "physical id\t: 0\n"
+        "siblings\t: 1\n"
+        "core id\t\t: 0\n"
+        "cpu cores\t: 1\n"
+        "apicid\t\t: 0\n"
+        "initial apicid\t: 0\n"
+        "fpu\t\t: yes\n"
+        "fpu_exception\t: yes\n"
+        "cpuid level\t: 22\n"
+        "wp\t\t: yes\n"
+        "flags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 cx16 pcid sse4_1 sse4_2 x2apic popcnt aes xsave avx rdrand hypervisor lahf_lm 3dnowprefetch fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 xsaves\n"
+        "bugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs taa itlb_multihit\n"
+        "bogomips\t: 4000.00\n"
+        "clflush size\t: 64\n"
+        "cache_alignment\t: 64\n"
+        "address sizes\t: 39 bits physical, 48 bits virtual\n"
+        "power management:\n\n";
+
+    uint32_t len = strlen(cpuinfo);
+    if (offset >= len) return 0;
+    if (offset + size > len) size = len - offset;
+
+    memcpy(buffer, cpuinfo + offset, size);
+    return size;
+}
+
+/* ========================================================================= */
 /* ProcFS Directory Operations                                               */
 /* ========================================================================= */
 static int procfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
@@ -510,8 +551,13 @@ static int procfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry)
         entry->inode = 3;
         return 0;
     }
+    if (index == 4) {
+        strlcpy(entry->name, "cpuinfo", sizeof(entry->name));
+        entry->inode = 4;
+        return 0;
+    }
 
-    index -= 4; /* Shift index for task entries */
+    index -= 5; /* Shift index for task entries */
 
     uint32_t seen = 0;
     int max = task_get_max();
@@ -564,6 +610,11 @@ static fs_node_t *procfs_finddir(fs_node_t *node, char *name) {
         fnode->read = proc_self_symlink_read;
         fnode->mask = 0777;
         fnode->inode = 3;
+    } else if (strcmp(name, "cpuinfo") == 0) {
+        strlcpy(fnode->name, "cpuinfo", sizeof(fnode->name));
+        fnode->read = proc_cpuinfo_read;
+        fnode->mask = 0444;
+        fnode->inode = 4;
     } else {
         // Attempt to parse name as PID
         int pid = 0;
