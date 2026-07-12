@@ -3747,6 +3747,75 @@ static syscall_ptr_t syscall_native_table[MAX_SYSCALL_NUM] = {
     [328] = (syscall_ptr_t)sys_pwritev2,
 };
 
+
+__attribute__((unused)) static int64_t sys_msync(void *addr, size_t length, int flags) { (void)addr; (void)length; (void)flags; return 0; }
+__attribute__((unused)) static int64_t sys_mincore(void *addr, size_t length, unsigned char *vec) { (void)addr; (void)length; if (vec) { if (!vmm_verify_user_access(vec, (length + 4095) / 4096, 1)) return -EFAULT; for (size_t i = 0; i < (length + 4095) / 4096; i++) vec[i] = 1; } return 0; }
+__attribute__((unused)) static int64_t sys_shmget(int key, size_t size, int shmflg) { (void)key; (void)size; (void)shmflg; return -ENOSYS; }
+__attribute__((unused)) static void* sys_shmat(int shmid, const void *shmaddr, int shmflg) { (void)shmid; (void)shmaddr; (void)shmflg; return (void*)-ENOSYS; }
+__attribute__((unused)) static int64_t sys_shmctl(int shmid, int cmd, void *buf) { (void)shmid; (void)cmd; (void)buf; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_getitimer(int which, void *value) { (void)which; (void)value; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_semop(int semid, void *sops, size_t nsops) { (void)semid; (void)sops; (void)nsops; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_semctl(int semid, int semnum, int cmd, ...) { (void)semid; (void)semnum; (void)cmd; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_shmdt(const void *shmaddr) { (void)shmaddr; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_msgget(int key, int msgflg) { (void)key; (void)msgflg; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg) { (void)msqid; (void)msgp; (void)msgsz; (void)msgflg; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg) { (void)msqid; (void)msgp; (void)msgsz; (void)msgtyp; (void)msgflg; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_msgctl(int msqid, int cmd, void *buf) { (void)msqid; (void)cmd; (void)buf; return -ENOSYS; }
+
+__attribute__((unused)) static int64_t sys_flock(int fd, int operation) {
+    (void)operation;
+    if (fd < 0 || fd >= MAX_FD) return -EBADF;
+    task_t* current = task_get_current();
+    if (!current || !current->fd_table[fd].node) return -EBADF;
+    return 0;
+}
+__attribute__((unused)) static int64_t sys_ptrace(long request, long pid, unsigned long addr, unsigned long data) { (void)request; (void)pid; (void)addr; (void)data; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_setfsuid(uint32_t fsuid) { task_t* current = task_get_current(); if(current) current->euid = fsuid; return fsuid; }
+__attribute__((unused)) static int64_t sys_setfsgid(uint32_t fsgid) { task_t* current = task_get_current(); if(current) current->egid = fsgid; return fsgid; }
+__attribute__((unused)) static int64_t sys_capset(void *header, const void *data) { (void)header; (void)data; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_rt_sigtimedwait(const void *set, void *info, const void *timeout, size_t sigsetsize) { (void)set; (void)info; (void)timeout; (void)sigsetsize; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_rt_sigqueueinfo(int pid, int sig, void *uinfo) { (void)pid; (void)sig; (void)uinfo; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_uselib(const char *library) { (void)library; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_personality(unsigned long persona) { (void)persona; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_ustat(unsigned dev, void *ubuf) { (void)dev; (void)ubuf; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_statfs(const char *path, void *buf) { (void)path; (void)buf; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_fstatfs(int fd, void *buf) { (void)fd; (void)buf; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_sysfs(int option, unsigned long arg1, unsigned long arg2) { (void)option; (void)arg1; (void)arg2; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_getpriority(int which, int who) { (void)which; (void)who; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_sched_setparam(int pid, void *param) { (void)pid; (void)param; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_sched_getparam(int pid, void *param) { (void)pid; (void)param; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_sched_setscheduler(int pid, int policy, const void *param) { (void)pid; (void)policy; (void)param; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_sched_rr_get_interval(int pid, void *tp) { (void)pid; (void)tp; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_mlock(const void *addr, size_t len) { (void)addr; (void)len; return 0; }
+__attribute__((unused)) static int64_t sys_munlock(const void *addr, size_t len) { (void)addr; (void)len; return 0; }
+__attribute__((unused)) static int64_t sys_mlockall(int flags) { (void)flags; return 0; }
+__attribute__((unused)) static int64_t sys_vhangup(void) { return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_modify_ldt(int func, void *ptr, unsigned long bytecount) { (void)func; (void)ptr; (void)bytecount; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_pivot_root(const char *new_root, const char *put_old) { (void)new_root; (void)put_old; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys__sysctl(void *args) { (void)args; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_adjtimex(void *buf) { (void)buf; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_setrlimit(int resource, const void *rlim) { (void)resource; (void)rlim; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_chroot(const char *path) { (void)path; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_acct(const char *name) { (void)name; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_settimeofday(const void *tv, const void *tz) { (void)tv; (void)tz; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_mount(const char *src, const char *target, const char *type, unsigned long flags, const void *data) { (void)src; (void)target; (void)type; (void)flags; (void)data; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_umount2(const char *target, int flags) { (void)target; (void)flags; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_swapon(const char *path, int swapflags) { (void)path; (void)swapflags; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_sethostname(char *name, int len) { (void)name; (void)len; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_setdomainname(char *name, int len) { (void)name; (void)len; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_ioperm(unsigned long from, unsigned long num, int turn_on) { (void)from; (void)num; (void)turn_on; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_get_kernel_syms(void *table) { (void)table; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_query_module(const char *name, int which, void *buf, size_t bufsize, size_t *ret) { (void)name; (void)which; (void)buf; (void)bufsize; (void)ret; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_tuxcall(void) { return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_security(void) { return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_readahead(int fd, int64_t offset, size_t count) { (void)fd; (void)offset; (void)count; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_setxattr(const char *path, const char *name, const void *value, size_t size, int flags) { (void)path; (void)name; (void)value; (void)size; (void)flags; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_lsetxattr(const char *path, const char *name, const void *value, size_t size, int flags) { (void)path; (void)name; (void)value; (void)size; (void)flags; return -ENOSYS; }
+__attribute__((unused)) static int64_t sys_fsetxattr(int fd, const char *name, const void *value, size_t size, int flags) { (void)fd; (void)name; (void)value; (void)size; (void)flags; return -ENOSYS; }
+__attribute__((unused)) static ssize_t sys_getxattr(const char *path, const char *name, void *value, size_t size) { (void)path; (void)name; (void)value; (void)size; return -ENOSYS; }
+__attribute__((unused)) static ssize_t sys_lgetxattr(const char *path, const char *name, void *value, size_t size) { (void)path; (void)name; (void)value; (void)size; return -ENOSYS; }
+
+
 static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [0 ... MAX_SYSCALL_NUM - 1] = sys_ni_syscall,
     [0] = (syscall_ptr_t)sys_read,
@@ -3772,20 +3841,20 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [21] = (syscall_ptr_t)sys_access,
     [22] = (syscall_ptr_t)sys_pipe,
     [23] = (syscall_ptr_t)sys_select,
-    [53] = (syscall_ptr_t)sys_socketpair,
+    [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [25] = (syscall_ptr_t)sys_mremap,
+    [26] = (syscall_ptr_t)sys_msync,
+    [27] = (syscall_ptr_t)sys_mincore,
     [28] = (syscall_ptr_t)sys_madvise,
+    [29] = (syscall_ptr_t)sys_shmget,
+    [30] = (syscall_ptr_t)sys_shmat,
+    [31] = (syscall_ptr_t)sys_shmctl,
     [32] = (syscall_ptr_t)sys_dup,
     [33] = (syscall_ptr_t)sys_dup2,
-
     [34] = (syscall_ptr_t)sys_pause,
-    [37] = (syscall_ptr_t)sys_alarm,
-    [98] = (syscall_ptr_t)sys_getrusage,
-    [100] = (syscall_ptr_t)sys_times,
-    [103] = (syscall_ptr_t)sys_syslog,
-    [115] = (syscall_ptr_t)sys_getgroups,
-    [116] = (syscall_ptr_t)sys_setgroups,
     [35] = (syscall_ptr_t)sys_nanosleep,
+    [36] = (syscall_ptr_t)sys_getitimer,
+    [37] = (syscall_ptr_t)sys_alarm,
     [39] = (syscall_ptr_t)sys_getpid,
     [41] = (syscall_ptr_t)sys_socket,
     [42] = (syscall_ptr_t)sys_connect,
@@ -3799,58 +3868,81 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [50] = (syscall_ptr_t)sys_listen,
     [51] = (syscall_ptr_t)sys_getsockname,
     [52] = (syscall_ptr_t)sys_getpeername,
+    [53] = (syscall_ptr_t)sys_socketpair,
     [54] = (syscall_ptr_t)sys_setsockopt,
     [55] = (syscall_ptr_t)sys_getsockopt,
-    [288] = (syscall_ptr_t)sys_accept4,
-
     [57] = (syscall_ptr_t)sys_fork_wrapper,
     [58] = (syscall_ptr_t)sys_fork_wrapper,
+    [59] = (syscall_ptr_t)sys_execve,
+    [60] = (syscall_ptr_t)sys_exit_wrapper,
     [61] = (syscall_ptr_t)sys_wait4,
     [62] = (syscall_ptr_t)sys_kill,
     [63] = (syscall_ptr_t)sys_uname,
+    [65] = (syscall_ptr_t)sys_semop,
+    [66] = (syscall_ptr_t)sys_semctl,
+    [67] = (syscall_ptr_t)sys_shmdt,
+    [68] = (syscall_ptr_t)sys_msgget,
+    [69] = (syscall_ptr_t)sys_msgsnd,
+    [70] = (syscall_ptr_t)sys_msgrcv,
+    [71] = (syscall_ptr_t)sys_msgctl,
     [72] = (syscall_ptr_t)sys_fcntl,
+    [73] = (syscall_ptr_t)sys_flock,
     [74] = (syscall_ptr_t)sys_fsync,
     [75] = (syscall_ptr_t)sys_fdatasync,
     [76] = (syscall_ptr_t)sys_truncate,
     [77] = (syscall_ptr_t)sys_ftruncate,
-
+    [78]  = (syscall_ptr_t)sys_getdents64,
     [79] = (syscall_ptr_t)sys_getcwd,
-
     [80] = (syscall_ptr_t)sys_chdir,
     [81] = (syscall_ptr_t)sys_fchdir,
+    [82] = (syscall_ptr_t)sys_rename,
     [83] = (syscall_ptr_t)sys_mkdir,
     [84] = (syscall_ptr_t)sys_rmdir,
     [86] = (syscall_ptr_t)sys_link,
     [87] = (syscall_ptr_t)sys_unlink,
+    [88] = (syscall_ptr_t)sys_symlink,
+    [89] = (syscall_ptr_t)sys_readlink,
+    [90] = (syscall_ptr_t)sys_chmod,
+    [91] = (syscall_ptr_t)sys_fchmod,
+    [92] = (syscall_ptr_t)sys_chown,
+    [93] = (syscall_ptr_t)sys_fchown,
+    [94] = (syscall_ptr_t)sys_lchown,
+    [95] = (syscall_ptr_t)sys_umask,
     [96] = (syscall_ptr_t)sys_gettimeofday,
     [97] = (syscall_ptr_t)sys_getrlimit,
+    [98] = (syscall_ptr_t)sys_getrusage,
     [99] = (syscall_ptr_t)sys_sysinfo,
+    [100] = (syscall_ptr_t)sys_times,
+    [101] = (syscall_ptr_t)sys_ptrace,
     [102] = (syscall_ptr_t)sys_getuid,
+    [103] = (syscall_ptr_t)sys_syslog,
+    [104] = (syscall_ptr_t)sys_getgid,
     [105] = (syscall_ptr_t)sys_setuid,
     [106] = (syscall_ptr_t)sys_setgid,
-    [104] = (syscall_ptr_t)sys_getgid,
     [107] = (syscall_ptr_t)sys_geteuid,
     [108] = (syscall_ptr_t)sys_getegid,
+    [109] = (syscall_ptr_t)sys_setpgid,
+    [110] = (syscall_ptr_t)sys_getppid,
+    [111] = (syscall_ptr_t)sys_getpgrp,
+    [112] = (syscall_ptr_t)sys_setsid,
     [113] = (syscall_ptr_t)sys_setreuid,
     [114] = (syscall_ptr_t)sys_setregid,
+    [115] = (syscall_ptr_t)sys_getgroups,
+    [116] = (syscall_ptr_t)sys_setgroups,
     [117] = (syscall_ptr_t)sys_setresuid,
     [118] = (syscall_ptr_t)sys_getresuid,
     [119] = (syscall_ptr_t)sys_setresgid,
     [120] = (syscall_ptr_t)sys_getresgid,
     [121] = (syscall_ptr_t)sys_getpgid,
     [124] = (syscall_ptr_t)sys_getsid,
-    [109] = (syscall_ptr_t)sys_setpgid,
-    [110] = (syscall_ptr_t)sys_getppid,
-    [111] = (syscall_ptr_t)sys_getpgrp,
-    [112] = (syscall_ptr_t)sys_setsid,
     [127] = (syscall_ptr_t)sys_rt_sigpending,
     [130] = (syscall_ptr_t)sys_rt_sigsuspend,
     [131] = (syscall_ptr_t)sys_sigaltstack,
     [157] = (syscall_ptr_t)sys_prctl,
     [158] = (syscall_ptr_t)sys_arch_prctl,
+    [169] = (syscall_ptr_t)sys_reboot,
     [186] = (syscall_ptr_t)sys_gettid,
     [202] = (syscall_ptr_t)sys_futex,
-    [78]  = (syscall_ptr_t)sys_getdents64,
     [217] = (syscall_ptr_t)sys_getdents64,
     [218] = (syscall_ptr_t)sys_set_tid_address,
     [228] = (syscall_ptr_t)sys_clock_gettime,
@@ -3865,9 +3957,10 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [259] = (syscall_ptr_t)sys_mknodat,
     [262] = (syscall_ptr_t)sys_newfstatat,
     [263] = (syscall_ptr_t)sys_unlinkat,
-    [265] = (syscall_ptr_t)sys_linkat,
     [264] = (syscall_ptr_t)sys_renameat,
+    [265] = (syscall_ptr_t)sys_linkat,
     [266] = (syscall_ptr_t)sys_symlinkat,
+    [267] = (syscall_ptr_t)sys_readlinkat,
     [268] = (syscall_ptr_t)sys_fchmodat,
     [269] = (syscall_ptr_t)sys_faccessat,
     [270] = (syscall_ptr_t)sys_pselect6,
@@ -3875,6 +3968,7 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [273] = (syscall_ptr_t)sys_set_robust_list,
     [274] = (syscall_ptr_t)sys_get_robust_list,
     [280] = (syscall_ptr_t)sys_utimensat,
+    [288] = (syscall_ptr_t)sys_accept4,
     [290] = (syscall_ptr_t)sys_eventfd2,
     [291] = (syscall_ptr_t)sys_epoll_create1,
     [292] = (syscall_ptr_t)sys_dup3,
@@ -3884,26 +3978,11 @@ static syscall_ptr_t syscall_linux_table[MAX_SYSCALL_NUM] = {
     [302] = (syscall_ptr_t)sys_prlimit64,
     [316] = (syscall_ptr_t)sys_renameat2,
     [318] = (syscall_ptr_t)sys_getrandom,
-    [400] = (syscall_ptr_t)sys_gethostbyname,
     [319] = (syscall_ptr_t)sys_memfd_create,
+    [322] = (syscall_ptr_t)sys_execveat,
     [327] = (syscall_ptr_t)sys_preadv2,
     [328] = (syscall_ptr_t)sys_pwritev2,
-
-    [169] = (syscall_ptr_t)sys_reboot,
-    [24] = (syscall_ptr_t)sys_sched_yield_wrapper,
-    [60] = (syscall_ptr_t)sys_exit_wrapper,
-    [82] = (syscall_ptr_t)sys_rename,
-    [88] = (syscall_ptr_t)sys_symlink,
-    [89] = (syscall_ptr_t)sys_readlink,
-    [90] = (syscall_ptr_t)sys_chmod,
-    [91] = (syscall_ptr_t)sys_fchmod,
-    [92] = (syscall_ptr_t)sys_chown,
-    [93] = (syscall_ptr_t)sys_fchown,
-    [94] = (syscall_ptr_t)sys_lchown,
-    [95] = (syscall_ptr_t)sys_umask,
-    [267] = (syscall_ptr_t)sys_readlinkat,
-    [322] = (syscall_ptr_t)sys_execveat,
-    [59] = (syscall_ptr_t)sys_execve,
+    [400] = (syscall_ptr_t)sys_gethostbyname,
 };
 
 
@@ -3959,6 +4038,17 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [40] = (syscall_ptr_t)sys_rmdir,
     [9] = (syscall_ptr_t)sys_link,
     [10] = (syscall_ptr_t)sys_unlink,
+    [173] = (syscall_ptr_t)sys_ioperm,
+    [177] = (syscall_ptr_t)sys_get_kernel_syms,
+    [178] = (syscall_ptr_t)sys_query_module,
+    [184] = (syscall_ptr_t)sys_tuxcall,
+    [185] = (syscall_ptr_t)sys_security,
+    [187] = (syscall_ptr_t)sys_readahead,
+    [188] = (syscall_ptr_t)sys_setxattr,
+    [189] = (syscall_ptr_t)sys_lsetxattr,
+    [190] = (syscall_ptr_t)sys_fsetxattr,
+    [191] = (syscall_ptr_t)sys_getxattr,
+    [192] = (syscall_ptr_t)sys_lgetxattr,
     [199] = (syscall_ptr_t)sys_getuid,
     [213] = (syscall_ptr_t)sys_setuid,
     [214] = (syscall_ptr_t)sys_setgid,
@@ -3971,13 +4061,42 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [209] = (syscall_ptr_t)sys_getresuid,
     [210] = (syscall_ptr_t)sys_setresgid,
     [211] = (syscall_ptr_t)sys_getresgid,
+    [122] = (syscall_ptr_t)sys_setfsuid,
+    [123] = (syscall_ptr_t)sys_setfsgid,
+    [126] = (syscall_ptr_t)sys_capset,
+    [128] = (syscall_ptr_t)sys_rt_sigtimedwait,
+    [129] = (syscall_ptr_t)sys_rt_sigqueueinfo,
     [132] = (syscall_ptr_t)sys_getpgid,
+    [142] = (syscall_ptr_t)sys_sched_setparam,
+    [143] = (syscall_ptr_t)sys_sched_getparam,
+    [144] = (syscall_ptr_t)sys_sched_setscheduler,
     [147] = (syscall_ptr_t)sys_getsid,
     [64] = (syscall_ptr_t)sys_getppid,
     [224] = (syscall_ptr_t)sys_gettid,
     [240] = (syscall_ptr_t)sys_futex,
+    [134] = (syscall_ptr_t)sys_uselib,
+    [135] = (syscall_ptr_t)sys_personality,
+    [136] = (syscall_ptr_t)sys_ustat,
+    [137] = (syscall_ptr_t)sys_statfs,
+    [138] = (syscall_ptr_t)sys_fstatfs,
+    [139] = (syscall_ptr_t)sys_sysfs,
+    [140] = (syscall_ptr_t)sys_getpriority,
     [141] = (syscall_ptr_t)sys_getdents64,
     [78]  = (syscall_ptr_t)sys_getdents64,
+    [153] = (syscall_ptr_t)sys_vhangup,
+    [154] = (syscall_ptr_t)sys_modify_ldt,
+    [155] = (syscall_ptr_t)sys_pivot_root,
+    [156] = (syscall_ptr_t)sys__sysctl,
+    [159] = (syscall_ptr_t)sys_adjtimex,
+    [160] = (syscall_ptr_t)sys_setrlimit,
+    [161] = (syscall_ptr_t)sys_chroot,
+    [163] = (syscall_ptr_t)sys_acct,
+    [164] = (syscall_ptr_t)sys_settimeofday,
+    [165] = (syscall_ptr_t)sys_mount,
+    [166] = (syscall_ptr_t)sys_umount2,
+    [167] = (syscall_ptr_t)sys_swapon,
+    [170] = (syscall_ptr_t)sys_sethostname,
+    [171] = (syscall_ptr_t)sys_setdomainname,
     [172] = (syscall_ptr_t)sys_prctl,
     [258] = (syscall_ptr_t)sys_set_tid_address,
     [265] = (syscall_ptr_t)sys_clock_gettime,
@@ -4000,6 +4119,10 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [339] = (syscall_ptr_t)sys_prlimit64,
     [355] = (syscall_ptr_t)sys_getrandom,
     [400] = (syscall_ptr_t)sys_gethostbyname,
+    [148] = (syscall_ptr_t)sys_sched_rr_get_interval,
+    [149] = (syscall_ptr_t)sys_mlock,
+    [150] = (syscall_ptr_t)sys_munlock,
+    [151] = (syscall_ptr_t)sys_mlockall,
     [152] = (syscall_ptr_t)sys_sched_yield_wrapper,
     [1] = (syscall_ptr_t)sys_exit_wrapper,
     [38] = (syscall_ptr_t)sys_rename,

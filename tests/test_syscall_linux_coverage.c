@@ -201,6 +201,15 @@ int main() {
     assert(sys_execve(NULL, NULL, NULL, NULL) == -EFAULT);
     assert(sys_execveat(0, NULL, NULL, NULL, 0, NULL) == -EFAULT);
 
+    printf("Testing newly added stubs\n");
+    assert(sys_msync(NULL, 0, 0) == 0);
+    unsigned char vec[1];
+    assert(sys_mincore(NULL, 0, vec) == 0);
+    assert(sys_shmget(0, 0, 0) == -ENOSYS);
+    assert((long)sys_shmat(0, NULL, 0) == -ENOSYS);
+    assert(sys_shmctl(0, 0, NULL) == -ENOSYS);
+    assert(sys_flock(3, 0) == 0);
+    assert(sys_flock(99, 0) == -EBADF);
 
 
     printf("Tests passed!\n");
