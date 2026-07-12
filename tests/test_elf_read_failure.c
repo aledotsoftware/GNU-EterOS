@@ -80,6 +80,7 @@ typedef struct {
     uint64_t tls_memsz;
     uint64_t tls_filesz;
     uint64_t tls_align;
+    uint64_t fs_base;
 } task_t;
 /* Types from fs/vfs.h */
 typedef struct fs_node {
