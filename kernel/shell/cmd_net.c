@@ -48,6 +48,7 @@ void cmd_net(const char* args) {
 #include "../../include/timer.h"
 #include "../../include/task.h"
 
+extern void net_update_status(void);
 void cmd_dhcp(const char* args) {
     (void)args;
 
@@ -61,6 +62,7 @@ void cmd_dhcp(const char* args) {
             terminal_write_string(buf);
             return;
         }
+        net_update_status();
         task_yield();
         task_sleep(100);
     }
@@ -76,6 +78,7 @@ void cmd_dhcp(const char* args) {
             terminal_write_string(buf);
             return;
         }
+        net_update_status();
         task_yield();
         task_sleep(100);
     }
