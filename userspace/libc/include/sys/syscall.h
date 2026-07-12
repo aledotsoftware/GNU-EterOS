@@ -140,6 +140,11 @@
 
 long syscall(long nr, ...);
 
+#define SYS_getrandom           318
+#define SYS_getgroups           115
+#define SYS_setgroups           116
+#define SYS_syslog              103
+
 #endif /* _SYS_SYSCALL_H */
 #define SYS_execveat             322
 #define SYS_preadv2              327
