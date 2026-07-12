@@ -445,6 +445,21 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         utoa_hex_s(max_vaddr, brk_buf, sizeof(brk_buf));
         serial_write_string(brk_buf);
         serial_write_string("\n");
+
+        /* Handle static TLS allocation for main executable if required */
+        if (current->tls_memsz > 0) {
+            uint64_t tls_size = PAGE_ALIGN_UP(current->tls_memsz + current->tls_align);
+            uint64_t tls_alloc = current->mmap_base;
+            for (uint64_t p = 0; p < tls_size; p += PAGE_SIZE) {
+                hal_mem_map((uint64_t)pmm_alloc_page(), tls_alloc + p, HAL_MEM_USER | HAL_MEM_WRITE);
+                memset((void*)(tls_alloc + p), 0, PAGE_SIZE);
+            }
+            if (current->tls_filesz > 0 && current->tls_vaddr != 0) {
+                memcpy((void*)tls_alloc, (void*)current->tls_vaddr, current->tls_filesz);
+            }
+            current->fs_base = tls_alloc;
+            current->mmap_base = PAGE_ALIGN_UP(tls_alloc + tls_size + PAGE_SIZE);
+        }
     } else if (current) {
         /* Advance mmap_base for shared libraries */
         current->mmap_base = PAGE_ALIGN_UP(max_vaddr + PAGE_SIZE);

@@ -184,17 +184,20 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                     if (safe_copy_from_user(&tr, wbuf + consumed, sizeof(tr)) != 0) break;
                     consumed += sizeof(struct binder_transaction_data);
 
+                    int target_dead = 0;
+                    task_t *target_task = NULL;
+                    if (tr.target.handle == 0 && cmd != BC_REPLY) {
+                        target_task = task_get_by_id((uint32_t)binder_context_mgr_pid);
+                    } else if (cmd == BC_REPLY) {
+                        target_task = task_get_by_id(tr.target.handle);
+                    }
+                    if (!target_task) target_dead = 1;
+
                     uint8_t *temp_payload = NULL;
                     if (tr.data.ptr.buffer && tr.data_size > 0) {
                         /* Real allocation instead of a static buffer, capped at 1MB to prevent OOM */
                         if (tr.data_size <= 1024 * 1024) {
-                            task_t *target_task = NULL;
-                            if (tr.target.handle == 0 && cmd != BC_REPLY) {
-                                target_task = task_get_by_id((uint32_t)binder_context_mgr_pid);
-                            } else if (cmd == BC_REPLY) {
-                                target_task = task_get_by_id(tr.target.handle);
-                            }
-                            if (target_task && target_task->binder_mmap_kptr && (target_task->binder_mmap_offset + tr.data_size <= target_task->binder_mmap_size)) {
+                            if (!target_dead && target_task->binder_mmap_kptr && (target_task->binder_mmap_offset + tr.data_size <= target_task->binder_mmap_size)) {
                                 /* Copy directly into receivers mapped memory area */
                                 uint64_t target_vaddr = target_task->binder_mmap_base + target_task->binder_mmap_offset;
                                 uint8_t *kptr = (uint8_t*)target_task->binder_mmap_kptr + target_task->binder_mmap_offset;
@@ -224,7 +227,18 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                     }
 
                     spin_lock(&binder_lock);
-                    if (tr.target.handle == 0 && cmd != BC_REPLY) {
+                    if (target_dead) {
+                        for (int i = 0; i < BINDER_MAX_QUEUED; i++) {
+                            if (!cl_queues[i].used) {
+                                cl_queues[i].pid = current->id;
+                                memset(&cl_queues[i].tr, 0, sizeof(struct binder_transaction_data));
+                                cl_queues[i].tr.code = BR_DEAD_REPLY;
+                                cl_queues[i].payload = NULL;
+                                cl_queues[i].used = 1;
+                                break;
+                            }
+                        }
+                    } else if (tr.target.handle == 0 && cmd != BC_REPLY) {
                         /* Route to context manager */
                         int next_head = (cm_q_head + 1) % BINDER_MAX_QUEUED;
                         if (next_head != cm_q_tail) {
@@ -318,7 +332,11 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                         payload_ptr = cl_queues[i].payload;
                         cl_queues[i].used = 0;
                         has_tr = 1;
-                        out_cmd = BR_REPLY;
+                        if (tr_copy.code == BR_DEAD_REPLY) {
+                            out_cmd = BR_DEAD_REPLY;
+                        } else {
+                            out_cmd = BR_REPLY;
+                        }
                         break;
                     }
                 }
@@ -326,7 +344,13 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
             spin_unlock(&binder_lock);
 
             if (has_tr) {
-                if (bwr.read_size >= sizeof(uint32_t) + sizeof(struct binder_transaction_data)) {
+                if (out_cmd == BR_DEAD_REPLY) {
+                    if (bwr.read_size >= sizeof(uint32_t)) {
+                        if (safe_copy_to_user(rbuf + read_out, &out_cmd, sizeof(out_cmd)) == 0) {
+                            read_out += sizeof(uint32_t);
+                        }
+                    }
+                } else if (bwr.read_size >= sizeof(uint32_t) + sizeof(struct binder_transaction_data)) {
                     /* Basic shim copies data to the user provided buffer instead of mmaps, to avoid passing kernel pointers */
                     if (payload_ptr && tr_copy.data.ptr.buffer) {
                         /* In this shim, we assume the reader provided a valid buffer in tr_copy.data.ptr.buffer
