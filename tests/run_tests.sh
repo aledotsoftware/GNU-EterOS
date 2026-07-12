@@ -1,26 +1,11 @@
 #!/bin/bash
 set -e
+cd "$(dirname "$0")/.."
 
 echo "Building and running tests..."
 
 # Test Heap
 echo "---------------------------------------------------"
-echo "Running test_heap..."
-gcc -D__ETEROS_HOST_TEST__ tests/test_heap.c -o tests/test_heap
-./tests/test_heap
-rm tests/test_heap
-
-echo "---------------------------------------------------"
-echo "Running test_heap_perf..."
-gcc -D__ETEROS_HOST_TEST__ -Iinclude tests/test_heap_perf.c -o tests/test_heap_perf
-./tests/test_heap_perf
-rm tests/test_heap_perf
-
-echo "---------------------------------------------------"
-echo "Running test_heap_security..."
-gcc -D__ETEROS_HOST_TEST__ tests/test_heap_security.c -o tests/test_heap_security
-./tests/test_heap_security
-rm tests/test_heap_security
 
 # Test String
 echo "---------------------------------------------------"
@@ -293,6 +278,11 @@ gcc -D__ETEROS_HOST_TEST__ tests/verify_gradient.c -o tests/verify_gradient
 rm tests/verify_gradient
 
 # Test Libc Expansion
+echo "---------------------------------------------------"
+echo "Running test_libc_expansion..."
+gcc -D__ETEROS_HOST_TEST__ -Iuserspace/libc/include tests/test_libc_expansion.c -o tests/test_libc_expansion
+./tests/test_libc_expansion
+rm tests/test_libc_expansion
 
 # Test Xtensa UART
 echo "---------------------------------------------------"

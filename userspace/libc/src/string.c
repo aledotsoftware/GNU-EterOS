@@ -678,3 +678,33 @@ int strcasecmp(const char *s1, const char *s2) {
     }
     return *(unsigned char*)s1 - *(unsigned char*)s2;
 }
+
+char *strndup(const char *s, size_t n) {
+    if (!s) return NULL;
+    size_t len = strnlen(s, n);
+    char *new_s = (char*)malloc(len + 1);
+    if (new_s) {
+        memcpy(new_s, s, len);
+        new_s[len] = '\0';
+    }
+    return new_s;
+}
+
+size_t strspn(const char *s, const char *accept) {
+    size_t count = 0;
+    while (*s && strchr(accept, *s)) {
+        count++;
+        s++;
+    }
+    return count;
+}
+
+size_t strcspn(const char *s, const char *reject) {
+    size_t count = 0;
+    while (*s) {
+        if (strchr(reject, *s)) break;
+        count++;
+        s++;
+    }
+    return count;
+}
