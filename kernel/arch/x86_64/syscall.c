@@ -561,8 +561,6 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
             is_binder = 1;
         } else if (file_node && strcmp(file_node->name, "__properties__") == 0) {
             is_properties = 1;
-        } else if (file_node && strcmp(file_node->name, "ashmem") == 0) {
-            /* ashmem can be mapped as an anonymous region */
         }
     }
 
@@ -603,6 +601,11 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
                 }
             }
         } else if (is_shmfs && shm_obj) {
+            /* Check prot mask for Ashmem compatibility */
+            if ((prot & shm_obj->prot_mask) != prot) {
+                return -EPERM;
+            }
+
             /* Map shared physical pages */
             uint32_t page_idx = (offset + (v - start)) / PAGE_SIZE;
             
@@ -655,7 +658,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
 #ifndef __ETEROS_HOST_TEST__
             memset((void*)v, 0, PAGE_SIZE);
 
-            if (file_node && strcmp(file_node->name, "ashmem") != 0) {
+            if (file_node) {
                 uint64_t current_offset = offset + (v - start);
                 if (current_offset < file_node->length) {
                     uint64_t read_len = PAGE_SIZE;
@@ -3002,14 +3005,15 @@ static int64_t sys_mprotect(void* addr, size_t len, int prot) {
         return -ENOMEM;
     }
 
-    uint64_t new_flags = PAGE_USER | PAGE_PRESENT;
-    if (prot & 2) new_flags |= PAGE_WRITE;
+    uint32_t new_flags = HAL_MEM_USER | HAL_MEM_READ;
+    if (prot & PROT_WRITE) new_flags |= HAL_MEM_WRITE;
+    if (prot & PROT_EXEC) new_flags |= HAL_MEM_EXEC;
 
     for (uint64_t v = start; v < end; v += PAGE_SIZE) {
         uint64_t phys = hal_mem_get_phys(v);
         if (phys != 0) {
             /* Keep existing physical mapping, update flags */
-            vmm_map_page(phys, v, new_flags);
+            hal_mem_map(phys, v, new_flags);
         } else {
             return -ENOMEM;
         }
