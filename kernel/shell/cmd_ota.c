@@ -260,7 +260,14 @@ receive_checksig:
                             }
                             if (space_idx > 0 && space_idx + 3 < j) {
                                 if (payload_data[space_idx + 1] != '2' || payload_data[space_idx + 2] != '0' || payload_data[space_idx + 3] != '0') {
-                                    terminal_write_string("  [OTA] Error: Respuesta HTTP no es 200 OK.\n");
+                                    terminal_write_string("  [OTA] Error: Respuesta HTTP no es 200 OK. Recibido: ");
+                                    char http_code_buf[4];
+                                    http_code_buf[0] = payload_data[space_idx + 1];
+                                    http_code_buf[1] = payload_data[space_idx + 2];
+                                    http_code_buf[2] = payload_data[space_idx + 3];
+                                    http_code_buf[3] = '\0';
+                                    terminal_write_string(http_code_buf);
+                                    terminal_write_string("\n");
                                     kfree(payload_data);
                                     sys_lwip_close(sock);
                                     if (passive_part) kfree(passive_part);
@@ -476,7 +483,14 @@ receive:
                             }
                             if (space_idx > 0 && space_idx + 3 < j) {
                                 if (payload_data[space_idx + 1] != '2' || payload_data[space_idx + 2] != '0' || payload_data[space_idx + 3] != '0') {
-                                    terminal_write_string("  [OTA] Error: Respuesta HTTP no es 200 OK.\n");
+                                    terminal_write_string("  [OTA] Error: Respuesta HTTP no es 200 OK. Recibido: ");
+                                    char http_code_buf[4];
+                                    http_code_buf[0] = payload_data[space_idx + 1];
+                                    http_code_buf[1] = payload_data[space_idx + 2];
+                                    http_code_buf[2] = payload_data[space_idx + 3];
+                                    http_code_buf[3] = '\0';
+                                    terminal_write_string(http_code_buf);
+                                    terminal_write_string("\n");
                                     kfree(payload_data);
                                     sys_lwip_close(sock);
                                     if (passive_part) kfree(passive_part);

@@ -167,6 +167,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/crypto/sha256.c        \
               $(KERNEL_DIR)/crypto/sha512.c        \
               $(KERNEL_DIR)/crypto/ed25519.c       \
+              $(KERNEL_DIR)/crypto/tweetnacl.c     \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
