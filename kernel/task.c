@@ -953,7 +953,7 @@ static void task_exit_internal(int status, int wait_status, int wait_code) {
     
     task_irq_restore(irq_flags);
 
-    for (;;) { hal_cpu_halt(); }
+    for (;;) { hal_cpu_enable_interrupts_and_halt(); }
 }
 
 void task_exit(int status) {

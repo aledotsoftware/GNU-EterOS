@@ -63,7 +63,7 @@ void timer_wait(uint32_t ms) {
 
     while (tick_count < (start_ticks + ticks_to_wait)) {
         /* Poner la CPU en bajo consumo hasta la próxima interrupción (timer tick) */
-        hal_cpu_halt();
+        hal_cpu_enable_interrupts_and_halt();
     }
 }
 
