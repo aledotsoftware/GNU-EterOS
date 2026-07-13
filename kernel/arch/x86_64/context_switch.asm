@@ -71,11 +71,13 @@ context_switch:
 ; -----------------------------------------------------------------------------
 extern sched_lock
 extern handle_signal_if_needed
+extern hal_interrupts_enable
 
 global fork_return
 fork_return:
     ; Release sched_lock held by the scheduler before returning to userspace
     mov dword [sched_lock], 0
+    call hal_interrupts_enable
 
     ; `rsp` currently points exactly to the 15 pushed registers from `struct syscall_regs`
     ; since sysret is used, we know it will return to user space.

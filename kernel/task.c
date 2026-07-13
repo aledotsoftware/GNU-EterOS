@@ -713,7 +713,7 @@ void schedule(void) {
     cpu->sched_ticks = 0;
 
     /* Cambiar estado */
-    if (current->state == TASK_RUNNING) {
+    if (current->state == TASK_RUNNING || current->state == TASK_READY) {
         current->state = TASK_READY;
         enqueue_ready(current);
     }
@@ -858,7 +858,19 @@ void task_wake_expired(uint64_t current_tick) {
         task_t* next = curr->next_sleep;
         curr->state = TASK_READY;
         dequeue_sleep(curr);
-        enqueue_ready(curr);
+
+        int is_active = 0;
+        for (int i = 0; i < MAX_CPUS; i++) {
+            if (cpus[i].state == CPU_STATE_ONLINE && cpus[i].current_task == (volatile void*)curr) {
+                is_active = 1;
+                break;
+            }
+        }
+
+        if (!is_active) {
+            enqueue_ready(curr);
+        }
+
         curr = next;
     }
     spin_unlock(&sched_lock);
@@ -876,12 +888,25 @@ void task_wakeup(task_t* t) {
     if (t->state == TASK_BLOCKED || t->state == TASK_SLEEPING) {
         t->state = TASK_READY;
         dequeue_sleep(t);
-        enqueue_ready(t);
+
+        int is_active = 0;
+        for (int i = 0; i < MAX_CPUS; i++) {
+            if (cpus[i].state == CPU_STATE_ONLINE && cpus[i].current_task == (volatile void*)t) {
+                is_active = 1;
+                break;
+            }
+        }
+
+        if (!is_active) {
+            enqueue_ready(t);
+        }
 
         cpu_info_t* current_cpu = get_current_cpu();
         if (current_cpu && (uint32_t)t->target_cpu != current_cpu->index) {
-            /* Send IPI to the target CPU to wake it up or force schedule */
-            lapic_send_ipi(cpus[t->target_cpu].apic_id, 0x20); /* 0x20 is timer vector, forces schedule() */
+            if (!is_active) {
+                /* Send IPI to the target CPU to wake it up or force schedule */
+                lapic_send_ipi(cpus[t->target_cpu].apic_id, 0x20); /* 0x20 is timer vector, forces schedule() */
+            }
         }
     }
     if (t->state == TASK_STOPPED) {
