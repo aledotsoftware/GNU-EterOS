@@ -222,6 +222,12 @@ int unlink(const char *pathname) {
 }
 
 #include <sys/sysinfo.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/resource.h>
+#include <sys/random.h>
+#include <grp.h>
+#include <syslog.h>
 
 int sysinfo(struct sysinfo *info) {
     long ret = syscall1(SYS_sysinfo, (long)info);
@@ -416,7 +422,7 @@ int preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
     if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return -1; }
     return (int)ret;
 }
-int getrusage(int who, void *usage) {
+int getrusage(int who, struct rusage *usage) {
     long ret = syscall2(SYS_getrusage, who, (long)usage);
     SYSCALL_RETURN(ret);
     return 0;
@@ -426,22 +432,24 @@ int getrandom(void *buf, size_t buflen, unsigned int flags) {
     SYSCALL_RETURN(ret);
     return (int)ret;
 }
-int getgroups(int size, void *list) {
+int getgroups(int size, gid_t list[]) {
     long ret = syscall2(SYS_getgroups, size, (long)list);
     SYSCALL_RETURN(ret);
     return (int)ret;
 }
-int setgroups(size_t size, const void *list) {
+int setgroups(size_t size, const gid_t *list) {
     long ret = syscall2(SYS_setgroups, size, (long)list);
     SYSCALL_RETURN(ret);
     return (int)ret;
 }
-int syslog(int type, char *bufp, int len) {
-    long ret = syscall3(SYS_syslog, type, (long)bufp, len);
-    SYSCALL_RETURN(ret);
-    return (int)ret;
+void syslog(int priority, const char *format, ...) {
+    char buf[1024];
+    va_list ap;
+    va_start(ap, format);
+    vsnprintf(buf, sizeof(buf), format, ap);
+    va_end(ap);
+    syscall3(SYS_syslog, priority, (long)buf, strlen(buf));
 }
-
 
 int msync(void *addr, size_t length, int flags) {
     long ret = syscall3(SYS_msync, (long)addr, length, flags);
@@ -460,7 +468,7 @@ int shmget(int key, size_t size, int shmflg) {
 
 void *shmat(int shmid, const void *shmaddr, int shmflg) {
     long ret = syscall3(SYS_shmat, shmid, (long)shmaddr, shmflg);
-    if (ret < 0 && ret >= -4095) {
+    if ((unsigned long)ret >= (unsigned long)-4095) {
         errno = -ret;
         return (void *)-1;
     }
