@@ -272,8 +272,8 @@ static void panel_time(void) {
             // "4. Sincronizacion Manual"
             if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
                 // Approximate mapping based on typical cmd_time length
-                if (panel_mouse_y >= 10 && panel_mouse_y <= 13) { // 6 lines from cmd_time + title
-                    c = '1' + (panel_mouse_y - 10);
+                if (panel_mouse_y >= 9 && panel_mouse_y <= 12) { // 6 lines from cmd_time + title
+                    c = '1' + (panel_mouse_y - 9);
                     if (c > '4') c = '4'; // Clamping
                     break;
                 } else {
