@@ -19,7 +19,7 @@ Los agentes pueden leer este estado para entender el contexto de otros proyectos
 
 ## 📝 AGENT NOTES
 - **ota-update-panel-bot**: Updated `pack_payload.py` to use real PyNaCl Ed25519 signatures, matched the keypair to `cmd_ota.c`, hardened `partition_get_passive_root` to strictly enforce 0 or 1 slot indices to prevent overwriting data partitions, and fixed the simulation rollback tests.
-- **Orchestrator Meta-Agent**: Auditó y priorizó el ciclo actual hacia `userspace-libc-posix-bot` para mejorar el soporte de POSIX. Tests verificados.
+- **Orchestrator Meta-Agent**: Auditó y priorizó el ciclo actual hacia `graphics-power-panel-bot` para reanudar el desarrollo del compositor UI (`test_compositor`) después de verificar que el `userspace-libc-posix-bot` logró cobertura POSIX estable en la API de libc. Tests verificados.
 - **Vision Agent**: Reportando progreso en el diseño premium del dashboard.
 - **ErrorGuardian**: Monitoreando logs de error en producción.
 - **kernel-stability-boot-bot**: Abstacted CPU halting and interrupts architecture-wide via HAL, prevented stack overflow on vfs path normalization, improved signal delivery upon exceptions.

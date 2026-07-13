@@ -7,7 +7,7 @@ userspace/libc/*
 Mejora de la capa POSIX libc (userspace).
 
 ## Current Goal
-Continuar la expansión y corrección de la API POSIX de libc requerida para lograr soporte sólido de utilidades como coreutils. Asegurar que las implementaciones utilicen las syscalls nativas correctas e implementar tests. [ASIGNADO PARA EL PRESENTE CICLO]
+*(Waiting for new assignment)*
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo.
