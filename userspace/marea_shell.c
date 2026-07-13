@@ -687,7 +687,7 @@ static void draw_menu(void) {
 /* Check if click is on a window's minimize button */
 static int hit_minimize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
+    int btn_cx = win->x + win->w - 14 - btn_spacing;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -696,7 +696,7 @@ static int hit_minimize_button(marea_window_t* win, int mx, int my) {
 /* Check if click is on a window's maximize button */
 static int hit_maximize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + win->w - 14 - btn_spacing;
+    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -742,8 +742,8 @@ static void draw_window_chrome(marea_window_t* win) {
     int hover_close = 0, hover_min = 0, hover_max = 0;
     if (find_window_at(mouse_x, mouse_y) == (win - windows)) {
         hover_close = hit_close_button(win, mouse_x, mouse_y);
-        hover_min = hit_minimize_button(win, mouse_x, mouse_y);
         hover_max = hit_maximize_button(win, mouse_x, mouse_y);
+        hover_min = hit_minimize_button(win, mouse_x, mouse_y);
     }
 
     /* Close (red) - Rightmost */
@@ -1691,8 +1691,8 @@ static void draw_tooltips(void) {
     int btn_base_y = win->y + TITLEBAR_HEIGHT / 2;
 
     int hover_close = hit_close_button(win, mouse_x, mouse_y);
-    int hover_min = hit_minimize_button(win, mouse_x, mouse_y);
     int hover_max = hit_maximize_button(win, mouse_x, mouse_y);
+    int hover_min = hit_minimize_button(win, mouse_x, mouse_y);
 
     if (hover_close) {
         fill_rounded_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 6, 0xE60F172A);

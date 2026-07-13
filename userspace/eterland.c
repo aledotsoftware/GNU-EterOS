@@ -362,7 +362,9 @@ int main(int argc, char* argv[]) {
                 input_event_t ev;
                 if (read(mfd, &ev, sizeof(ev)) == sizeof(ev)) {
                     if (ev.type == EV_REL) {
-                        restore_cursor_bg(mx, my);
+                        int old_x = mx;
+                        int old_y = my;
+                        restore_cursor_bg(old_x, old_y);
                         if (ev.code == REL_X) mx += ev.value;
                         if (ev.code == REL_Y) my += ev.value;
 
@@ -379,7 +381,9 @@ int main(int argc, char* argv[]) {
             if (fds[0].revents & POLLIN) {
                 char c;
                 if (read(tfd, &c, 1) > 0) {
-                    restore_cursor_bg(mx, my);
+                    int old_x = mx;
+                    int old_y = my;
+                    restore_cursor_bg(old_x, old_y);
                     if (c == '\r' || c == '\n') {
                         execute_command();
                     } else if (c == '\b' || c == 0x08 || c == 0x7F) {
