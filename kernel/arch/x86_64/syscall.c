@@ -2949,7 +2949,7 @@ void get_random_bytes(uint8_t *buf, size_t len) {
 static int64_t sys_getrandom(void* buf, size_t buflen, unsigned int flags) {
     (void)flags;
     if (buflen == 0) return 0;
-    if (!buf) return -EFAULT;
+    if (buflen > 0 && !buf) return -EFAULT;
     if (!vmm_verify_user_access(buf, buflen, 1)) return -EFAULT;
     get_random_bytes((uint8_t*)buf, buflen);
     return buflen;
@@ -3034,6 +3034,13 @@ static int64_t sys_mprotect(void* addr, size_t len, int prot) {
 
 #define MREMAP_MAYMOVE 1
 #define MREMAP_FIXED   2
+
+
+
+
+__attribute__((unused)) static int64_t sys_mlock(const void *addr, size_t len) { (void)addr; (void)len; return 0; }
+__attribute__((unused)) static int64_t sys_munlock(const void *addr, size_t len) { (void)addr; (void)len; return 0; }
+__attribute__((unused)) static int64_t sys_mlockall(int flags) { (void)flags; return 0; }
 
 static int64_t sys_mremap(void* old_addr, size_t old_size, size_t new_size, int flags, void* new_addr) {
     uint64_t old_start = (uint64_t)old_addr;
@@ -3519,7 +3526,7 @@ static int64_t sys_getgroups(int size, uint32_t list[]) {
     // In EterOS we only have a single primary GID for now
     if (size == 0) return 1; // Number of supplementary groups (just primary)
 
-    if (size < 1) return -EINVAL;
+    if (size < 0) return -EINVAL;
 
     if (!list) return -EFAULT;
     if (!vmm_verify_user_access(list, sizeof(uint32_t), 1)) return -EFAULT;
@@ -3535,11 +3542,11 @@ static int64_t sys_setgroups(size_t size, const uint32_t *list) {
     // Only root can set groups
     if (current->euid != 0) return -EPERM;
 
-    // We don't support supplementary groups yet, but accept clearing them or setting to just the primary
+    // We don\'t support supplementary groups yet, but accept clearing them or setting to just the primary
+    if (size > 0 && !list) return -EFAULT;
     if (size > 1) {
-        if (!list) return -EFAULT;
-        // Technically not supported, but we'll accept it to appease GNU tools
-        if (!vmm_verify_user_access(list, size * sizeof(uint32_t), 0)) return -EFAULT;
+        // Technically not supported, but we\'ll accept it to appease GNU tools
+        if (!vmm_verify_user_access((void*)list, size * sizeof(uint32_t), 0)) return -EFAULT;
     }
 
     return 0;
@@ -3800,9 +3807,6 @@ __attribute__((unused)) static int64_t sys_sched_setparam(int pid, void *param) 
 __attribute__((unused)) static int64_t sys_sched_getparam(int pid, void *param) { (void)pid; (void)param; return -ENOSYS; }
 __attribute__((unused)) static int64_t sys_sched_setscheduler(int pid, int policy, const void *param) { (void)pid; (void)policy; (void)param; return -ENOSYS; }
 __attribute__((unused)) static int64_t sys_sched_rr_get_interval(int pid, void *tp) { (void)pid; (void)tp; return -ENOSYS; }
-__attribute__((unused)) static int64_t sys_mlock(const void *addr, size_t len) { (void)addr; (void)len; return 0; }
-__attribute__((unused)) static int64_t sys_munlock(const void *addr, size_t len) { (void)addr; (void)len; return 0; }
-__attribute__((unused)) static int64_t sys_mlockall(int flags) { (void)flags; return 0; }
 __attribute__((unused)) static int64_t sys_vhangup(void) { return -ENOSYS; }
 __attribute__((unused)) static int64_t sys_modify_ldt(int func, void *ptr, unsigned long bytecount) { (void)func; (void)ptr; (void)bytecount; return -ENOSYS; }
 __attribute__((unused)) static int64_t sys_pivot_root(const char *new_root, const char *put_old) { (void)new_root; (void)put_old; return -ENOSYS; }

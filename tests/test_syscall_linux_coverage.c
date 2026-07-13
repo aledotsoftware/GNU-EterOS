@@ -4,6 +4,9 @@
 
 #define __ETEROS_HOST_TEST__ 1
 #include "../include/types.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/socket.h>
 #include "../include/elf.h"
 #include "../include/linux_compat.h"
 #include "../include/cpu.h"
@@ -32,17 +35,19 @@ fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*
 
 #include "../kernel/arch/x86_64/syscall.c"
 
+#undef malloc
+#define malloc __builtin_malloc
+#undef free
+#define free __builtin_free
+#undef printf
+#undef exit
+#define exit __builtin_exit
 #undef memcpy
 #undef memset
 #undef strcmp
 #undef strncpy
 #undef strlcpy
 #undef strlen
-
-#undef malloc
-#undef free
-#undef printf
-#undef exit
 
 #undef assert
 #define assert(x) do { if (!(x)) { printf("Assertion failed: %s\n", #x); exit(1); } } while (0)
@@ -96,7 +101,9 @@ int net_socket(int domain, int type, int protocol) { return 0; }
 int net_close(int sock) { return 0; }
 int net_connect(int sock, const struct sockaddr_in_old* addr, int addrlen) { return 0; }
 int net_send(int sock, const void* buf, int len, int flags) { return 0; }
+
 int net_recv(int sock, void* buf, int len, int flags) { return 0; }
+
 ssize_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) { return 0; }
 uint32_t write_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) { return 0; }
 void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {}
@@ -190,8 +197,6 @@ int main() {
     assert(sys_prlimit64(0, 0, NULL, (void*)rlim_buf) == 0);
     assert(*(uint64_t*)rlim_buf == ~0ULL);
 
-
-
     printf("Testing sys_syslog\n");
     assert(sys_syslog(0, NULL, 0) == 0);
 
@@ -208,7 +213,6 @@ int main() {
     printf("Testing sys_reboot\n");
     assert(sys_reboot(1, 2, 3, NULL) == 0);
 
-
     printf("Testing execve wrapper defaults\n");
     assert(sys_execve(NULL, NULL, NULL, NULL) == -EFAULT);
     assert(sys_execveat(0, NULL, NULL, NULL, 0, NULL) == -EFAULT);
@@ -222,7 +226,6 @@ int main() {
     assert(sys_shmctl(0, 0, NULL) == -ENOSYS);
     assert(sys_flock(3, 0) == 0);
     assert(sys_flock(99, 0) == -EBADF);
-
 
     printf("Tests passed!\n");
     free(valid_node);
