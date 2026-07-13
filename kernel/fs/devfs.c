@@ -1323,6 +1323,16 @@ static int devfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     return -EROFS;
 }
 
+static int devfs_unlink(fs_node_t *parent, char *name) {
+    (void)parent; (void)name;
+    return -EROFS;
+}
+
+static int devfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    (void)old_parent; (void)old_name; (void)new_parent; (void)new_name;
+    return -EROFS;
+}
+
 static int devfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
     (void)parent; (void)name; (void)permission;
     return -EROFS;
@@ -1341,6 +1351,8 @@ fs_node_t* devfs_init(void) {
     devfs_root->finddir = devfs_finddir;
     devfs_root->create = devfs_create;
     devfs_root->mkdir = devfs_mkdir;
+    devfs_root->unlink = devfs_unlink;
+    devfs_root->rename = devfs_rename;
     dev_tty_termios.c_lflag = ECHO | ICANON | ISIG;
 
     return devfs_root;

@@ -107,8 +107,12 @@ int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) {
 }
 
 int unlink_fs(fs_node_t *parent, char *name) {
-    if ((parent->flags & 0x7) == FS_DIRECTORY && parent->unlink != 0)
-        return parent->unlink(parent, name);
+    if ((parent->flags & 0x7) == FS_DIRECTORY) {
+        if (parent->unlink != 0)
+            return parent->unlink(parent, name);
+        else
+            return -EPERM;
+    }
     return -ENOTDIR;
 }
 

@@ -33,6 +33,8 @@ ssize_t initrd_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *bu
 int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry);
 int initrd_create(fs_node_t *parent, char *name, uint16_t permission);
 int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission);
+int initrd_unlink(fs_node_t *parent, char *name);
+int initrd_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name);
 fs_node_t *initrd_finddir(fs_node_t *node, char *name);
 
 static int initrd_is_root_handle(fs_node_t *node) {
@@ -101,6 +103,8 @@ static fs_node_t* initrd_make_dir_node(const char* name, const char* full_path) 
     fnode->finddir = &initrd_finddir;
     fnode->mkdir = &initrd_mkdir;
     fnode->create = &initrd_create;
+    fnode->unlink = &initrd_unlink;
+    fnode->rename = &initrd_rename;
     if (full_path && full_path[0]) {
         size_t n = strlen(full_path) + 1;
         char* p = (char*)kmalloc(n);
@@ -229,6 +233,16 @@ int initrd_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
 int initrd_create(fs_node_t *parent, char *name, uint16_t permission) {
     (void)parent; (void)name; (void)permission;
     return -EROFS; // Initrd is read-only
+}
+
+int initrd_unlink(fs_node_t *parent, char *name) {
+    (void)parent; (void)name;
+    return -EROFS;
+}
+
+int initrd_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    (void)old_parent; (void)old_name; (void)new_parent; (void)new_name;
+    return -EROFS;
 }
 
 int initrd_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
@@ -392,6 +406,8 @@ fs_node_t *initialise_initrd(uint64_t start_addr, uint32_t size) {
     initrd_root->finddir = &initrd_finddir;
     initrd_root->mkdir = &initrd_mkdir;
     initrd_root->create = &initrd_create;
+    initrd_root->unlink = &initrd_unlink;
+    initrd_root->rename = &initrd_rename;
     initrd_root->ptr = 0;
     initrd_root->impl = 0;
 

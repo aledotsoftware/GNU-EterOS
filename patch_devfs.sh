@@ -1,1 +1,0 @@
-sed -i 's/temp_payload = (uint8_t\*)(uintptr_t)target_vaddr; \/\* Store the receivers VADDR so they can access it directly \*\//temp_payload = (uint8_t*)(uintptr_t)(target_task->binder_mmap_offset); \/\* Store the offset within the binder VMA so receiver knows where it is \*\//' kernel/fs/devfs.c
