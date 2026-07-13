@@ -2,6 +2,7 @@
 #include <sem.h>
 #include <lock.h>
 #include <hal.h>
+#include <io.h>
 #include <string.h>
 
 #define INPUT_QUEUE_SIZE 1024
@@ -20,14 +21,11 @@ static sem_t mouse_sem;
 static spinlock_t mouse_lock = 0;
 
 static inline uint64_t save_irq(void) {
-    uint64_t flags;
-    __asm__ volatile("pushfq; pop %0" : "=r"(flags));
-    hal_interrupts_disable();
-    return flags;
+    return irq_save();
 }
 
 static inline void restore_irq(uint64_t flags) {
-    __asm__ volatile("push %0; popfq" :: "r"(flags));
+    irq_restore(flags);
 }
 
 void input_init(void) {

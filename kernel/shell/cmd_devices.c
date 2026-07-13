@@ -1,6 +1,7 @@
 #include "shell_internal.h"
 #include "../../include/keyboard.h"
 #include "../../include/mouse.h"
+#include "../../include/nvram.h"
 #include "../../include/drivers/disk.h"
 #include "../../include/fs/initrd.h"
 
@@ -88,7 +89,6 @@ void cmd_storage(const char* args) {
     (void)args;
     terminal_write_string("\n  [Almacenamiento]\n");
 
-    #include "../../include/nvram.h"
     uint8_t active_id = nvram_get_boot_partition();
     uint8_t passive_id = (active_id == 0) ? 1 : 0;
 
