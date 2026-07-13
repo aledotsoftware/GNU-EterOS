@@ -655,6 +655,16 @@ static int procfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     return -EROFS;
 }
 
+static int procfs_unlink(fs_node_t *parent, char *name) {
+    (void)parent; (void)name;
+    return -EROFS;
+}
+
+static int procfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    (void)old_parent; (void)old_name; (void)new_parent; (void)new_name;
+    return -EROFS;
+}
+
 static int procfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
     (void)parent; (void)name; (void)permission;
     return -EROFS;
@@ -673,6 +683,8 @@ fs_node_t* procfs_init(void) {
     procfs_root->finddir = procfs_finddir;
     procfs_root->create = procfs_create;
     procfs_root->mkdir = procfs_mkdir;
+    procfs_root->unlink = procfs_unlink;
+    procfs_root->rename = procfs_rename;
 
     return procfs_root;
 }

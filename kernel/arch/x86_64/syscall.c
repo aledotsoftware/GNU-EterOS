@@ -1277,7 +1277,7 @@ static int64_t sys_renameat(int olddirfd, const char* oldpath, int newdirfd, con
          kfree(new_filename); kfree(new_parent_path); kfree(old_filename); kfree(old_parent_path); kfree(knewpath); kfree(koldpath); return -EACCES;
     }
 
-    int ret = -ENOSYS;
+    int ret = -EPERM;
     if (old_parent->rename != 0) {
         ret = old_parent->rename(old_parent, old_filename, new_parent, new_filename);
     }
