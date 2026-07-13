@@ -176,7 +176,7 @@ body {
 
 /* Tooltip implementation */
 .dock-item::before {
-    content: attr(data-tooltip);
+    content: attr(data-title);
     position: absolute;
     bottom: 100%;
     left: 50%;
@@ -326,7 +326,7 @@ body {
 }
 
 .control::before {
-    content: attr(title);
+    content: attr(data-title);
     position: absolute;
     bottom: 100%;
     left: 50%;

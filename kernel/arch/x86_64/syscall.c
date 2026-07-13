@@ -602,7 +602,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
             }
         } else if (is_shmfs && shm_obj) {
             /* Check prot mask for Ashmem compatibility */
-            if ((prot & shm_obj->prot_mask) != prot) {
+            if (((uint32_t)prot & shm_obj->prot_mask) != (uint32_t)prot) {
                 return -EPERM;
             }
 

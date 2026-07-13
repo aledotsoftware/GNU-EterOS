@@ -7,11 +7,7 @@
 
 ### ✅ Resultados de Verificación
 ### ⚠️ Advertencias de Compilación
-Durante el build del kernel x86_64, se detectaron las siguientes advertencias menores:
-- Variables sin usar en `kernel/shell/cmd_ota.c` (`boot_part`) y `kernel/fs/initrd.c` (`virtual_dirs_count`).
-- Comparación de distintos signos en `kernel/fs/devfs.c` (`request == ASHMEM_GET_NAME`).
-- Comparación siempre verdadera en `kernel/fs/procfs.c` relacionada con la validación de arreglos en estructuras `task_t`.
-
+- Durante el build del kernel x86_64, no se detectaron advertencias menores. Clean build exitoso.
 - **Make all (Build):** Éxito. Kernel compilado a `build/kernel.bin` y libc/userspace empaquetados en `build/initrd.img` de manera satisfactoria. La compilación incluye optimizaciones SMP y el soporte avanzado de lwIP.
 - **Make clean:** Éxito. Funciona correctamente eliminando artefactos (como `.o` y `build/`) sin borrar código fuente rastreado en git.
 - **Tests Nativos:** Éxito. Todos los tests de host C ejecutados mediante `tests/run_tests.sh` pasan exitosamente. La remoción del uso de `|| true` del script de testeo ha sido comprobada, garantizando rigor total en el entorno de integración contínua (CI).
