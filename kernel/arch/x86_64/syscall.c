@@ -2542,7 +2542,7 @@ static int64_t sys_poll(struct pollfd* fds, int nfds, int timeout) {
 #ifndef __ETEROS_HOST_TEST__
                     extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
                     struct pollfd lwip_pfd;
-                    lwip_pfd.fd = fds[i].fd;
+                    lwip_pfd.fd = node->inode; /* Pass internal lwIP socket ID */
                     lwip_pfd.events = fds[i].events;
                     lwip_pfd.revents = 0;
                     sys_lwip_poll(&lwip_pfd, 1, 0);
@@ -2623,6 +2623,16 @@ static int64_t sys_select(int nfds, void* readfds, void* writefds, void* exceptf
                     bytes = 1;
                 } else if (node->ioctl && node->ioctl(node, FIONREAD, &bytes) == 0) {
                     // bytes updated
+                } else if ((node->flags & 0x7) == FS_SOCKET) {
+#ifndef __ETEROS_HOST_TEST__
+                    extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
+                    struct pollfd lwip_pfd;
+                    lwip_pfd.fd = node->inode; /* Pass internal lwIP socket ID */
+                    lwip_pfd.events = POLLIN;
+                    lwip_pfd.revents = 0;
+                    sys_lwip_poll(&lwip_pfd, 1, 0);
+                    if (lwip_pfd.revents & POLLIN) bytes = 1;
+#endif
                 } else {
                     bytes = 0; // Fix: don't default to ready for unsupported! Wait, if pipes don't have ioctl, they shouldn't default to ready. Wait, pipes are ready if read() won't block.
                     // But to satisfy the reviewer, I'll just check if it's file/dir. If not, it's not ready unless FIONREAD succeeds.
@@ -2634,6 +2644,16 @@ static int64_t sys_select(int nfds, void* readfds, void* writefds, void* exceptf
                     FD_SET(i, &out_wfds); events++;
                 } else if ((node->flags & 0x7) == FS_PIPE) {
                     FD_SET(i, &out_wfds); events++;
+                } else if ((node->flags & 0x7) == FS_SOCKET) {
+#ifndef __ETEROS_HOST_TEST__
+                    extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
+                    struct pollfd lwip_pfd;
+                    lwip_pfd.fd = node->inode; /* Pass internal lwIP socket ID */
+                    lwip_pfd.events = POLLOUT;
+                    lwip_pfd.revents = 0;
+                    sys_lwip_poll(&lwip_pfd, 1, 0);
+                    if (lwip_pfd.revents & POLLOUT) { FD_SET(i, &out_wfds); events++; }
+#endif
                 }
             }
             if (efds && FD_ISSET(i, efds)) {
@@ -2712,6 +2732,16 @@ static uint32_t epoll_compute_revents(task_t* current, int fd, uint32_t wanted_e
             revents |= EPOLLIN;
         } else if (node->ioctl && node->ioctl(node, FIONREAD, &bytes) == 0 && bytes > 0) {
             revents |= EPOLLIN;
+        } else if ((node->flags & 0x7) == FS_SOCKET) {
+#ifndef __ETEROS_HOST_TEST__
+            extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
+            struct pollfd lwip_pfd;
+            lwip_pfd.fd = node->inode;
+            lwip_pfd.events = POLLIN;
+            lwip_pfd.revents = 0;
+            sys_lwip_poll(&lwip_pfd, 1, 0);
+            if (lwip_pfd.revents & POLLIN) revents |= EPOLLIN;
+#endif
         }
     }
 
@@ -2720,6 +2750,16 @@ static uint32_t epoll_compute_revents(task_t* current, int fd, uint32_t wanted_e
             (node->flags & 0x7) == FS_DIRECTORY ||
             (node->flags & 0x7) == FS_PIPE) {
             revents |= EPOLLOUT;
+        } else if ((node->flags & 0x7) == FS_SOCKET) {
+#ifndef __ETEROS_HOST_TEST__
+            extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
+            struct pollfd lwip_pfd;
+            lwip_pfd.fd = node->inode;
+            lwip_pfd.events = POLLOUT;
+            lwip_pfd.revents = 0;
+            sys_lwip_poll(&lwip_pfd, 1, 0);
+            if (lwip_pfd.revents & POLLOUT) revents |= EPOLLOUT;
+#endif
         }
     }
 

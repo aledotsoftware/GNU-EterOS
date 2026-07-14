@@ -161,23 +161,8 @@ ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, void *from, 
 int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout) {
     if (nfds > MAX_FD) return -EINVAL; /* Prevent kernel memory exhaustion */
 
-    struct pollfd *mapped_fds = kmalloc(nfds * sizeof(struct pollfd));
-    if (!mapped_fds) return -ENOMEM;
-
-    for (uint32_t i = 0; i < nfds; i++) {
-        mapped_fds[i].fd = get_lwip_sock(fds[i].fd);
-        mapped_fds[i].events = fds[i].events;
-        mapped_fds[i].revents = 0;
-    }
-
-    int res = lwip_poll(mapped_fds, nfds, timeout);
-
-    for (uint32_t i = 0; i < nfds; i++) {
-        fds[i].revents = mapped_fds[i].revents;
-    }
-
-    kfree(mapped_fds);
-    return res;
+    /* fds[i].fd should already contain the lwIP socket ID, provided by caller (sys_poll/sys_select) */
+    return lwip_poll(fds, nfds, timeout);
 }
 
 int sys_lwip_select(int maxfdp1, fd_set *readset, fd_set *writeset, fd_set *exceptset, struct timeval *timeout) {
