@@ -96,11 +96,13 @@ static void wait_for_enter(void) {
 
 static void panel_keyboard(void) {
     cmd_clear("");
-    terminal_write_string("\n  -- Teclado --\n");
-    terminal_write_string("  1. Layout: Espanol (es)\n"); // Y=2
-    terminal_write_string("  2. Layout: Ingles (en)\n"); // Y=3
-    terminal_write_string("  3. Ajustar Typematic Rate\n"); // Y=4
-    terminal_write_string("  Elija [1-3] o presione ESC para volver.\n");
+    terminal_set_cursor(0, 1);
+    terminal_write_string("  -- Teclado --\n");
+    terminal_set_cursor(0, 3);
+    terminal_write_string("  1. Layout: Espanol (es)\n"); // Y=3
+    terminal_write_string("  2. Layout: Ingles (en)\n"); // Y=4
+    terminal_write_string("  3. Ajustar Typematic Rate\n"); // Y=5
+    terminal_write_string("\n  Elija [1-3] o presione ESC para volver.\n");
 
     char c = 0;
     while (1) {
@@ -114,9 +116,7 @@ static void panel_keyboard(void) {
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
             if (panel_mouse_x >= 2 && panel_mouse_x <= 40) {
-                if (panel_mouse_y == 2) c = '1';
-                else if (panel_mouse_y == 3) c = '2';
-                else if (panel_mouse_y == 4) c = '3';
+                if (panel_mouse_y >= 3 && panel_mouse_y <= 5) c = '1' + (panel_mouse_y - 3);
                 else c = KB_KEY_ESCAPE; // Click outside returns
             } else {
                 c = KB_KEY_ESCAPE;
@@ -149,13 +149,15 @@ static void panel_keyboard(void) {
 
 static void panel_mouse_cfg(void) {
     cmd_clear("");
-    terminal_write_string("\n  -- Mouse --\n");
-    terminal_write_string("  1. Sensibilidad: Baja (Multiplicador 1)\n"); // Y=2
-    terminal_write_string("  2. Sensibilidad: Media (Multiplicador 5)\n"); // Y=3
-    terminal_write_string("  3. Sensibilidad: Alta (Multiplicador 10)\n"); // Y=4
-    terminal_write_string("  4. Modo Diestro (Normal)\n"); // Y=5
-    terminal_write_string("  5. Modo Zurdo (Invertido)\n"); // Y=6
-    terminal_write_string("  Elija [1-5] o haga click para seleccionar, o ESC para volver.\n");
+    terminal_set_cursor(0, 1);
+    terminal_write_string("  -- Mouse --\n");
+    terminal_set_cursor(0, 3);
+    terminal_write_string("  1. Sensibilidad: Baja (Multiplicador 1)\n"); // Y=3
+    terminal_write_string("  2. Sensibilidad: Media (Multiplicador 5)\n"); // Y=4
+    terminal_write_string("  3. Sensibilidad: Alta (Multiplicador 10)\n"); // Y=5
+    terminal_write_string("  4. Modo Diestro (Normal)\n"); // Y=6
+    terminal_write_string("  5. Modo Zurdo (Invertido)\n"); // Y=7
+    terminal_write_string("\n  Elija [1-5] o haga click para seleccionar, o ESC para volver.\n");
 
     char c = 0;
     while (1) {
@@ -170,8 +172,8 @@ static void panel_mouse_cfg(void) {
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
             if (panel_mouse_x >= 2 && panel_mouse_x <= 40) {
-                if (panel_mouse_y >= 2 && panel_mouse_y <= 6) {
-                    c = '1' + (panel_mouse_y - 2);
+                if (panel_mouse_y >= 3 && panel_mouse_y <= 7) {
+                    c = '1' + (panel_mouse_y - 3);
                     break;
                 } else {
                     c = KB_KEY_ESCAPE;
@@ -213,12 +215,14 @@ static void panel_mouse_cfg(void) {
 
 static void panel_storage(void) {
     cmd_clear("");
-    terminal_write_string("\n  -- Almacenamiento --\n");
+    terminal_set_cursor(0, 1);
+    terminal_write_string("  -- Almacenamiento --\n");
 
     uint8_t active_id = nvram_get_boot_partition();
     uint8_t passive_id = (active_id == 0) ? 1 : 0;
 
-    terminal_write_string("\n  [A/B Slots - NVRAM]\n");
+    terminal_set_cursor(0, 3);
+    terminal_write_string("  [A/B Slots - NVRAM]\n");
     terminal_write_string("  Slot Activo:  ");
     terminal_write_string(active_id == 0 ? "A (part0)" : "B (part1)");
     terminal_write_string("\n  Slot Pasivo:  ");
@@ -241,16 +245,22 @@ static void panel_storage(void) {
     wait_for_enter();
 }
 
-static void panel_time(void) {
+static void draw_panel_time_menu(void) {
     cmd_clear("");
-    terminal_write_string("\n  -- Tiempo --\n");
+    terminal_set_cursor(0, 1);
+    terminal_write_string("  -- Tiempo --\n");
     cmd_time("");
-    terminal_write_string("  1. Sincronizar via red (NTP / Resolucion DNS)\n"); // Y = varies based on cmd_time output length, usually 5-6 lines
-    // Let's print fixed options and read keyboard for simplicity to not hardcode dynamic Y positions here
-    terminal_write_string("  2. Zona Horaria: Argentina (UTC-3)\n");
-    terminal_write_string("  3. Zona Horaria: UTC (0)\n");
-    terminal_write_string("  4. Sincronizacion Manual Avanzada (HH:MM:SS)\n");
-    terminal_write_string("  Elija [1-4] usando el teclado numerico (o ESC para cancelar y volver).\n");
+
+    terminal_set_cursor(0, 10);
+    terminal_write_string("  1. Sincronizar via red (NTP / Resolucion DNS)\n"); // Y=10
+    terminal_write_string("  2. Zona Horaria: Argentina (UTC-3)\n"); // Y=11
+    terminal_write_string("  3. Zona Horaria: UTC (0)\n"); // Y=12
+    terminal_write_string("  4. Sincronizacion Manual Avanzada (HH:MM:SS)\n"); // Y=13
+    terminal_write_string("\n  Elija [1-4] o haga click para seleccionar, o ESC para volver.\n");
+}
+
+static void panel_time(void) {
+    draw_panel_time_menu();
 
     char c = 0;
     while (1) {
@@ -264,17 +274,9 @@ static void panel_time(void) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            // The output of cmd_time is about 6 lines long.
-            // Menu starts at roughly y=10.
-            // "1. Sincronizar via red"
-            // "2. Zona Horaria"
-            // "3. Zona Horaria UTC"
-            // "4. Sincronizacion Manual"
             if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                // Approximate mapping based on typical cmd_time length
-                if (panel_mouse_y >= 9 && panel_mouse_y <= 12) { // 6 lines from cmd_time + title
-                    c = '1' + (panel_mouse_y - 9);
-                    if (c > '4') c = '4'; // Clamping
+                if (panel_mouse_y >= 10 && panel_mouse_y <= 13) {
+                    c = '1' + (panel_mouse_y - 10);
                     break;
                 } else {
                     c = KB_KEY_ESCAPE;
@@ -461,13 +463,15 @@ void cmd_panel(const char* args) {
                 draw_panel_menu();
             } else if (opt == '5') {
                 cmd_clear("");
-                terminal_write_string("\n  -- Usuarios y Seguridad --\n");
-                terminal_write_string("  1. Habilitar Auto-login (autologin on)\n"); // y=2
-                terminal_write_string("  2. Deshabilitar Auto-login (autologin off)\n"); // y=3
-                terminal_write_string("  3. Crear Usuario (add)\n"); // y=4
-                terminal_write_string("  4. Eliminar Usuario (del)\n"); // y=5
-                terminal_write_string("  5. Cambiar Contrasena (passwd)\n"); // y=6
-                terminal_write_string("\n  Elija [1-5] o ESC para volver.\n");
+                terminal_set_cursor(0, 1);
+                terminal_write_string("  -- Usuarios y Seguridad --\n");
+                terminal_set_cursor(0, 3);
+                terminal_write_string("  1. Habilitar Auto-login (autologin on)\n"); // y=3
+                terminal_write_string("  2. Deshabilitar Auto-login (autologin off)\n"); // y=4
+                terminal_write_string("  3. Crear Usuario (add)\n"); // y=5
+                terminal_write_string("  4. Eliminar Usuario (del)\n"); // y=6
+                terminal_write_string("  5. Cambiar Contrasena (passwd)\n"); // y=7
+                terminal_write_string("\n  Elija [1-5] o ESC para volver.\n"); // y=9
                 char c = 0;
                 while (1) {
                     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
@@ -478,8 +482,8 @@ void cmd_panel(const char* args) {
                     if (panel_mouse_clicked) {
                         panel_mouse_clicked = false;
                         if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                            if (panel_mouse_y >= 2 && panel_mouse_y <= 6) {
-                                c = '1' + (panel_mouse_y - 2);
+                            if (panel_mouse_y >= 3 && panel_mouse_y <= 7) {
+                                c = '1' + (panel_mouse_y - 3);
                                 break;
                             } else {
                                 c = KB_KEY_ESCAPE;
@@ -510,10 +514,12 @@ void cmd_panel(const char* args) {
                 draw_panel_menu();
             } else if (opt == '6') {
                 cmd_clear("");
-                terminal_write_string("\n  -- Red y Conectividad --\n");
+                terminal_set_cursor(0, 1);
+                terminal_write_string("  -- Red y Conectividad --\n");
+                terminal_set_cursor(0, 3);
                 cmd_net("");
-                // cmd_net outputs exactly 7 lines everywhere, so options start at y=10
-                terminal_write_string("\n  1. Renovar DHCP\n");
+                terminal_set_cursor(0, 10);
+                terminal_write_string("  1. Renovar DHCP\n");
                 terminal_write_string("  2. Probar conexion (wget tudexgames.com)\n");
                 terminal_write_string("\n  Elija [1-2] o ESC para volver.\n");
                 char c = 0;
@@ -526,7 +532,7 @@ void cmd_panel(const char* args) {
                     if (panel_mouse_clicked) {
                         panel_mouse_clicked = false;
                         if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                            if (panel_mouse_y >= 10 && panel_mouse_y <= 11) { // 7 lines from cmd_net + title
+                            if (panel_mouse_y >= 10 && panel_mouse_y <= 11) {
                                 c = '1' + (panel_mouse_y - 10);
                                 if (c > '2') c = '2';
                                 break;

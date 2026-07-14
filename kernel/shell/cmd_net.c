@@ -6,42 +6,36 @@
 
 void cmd_net(const char* args) {
     (void)args;
-    terminal_write_string("==== Network Status ====\n");
+    terminal_write_string("  ==== Network Status ====\n");
 
     uint8_t* net_get_mac(void);
     uint8_t* mac = net_get_mac();
     if (!mac) {
-        terminal_write_string("Error: MAC address not found.\n");
+        terminal_write_string("  Error: MAC address not found.\n");
         return;
     }
 
     char buf[64];
-    snprintf(buf, sizeof(buf), "MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+    snprintf(buf, sizeof(buf), "  MAC Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     terminal_write_string(buf);
 
     if (network_ready) {
-        terminal_write_string("State: UP\n");
+        terminal_write_string("  State: UP\n");
 
-        snprintf(buf, sizeof(buf), "IP Address: %d.%d.%d.%d\n",
+        snprintf(buf, sizeof(buf), "  IP Address: %d.%d.%d.%d\n",
             (my_ip >> 24) & 0xFF, (my_ip >> 16) & 0xFF, (my_ip >> 8) & 0xFF, my_ip & 0xFF);
         terminal_write_string(buf);
 
-        snprintf(buf, sizeof(buf), "Gateway: %d.%d.%d.%d\n",
+        snprintf(buf, sizeof(buf), "  Gateway: %d.%d.%d.%d\n",
             (gateway_ip >> 24) & 0xFF, (gateway_ip >> 16) & 0xFF, (gateway_ip >> 8) & 0xFF, gateway_ip & 0xFF);
         terminal_write_string(buf);
 
-        snprintf(buf, sizeof(buf), "DNS: %d.%d.%d.%d\n",
+        snprintf(buf, sizeof(buf), "  DNS: %d.%d.%d.%d\n",
             (dns_ip >> 24) & 0xFF, (dns_ip >> 16) & 0xFF, (dns_ip >> 8) & 0xFF, dns_ip & 0xFF);
         terminal_write_string(buf);
     } else {
-        terminal_write_string("State: DOWN (Link or DHCP pending)\n");
-        terminal_write_string("\n\n\n");
-    }
-    // Pad output to always be exactly 6 lines after the title
-    if (!network_ready) {
-        // Output already has 1 line (MAC) + 1 line (State) + 3 newlines = 5 lines. Add 1 more.
-        terminal_write_string("\n");
+        terminal_write_string("  State: DOWN (Link or DHCP pending)\n");
     }
 }
 
