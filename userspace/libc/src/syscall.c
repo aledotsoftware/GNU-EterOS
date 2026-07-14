@@ -254,13 +254,13 @@ int getpid(void) {
     return (int)syscall0(SYS_getpid);
 }
 
-int setuid(int uid) {
+int setuid(uid_t uid) {
     long ret = syscall1(SYS_setuid, uid);
     SYSCALL_RETURN(ret);
     return 0;
 }
 
-int setgid(int gid) {
+int setgid(gid_t gid) {
     long ret = syscall1(SYS_setgid, gid);
     SYSCALL_RETURN(ret);
     return 0;
@@ -454,16 +454,19 @@ void syslog(int priority, const char *format, ...) {
 int msync(void *addr, size_t length, int flags) {
     long ret = syscall3(SYS_msync, (long)addr, length, flags);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int mincore(void *addr, size_t length, unsigned char *vec) {
     long ret = syscall3(SYS_mincore, (long)addr, length, (long)vec);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int shmget(int key, size_t size, int shmflg) {
     long ret = syscall3(SYS_shmget, key, size, shmflg);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 void *shmat(int shmid, const void *shmaddr, int shmflg) {
@@ -478,16 +481,19 @@ void *shmat(int shmid, const void *shmaddr, int shmflg) {
 int shmctl(int shmid, int cmd, void *buf) {
     long ret = syscall3(SYS_shmctl, shmid, cmd, (long)buf);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int getitimer(int which, void *curr_value) {
     long ret = syscall2(SYS_getitimer, which, (long)curr_value);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int semop(int semid, void *sops, size_t nsops) {
     long ret = syscall3(SYS_semop, semid, (long)sops, nsops);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int semctl(int semid, int semnum, int cmd, ...) {
@@ -498,75 +504,90 @@ int semctl(int semid, int semnum, int cmd, ...) {
     va_end(ap);
     long ret = syscall4(SYS_semctl, semid, semnum, cmd, arg);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int shmdt(const void *shmaddr) {
     long ret = syscall1(SYS_shmdt, (long)shmaddr);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int msgget(int key, int msgflg) {
     long ret = syscall2(SYS_msgget, key, msgflg);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg) {
     long ret = syscall4(SYS_msgsnd, msqid, (long)msgp, msgsz, msgflg);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg) {
     long ret = syscall5(SYS_msgrcv, msqid, (long)msgp, msgsz, msgtyp, msgflg);
     SYSCALL_RETURN(ret);
+    return (ssize_t)ret;
 }
 
 int msgctl(int msqid, int cmd, void *buf) {
     long ret = syscall3(SYS_msgctl, msqid, cmd, (long)buf);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int flock(int fd, int operation) {
     long ret = syscall2(SYS_flock, fd, operation);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 
 int ptrace(long request, long pid, unsigned long addr, unsigned long data) {
     long ret = syscall4(SYS_ptrace, request, pid, addr, data);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int setfsuid(uid_t fsuid) {
     long ret = syscall1(SYS_setfsuid, fsuid);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int setfsgid(gid_t fsgid) {
     long ret = syscall1(SYS_setfsgid, fsgid);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int uselib(const char *library) {
     long ret = syscall1(SYS_uselib, (long)library);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int personality(unsigned long persona) {
     long ret = syscall1(SYS_personality, persona);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int getpriority(int which, int who) {
     long ret = syscall2(SYS_getpriority, which, who);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int sched_setparam(int pid, const void *param) {
     long ret = syscall2(SYS_sched_setparam, pid, (long)param);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
 
 int sched_getparam(int pid, void *param) {
     long ret = syscall2(SYS_sched_getparam, pid, (long)param);
     SYSCALL_RETURN(ret);
+    return (int)ret;
 }
