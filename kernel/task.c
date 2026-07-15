@@ -1209,6 +1209,10 @@ int task_fork(void* regs_ptr) {
     tasks[slot].pgid = parent->pgid;
     tasks[slot].sid = parent->sid;
     tasks[slot].user_rsp = parent->user_rsp; /* Saved from syscall entry */
+    tasks[slot].binder_mmap_base = parent->binder_mmap_base;
+    tasks[slot].binder_mmap_size = parent->binder_mmap_size;
+    tasks[slot].binder_mmap_offset = parent->binder_mmap_offset;
+    tasks[slot].binder_mmap_kptr = parent->binder_mmap_kptr;
     tasks[slot].mmap_base = parent->mmap_base;
     tasks[slot].wait_status = 0;
     tasks[slot].wait_code = 0;
@@ -1398,6 +1402,10 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     tasks[slot].euid = parent->euid;
     tasks[slot].egid = parent->egid;
     tasks[slot].user_rsp = stack_top ? stack_top : parent->user_rsp;
+    tasks[slot].binder_mmap_base = parent->binder_mmap_base;
+    tasks[slot].binder_mmap_size = parent->binder_mmap_size;
+    tasks[slot].binder_mmap_offset = parent->binder_mmap_offset;
+    tasks[slot].binder_mmap_kptr = parent->binder_mmap_kptr;
     tasks[slot].mmap_base = parent->mmap_base;
     tasks[slot].wait_status = 0;
     tasks[slot].wait_code = 0;

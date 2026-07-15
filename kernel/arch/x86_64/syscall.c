@@ -570,7 +570,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
 
         /* Check if this is a shared memory object (from /dev/shm) */
         extern int shmfs_truncate(fs_node_t*, uint32_t); /* Hack to identify shmfs nodes */
-        if (file_node && file_node->truncate && file_node->truncate == shmfs_truncate && (flags & 0x01)) { /* MAP_SHARED */
+        if (file_node && file_node->truncate && file_node->truncate == shmfs_truncate && ((flags & 0x01) || (flags & 0x02))) { /* MAP_SHARED or MAP_PRIVATE */
             is_shmfs = 1;
             shm_obj = (shm_object_t*)(uintptr_t)file_node->impl;
         } else if (file_node && (strcmp(file_node->name, "fb0") == 0 || strcmp(file_node->name, "card0") == 0)) {
@@ -653,7 +653,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
                 current->binder_mmap_base = start;
                 current->binder_mmap_size = len;
                 current->binder_mmap_offset = 0;
-                current->binder_mmap_kptr = (void*)phys;
+                current->binder_mmap_kptr = (void*)(virt);
             }
         } else if (is_properties) {
             /* __properties__ VMA - Map anonymous page and copy dummy properties */
