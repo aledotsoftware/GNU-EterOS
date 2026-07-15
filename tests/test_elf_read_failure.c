@@ -10,7 +10,8 @@
 
 /* Undefine macros from project headers so we can use standard libc functions */
 #undef memcpy
-#undef memset
+#define eteros_memset memset
+#define eteros_memcpy memcpy
 #undef strcmp
 #undef snprintf
 #undef vsnprintf
@@ -44,13 +45,13 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 #define PAGE_ALIGN_UP(x)   (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
 
 /* Mock Types */
-typedef uint64_t uint64_t;
-typedef uint32_t uint32_t;
-typedef uint16_t uint16_t;
-typedef uint8_t  uint8_t;
-typedef int32_t  int32_t;
-typedef int64_t  int64_t;
-typedef size_t   size_t;
+//typedef uint64_t uint64_t;
+//typedef uint32_t uint32_t;
+//typedef uint16_t uint16_t;
+//typedef uint8_t  uint8_t;
+//typedef int32_t  int32_t;
+//typedef int64_t  int64_t;
+//typedef size_t   size_t;
 
 /* Types from task.h */
 typedef uint64_t Elf64_Xword;
@@ -68,7 +69,7 @@ typedef struct {
 #define DT_NEEDED  1
 #define DT_STRTAB  5
 
-typedef struct {
+typedef struct task {
     char name[32];
     uint64_t os_abi;
     uint8_t is_linux;
