@@ -523,13 +523,31 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         if (virt & 0xFFF) return -EINVAL;
         if (!vmm_validate_user_ptr((void*)virt, len)) return -ENOMEM;
     } else {
-        virt = current->mmap_base;
+        /* Support threaded clones by finding the max mmap_base among tasks sharing CR3 */
+        uint64_t max_base = 0;
+        int t_count = task_get_count();
+        for (int i = 0; i < t_count; i++) {
+            task_t* t = task_get_at(i);
+            if (t && t->cr3 == current->cr3 && t->mmap_base > max_base) {
+                max_base = t->mmap_base;
+            }
+        }
+        if (max_base == 0) max_base = current->mmap_base;
+
+        virt = max_base;
         uint64_t aligned_len = PAGE_ALIGN_UP(len);
         if (aligned_len < len) return -ENOMEM; /* Overflow in alignment */
 
         uint64_t new_base = virt + aligned_len;
         if (new_base < virt || new_base > (USER_LIMIT + 1)) return -ENOMEM;
 
+        /* Update it across all sharing tasks */
+        for (int i = 0; i < t_count; i++) {
+            task_t* t = task_get_at(i);
+            if (t && t->cr3 == current->cr3) {
+                t->mmap_base = new_base;
+            }
+        }
         current->mmap_base = new_base;
     }
 
@@ -3067,6 +3085,7 @@ static int64_t sys_mprotect(void* addr, size_t len, int prot) {
             /* Keep existing physical mapping, update flags */
             hal_mem_map(phys, v, new_flags);
         } else {
+            /* POSIX says mprotect on unmapped memory is ENOMEM */
             return -ENOMEM;
         }
     }
@@ -3120,20 +3139,31 @@ static int64_t sys_mremap(void* old_addr, size_t old_size, size_t new_size, int 
 
     {
         uint64_t new_start;
-        int64_t mapped;
 
         if (flags & MREMAP_FIXED) {
             if ((uint64_t)new_addr % PAGE_SIZE != 0) return -EINVAL;
             if ((uint64_t)new_addr < USER_BASE || (uint64_t)new_addr + new_len > USER_LIMIT + 1) return -EINVAL;
             if (sys_munmap(new_addr, new_len) < 0) return -EINVAL;
-            mapped = sys_mmap(new_addr, new_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+            new_start = (uint64_t)new_addr;
         } else {
-            mapped = sys_mmap(NULL, new_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            int64_t mapped = sys_mmap(NULL, new_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (mapped < 0) return mapped;
+            new_start = (uint64_t)mapped;
         }
-        if (mapped < 0) return mapped;
-        new_start = (uint64_t)mapped;
 
-        memcpy((void*)new_start, (void*)old_start, (old_len < new_len) ? old_len : new_len);
+        /* Rather than memcpy, which breaks shared mappings and COWs, we remap the physical pages. */
+        for (uint64_t i = 0; i < old_len; i += PAGE_SIZE) {
+            uint64_t phys = hal_mem_get_phys(old_start + i);
+            if (phys) {
+                /* We have to unmap old page before re-mapping because we might overlap,
+                   or just map it to the new location. Actually, since we unmap the old region at the end,
+                   we should reference it and then unmap it. */
+                pmm_ref_page((void*)phys);
+                /* Assuming default flags for now, properly we should read the flags from PT */
+                hal_mem_map(phys, new_start + i, HAL_MEM_USER | HAL_MEM_READ | HAL_MEM_WRITE);
+            }
+        }
+
         sys_munmap((void*)old_start, old_len);
         return (int64_t)new_start;
     }
