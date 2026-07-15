@@ -98,31 +98,39 @@ static ssize_t proc_uptime_read(fs_node_t *node, uint32_t offset, uint32_t size,
 /* ========================================================================= */
 static ssize_t proc_meminfo_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node;
-    char meminfo_str[256];
+    char meminfo_str[512];
     char num_buf[32];
 
     uint64_t total = pmm_get_total_ram();
     uint64_t free = pmm_get_free_ram();
     uint64_t used = pmm_get_used_ram();
 
-    /* Format similar to Linux /proc/meminfo but simplified */
-    /* TotalRam: X kB */
+    /* Format similar to Linux /proc/meminfo */
     strlcpy(meminfo_str, "MemTotal:       ", sizeof(meminfo_str));
     itoa_s((int64_t)(total / 1024), num_buf, sizeof(num_buf), 10);
     strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
     strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
 
-    /* MemFree: Y kB */
     strlcat(meminfo_str, "MemFree:        ", sizeof(meminfo_str));
     itoa_s((int64_t)(free / 1024), num_buf, sizeof(num_buf), 10);
     strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
     strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
 
-    /* MemUsed: Z kB */
-    strlcat(meminfo_str, "MemUsed:        ", sizeof(meminfo_str));
+    strlcat(meminfo_str, "MemAvailable:   ", sizeof(meminfo_str));
+    itoa_s((int64_t)(free / 1024), num_buf, sizeof(num_buf), 10);
+    strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
+    strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
+
+    strlcat(meminfo_str, "Buffers:        0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "Cached:         0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "SwapCached:     0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "Active:         ", sizeof(meminfo_str));
     itoa_s((int64_t)(used / 1024), num_buf, sizeof(num_buf), 10);
     strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
     strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "Inactive:       0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "SwapTotal:      0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "SwapFree:       0 kB\n", sizeof(meminfo_str));
 
     size_t len = strlen(meminfo_str);
     if (offset >= len) return 0;

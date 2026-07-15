@@ -151,7 +151,8 @@ void test_proc_meminfo() {
 
     ASSERT(strstr(buffer, "MemTotal:       65536 kB"));
     ASSERT(strstr(buffer, "MemFree:        32768 kB"));
-    ASSERT(strstr(buffer, "MemUsed:        32768 kB"));
+    ASSERT(strstr(buffer, "MemAvailable:   32768 kB"));
+    ASSERT(strstr(buffer, "Active:         32768 kB"));
 
     kfree(meminfo_node);
     kfree(root);
@@ -181,6 +182,10 @@ void test_proc_directory() {
     /* Index 3: self */
     ASSERT(root->readdir(root, 3, &entry) == 0);
     ASSERT(eteros_strcmp(entry.name, "self") == 0);
+
+    /* Index 4: cpuinfo */
+    ASSERT(root->readdir(root, 4, &entry) == 0);
+    ASSERT(eteros_strcmp(entry.name, "cpuinfo") == 0);
 
     /* Test PID symlink */
     fs_node_t* self_node = root->finddir(root, "self");
