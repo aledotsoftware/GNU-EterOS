@@ -7,7 +7,7 @@ kernel/gfx/, kernel/drivers/video/
 Framebuffer/gfx/window/UI shell y panel gráfico.
 
 ## Current Goal
-Continuar con las mejoras visuales y prototipo del compositor (referencia `test_compositor`) y preparar el renderizado para el GNU Desktop. [ASIGNADO PARA EL PRESENTE CICLO]
+Implementar prototipo de animación del compositor visual (`test_compositor`) en `kernel/shell/cmd_misc.c` utilizando APIs del kernel como `timer_sleep` y `window_invalidate` (y `compositor_render` si es necesario), probando que las ventanas se muevan en bucle en el entorno gráfico, sentando bases prácticas para GNU Desktop sobre EterOS. [ASIGNADO PARA EL PRESENTE CICLO]
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

@@ -7,7 +7,7 @@ ORCHESTRATOR_REPORT.md, README.md, tests/run_integration.sh, agents/**/*.md
 Auditoría global, priorización, actualización de agentes/reportes.
 
 ## Current Goal
-[Completado] Se verificó que los tests y compilación del kernel funcionan. Se actualizó el ORCHESTRATOR_REPORT.md para reflejar que la próxima acción la realizará el \`userspace-libc-posix-bot\` expandiendo el soporte de API POSIX necesario para las coreutils, luego de la corrección de fallas.
+[Completado] Se verificó que los tests y compilación (incluido pruebas de integración QEMU y de UI web) operan exitosamente. Se actualizó el ORCHESTRATOR_REPORT.md para reflejar que la próxima acción la realizará el `graphics-power-panel-bot`, enfocándose en el bucle de animación para `test_compositor`.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
