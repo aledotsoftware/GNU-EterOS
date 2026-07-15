@@ -116,6 +116,9 @@ static void shell_run_user_task(void) {
     if (cpu) cpu->user_stack_scratch = rsp;
 
     kfree(path);
+#ifndef __ETEROS_HOST_TEST__
+    __asm__ volatile ("wrmsr" : : "c" (0xC0000100 /* MSR_FS_BASE */), "a" ((uint32_t)(current->fs_base & 0xFFFFFFFF)), "d" ((uint32_t)(current->fs_base >> 32)));
+#endif
     enter_user_mode((void*)entry_point, (void*)rsp);
 }
 

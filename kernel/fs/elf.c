@@ -438,7 +438,7 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         }
     }
 
-    if (current && base_vaddr == 0) {
+    if (current && (base_vaddr == 0 || base_vaddr == 0x200000000)) {
         current->brk = max_vaddr;
         serial_write_string("[ELF] Set process BRK to 0x");
         char brk_buf[32];
@@ -447,19 +447,43 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         serial_write_string("\n");
 
         /* Handle static TLS allocation for main executable if required */
+        /* We always allocate a TCB for the main executable because x86-64 System V ABI programs expect fs:0 to point to a valid TCB. */
+        uint64_t aligned_tls_size = 0;
         if (current->tls_memsz > 0) {
-            uint64_t tls_size = PAGE_ALIGN_UP(current->tls_memsz + current->tls_align);
-            uint64_t tls_alloc = current->mmap_base;
-            for (uint64_t p = 0; p < tls_size; p += PAGE_SIZE) {
-                hal_mem_map((uint64_t)pmm_alloc_page(), tls_alloc + p, HAL_MEM_USER | HAL_MEM_WRITE);
-                memset((void*)(tls_alloc + p), 0, PAGE_SIZE);
-            }
-            if (current->tls_filesz > 0 && current->tls_vaddr != 0) {
-                memcpy((void*)tls_alloc, (void*)current->tls_vaddr, current->tls_filesz);
-            }
-            current->fs_base = tls_alloc;
-            current->mmap_base = PAGE_ALIGN_UP(tls_alloc + tls_size + PAGE_SIZE);
+            aligned_tls_size = (current->tls_memsz + current->tls_align - 1) & ~(current->tls_align - 1);
+        } else {
+            /* If PT_TLS is missing but the compiler emitted TLS variables (e.g. __thread int errno),
+               it expects them at negative offsets from TCB. We pad `aligned_tls_size` to prevent page faults. */
+            aligned_tls_size = 4096;
         }
+
+        uint64_t tcb_size = 64;
+        uint64_t total_size = PAGE_ALIGN_UP(aligned_tls_size + tcb_size);
+
+        uint64_t tls_alloc = current->mmap_base;
+        for (uint64_t p = 0; p < total_size; p += PAGE_SIZE) {
+            hal_mem_map((uint64_t)pmm_alloc_page(), tls_alloc + p, HAL_MEM_USER | HAL_MEM_WRITE);
+            memset((void*)(tls_alloc + p), 0, PAGE_SIZE);
+        }
+
+        /* Under x86_64 System V ABI (Variant II), TLS variables are located at NEGATIVE offsets from the TCB.
+           The TCB is at the end of the TLS block. */
+        uint64_t tcb_addr = tls_alloc + aligned_tls_size;
+
+        if (current->tls_memsz > 0 && current->tls_filesz > 0 && current->tls_vaddr != 0) {
+            /* Copy the TLS initialization image just BEFORE the TCB */
+            memcpy((void*)(tcb_addr - current->tls_memsz), (void*)current->tls_vaddr, current->tls_filesz);
+        }
+
+        /* TCB must point to itself at offset 0 */
+        *(uint64_t*)tcb_addr = tcb_addr;
+
+        current->fs_base = tcb_addr;
+#ifndef __ETEROS_HOST_TEST__
+        /* Can't include msr.h directly inside a function, let's use inline asm */
+        __asm__ volatile ("wrmsr" : : "c" (0xC0000100 /* MSR_FS_BASE */), "a" ((uint32_t)(tcb_addr & 0xFFFFFFFF)), "d" ((uint32_t)(tcb_addr >> 32)));
+#endif
+        current->mmap_base = PAGE_ALIGN_UP(tls_alloc + total_size + PAGE_SIZE);
     } else if (current) {
         /* Advance mmap_base for shared libraries */
         current->mmap_base = PAGE_ALIGN_UP(max_vaddr + PAGE_SIZE);
