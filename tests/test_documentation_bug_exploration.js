@@ -67,10 +67,10 @@ function testOutdatedInformation() {
     return false;
   }
   
-  // Verificar copyright 2026 (información desactualizada)
-  if (content.includes('2026')) {
-    counterexamples.push('README.md contiene "2026" (copyright desactualizado)');
-    console.log(`${RED}✗ FALLO: README.md contiene "2026" (información desactualizada)${RESET}`);
+  // Verificar copyright 2025 (información desactualizada)
+  if (content.includes('2025')) {
+    counterexamples.push('README.md contiene "2025" (copyright desactualizado)');
+    console.log(`${RED}✗ FALLO: README.md contiene "2025" (información desactualizada)${RESET}`);
     return false;
   }
   

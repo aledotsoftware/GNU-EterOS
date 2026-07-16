@@ -1,6 +1,6 @@
 /**
  * éterOS - 8259 PIC Implementation
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Inicialización y control del Programmable Interrupt Controller.
  * Remapea IRQs para evitar conflictos con excepciones de CPU.

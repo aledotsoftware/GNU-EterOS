@@ -1,6 +1,6 @@
 /**
  * éterOS - Timer API (PIT 8254)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  */
 
 #ifndef ETEROS_TIMER_H

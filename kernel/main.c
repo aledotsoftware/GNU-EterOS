@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - Kernel Main
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  * 
  * Punto de entrada principal del kernel de éterOS.
@@ -331,7 +331,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
     /* ---- Log de depuración ---- */
     klog(KLOG_INFO, "Kernel loaded.\n");
-    klog(KLOG_INFO, "(c) 2026 Tudex Networks\n");
+    klog(KLOG_INFO, "(c) 2025 Tudex Networks\n");
 
     /* ---- 6. Información del sistema ---- */
     kernel_print_sysinfo();
@@ -436,7 +436,7 @@ static void kernel_print_banner(void) {
             ETEROS_VERSION_MAJOR, ETEROS_VERSION_MINOR, ETEROS_VERSION_PATCH, ETEROS_CODENAME);
 
     /* Copyright */
-    hal_console_write("       \033[38;2;120;120;120m(c) 2026 Tudex Networks \033[38;2;80;80;80m| Premium Edition\033[0m\n");
+    hal_console_write("       \033[38;2;120;120;120m(c) 2025 Tudex Networks \033[38;2;80;80;80m| Premium Edition\033[0m\n");
     
     hal_console_write("\033[38;2;0;200;255m  ====================================================================\033[0m\n");
     hal_console_write("\n");

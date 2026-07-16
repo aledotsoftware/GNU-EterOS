@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - Hardware Abstraction Layer (HAL)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  *
  * La HAL es la capa que hace a éterOS universal.

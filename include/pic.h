@@ -1,6 +1,6 @@
 /**
  * éterOS - 8259 PIC (Programmable Interrupt Controller)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * El PIC traduce IRQs de hardware en interrupciones de CPU.
  * Se remapea IRQ 0-7 a INT 32-39 e IRQ 8-15 a INT 40-47

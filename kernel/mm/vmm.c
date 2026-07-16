@@ -1,6 +1,6 @@
 /**
  * éterOS - Virtual Memory Manager (VMM)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * 
  * Gestiona la paginación de 4 niveles (x86_64 Long Mode).
  * Controla PML4, PDPT, PD, PT para mapear direcciones virtuales a físicas.

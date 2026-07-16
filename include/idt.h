@@ -1,6 +1,6 @@
 /**
  * éterOS - Interrupt Descriptor Table (IDT)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Gestión de interrupciones para x86_64 Long Mode y i386 Protected Mode.
  * Tabla de 256 entradas que define los handlers para:

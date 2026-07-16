@@ -1,6 +1,6 @@
 /**
  * éterOS - Task Scheduler (Round-Robin Preemptive)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Multitarea preemptiva con Round-Robin.
  * Cada tarea tiene su propio stack de kernel (4 KB).

@@ -1,6 +1,6 @@
 /**
  * éterOS - IDT Implementation (i386 / 32-bit Protected Mode)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Configura la Interrupt Descriptor Table para modo de 32 bits.
  * Usa __attribute__((interrupt)) de GCC para generar los ISR stubs.

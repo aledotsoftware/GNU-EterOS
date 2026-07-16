@@ -1,6 +1,6 @@
 /**
  * éterOS - RTC Driver (Real Time Clock)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  */
 
 #include "rtc.h"

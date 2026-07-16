@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - SantiTravel v1.1
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  *
  * Primera aplicación nativa del ecosistema éterOS.

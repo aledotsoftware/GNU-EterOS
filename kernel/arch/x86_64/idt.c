@@ -1,6 +1,6 @@
 /**
  * éterOS - IDT Implementation (x86_64)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Configura la Interrupt Descriptor Table con handlers para:
  *   - Excepciones de CPU (0-31): Division by zero, Page fault, etc.
