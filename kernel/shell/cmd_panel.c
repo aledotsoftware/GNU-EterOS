@@ -1,4 +1,5 @@
 #include "shell_internal.h"
+#include "../../include/stdio.h"
 #include "../../include/keyboard.h"
 #include "../../include/net/defs.h"
 #include "../../include/mouse.h"
@@ -273,8 +274,48 @@ static void panel_time(void) {
     cmd_clear("");
     terminal_set_cursor(2, 1);
     terminal_write_string("-- Tiempo --");
-    terminal_set_cursor(0, 3);
-    cmd_time("");
+
+    rtc_time_t utc, local;
+    rtc_get_time(&utc);
+    rtc_get_local_time(&utc, &local);
+
+    char buf[16];
+
+    terminal_set_cursor(2, 3);
+    terminal_write_string("Hora Local:  ");
+    itoa_s(local.hours, buf, sizeof(buf), 10);
+    if(local.hours < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+    terminal_write_string(":");
+    itoa_s(local.minutes, buf, sizeof(buf), 10);
+    if(local.minutes < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+    terminal_write_string(":");
+    itoa_s(local.seconds, buf, sizeof(buf), 10);
+    if(local.seconds < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+
+    terminal_write_string("  (Offset: ");
+    int8_t tz = rtc_get_timezone();
+    itoa_s(tz, buf, sizeof(buf), 10);
+    if (tz > 0) terminal_write_string("+");
+    terminal_write_string(buf);
+    terminal_write_string(")");
+
+    terminal_set_cursor(2, 4);
+    terminal_write_string("Hora UTC:    ");
+    itoa_s(utc.hours, buf, sizeof(buf), 10);
+    if(utc.hours < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+    terminal_write_string(":");
+    itoa_s(utc.minutes, buf, sizeof(buf), 10);
+    if(utc.minutes < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+    terminal_write_string(":");
+    itoa_s(utc.seconds, buf, sizeof(buf), 10);
+    if(utc.seconds < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+
     terminal_set_cursor(2, 9);
     terminal_write_string("1. Sincronizar via red (NTP / Resolucion DNS)");
     terminal_set_cursor(2, 10);
@@ -298,15 +339,8 @@ static void panel_time(void) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            // The output of cmd_time is about 6 lines long.
-            // Menu starts at roughly y=10.
-            // "1. Sincronizar via red"
-            // "2. Zona Horaria"
-            // "3. Zona Horaria UTC"
-            // "4. Sincronizacion Manual"
             if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                // Approximate mapping based on typical cmd_time length
-                if (panel_mouse_y >= 9 && panel_mouse_y <= 12) { // 6 lines from cmd_time + title
+                if (panel_mouse_y >= 9 && panel_mouse_y <= 12) {
                     c = '1' + (panel_mouse_y - 9);
                     if (c > '4') c = '4'; // Clamping
                     break;
@@ -553,8 +587,42 @@ void cmd_panel(const char* args) {
                 cmd_clear("");
                 terminal_set_cursor(2, 1);
                 terminal_write_string("-- Red y Conectividad --");
-                terminal_set_cursor(0, 3);
-                cmd_net("");
+
+                uint8_t* net_get_mac(void);
+                uint8_t* mac = net_get_mac();
+                char buf[64];
+
+                terminal_set_cursor(2, 3);
+                if (!mac) {
+                    terminal_write_string("MAC Address: Error (not found)");
+                } else {
+                    snprintf(buf, sizeof(buf), "MAC Address: %02x:%02x:%02x:%02x:%02x:%02x",
+                        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+                    terminal_write_string(buf);
+                }
+
+                terminal_set_cursor(2, 5);
+                if (network_ready) {
+                    terminal_write_string("State: UP");
+
+                    terminal_set_cursor(2, 6);
+                    snprintf(buf, sizeof(buf), "IP Address: %d.%d.%d.%d",
+                        (my_ip >> 24) & 0xFF, (my_ip >> 16) & 0xFF, (my_ip >> 8) & 0xFF, my_ip & 0xFF);
+                    terminal_write_string(buf);
+
+                    terminal_set_cursor(2, 7);
+                    snprintf(buf, sizeof(buf), "Gateway: %d.%d.%d.%d",
+                        (gateway_ip >> 24) & 0xFF, (gateway_ip >> 16) & 0xFF, (gateway_ip >> 8) & 0xFF, gateway_ip & 0xFF);
+                    terminal_write_string(buf);
+
+                    terminal_set_cursor(2, 8);
+                    snprintf(buf, sizeof(buf), "DNS: %d.%d.%d.%d",
+                        (dns_ip >> 24) & 0xFF, (dns_ip >> 16) & 0xFF, (dns_ip >> 8) & 0xFF, dns_ip & 0xFF);
+                    terminal_write_string(buf);
+                } else {
+                    terminal_write_string("State: DOWN (Link or DHCP pending)");
+                }
+
                 terminal_set_cursor(2, 11);
                 terminal_write_string("1. Renovar DHCP");
                 terminal_set_cursor(2, 12);
@@ -562,7 +630,7 @@ void cmd_panel(const char* args) {
                 terminal_set_cursor(2, 14);
                 terminal_write_string("Elija [1-2] o ESC para volver.");
                 char c = 0;
-                int start_y = 11;
+
                 while (1) {
                     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
                     if (keyboard_has_input()) {
@@ -572,8 +640,8 @@ void cmd_panel(const char* args) {
                     if (panel_mouse_clicked) {
                         panel_mouse_clicked = false;
                         if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                            if (panel_mouse_y >= start_y && panel_mouse_y <= start_y + 1) { // 7 lines from cmd_net + title + newline
-                                c = '1' + (panel_mouse_y - start_y);
+                            if (panel_mouse_y >= 11 && panel_mouse_y <= 12) {
+                                c = '1' + (panel_mouse_y - 11);
                                 if (c > '2') c = '2';
                                 break;
                             } else {
