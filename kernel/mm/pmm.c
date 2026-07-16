@@ -215,7 +215,7 @@ void pmm_init(void) {
     extern uint8_t _kernel_start;
     ASSERT((uint64_t)&_kernel_start >= 0x100000 && "Kernel no esta cargado en 1MB!");
     ASSERT((uint64_t)pmm_bitmap == 0x1A000 && "PMM Bitmap no esta en la region correcta!");
-    ASSERT((uint64_t)pmm_ref_counts > ((uint64_t)pmm_bitmap + pmm_bitmap_size) - 4096 && "PMM RefCounts colisionan con el Bitmap");
+    ASSERT((uint64_t)pmm_ref_counts >= ((uint64_t)pmm_bitmap + pmm_bitmap_size) && "PMM RefCounts colisionan con el Bitmap");
 
     /* Inicializar bitmap: MARCAR TODO COMO USADO (1) por defecto */
     /* Luego liberaremos solo las regiones USABLE del mapa E820 */
@@ -227,7 +227,7 @@ void pmm_init(void) {
     }
 
     used_ram = total_ram; /* Temporalmente todo usado */
-    serial_write_string("[PMM] Bitmap at 0x400000, processing E820 regions...\n");
+    serial_write_string("[PMM] Bitmap at 0x1A000, processing E820 regions...\n");
 
     /* 3. Procesar mapa E820 y liberar regiones usables */
     for (uint32_t i = 0; i < mem_map->entry_count; i++) {

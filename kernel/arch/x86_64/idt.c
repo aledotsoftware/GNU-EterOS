@@ -298,7 +298,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     __asm__ volatile("mov %%rbp, %0" : "=r"(rbp));
     for (int i=0; i<15 && rbp != NULL; i++) {
         /* Instead check if it maps to physical memory. Verify rbp and rbp+1 */
-        if (!vmm_virt_to_phys((uint64_t)rbp)) {
+        if ((uint64_t)rbp == 0 || ((uint64_t)rbp % 8 != 0) || !vmm_virt_to_phys((uint64_t)rbp)) {
             serial_write_string("  <Invalid RBP pointer>\n");
             break;
         }

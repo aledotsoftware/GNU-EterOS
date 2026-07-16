@@ -251,6 +251,8 @@ void vmm_unmap_page(uint64_t virt_addr) {
 }
 
 uint64_t vmm_virt_to_phys(uint64_t virt_addr) {
+    if (virt_addr == 0) return 0;
+
     uint64_t pml4_idx = PML4_INDEX(virt_addr);
     uint64_t pdpt_idx = PDPT_INDEX(virt_addr);
     uint64_t pd_idx   = PD_INDEX(virt_addr);
@@ -619,11 +621,7 @@ static void free_pt_recursive(pt_entry_t* table, int level) {
         if (!(table[i] & PAGE_PRESENT)) continue;
 
         /* Skip Kernel Mappings */
-        /* Level 4 (PML4): Index != 0 -> Kernel (Higher Half) */
-        if (level == 4 && i != 0) continue;
-
-        /* Level 3 (PDPT inside PML4[0]): Index < 8 -> Kernel Identity Map (0-8GB) */
-        if (level == 3 && i < 8) continue;
+        if (!(table[i] & PAGE_USER)) continue;
 
         /* Skip HUGE pages (already handled or kernel mapped) */
         if ((level == 3 || level == 2) && (table[i] & PAGE_HUGE)) {
