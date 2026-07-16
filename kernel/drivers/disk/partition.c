@@ -234,7 +234,11 @@ static fs_node_t *create_partition_node(int index) {
     return node;
 }
 
-fs_node_t *partition_get_active_root(void) {
+// Helper to compute the boot partition index securely once, mitigating post-boot changes.
+static int get_booted_active_index(void) {
+    static int cached_active_idx = -1;
+    if (cached_active_idx != -1) return cached_active_idx;
+
     int active_idx = active_partition_index;
     uint8_t nvram_part = nvram_get_boot_partition();
     uint8_t update_state = nvram_get_update_state();
@@ -249,6 +253,17 @@ fs_node_t *partition_get_active_root(void) {
         }
     }
 
+    // Cache the resolved boot index
+    if (active_idx == 0 || active_idx == 1) {
+        cached_active_idx = active_idx;
+    }
+
+    return active_idx;
+}
+
+fs_node_t *partition_get_active_root(void) {
+    int active_idx = get_booted_active_index();
+
     if (active_idx != 0 && active_idx != 1) return NULL;
 
     if (active_idx < 0 || active_idx >= partition_count) return NULL;
@@ -259,17 +274,7 @@ fs_node_t *partition_get_active_root(void) {
 fs_node_t *partition_get_passive_root(void) {
     if (partition_count < 2) return NULL;
 
-    int active_idx = active_partition_index;
-    uint8_t nvram_part = nvram_get_boot_partition();
-    uint8_t update_state = nvram_get_update_state();
-
-    if (nvram_part != 0xFF && nvram_part < partition_count) {
-        if (update_state == UPDATE_STATE_PENDING) {
-            active_idx = (nvram_part == 0) ? 1 : 0;
-        } else {
-            active_idx = nvram_part;
-        }
-    }
+    int active_idx = get_booted_active_index();
 
     // Ensure active_idx is strictly 0 or 1 before flipping
     if (active_idx != 0 && active_idx != 1) {
