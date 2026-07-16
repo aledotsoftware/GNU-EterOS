@@ -81,6 +81,13 @@ int main(int argc, char *argv[]) {
         close(fd);
         return 1;
     }
+    if (chmod("/etc/shadow.tmp", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow.tmp\n");
+        close(temp_fd);
+        close(fd);
+        unlink("/etc/shadow.tmp");
+        return 1;
+    }
 
     int found = 0;
     char line[MAX_LINE];
@@ -139,7 +146,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    rename("/etc/shadow.tmp", "/etc/shadow");
+    if (rename("/etc/shadow.tmp", "/etc/shadow") < 0) {
+        printf("Error: Failed to rename /etc/shadow.tmp\n");
+        return 1;
+    }
 
     /* Enforce shadow file permissions */
     chmod("/etc/shadow", 0600);

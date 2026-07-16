@@ -38,6 +38,9 @@ int main(int argc, char *argv[]) {
     } else {
         close(passwd_fd);
     }
+    if (chmod("/etc/passwd", 0644) < 0) {
+        printf("Error: Failed to set permissions on /etc/passwd\n");
+    }
 
     /* Initialize /etc/shadow if missing */
     int shadow_fd = open("/etc/shadow", O_RDONLY);
@@ -52,7 +55,9 @@ int main(int argc, char *argv[]) {
         close(shadow_fd);
     }
     /* Always enforce shadow file permissions to 0600 */
-    chmod("/etc/shadow", 0600);
+    if (chmod("/etc/shadow", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow\n");
+    }
 
     /* Check for preferred shell from argv */
     const char* preferred_shell = "sh.elf";

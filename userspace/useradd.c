@@ -129,6 +129,13 @@ int main(int argc, char *argv[]) {
         if (fd >= 0) close(fd);
         return 1;
     }
+    if (chmod("/etc/passwd.tmp", 0644) < 0) {
+        printf("Error: Failed to set permissions on /etc/passwd.tmp\n");
+        close(temp_fd);
+        if (fd >= 0) close(fd);
+        unlink("/etc/passwd.tmp");
+        return 1;
+    }
 
     if (fd >= 0) {
         char line[MAX_LINE];
@@ -142,7 +149,10 @@ int main(int argc, char *argv[]) {
     snprintf(passwd_entry, sizeof(passwd_entry), "%s:x:%d:%d::/home/%s:/bin/sh\n", username, next_uid, next_uid, username);
     write(temp_fd, passwd_entry, strlen(passwd_entry));
     close(temp_fd);
-    rename("/etc/passwd.tmp", "/etc/passwd");
+    if (rename("/etc/passwd.tmp", "/etc/passwd") < 0) {
+        printf("Error: Failed to rename /etc/passwd.tmp\n");
+        return 1;
+    }
 
     /* Check if shadow exists */
     int fd_shadow = open("/etc/shadow", O_RDONLY);
@@ -165,6 +175,13 @@ int main(int argc, char *argv[]) {
         if (fd_shadow >= 0) close(fd_shadow);
         return 1;
     }
+    if (chmod("/etc/shadow.tmp", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow.tmp\n");
+        close(temp_shadow_fd);
+        if (fd_shadow >= 0) close(fd_shadow);
+        unlink("/etc/shadow.tmp");
+        return 1;
+    }
 
     if (fd_shadow >= 0) {
         char line[MAX_LINE];
@@ -178,7 +195,10 @@ int main(int argc, char *argv[]) {
     snprintf(shadow_entry, sizeof(shadow_entry), "%s:%s:19000:0:99999:7:::\n", username, hash_str);
     write(temp_shadow_fd, shadow_entry, strlen(shadow_entry));
     close(temp_shadow_fd);
-    rename("/etc/shadow.tmp", "/etc/shadow");
+    if (rename("/etc/shadow.tmp", "/etc/shadow") < 0) {
+        printf("Error: Failed to rename /etc/shadow.tmp\n");
+        return 1;
+    }
 
     /* Enforce file permissions */
     chmod("/etc/shadow", 0600);
