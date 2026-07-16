@@ -118,6 +118,9 @@ int main(int argc, char *argv[]) {
             const char* root_entry = "root:x:0:0:root:/root:/bin/sh\n";
             write(fd, root_entry, strlen(root_entry));
             close(fd);
+        } else {
+            printf("Error: Could not create /etc/passwd\n");
+            return 1;
         }
     }
 
@@ -162,6 +165,9 @@ int main(int argc, char *argv[]) {
             const char* root_entry = "root::19000:0:99999:7:::\n";
             write(fd_shadow, root_entry, strlen(root_entry));
             close(fd_shadow);
+        } else {
+            printf("Error: Could not create /etc/shadow\n");
+            return 1;
         }
     } else {
         close(fd_shadow);
