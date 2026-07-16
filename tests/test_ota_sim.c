@@ -76,11 +76,7 @@ fs_node_t* partition_get_active_root() {
     uint8_t update_state = nvram_get_update_state();
 
     if (nvram_part != 0xFF) {
-        if (update_state == UPDATE_STATE_PENDING) {
-            node->impl = (nvram_part == 0) ? 1 : 0;
-        } else {
-            node->impl = nvram_part;
-        }
+        node->impl = nvram_part;
     } else {
         node->impl = 0; // Default active
     }

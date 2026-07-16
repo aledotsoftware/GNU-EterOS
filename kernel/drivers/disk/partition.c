@@ -244,13 +244,7 @@ static int get_booted_active_index(void) {
     uint8_t update_state = nvram_get_update_state();
 
     if (nvram_part != 0xFF && nvram_part < partition_count) {
-        if (update_state == UPDATE_STATE_PENDING) {
-            // If an update is pending, NVRAM holds the *next* boot partition.
-            // The currently active partition (the one we booted from) is the other one.
-            active_idx = (nvram_part == 0) ? 1 : 0;
-        } else {
-            active_idx = nvram_part;
-        }
+        active_idx = nvram_part;
     }
 
     // Cache the resolved boot index

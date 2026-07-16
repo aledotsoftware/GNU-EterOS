@@ -1,0 +1,57 @@
+--- kernel/shell/cmd_ota.c
++++ kernel/shell/cmd_ota.c
+@@ -17,6 +17,8 @@
+
+ static char ota_repo_url[OTA_MAX_URL] = "http://repo.eteros.org/updates";
+
++static bool ota_reboot_pending = false;
++
+ static uint16_t parse_url(const char* url, char* host, size_t host_size, char* path, size_t path_size) {
+     uint16_t port = 80;
+     if (strncmp(url, "http://", 7) == 0) {
+@@ -118,7 +120,7 @@
+
+         terminal_write_string("\n\n  [Estado de Actualizacion]: ");
+         if (current_update_state == UPDATE_STATE_PENDING) {
+-            if (current_booted == nvram_get_boot_partition()) {
++            if (!ota_reboot_pending) {
+                 terminal_write_string("Pendiente (Se requiere 'ota confirm' o hara rollback en prox reinicio)");
+             } else {
+                 terminal_write_string("Pendiente (Reinicio requerido para aplicar)");
+@@ -677,6 +679,7 @@
+         // Commit atomic switch
+         nvram_set_boot_partition(next_part);
+         nvram_set_update_state(UPDATE_STATE_PENDING);
++        ota_reboot_pending = true;
+
+         terminal_write_string("  [OTA] Actualizacion completada con exito.\n");
+         terminal_write_string("  [OTA] El sistema arrancara desde el Slot ");
+@@ -685,6 +688,7 @@
+     } else if (strcmp(subcmd, "confirm") == 0) {
+         if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
+             nvram_set_update_state(UPDATE_STATE_SUCCESS);
++            ota_reboot_pending = false;
+             terminal_write_string("  [OTA] Actualizacion confirmada como exitosa.\n");
+         } else {
+             terminal_write_string("  [OTA] No hay ninguna actualizacion pendiente por confirmar.\n");
+@@ -696,16 +700,17 @@
+                 uint8_t current_booted = active_node->impl;
+                 uint8_t nvram_target = nvram_get_boot_partition();
+
+-                if (current_booted == nvram_target) {
++                if (!ota_reboot_pending) {
+                     // We have already rebooted into the new slot. Rollback to the OTHER slot.
+-                    uint8_t rollback_part = (current_booted == 0) ? 1 : 0;
++                    uint8_t rollback_part = (nvram_target == 0) ? 1 : 0;
+                     nvram_set_boot_partition(rollback_part);
+                     nvram_set_update_state(UPDATE_STATE_FAILED);
+                     terminal_write_string("  [OTA] Rollback post-reinicio ejecutado. El sistema regresara al slot original en el proximo reinicio.\n");
+                 } else {
+                     // We haven't rebooted yet. The active node is our original slot.
+                     // Rollback simply means setting the boot partition back to our current slot.
+-                    nvram_set_boot_partition(current_booted);
++                    uint8_t original_part = (nvram_target == 0) ? 1 : 0;
++                    nvram_set_boot_partition(original_part);
+                     nvram_set_update_state(UPDATE_STATE_FAILED);
+                     terminal_write_string("  [OTA] Rollback pre-reinicio ejecutado. La actualizacion pendiente ha sido cancelada.\n");
+                 }
