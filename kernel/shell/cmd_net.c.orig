@@ -36,12 +36,12 @@ void cmd_net(const char* args) {
         terminal_write_string(buf);
     } else {
         terminal_write_string("State: DOWN (Link or DHCP pending)\n");
+        terminal_write_string("\n\n\n");
     }
-
-    // Ensure exactly 6 output lines following the title
+    // Pad output to always be exactly 6 lines after the title
     if (!network_ready) {
-        // We only emitted MAC and State: DOWN, so we need 4 blank lines to reach 6 total.
-        terminal_write_string("\n\n\n\n");
+        // Output already has 1 line (MAC) + 1 line (State) + 3 newlines = 5 lines. Add 1 more.
+        terminal_write_string("\n");
     }
 }
 
