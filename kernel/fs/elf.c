@@ -472,7 +472,7 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
 
         if (current->tls_memsz > 0 && current->tls_filesz > 0 && current->tls_vaddr != 0) {
             /* Copy the TLS initialization image just BEFORE the TCB */
-            memcpy((void*)(tcb_addr - current->tls_memsz), (void*)current->tls_vaddr, current->tls_filesz);
+            memcpy((void*)(tcb_addr - aligned_tls_size), (void*)current->tls_vaddr, current->tls_filesz);
         }
 
         /* TCB must point to itself at offset 0 */

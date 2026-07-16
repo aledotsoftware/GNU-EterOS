@@ -1,6 +1,8 @@
 #ifndef _SYSLOG_H
 #define _SYSLOG_H
 
+#include <errno.h>
+
 #define LOG_EMERG   0
 #define LOG_ALERT   1
 #define LOG_CRIT    2

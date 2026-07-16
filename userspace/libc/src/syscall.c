@@ -32,14 +32,14 @@ static inline long syscall2(long n, long a1, long a2) {
         errno = (int)(-(ret)); \
         return -1; \
     } \
-    return (int)(ret);
+    return (int)(ret)
 
 #define SYSCALL_RETURN_PTR(ret) \
     if ((unsigned long)(ret) >= (unsigned long)-4095) { \
         errno = (int)(-(ret)); \
         return (void*)-1; \
     } \
-    return (void*)(ret);
+    return (void*)(ret)
 
 static inline long syscall3(long n, long a1, long a2, long a3) {
     long ret;
@@ -448,7 +448,8 @@ void syslog(int priority, const char *format, ...) {
     va_start(ap, format);
     vsnprintf(buf, sizeof(buf), format, ap);
     va_end(ap);
-    syscall3(SYS_syslog, priority, (long)buf, strlen(buf));
+    long ret = syscall3(SYS_syslog, priority, (long)buf, strlen(buf));
+    if ((unsigned long)ret >= (unsigned long)-4095) { errno = (int)(-ret); return; }
 }
 
 int msync(void *addr, size_t length, int flags) {
@@ -576,7 +577,10 @@ int personality(unsigned long persona) {
 
 int getpriority(int which, int who) {
     long ret = syscall2(SYS_getpriority, which, who);
-    SYSCALL_RETURN(ret);
+    if ((unsigned long)ret >= (unsigned long)-4095) {
+        errno = (int)(-ret);
+        return -1;
+    }
     return 20 - (int)ret;
 }
 
