@@ -488,7 +488,8 @@ test-web:
 # ---- UI Verification Scripts ----
 test-verification:
 	@echo "[TEST] Ejecutando UI Verification Scripts..."
-	@. venv/bin/activate && set -e; for test in verification/verify_*.py; do echo "Running $$test"; python3 "$$test"; done
+	@if [ ! -d "venv" ]; then python3 -m venv venv && . venv/bin/activate && pip install playwright pytest && playwright install; fi
+	@. venv/bin/activate && set -e; for test in verification/verify_*.py; do echo "Running $$test"; if ! python3 "$$test"; then exit 1; fi; done
 
 test-all: test test-integration test-web test-verification
 	@echo "All tests passed successfully!"
