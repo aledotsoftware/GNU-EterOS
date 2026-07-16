@@ -1,6 +1,6 @@
 /**
  * éterOS - SantiTravel: Primera Aplicación Nativa
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Registro de viajes y aventuras con Santi.
  * Primera app oficial del ecosistema éterOS.

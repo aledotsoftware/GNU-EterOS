@@ -1,6 +1,6 @@
 /**
  * éterOS - Driver de Teclado PS/2
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Maneja el teclado PS/2 mediante IRQ1.
  * Traduce scancodes (Set 1) a caracteres ASCII.

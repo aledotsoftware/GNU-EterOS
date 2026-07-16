@@ -1,4 +1,4 @@
-## 2026-03-09 - Framebuffer Window Control Hover States
+## 2025-03-09 - Framebuffer Window Control Hover States
 **Learning:** In raw framebuffer environments without native DOM/CSS elements, providing immediate interactive feedback is crucial for UX since users lack standard cursor change cues. Redrawing the entire screen () on every mouse movement event () to display hover states on window controls causes massive latency and flickering. However, failing to provide hover indicators (like 'X' on close buttons) makes the UI feel unresponsive.
 **Action:** Implement localized, conditional redrawing. Track the currently hovered interactive element (e.g., ) during the mouse movement loop. Only trigger a targeted redraw of the specific UI component (like ) when the mouse enters or leaves its bounding box, providing instant visual feedback while avoiding the performance penalty of a full-screen clear.
 

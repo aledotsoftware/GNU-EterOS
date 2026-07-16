@@ -8,7 +8,7 @@
   - **OBJETIVO**: Identificar contraejemplos que demuestran que la documentación es defectuosa
   - **Enfoque PBT Acotado**: Para bugs determinísticos de documentación, acotar la propiedad a casos concretos fallidos
   - Test de implementación basado en Bug Condition del diseño:
-    - Verificar que README.md contiene "2026" (información desactualizada)
+    - Verificar que README.md contiene "2025" (información desactualizada)
     - Verificar que kernel/drivers/README.md NO existe (documentación faltante)
     - Verificar que kernel/fs/README.md NO existe (documentación faltante)
     - Verificar que kernel/net/README.md NO existe (documentación faltante)
@@ -50,7 +50,7 @@
 - [-] 3. Corrección de documentación desactualizada, faltante e incompleta
 
   - [x] 3.1 Actualizar README.md principal
-    - Corregir copyright de "2026" al año actual
+    - Corregir copyright de "2025" al año actual
     - Verificar y actualizar versión de "v0.2.0" a la versión actual del proyecto
     - Revisar comandos de compilación para asegurar que están actualizados
     - PRESERVAR secciones técnicas correctas (arquitectura Ether-Core, gestión de memoria, planificador SMP)
@@ -207,7 +207,7 @@
     - Ejecutar test de exploración de condición de bug del paso 1
     - **RESULTADO ESPERADO**: Test PASA (confirma que el bug está corregido)
     - Verificar que:
-      - README.md ya NO contiene "2026" (información actualizada)
+      - README.md ya NO contiene "2025" (información actualizada)
       - Todos los archivos de documentación requeridos EXISTEN
       - Cada archivo contiene contenido completo y preciso
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_

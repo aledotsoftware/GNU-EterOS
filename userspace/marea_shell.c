@@ -1,6 +1,6 @@
 /**
  * eterOS — Marea Shell (Wayland-inspired Desktop Environment)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Proceso userspace que actúa como compositor y window manager.
  * Se conecta al framebuffer via /dev/fb0 mmap y lee input de

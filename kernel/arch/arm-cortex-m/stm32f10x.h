@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - STM32F103 Register Definitions (CMSIS-like)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  *
  * Defines memory map and register structures for STM32F103 (Cortex-M3).

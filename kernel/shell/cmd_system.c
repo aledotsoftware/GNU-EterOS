@@ -201,7 +201,7 @@ void cmd_about(const char* args) {
 
     terminal_write_string("\n");
     terminal_write_string("  El Sistema Operativo de la Nueva Era\n");
-    terminal_write_colored("  (c) 2026 Tudex Networks\n",
+    terminal_write_colored("  (c) 2025 Tudex Networks\n",
                           VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
     terminal_write_string("\n");
     terminal_write_string("  Kernel hibrido bare-metal para x86_64.\n");

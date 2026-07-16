@@ -1,6 +1,6 @@
 /**
  * éterOS - Physical Memory Manager (PMM)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * 
  * Gestiona la asignación de frames físicos de 4KB usando un Bitmap.
  * Lee el mapa de memoria E820 proveído por el bootloader.

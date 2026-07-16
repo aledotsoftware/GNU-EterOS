@@ -1,6 +1,6 @@
 /**
  * éterOS - Task Scheduler (Round-Robin Preemptive, SMP-Ready)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Scheduler preemptivo basado en timer (PIT IRQ0).
  * Cada SCHEDULER_HZ ticks, se selecciona la siguiente tarea READY.

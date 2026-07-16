@@ -1,6 +1,6 @@
 /**
  * éterOS - x86_64 Syscall Handler
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  */
 
 #include <syscall.h>
@@ -1881,7 +1881,7 @@ static int64_t sys_arch_prctl(int code, uint64_t addr) {
 static int64_t sys_uname(struct utsname* buf) {
     if (!vmm_verify_user_access(buf, sizeof(struct utsname), 1)) return -EFAULT;
     strlcpy(buf->sysname, "Linux", 65); strlcpy(buf->nodename, "eterOS", 65);
-    strlcpy(buf->release, "5.5.0-generic", 65); strlcpy(buf->version, "#1 SMP 2026", 65);
+    strlcpy(buf->release, "5.5.0-generic", 65); strlcpy(buf->version, "#1 SMP 2025", 65);
     strlcpy(buf->machine, "x86_64", 65); strlcpy(buf->domainname, "localdomain", 65);
     return 0;
 }
