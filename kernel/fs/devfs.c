@@ -210,16 +210,16 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                                 }
                             } else {
                                 /* Fallback to legacy kmalloc if no mmap or full */
-                            temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
-                            if (temp_payload) {
-                                if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
-                                    kfree(temp_payload);
-                                    temp_payload = NULL;
+                                temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
+                                if (temp_payload) {
+                                    if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
+                                        kfree(temp_payload);
+                                        temp_payload = NULL;
+                                        tr.data_size = 0;
+                                    }
+                                } else {
                                     tr.data_size = 0;
                                 }
-                            } else {
-                            }
-                                tr.data_size = 0;
                             }
                         } else {
                             tr.data_size = 0; /* Deny oversized requests */

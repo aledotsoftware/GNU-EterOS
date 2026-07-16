@@ -3056,6 +3056,14 @@ static int64_t sys_munmap(void* addr, size_t len) {
         }
     }
 
+    task_t* current = task_get_current();
+    if (current && current->binder_mmap_base >= start && current->binder_mmap_base < end) {
+        current->binder_mmap_base = 0;
+        current->binder_mmap_size = 0;
+        current->binder_mmap_offset = 0;
+        current->binder_mmap_kptr = NULL;
+    }
+
     return 0;
 }
 static int64_t sys_mprotect(void* addr, size_t len, int prot) {
