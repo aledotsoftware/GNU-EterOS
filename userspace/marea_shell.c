@@ -1013,7 +1013,7 @@ static void term_execute(marea_window_t* win) {
 
         if (strcmp(argv[0], "help") == 0) {
             term_print(win, "\n", COL_TERM_FG);
-            term_print(win, "Marea Shell Terminal v0.2.0 Genesis SMP\n", COL_ACCENT);
+            term_print(win, "eterOS Marea UI v0.2.0 Genesis SMP\n", COL_ACCENT);
             term_print(win, "Comandos internos: help, clear, echo, uname, cd, pwd, exit\n", COL_TERM_FG);
             term_print(win, "Comandos externos: se resuelven en /gnu/bin, /bin y /\n", COL_TERM_FG);
         } else if (strcmp(argv[0], "clear") == 0) {

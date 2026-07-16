@@ -700,7 +700,6 @@ receive:
         if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
             fs_node_t *active_node = partition_get_active_root();
             if (active_node) {
-                uint8_t current_booted = active_node->impl;
                 uint8_t nvram_target = nvram_get_boot_partition();
 
                 if (!ota_reboot_pending) {
