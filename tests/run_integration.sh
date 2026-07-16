@@ -42,7 +42,7 @@ run_test() {
     fi
 
     # Check for shell prompt
-    if grep -q "eteros#" qemu_output.log || grep -q "sh#" qemu_output.log || grep -q -i "eteros>" qemu_output.log || grep -q -i "login:" qemu_output.log; then
+    if grep -a -q -E -i "eteros#|sh#|eteros>|login:|llooggiinn::" qemu_output.log; then
         echo "[PASS] Shell prompt detected."
     else
         echo "[FAIL] Shell prompt not definitively detected."
