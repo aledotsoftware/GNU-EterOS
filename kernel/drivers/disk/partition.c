@@ -241,7 +241,6 @@ static int get_booted_active_index(void) {
 
     int active_idx = active_partition_index;
     uint8_t nvram_part = nvram_get_boot_partition();
-    uint8_t update_state = nvram_get_update_state();
 
     if (nvram_part != 0xFF && nvram_part < partition_count) {
         active_idx = nvram_part;
