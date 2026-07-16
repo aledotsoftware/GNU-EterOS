@@ -7,7 +7,7 @@ ORCHESTRATOR_REPORT.md, README.md, tests/run_integration.sh, agents/**/*.md
 Auditoría global, priorización, actualización de agentes/reportes.
 
 ## Current Goal
-[Completado] Se verificó que los tests y compilación (incluido pruebas de integración QEMU y de UI web) operan exitosamente. Se actualizó el ORCHESTRATOR_REPORT.md para reflejar que el `graphics-power-panel-bot` completó el prototipo del compositor visual. El siguiente ciclo se asignó al `linux-syscall-compliance-bot` para corregir la tabla de syscalls (colisión 141) y proveer implementaciones reales de `sys_getpriority` y `sys_setpriority` en la estructura `task_t`.
+[Actual] Re-asignado al `linux-syscall-compliance-bot` para corregir la tabla de syscalls (colisión 141) y proveer implementaciones reales de `sys_getpriority` y `sys_setpriority` tras un intento fallido.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
