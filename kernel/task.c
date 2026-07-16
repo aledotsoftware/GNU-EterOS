@@ -899,11 +899,8 @@ void task_wakeup(task_t* t) {
 
         if (!is_active) {
             enqueue_ready(t);
-        }
-
-        cpu_info_t* current_cpu = get_current_cpu();
-        if (current_cpu && (uint32_t)t->target_cpu != current_cpu->index) {
-            if (!is_active) {
+            cpu_info_t* current_cpu = get_current_cpu();
+            if (current_cpu && (uint32_t)t->target_cpu != current_cpu->index) {
                 /* Send IPI to the target CPU to wake it up or force schedule */
                 lapic_send_ipi(cpus[t->target_cpu].apic_id, 0x20); /* 0x20 is timer vector, forces schedule() */
             }
@@ -911,7 +908,20 @@ void task_wakeup(task_t* t) {
     }
     if (t->state == TASK_STOPPED) {
         t->state = TASK_READY;
-        enqueue_ready(t);
+        int is_active = 0;
+        for (int i = 0; i < MAX_CPUS; i++) {
+            if (cpus[i].state == CPU_STATE_ONLINE && cpus[i].current_task == (volatile void*)t) {
+                is_active = 1;
+                break;
+            }
+        }
+        if (!is_active) {
+            enqueue_ready(t);
+            cpu_info_t* current_cpu = get_current_cpu();
+            if (current_cpu && (uint32_t)t->target_cpu != current_cpu->index) {
+                lapic_send_ipi(cpus[t->target_cpu].apic_id, 0x20);
+            }
+        }
     }
     spin_unlock(&sched_lock);
 
@@ -927,15 +937,25 @@ static void task_mark_parent_wait_event(task_t* current, int wait_status, int wa
 static void task_wake_parent_waiter(task_t* current) {
     for (int i = 0; i < MAX_TASKS; i++) {
         if (tasks[i].id == current->parent_id &&
-            (tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_BLOCKED)) {
+            (tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_BLOCKED || tasks[i].state == TASK_STOPPED)) {
+
+            int is_active = 0;
+            for (int c = 0; c < MAX_CPUS; c++) {
+                if (cpus[c].state == CPU_STATE_ONLINE && cpus[c].current_task == (volatile void*)&tasks[i]) {
+                    is_active = 1;
+                    break;
+                }
+            }
+
             tasks[i].state = TASK_READY;
             dequeue_sleep(&tasks[i]);
-            enqueue_ready(&tasks[i]);
-
-            cpu_info_t* target_cpu = &cpus[tasks[i].target_cpu];
-            cpu_info_t* current_cpu = get_current_cpu();
-            if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index && target_cpu->state == CPU_STATE_ONLINE) {
-                lapic_send_ipi(target_cpu->apic_id, 0x20);
+            if (!is_active) {
+                enqueue_ready(&tasks[i]);
+                cpu_info_t* target_cpu = &cpus[tasks[i].target_cpu];
+                cpu_info_t* current_cpu = get_current_cpu();
+                if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index && target_cpu->state == CPU_STATE_ONLINE) {
+                    lapic_send_ipi(target_cpu->apic_id, 0x20);
+                }
             }
         }
     }
@@ -1045,13 +1065,21 @@ int task_kill(uint32_t pid) {
             tasks[i].signal_pending |= (1ULL << SIGKILL);
 
             if (tasks[i].state == TASK_BLOCKED || tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_STOPPED) {
+                int is_active = 0;
+                for (int c = 0; c < MAX_CPUS; c++) {
+                    if (cpus[c].state == CPU_STATE_ONLINE && cpus[c].current_task == (volatile void*)&tasks[i]) {
+                        is_active = 1;
+                        break;
+                    }
+                }
                 tasks[i].state = TASK_READY;
                 dequeue_sleep(&tasks[i]);
-                enqueue_ready(&tasks[i]);
-
-                cpu_info_t* current_cpu = get_current_cpu();
-                if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index) {
-                    lapic_send_ipi(cpus[tasks[i].target_cpu].apic_id, 0x20);
+                if (!is_active) {
+                    enqueue_ready(&tasks[i]);
+                    cpu_info_t* current_cpu = get_current_cpu();
+                    if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index) {
+                        lapic_send_ipi(cpus[tasks[i].target_cpu].apic_id, 0x20);
+                    }
                 }
             }
             
