@@ -687,7 +687,7 @@ static void draw_menu(void) {
 /* Check if click is on a window's minimize button */
 static int hit_minimize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + win->w - 14 - btn_spacing;
+    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -696,7 +696,7 @@ static int hit_minimize_button(marea_window_t* win, int mx, int my) {
 /* Check if click is on a window's maximize button */
 static int hit_maximize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
+    int btn_cx = win->x + win->w - 14 - btn_spacing;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
