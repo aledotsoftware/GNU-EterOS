@@ -7,7 +7,7 @@ kernel/gfx/, kernel/drivers/video/
 Framebuffer/gfx/window/UI shell y panel gráfico.
 
 ## Current Goal
-Implementar prototipo de animación del compositor visual (`test_compositor`) en `kernel/shell/cmd_misc.c` utilizando APIs del kernel como `timer_sleep` y `window_invalidate` (y `compositor_render` si es necesario), probando que las ventanas se muevan en bucle en el entorno gráfico, sentando bases prácticas para GNU Desktop sobre EterOS. [ASIGNADO PARA EL PRESENTE CICLO]
+[Completado] Prototipo de animación de compositor visual implementado en `kernel/shell/cmd_misc.c`. El bot quedará en standby a la espera de nuevas asignaciones.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

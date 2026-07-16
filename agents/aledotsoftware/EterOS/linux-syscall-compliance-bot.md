@@ -7,7 +7,7 @@ kernel/arch/x86_64/syscall.c
 Cobertura progresiva de syscalls Linux x86_64 con foco en GNU/Linux real.
 
 ## Current Goal
-[Completado] Se verificó que `sys_fsync`, `sys_fdatasync`, `sys_truncate`, y `sys_ftruncate` están correctamente implementados en la base VFS. Se actualizaron los tests mock `test_syscall_linux_coverage.c`. El bot quedará en standby a la espera de nuevas prioridades identificadas.
+Corregir la tabla de syscalls Linux (`kernel/arch/x86_64/syscall.c`) donde la syscall 141 apunta erróneamente a `sys_getdents64` en lugar de `sys_setpriority`. Añadir la propiedad `int nice;` a `task_t` (`include/task.h`) e implementar la lógica real para `sys_getpriority` (syscall 140) y `sys_setpriority` (syscall 141) removiendo el retorno `-ENOSYS`. [ASIGNADO PARA EL PRESENTE CICLO]
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.
