@@ -2342,7 +2342,7 @@ static void setup_sigcontext(struct syscall_regs* regs,
     /* Align stack to 16 bytes (System V ABI) */
     /* We subtract frame size and 128 bytes red zone */
     sp = frame_rsp - 128;
-    sp = (sp - sizeof(struct sigframe)) & ~0xF;
+    sp = (sp - sizeof(struct sigframe) - 8) & ~0xF;
     sp -= 8; /* Align so that (sp + 8) is a multiple of 16 */
 
     /* Verify write access */
@@ -3152,16 +3152,11 @@ static int64_t sys_mremap(void* old_addr, size_t old_size, size_t new_size, int 
         for (uint64_t i = 0; i < old_len; i += PAGE_SIZE) {
             uint64_t phys = hal_mem_get_phys(old_start + i);
             if (phys) {
-                /* We have to unmap old page before re-mapping because we might overlap,
-                   or just map it to the new location. Actually, since we unmap the old region at the end,
-                   we should reference it and then unmap it. */
-                pmm_ref_page((void*)phys);
                 /* Assuming default flags for now, properly we should read the flags from PT */
                 hal_mem_map(phys, new_start + i, HAL_MEM_USER | HAL_MEM_READ | HAL_MEM_WRITE);
+                vmm_unmap_page(old_start + i);
             }
         }
-
-        sys_munmap((void*)old_start, old_len);
         return (int64_t)new_start;
     }
 }
