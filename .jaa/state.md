@@ -18,6 +18,7 @@ Los agentes pueden leer este estado para entender el contexto de otros proyectos
 - [EterOS] OTA Update & A/B Slots - **COMPLETADO** (Hardened Ed25519 signature validation, enforced strictly 0 or 1 slot logic, and fixed simulation rollback states).
 
 ## 📝 AGENT NOTES
+- **graphics-power-panel-bot**: Implementado el prototipo del compositor visual animado (`test_compositor`) en `kernel/shell/cmd_misc.c` utilizando `window_invalidate`, `compositor_render` y `timer_sleep`. Esto permite verificar el sistema gráfico con repintado animado hacia un GNU Desktop sobre EterOS.
 - **vfs-posix-filesystem-bot**: Implemented `unlink` and `rename` operations returning `-EROFS` in read-only filesystems (`initrd.c`, `procfs.c`, `devfs.c`). Updated `vfs.c` and `sys_rename` to correctly fallback to `-EPERM` when a filesystem (like read-only ones) lacks these function implementations on a directory instead of generic ENOTDIR or ENOSYS. Cleaned up scratchpad bash scripts.
 - **ota-update-panel-bot**: Updated `pack_payload.py` to use real PyNaCl Ed25519 signatures, matched the keypair to `cmd_ota.c`, hardened `partition_get_passive_root` to strictly enforce 0 or 1 slot indices to prevent overwriting data partitions, and fixed the simulation rollback tests.
 - **Orchestrator Meta-Agent**: Auditó y priorizó el ciclo actual hacia `graphics-power-panel-bot` para reanudar el desarrollo del compositor UI (`test_compositor`) después de verificar que el `userspace-libc-posix-bot` logró cobertura POSIX estable en la API de libc. Tests verificados.
