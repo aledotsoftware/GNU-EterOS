@@ -463,7 +463,8 @@ static int vmm_resolve_cow(uint64_t addr, pt_entry_t* pt, uint64_t pt_idx) {
 }
 
 int vmm_handle_page_fault(uint64_t addr, uint64_t error_code) {
-    /* Error Code:
+    /* [KERNEL HYBRID VMM BOUNDARY] Page Fault Resolution
+       Error Code:
        Bit 0: Present (0=Not Present, 1=Protection Violation)
        Bit 1: Write (1=Write)
        Bit 2: User (1=User)
