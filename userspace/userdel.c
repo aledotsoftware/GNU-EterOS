@@ -82,7 +82,9 @@ static int remove_user_from_file(const char* filepath, const char* username) {
         return 0; // Not found, but no error during reading
     }
 
-    rename(temp_filepath, filepath);
+    if (rename(temp_filepath, filepath) < 0) {
+        return -1;
+    }
 
     return 1; // Found and removed
 }
