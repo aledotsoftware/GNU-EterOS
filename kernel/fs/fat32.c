@@ -96,7 +96,7 @@ int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_s
     if (bpb->boot_sector_signature != FAT32_BOOT_SIGNATURE) {
         hal_console_write("[FAT32] Invalid Boot Sector Signature\n");
         kfree(buffer);
-        return -4;
+        return -EIO;
     }
 
     // Load geometry
@@ -107,7 +107,7 @@ int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_s
     // Check minimal sector size (usually 512)
     if (vol->bytes_per_sector == 0) {
         kfree(buffer);
-        return -5;
+        return -EIO;
     }
 
     // Calculate offsets
@@ -179,7 +179,7 @@ static int fat32_fat_set(fat32_volume_t* vol, uint32_t cluster, uint32_t value) 
     // Write back
     if (fat32_write_sector_cached(vol, fat_sector, buffer) != 0) {
         kfree(buffer);
-        return -4;
+        return -EIO;
     }
 
     kfree(buffer);
@@ -240,7 +240,7 @@ static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
     }
 
     kfree(buffer);
-    return -4; // No free space found
+    return -ENOSPC; // No free space found
 }
 
 /* Helper: Free cluster chain */
@@ -761,7 +761,7 @@ static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permissio
     entry.fst_clus_hi = (cluster >> 16) & 0xFFFF;
     entry.fst_clus_lo = cluster & 0xFFFF;
 
-    if (fat32_update_dirent(vol, sector, offset, &entry) != 0) return -4;
+    if (fat32_update_dirent(vol, sector, offset, &entry) != 0) return -EIO;
 
     uint32_t parent_clus = parent->inode;
     if (parent_clus == vol->root_cluster) parent_clus = 0;
@@ -784,7 +784,7 @@ static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permissio
 
     uint32_t lba = fat32_cluster_to_lba(vol, cluster);
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -5;
+    if (!buffer) return -EIO;
     memset(buffer, 0, vol->bytes_per_sector);
     memcpy(buffer, dot, sizeof(dot));
     fat32_write_sector_cached(vol, lba, buffer);
