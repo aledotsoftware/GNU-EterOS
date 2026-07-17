@@ -797,9 +797,15 @@ void task_block_with_timeout(uint64_t wake_tick) {
 
     spin_lock(&sched_lock);
     task_t* current = task_get_current();
-    current->wake_tick = wake_tick;
-    current->state = TASK_BLOCKED;
-    enqueue_sleep(current);
+
+    if (current->signal_pending != 0) {
+        current->state = TASK_READY;
+    } else {
+        current->wake_tick = wake_tick;
+        current->state = TASK_BLOCKED;
+        enqueue_sleep(current);
+    }
+
     spin_unlock(&sched_lock);
 
     task_irq_restore(irq_flags);
@@ -812,8 +818,14 @@ void task_block(void) {
 
     spin_lock(&sched_lock);
     task_t* current = task_get_current();
-    current->wake_tick = 0;
-    current->state = TASK_BLOCKED;
+
+    if (current->signal_pending != 0) {
+        current->state = TASK_READY;
+    } else {
+        current->wake_tick = 0;
+        current->state = TASK_BLOCKED;
+    }
+
     spin_unlock(&sched_lock);
 
     task_irq_restore(irq_flags);
