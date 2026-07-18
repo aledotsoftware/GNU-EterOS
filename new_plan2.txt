@@ -1,0 +1,14 @@
+Ah, wait. Memory says:
+"In EterOS OTA payload processing (e.g., in `cmd_ota.c`), signature size checks must verify if the payload size is strictly less than 64 bytes (`payload_size < 64`) rather than `<= 64` to properly support valid, data-empty 64-byte Ed25519 signatures without causing premature length-check failures."
+
+Wait, `cmd_ota.c` has `if (payload_size < 64)` on lines 340 and 563.
+And on lines 602 it has `if (payload_size < data_offset)` where `data_offset = 64`.
+
+What if the prompt implies we *should* fix something related to `payload_size < 64`? Wait, maybe there's a bug in another check? No, the memory is just an observation. Wait, memory says: "must verify if the payload size is strictly less than 64 bytes (`payload_size < 64`) rather than `<= 64`".
+If we check the original code: it already uses `< 64`.
+
+Wait! The code review says:
+"The patch correctly and perfectly addresses points 2 and 3 of the 'Trabajo esperado' (improving diagnostics and verifying active/pending slot states). However, the prompt also explicitly requested to 'Endurecer firma' (harden signatures) and listed crypto files (ed25519.c, sha256.c) in the 'Foco real' which were left untouched."
+
+How do we "Endurecer firma"?
+Let's look at `ed25519.c` and `sha256.c` in `kernel/crypto/`.
