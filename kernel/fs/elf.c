@@ -450,7 +450,8 @@ uint64_t elf_load_file(const char* path, uint64_t base_vaddr) {
         /* We always allocate a TCB for the main executable because x86-64 System V ABI programs expect fs:0 to point to a valid TCB. */
         uint64_t aligned_tls_size = 0;
         if (current->tls_memsz > 0) {
-            aligned_tls_size = (current->tls_memsz + current->tls_align - 1) & ~(current->tls_align - 1);
+            uint64_t align = current->tls_align ? current->tls_align : 1;
+            aligned_tls_size = (current->tls_memsz + align - 1) & ~(align - 1);
         } else {
             /* If PT_TLS is missing but the compiler emitted TLS variables (e.g. __thread int errno),
                it expects them at negative offsets from TCB. We pad `aligned_tls_size` to prevent page faults. */
