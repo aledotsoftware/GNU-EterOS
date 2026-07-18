@@ -1,0 +1,15 @@
+Ah!!
+Look at lines 322 and 545:
+`if (payload_size < 1024) {`
+`   terminal_write_string("  [OTA] Error: El archivo descargado esta incompleto o es muy pequeno.\n");`
+`   kfree(payload_data);`
+`   if (passive_part) kfree(passive_part);`
+`   return;`
+`}`
+
+If the signature size checks must support "valid, data-empty 64-byte Ed25519 signatures", then `payload_size < 1024` check will prematurely cause length-check failures!!
+
+Let me replace that `payload_size < 1024` with `payload_size < 64`. Wait, if `payload_size < 64` is already checked later... wait! No, the check later is `if (payload_size < 64) { error }`. But we have a `if (payload_size < 1024) { error }` earlier, which makes the `< 64` check pointless (because anything < 1024 fails first).
+
+So I need to remove `if (payload_size < 1024)` check or change it to `< 64` in `cmd_ota.c`. Memory perfectly matches this: "without causing premature length-check failures". It's the `payload_size < 1024` that is causing premature failures. Wait, no. "must verify if the payload size is strictly less than 64 bytes (`payload_size < 64`) rather than `<= 64` to properly support valid, data-empty 64-byte Ed25519 signatures". Maybe there's a `<= 64`? But I already grepped for `<= 64` and found none. It must be that someone changed it to `< 1024` or something else? Wait. If I change `if (payload_size < 1024)` to `if (payload_size < 64)`, that solves it and aligns with checking if it's strictly less than 64.
+Let's modify `kernel/shell/cmd_ota.c` to replace `if (payload_size < 1024)` with `if (payload_size < 64)` and also remove the duplicate `if (payload_size < 64)` check that happens right after it! Wait, let me just change `if (payload_size < 1024)` to `if (payload_size < 64)`.
