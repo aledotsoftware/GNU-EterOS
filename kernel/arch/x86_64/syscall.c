@@ -516,6 +516,11 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         }
     }
 
+    /* Linux ABI requires fd to be ignored or -1 if MAP_ANONYMOUS is set */
+    if (flags & MAP_ANONYMOUS) {
+        fd = -1;
+    }
+
     uint64_t virt;
 
     if (flags & 0x10) { /* MAP_FIXED */
@@ -840,7 +845,7 @@ static int check_node_permission(fs_node_t* node, uint32_t req_mask) {
 }
 
 static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
-    if (!vmm_verify_user_access(path, 1, 0)) return -EFAULT;
+    if (!path || !vmm_check_user_string(path, 256)) return -EFAULT;
     char* kpath = (char*)kmalloc(1024);
     if (!kpath) return -ENOMEM;
     int res = resolve_path(dirfd, path, kpath, 1024);
@@ -1192,6 +1197,7 @@ static int64_t sys_fchmodat(int dirfd, const char* path, int mode) {
 }
 
 static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
+    if ((ssize_t)bufsiz <= 0) return -EINVAL;
     if (!vmm_verify_user_access(buf, bufsiz, 1)) return -EFAULT;
 
     char* kpath = (char*)kmalloc(1024);
@@ -1852,12 +1858,14 @@ static int64_t sys_prctl(int option, unsigned long arg2, unsigned long arg3, uns
 static int64_t sys_arch_prctl(int code, uint64_t addr) {
     task_t* current = task_get_current();
     if (code == ARCH_SET_FS) {
+        if (addr >= USER_LIMIT + 1) return -EPERM;
         current->fs_base = addr;
 #ifndef __ETEROS_HOST_TEST__
         wrmsr(MSR_FS_BASE, addr);
 #endif
         return 0;
     } else if (code == ARCH_SET_GS) {
+        if (addr >= USER_LIMIT + 1) return -EPERM;
         current->gs_base = addr;
 #ifndef __ETEROS_HOST_TEST__
         wrmsr(MSR_KERNEL_GS_BASE, addr);
