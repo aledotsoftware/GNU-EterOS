@@ -11,7 +11,7 @@ def run():
         file_path = f"file://{os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_ui', 'index.html'))}"
 
         print(f"Navigating to {file_path}")
-        page.goto(file_path)
+        page.goto(file_path, wait_until="domcontentloaded")
 
         # 1. Verify Image accessibility
         img_locator = page.locator("svg.splash-logo")
