@@ -126,7 +126,7 @@ static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, u
 static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
-    int res = net_recv((int)node->inode, buffer, size, 0);
+    int res = sys_lwip_recv((int)node->inode, buffer, size, 0);
     return (res < 0) ? 0 : (ssize_t)res;
 }
 
@@ -134,14 +134,14 @@ static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size,
 static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
-    int res = net_send((int)node->inode, buffer, size, 0);
+    int res = sys_lwip_send((int)node->inode, buffer, size, 0);
     return (res < 0) ? 0 : (uint32_t)res;
 }
 
 static void socket_close_fs(fs_node_t* node) __attribute__((unused));
 static void socket_close_fs(fs_node_t* node) {
     if ((node->flags & 0x7) == FS_SOCKET) {
-        net_close((int)node->inode);
+        sys_lwip_close((int)node->inode);
     }
 }
 

@@ -86,7 +86,7 @@ static inline int get_lwip_sock(int fd) {
     return (int)node->inode;
 }
 
-int sys_lwip_bind(int fd, const void *name, socklen_t namelen) {
+int sys_lwip_bind(int fd, const struct sockaddr *name, socklen_t namelen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_bind(sock, name, namelen);
@@ -140,19 +140,19 @@ int sys_lwip_accept(int fd, void *addr, socklen_t *addrlen) {
     return new_fd;
 }
 
-int sys_lwip_connect(int fd, const void *name, socklen_t namelen) {
+int sys_lwip_connect(int fd, const struct sockaddr *name, socklen_t namelen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_connect(sock, name, namelen);
 }
 
-ssize_t sys_lwip_sendto(int fd, const void *data, size_t size, int flags, const void *to, socklen_t tolen) {
+ssize_t sys_lwip_sendto(int fd, const void *data, size_t size, int flags, const struct sockaddr *to, socklen_t tolen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_sendto(sock, data, size, flags, to, tolen);
 }
 
-ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, void *from, socklen_t *fromlen) {
+ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_recvfrom(sock, mem, len, flags, (struct sockaddr*)from, (socklen_t*)fromlen);
@@ -245,13 +245,13 @@ int sys_lwip_shutdown(int fd, int how) {
     return lwip_shutdown(sock, how);
 }
 
-ssize_t sys_lwip_sendmsg(int fd, const void *msg, int flags) {
+ssize_t sys_lwip_sendmsg(int fd, const struct msghdr *msg, int flags) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_sendmsg(sock, msg, flags);
 }
 
-ssize_t sys_lwip_recvmsg(int fd, void *msg, int flags) {
+ssize_t sys_lwip_recvmsg(int fd, struct msghdr *msg, int flags) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_recvmsg(sock, msg, flags);
