@@ -1842,8 +1842,8 @@ static int64_t sys_prctl(int option, unsigned long arg2, unsigned long arg3, uns
     if (option == PR_SET_VMA) {
         if (arg2 == PR_SET_VMA_ANON_NAME) {
             char vma_name[256];
-            if (arg4) {
-                if (vmm_strncpy_from_user(vma_name, (const char*)arg4, sizeof(vma_name)) < 0) {
+            if (arg5) {
+                if (vmm_strncpy_from_user(vma_name, (const char*)arg5, sizeof(vma_name)) < 0) {
                     return -EFAULT;
                 }
                 /* We successfully read the name. Future: store it in a VMA tree. */

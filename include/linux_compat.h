@@ -75,19 +75,31 @@ struct binder_transaction_data {
 };
 
 enum {
-    BC_TRANSACTION = 0x40406300,
-    BC_REPLY       = 0x40406301,
-    BC_FREE_BUFFER = 0x40406303,
+    BC_TRANSACTION     = 0x40406300,
+    BC_REPLY           = 0x40406301,
+    BC_FREE_BUFFER     = 0x40086303,
+    BC_INCREFS         = 0x40046304,
+    BC_ACQUIRE         = 0x40046305,
+    BC_RELEASE         = 0x40046306,
+    BC_DECREFS         = 0x40046307,
+    BC_REGISTER_LOOPER = 0x0000630b,
+    BC_ENTER_LOOPER    = 0x0000630c,
+    BC_EXIT_LOOPER     = 0x0000630d,
 };
 
 enum {
     BR_ERROR = 0x80047200,
     BR_OK    = 0x7201,
-    BR_TRANSACTION = 0x80287202,
-    BR_REPLY       = 0x80287203,
-    BR_DEAD_REPLY  = 0x7205,
-    BR_TRANSACTION_COMPLETE = 0x7206,
-    BR_NOOP        = 0x720c,
+    BR_TRANSACTION = 0x80407202,
+    BR_REPLY       = 0x80407203,
+    BR_DEAD_REPLY  = 0x00007205,
+    BR_TRANSACTION_COMPLETE = 0x00007206,
+    BR_INCREFS     = 0x80087207,
+    BR_ACQUIRE     = 0x80087208,
+    BR_RELEASE     = 0x80087209,
+    BR_DECREFS     = 0x8008720a,
+    BR_NOOP        = 0x0000720c,
+    BR_DEAD_BINDER = 0x8008720f,
 };
 
 /* Linux x86_64 stat structure for ABI compatibility */
