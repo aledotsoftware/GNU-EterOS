@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - Xtensa HAL Implementation (ESP32)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  *
  * Implementación de la HAL para la arquitectura Xtensa LX6/LX7 (ESP32/S2/S3).

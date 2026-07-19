@@ -1,0 +1,14 @@
+Let me think. The code reviewer said:
+1. The patch removes the UPDATE_STATE_PENDING logic in partition.c which is risky because when an update is downloaded but not rebooted yet, NVRAM points to the new partition while the system still runs on the old one. If we remove this check, the OS thinks its active partition changed before a reboot has actually occurred.
+2. The patch misses the core objectives: adding new diagnostic messages to cmd_ota.c, hardening signature verification, and checking crypto/updater files.
+
+Ah! The reviewer is saying that pre-reboot, `nvram_part` is NEW, but we are running in OLD.
+If `active_idx = nvram_part`, then `active_idx` becomes NEW, which means the OS thinks its active partition is the NEW one, even though we haven't rebooted!
+This is a very good point. BUT my earlier thought was that `active_idx` is ONLY evaluated at boot because it caches the value.
+If it caches the value AT BOOT, then pre-reboot (when we change NVRAM to NEW), `cached_active_idx` is STILL the OLD one, so `partition_get_active_root()` STILL returns the OLD one!
+So the OS DOES NOT think its active partition changed!
+But wait, if we reboot, AT BOOT TIME we are in the NEW partition. NVRAM is NEW, state is PENDING.
+If we kept the old code: at boot time, it evaluates `active_idx = (nvram_part == 0) ? 1 : 0`, which makes it OLD! This means at boot time, it thinks it's in the OLD partition!
+Wait... if the old code evaluates to OLD at boot time, then `current_booted` is OLD. Then it does post-reboot rollback by checking `current_booted == nvram_target`. But `current_booted` (OLD) is NOT EQUAL to `nvram_target` (NEW)! So it would NEVER do post-reboot rollback!
+
+Let me check the `test_ota_sim` logic again.

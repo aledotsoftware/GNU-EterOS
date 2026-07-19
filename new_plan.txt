@@ -1,0 +1,13 @@
+Wait, let's look at `kernel/shell/cmd_ota.c`.
+In `cmd_ota.c`, lines 340 and 563 are `if (payload_size < 64)`.
+But what does memory say?
+"In EterOS OTA payload processing (e.g., in cmd_ota.c), signature size checks must verify if the payload size is strictly less than 64 bytes (`payload_size < 64`) rather than `<= 64` to properly support valid, data-empty 64-byte Ed25519 signatures without causing premature length-check failures."
+
+Ah, maybe there's a check `payload_size < data_offset` where `data_offset = 64`. Wait, line 600:
+`uint32_t data_offset = 64;`
+`if (payload_size < data_offset) {`
+
+Is there another place where we check signature size?
+What about `checksig`?
+
+Let's read `cmd_ota.c` around `checksig`.

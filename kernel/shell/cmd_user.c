@@ -46,16 +46,10 @@ static void cmd_useradd(const char* args) {
         /* SHA256 */
         uint8_t hash[SHA256_BLOCK_SIZE];
         sha256((const uint8_t*)password, strlen(password), hash);
+        const char hex_chars[] = "0123456789abcdef";
         for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-            char hex[3];
-            utoa_hex_s(hash[i], hex, sizeof(hex));
-            if (hash[i] < 16) {
-                hash_str[i*2] = '0';
-                hash_str[i*2+1] = hex[0];
-            } else {
-                hash_str[i*2] = hex[0];
-                hash_str[i*2+1] = hex[1];
-            }
+            hash_str[i*2] = hex_chars[(hash[i] >> 4) & 0xF];
+            hash_str[i*2+1] = hex_chars[hash[i] & 0xF];
         }
         hash_str[SHA256_BLOCK_SIZE * 2] = '\0';
     } else {
@@ -105,6 +99,7 @@ static void cmd_useradd(const char* args) {
             return;
         }
     }
+    if (passwd_node) passwd_node->mask = 0644;
 
     fs_node_t* shadow_node = vfs_lookup(fs_root, "/etc/shadow");
     if (!shadow_node) {
@@ -239,6 +234,7 @@ static void remove_user_from_vfs_file(const char* filepath, const char* username
         if (node->truncate) node->truncate(node, 0);
         else node->length = 0; /* Fallback */
         write_fs(node, 0, tmp_node->length, new_buf);
+        node->mask = is_shadow ? 0600 : 0644;
         kfree(new_buf);
     }
     vfs_unlink(temp_path);
@@ -300,16 +296,10 @@ static void cmd_passwd(const char* args) {
         /* SHA256 */
         uint8_t hash[SHA256_BLOCK_SIZE];
         sha256((const uint8_t*)password, strlen(password), hash);
+        const char hex_chars[] = "0123456789abcdef";
         for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-            char hex[3];
-            utoa_hex_s(hash[i], hex, sizeof(hex));
-            if (hash[i] < 16) {
-                hash_str[i*2] = '0';
-                hash_str[i*2+1] = hex[0];
-            } else {
-                hash_str[i*2] = hex[0];
-                hash_str[i*2+1] = hex[1];
-            }
+            hash_str[i*2] = hex_chars[(hash[i] >> 4) & 0xF];
+            hash_str[i*2+1] = hex_chars[hash[i] & 0xF];
         }
         hash_str[SHA256_BLOCK_SIZE * 2] = '\0';
     } else {
@@ -391,6 +381,7 @@ static void cmd_passwd(const char* args) {
         if (shadow_node->truncate) shadow_node->truncate(shadow_node, 0);
         else shadow_node->length = 0;
         write_fs(shadow_node, 0, tmp_node->length, new_buf);
+        shadow_node->mask = 0600;
         kfree(new_buf);
         terminal_write_string("  Contrasena actualizada.\n");
     } else {

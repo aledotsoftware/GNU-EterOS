@@ -116,6 +116,16 @@ int unlink_fs(fs_node_t *parent, char *name) {
     return -ENOTDIR;
 }
 
+int rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    if ((old_parent->flags & 0x7) == FS_DIRECTORY && (new_parent->flags & 0x7) == FS_DIRECTORY) {
+        if (old_parent->rename != 0)
+            return old_parent->rename(old_parent, old_name, new_parent, new_name);
+        else
+            return -EPERM;
+    }
+    return -ENOTDIR;
+}
+
 int link_fs(fs_node_t *parent, fs_node_t *target, char *name) {
     if ((parent->flags & 0x7) == FS_DIRECTORY && parent->link != 0)
         return parent->link(parent, target, name);

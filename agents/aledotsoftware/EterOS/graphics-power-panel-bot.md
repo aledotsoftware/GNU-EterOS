@@ -7,7 +7,7 @@ kernel/gfx/, kernel/drivers/video/
 Framebuffer/gfx/window/UI shell y panel gráfico.
 
 ## Current Goal
-Continuar con las mejoras visuales y prototipo del compositor (referencia `test_compositor`) y preparar el renderizado para el GNU Desktop. [ASIGNADO PARA EL PRESENTE CICLO]
+[Completado] Prototipo de animación de compositor visual implementado en `kernel/shell/cmd_misc.c`. El bot quedará en standby a la espera de nuevas asignaciones.
 
 ## Guidelines
 - Trabaja sobre el estado actual del repo, no sobre una arquitectura idealizada.

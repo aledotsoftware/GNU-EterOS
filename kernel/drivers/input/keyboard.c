@@ -1,6 +1,6 @@
 /**
  * éterOS - Driver de Teclado PS/2
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Maneja scancodes Set 1 del teclado PS/2 estándar.
  * Usa un ring buffer para desacoplar el handler de IRQ

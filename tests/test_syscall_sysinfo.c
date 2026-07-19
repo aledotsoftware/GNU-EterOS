@@ -137,3 +137,4 @@ int main() {
     return 0;
 }
 void task_stop_signal(int sig) {}
+int rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) { return 0; }

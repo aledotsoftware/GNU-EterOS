@@ -44,6 +44,8 @@ syscall_entry:
     call handle_signal_if_needed
 
     ; 6. Restore Registers
+    ; Notice that `handle_signal_if_needed` (and `sys_rt_sigreturn`) might have modified `gs:72` (user_stack_scratch)
+    ; or the register frame itself in order to jump to a signal handler.
     POP_ALL
 
     ; 7. Restore User Stack (user_stack_scratch)

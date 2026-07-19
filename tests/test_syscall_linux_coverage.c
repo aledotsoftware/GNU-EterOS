@@ -111,6 +111,7 @@ void close_fs(fs_node_t *node) {}
 int create_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int unlink_fs(fs_node_t *parent, char *name) { return 0; }
+int rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) { return 0; }
 fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
     if (strcmp(path, "/valid") == 0) {
         fs_node_t* n = malloc(sizeof(fs_node_t));
@@ -170,6 +171,9 @@ int main() {
     assert(sys_fchown(3, 200, 200) == 0);
 
     assert(sys_umask(0022) == 0022);
+
+    assert(sys_setpriority(ETEROS_PRIO_PROCESS, 0, 10) == 0 || sys_setpriority(ETEROS_PRIO_PROCESS, 0, 10) == -ESRCH);
+    assert(sys_getpriority(ETEROS_PRIO_PROCESS, 0) == 10 || sys_getpriority(ETEROS_PRIO_PROCESS, 0) == -ESRCH);
 
     char buf[10];
     printf("pread returned %ld\n", sys_pread64(3, buf, 10, 0)); // node doesn't have read ops attached

@@ -86,7 +86,7 @@ static inline int get_lwip_sock(int fd) {
     return (int)node->inode;
 }
 
-int sys_lwip_bind(int fd, const void *name, socklen_t namelen) {
+int sys_lwip_bind(int fd, const struct sockaddr *name, socklen_t namelen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_bind(sock, name, namelen);
@@ -140,19 +140,19 @@ int sys_lwip_accept(int fd, void *addr, socklen_t *addrlen) {
     return new_fd;
 }
 
-int sys_lwip_connect(int fd, const void *name, socklen_t namelen) {
+int sys_lwip_connect(int fd, const struct sockaddr *name, socklen_t namelen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_connect(sock, name, namelen);
 }
 
-ssize_t sys_lwip_sendto(int fd, const void *data, size_t size, int flags, const void *to, socklen_t tolen) {
+ssize_t sys_lwip_sendto(int fd, const void *data, size_t size, int flags, const struct sockaddr *to, socklen_t tolen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_sendto(sock, data, size, flags, to, tolen);
 }
 
-ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, void *from, socklen_t *fromlen) {
+ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_recvfrom(sock, mem, len, flags, (struct sockaddr*)from, (socklen_t*)fromlen);
@@ -161,23 +161,8 @@ ssize_t sys_lwip_recvfrom(int fd, void *mem, size_t len, int flags, void *from, 
 int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout) {
     if (nfds > MAX_FD) return -EINVAL; /* Prevent kernel memory exhaustion */
 
-    struct pollfd *mapped_fds = kmalloc(nfds * sizeof(struct pollfd));
-    if (!mapped_fds) return -ENOMEM;
-
-    for (uint32_t i = 0; i < nfds; i++) {
-        mapped_fds[i].fd = get_lwip_sock(fds[i].fd);
-        mapped_fds[i].events = fds[i].events;
-        mapped_fds[i].revents = 0;
-    }
-
-    int res = lwip_poll(mapped_fds, nfds, timeout);
-
-    for (uint32_t i = 0; i < nfds; i++) {
-        fds[i].revents = mapped_fds[i].revents;
-    }
-
-    kfree(mapped_fds);
-    return res;
+    /* fds[i].fd should already contain the lwIP socket ID, provided by caller (sys_poll/sys_select) */
+    return lwip_poll(fds, nfds, timeout);
 }
 
 int sys_lwip_select(int maxfdp1, fd_set *readset, fd_set *writeset, fd_set *exceptset, struct timeval *timeout) {
@@ -260,13 +245,13 @@ int sys_lwip_shutdown(int fd, int how) {
     return lwip_shutdown(sock, how);
 }
 
-ssize_t sys_lwip_sendmsg(int fd, const void *msg, int flags) {
+ssize_t sys_lwip_sendmsg(int fd, const struct msghdr *msg, int flags) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_sendmsg(sock, msg, flags);
 }
 
-ssize_t sys_lwip_recvmsg(int fd, void *msg, int flags) {
+ssize_t sys_lwip_recvmsg(int fd, struct msghdr *msg, int flags) {
     int sock = get_lwip_sock(fd);
     if (sock < 0) return -EBADF;
     return lwip_recvmsg(sock, msg, flags);

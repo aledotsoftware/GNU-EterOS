@@ -74,9 +74,13 @@ void cmd_ota(const char* args) {
 
         terminal_write_string("\n\n  [Slots de Arranque]:\n");
 
+        uint8_t current_update_state = nvram_get_update_state();
+        uint8_t current_booted = 0xFF;
+
         fs_node_t *active_node = partition_get_active_root();
         terminal_write_string("    Slot Activo: ");
         if (active_node) {
+            current_booted = active_node->impl;
             terminal_write_string(active_node->impl == 0 ? "A (0)" : (active_node->impl == 1 ? "B (1)" : "Desconocido"));
             terminal_write_string(" [particion ");
             terminal_write_string(active_node->name);
@@ -92,10 +96,12 @@ void cmd_ota(const char* args) {
             terminal_write_string("Desconocido (No disponible)");
         }
 
-        uint8_t current_update_state = nvram_get_update_state();
+        if (current_update_state == UPDATE_STATE_PENDING && current_booted == nvram_get_boot_partition()) {
+            terminal_write_string("  <-- [! ATENCION: Ejecutando actualizacion NO CONFIRMADA !]");
+        }
 
         fs_node_t *passive_node = partition_get_passive_root();
-        if (current_update_state == UPDATE_STATE_PENDING) {
+        if (current_update_state == UPDATE_STATE_PENDING && current_booted != nvram_get_boot_partition()) {
             terminal_write_string("\n    Slot Pendiente (Proximo arranque): ");
         } else {
             terminal_write_string("\n    Slot Pasivo (Disponible para OTA): ");
@@ -114,11 +120,16 @@ void cmd_ota(const char* args) {
             terminal_write_string("Desconocido (No disponible)");
         }
 
-        uint8_t update_state = nvram_get_update_state();
         terminal_write_string("\n\n  [Estado de Actualizacion]: ");
-        if (update_state == UPDATE_STATE_PENDING) terminal_write_string("Pendiente (Reinicio requerido)");
-        else if (update_state == UPDATE_STATE_SUCCESS) terminal_write_string("Exitoso (Arranque confirmado)");
-        else if (update_state == UPDATE_STATE_FAILED) terminal_write_string("Fallido (Rollback)");
+        if (current_update_state == UPDATE_STATE_PENDING) {
+            if (current_booted == nvram_get_boot_partition()) {
+                terminal_write_string("Pendiente (Se requiere 'ota confirm' o hara rollback en prox reinicio)");
+            } else {
+                terminal_write_string("Pendiente (Reinicio requerido para aplicar)");
+            }
+        }
+        else if (current_update_state == UPDATE_STATE_SUCCESS) terminal_write_string("Exitoso (Arranque confirmado)");
+        else if (current_update_state == UPDATE_STATE_FAILED) terminal_write_string("Fallido (Rollback)");
         else terminal_write_string("Ninguno/Limpio");
 
         terminal_write_string("\n\n");
@@ -308,12 +319,7 @@ receive_checksig:
             memmove(payload_data, payload_data + body_start_idx, payload_size);
         }
 
-        if (payload_size < 1024) {
-             terminal_write_string("  [OTA] Error: El archivo descargado esta incompleto o es muy pequeno.\n");
-             kfree(payload_data);
-             if (passive_part) kfree(passive_part);
-             return;
-        }
+
 
         terminal_write_string("  [OTA] Payload descargado (");
         char size_buf[16];
@@ -324,7 +330,7 @@ receive_checksig:
         terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
 
         // Assume the first 64 bytes of payload are the signature, rest is actual image.
-        if (payload_size <= 64) {
+        if (payload_size < 64) {
             terminal_write_string("  [OTA] ERROR: Payload demasiado pequeno para contener firma.\n");
             kfree(payload_data);
             kfree(passive_part);
@@ -531,12 +537,7 @@ receive:
             memmove(payload_data, payload_data + body_start_idx, payload_size);
         }
 
-        if (payload_size < 1024) {
-             terminal_write_string("  [OTA] Error: El archivo descargado esta incompleto o es muy pequeno.\n");
-             kfree(payload_data);
-             if (passive_part) kfree(passive_part);
-             return;
-        }
+
 
         terminal_write_string("  [OTA] Payload descargado (");
         char size_buf[16];
@@ -547,7 +548,7 @@ receive:
         terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
 
         // Assume the first 64 bytes of payload are the signature, rest is actual image.
-        if (payload_size <= 64) {
+        if (payload_size < 64) {
             terminal_write_string("  [OTA] ERROR: Payload demasiado pequeno para contener firma.\n");
             kfree(payload_data);
             kfree(passive_part);
@@ -685,10 +686,23 @@ receive:
         if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
             fs_node_t *active_node = partition_get_active_root();
             if (active_node) {
-                uint8_t current_part = active_node->impl;
-                nvram_set_boot_partition(current_part);
-                nvram_set_update_state(UPDATE_STATE_FAILED);
-                terminal_write_string("  [OTA] Rollback solicitado. El sistema regresara al slot anterior en el proximo reinicio.\n");
+                uint8_t current_booted = active_node->impl;
+                uint8_t nvram_target = nvram_get_boot_partition();
+
+                if (current_booted == nvram_target) {
+                    // We have already rebooted into the new slot. Rollback to the OTHER slot.
+                    uint8_t rollback_part = (current_booted == 0) ? 1 : 0;
+                    nvram_set_boot_partition(rollback_part);
+                    nvram_set_update_state(UPDATE_STATE_FAILED);
+                    terminal_write_string("  [OTA] Rollback post-reinicio ejecutado. El sistema regresara al slot original en el proximo reinicio.\n");
+                } else {
+                    // We haven't rebooted yet. The active node is our original slot.
+                    // Rollback simply means setting the boot partition back to our current slot.
+                    nvram_set_boot_partition(current_booted);
+                    nvram_set_update_state(UPDATE_STATE_FAILED);
+                    terminal_write_string("  [OTA] Rollback pre-reinicio ejecutado. La actualizacion pendiente ha sido cancelada.\n");
+                }
+
                 kfree(active_node);
             } else {
                 terminal_write_string("  [OTA] ERROR: No se pudo determinar el slot activo para hacer rollback.\n");

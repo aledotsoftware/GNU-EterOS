@@ -319,7 +319,6 @@ int e1000_send_packet(const void* data, uint16_t len) {
         }
     }
     
-    serial_write_string("[NET] Paquete enviado.\n");
     return 0;
 }
 

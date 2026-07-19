@@ -1,6 +1,6 @@
 /**
  * éterOS - Task Scheduler (Round-Robin Preemptive, SMP-Ready)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Scheduler preemptivo basado en timer (PIT IRQ0).
  * Cada SCHEDULER_HZ ticks, se selecciona la siguiente tarea READY.
@@ -161,6 +161,12 @@ static void dequeue_sleep(task_t* t) {
 static void enqueue_ready(task_t* t) {
     if (!t) return;
 
+    /* Avoid double enqueuing */
+    if (t->next_ready || t->prev_ready) return;
+    if (t->target_cpu >= 0 && t->target_cpu < total_cpus) {
+        if (cpus[t->target_cpu].local_ready_head == t) return;
+    }
+
     /* Simple load balancing / target assignment */
     cpu_info_t* target_cpu_ptr = NULL;
     if (t->target_cpu >= 0 && t->target_cpu < total_cpus && cpus[t->target_cpu].state == CPU_STATE_ONLINE) {
@@ -205,6 +211,8 @@ static void dequeue_ready(task_t* t) {
         /* If head is t */
         if (target_cpu_ptr->local_ready_head == t) {
             target_cpu_ptr->local_ready_head = t->next_ready;
+        } else {
+            return; /* Task is not in the ready queue */
         }
     }
 
@@ -606,7 +614,7 @@ int task_create(const char* name, void (*entry)(void)) {
         task_count = slot + 1;
     }
 
-    enqueue_ready(&tasks[slot]);
+    tasks[slot].state = TASK_READY; enqueue_ready(&tasks[slot]);
     spin_unlock(&sched_lock);
     task_irq_restore(irq_flags);
 
@@ -631,7 +639,7 @@ static task_t* find_next_task(task_t* current) {
     }
 
     /* Si no hay tareas listas y la actual esta muerta/durmiendo */
-    if (current->state == TASK_RUNNING) {
+    if (current->state == TASK_RUNNING || current->state == TASK_READY) {
         return current;
     }
 
@@ -702,7 +710,7 @@ void schedule(void) {
     }
 
     /* Solo switchear cada SCHEDULER_HZ ticks (excepto si la actual murio/bloqueo) */
-    if (current->state == TASK_RUNNING) {
+    if (current->state == TASK_RUNNING || current->state == TASK_READY) {
         cpu->sched_ticks++;
         if (cpu->sched_ticks < SCHEDULER_HZ) {
             spin_unlock(&sched_lock);
@@ -723,9 +731,7 @@ void schedule(void) {
     current->gs_base = rdmsr(MSR_KERNEL_GS_BASE); /* User GS is in KERNEL_GS_BASE while in kernel */
     
     /* Remove next task from ready queue */
-    if (next_task != current) {
-        dequeue_ready(next_task);
-    }
+    if (next_task->state == TASK_READY) { dequeue_ready(next_task); }
 
     next_task->state = TASK_RUNNING;
     /* Clear any pending timeout when task is scheduled */
@@ -797,9 +803,15 @@ void task_block_with_timeout(uint64_t wake_tick) {
 
     spin_lock(&sched_lock);
     task_t* current = task_get_current();
-    current->wake_tick = wake_tick;
-    current->state = TASK_BLOCKED;
-    enqueue_sleep(current);
+
+    if (current->signal_pending != 0) {
+        current->state = TASK_READY;
+    } else {
+        current->wake_tick = wake_tick;
+        current->state = TASK_BLOCKED;
+        enqueue_sleep(current);
+    }
+
     spin_unlock(&sched_lock);
 
     task_irq_restore(irq_flags);
@@ -812,8 +824,14 @@ void task_block(void) {
 
     spin_lock(&sched_lock);
     task_t* current = task_get_current();
-    current->wake_tick = 0;
-    current->state = TASK_BLOCKED;
+
+    if (current->signal_pending != 0) {
+        current->state = TASK_READY;
+    } else {
+        current->wake_tick = 0;
+        current->state = TASK_BLOCKED;
+    }
+
     spin_unlock(&sched_lock);
 
     task_irq_restore(irq_flags);
@@ -899,11 +917,8 @@ void task_wakeup(task_t* t) {
 
         if (!is_active) {
             enqueue_ready(t);
-        }
-
-        cpu_info_t* current_cpu = get_current_cpu();
-        if (current_cpu && (uint32_t)t->target_cpu != current_cpu->index) {
-            if (!is_active) {
+            cpu_info_t* current_cpu = get_current_cpu();
+            if (current_cpu && (uint32_t)t->target_cpu != current_cpu->index) {
                 /* Send IPI to the target CPU to wake it up or force schedule */
                 lapic_send_ipi(cpus[t->target_cpu].apic_id, 0x20); /* 0x20 is timer vector, forces schedule() */
             }
@@ -911,7 +926,20 @@ void task_wakeup(task_t* t) {
     }
     if (t->state == TASK_STOPPED) {
         t->state = TASK_READY;
-        enqueue_ready(t);
+        int is_active = 0;
+        for (int i = 0; i < MAX_CPUS; i++) {
+            if (cpus[i].state == CPU_STATE_ONLINE && cpus[i].current_task == (volatile void*)t) {
+                is_active = 1;
+                break;
+            }
+        }
+        if (!is_active) {
+            enqueue_ready(t);
+            cpu_info_t* current_cpu = get_current_cpu();
+            if (current_cpu && (uint32_t)t->target_cpu != current_cpu->index) {
+                lapic_send_ipi(cpus[t->target_cpu].apic_id, 0x20);
+            }
+        }
     }
     spin_unlock(&sched_lock);
 
@@ -927,15 +955,25 @@ static void task_mark_parent_wait_event(task_t* current, int wait_status, int wa
 static void task_wake_parent_waiter(task_t* current) {
     for (int i = 0; i < MAX_TASKS; i++) {
         if (tasks[i].id == current->parent_id &&
-            (tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_BLOCKED)) {
+            (tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_BLOCKED || tasks[i].state == TASK_STOPPED)) {
+
+            int is_active = 0;
+            for (int c = 0; c < MAX_CPUS; c++) {
+                if (cpus[c].state == CPU_STATE_ONLINE && cpus[c].current_task == (volatile void*)&tasks[i]) {
+                    is_active = 1;
+                    break;
+                }
+            }
+
             tasks[i].state = TASK_READY;
             dequeue_sleep(&tasks[i]);
-            enqueue_ready(&tasks[i]);
-
-            cpu_info_t* target_cpu = &cpus[tasks[i].target_cpu];
-            cpu_info_t* current_cpu = get_current_cpu();
-            if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index && target_cpu->state == CPU_STATE_ONLINE) {
-                lapic_send_ipi(target_cpu->apic_id, 0x20);
+            if (!is_active) {
+                enqueue_ready(&tasks[i]);
+                cpu_info_t* target_cpu = &cpus[tasks[i].target_cpu];
+                cpu_info_t* current_cpu = get_current_cpu();
+                if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index && target_cpu->state == CPU_STATE_ONLINE) {
+                    lapic_send_ipi(target_cpu->apic_id, 0x20);
+                }
             }
         }
     }
@@ -1045,13 +1083,21 @@ int task_kill(uint32_t pid) {
             tasks[i].signal_pending |= (1ULL << SIGKILL);
 
             if (tasks[i].state == TASK_BLOCKED || tasks[i].state == TASK_SLEEPING || tasks[i].state == TASK_STOPPED) {
+                int is_active = 0;
+                for (int c = 0; c < MAX_CPUS; c++) {
+                    if (cpus[c].state == CPU_STATE_ONLINE && cpus[c].current_task == (volatile void*)&tasks[i]) {
+                        is_active = 1;
+                        break;
+                    }
+                }
                 tasks[i].state = TASK_READY;
                 dequeue_sleep(&tasks[i]);
-                enqueue_ready(&tasks[i]);
-
-                cpu_info_t* current_cpu = get_current_cpu();
-                if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index) {
-                    lapic_send_ipi(cpus[tasks[i].target_cpu].apic_id, 0x20);
+                if (!is_active) {
+                    enqueue_ready(&tasks[i]);
+                    cpu_info_t* current_cpu = get_current_cpu();
+                    if (current_cpu && (uint32_t)tasks[i].target_cpu != current_cpu->index) {
+                        lapic_send_ipi(cpus[tasks[i].target_cpu].apic_id, 0x20);
+                    }
                 }
             }
             
@@ -1209,6 +1255,10 @@ int task_fork(void* regs_ptr) {
     tasks[slot].pgid = parent->pgid;
     tasks[slot].sid = parent->sid;
     tasks[slot].user_rsp = parent->user_rsp; /* Saved from syscall entry */
+    tasks[slot].binder_mmap_base = parent->binder_mmap_base;
+    tasks[slot].binder_mmap_size = parent->binder_mmap_size;
+    tasks[slot].binder_mmap_offset = parent->binder_mmap_offset;
+    tasks[slot].binder_mmap_kptr = parent->binder_mmap_kptr;
     tasks[slot].mmap_base = parent->mmap_base;
     tasks[slot].wait_status = 0;
     tasks[slot].wait_code = 0;
@@ -1244,7 +1294,7 @@ int task_fork(void* regs_ptr) {
 
     if (slot >= task_count) task_count = slot + 1;
 
-    enqueue_ready(&tasks[slot]);
+    tasks[slot].state = TASK_READY; enqueue_ready(&tasks[slot]);
     spin_unlock(&sched_lock);
     task_irq_restore(irq_flags);
 
@@ -1398,6 +1448,10 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
     tasks[slot].euid = parent->euid;
     tasks[slot].egid = parent->egid;
     tasks[slot].user_rsp = stack_top ? stack_top : parent->user_rsp;
+    tasks[slot].binder_mmap_base = parent->binder_mmap_base;
+    tasks[slot].binder_mmap_size = parent->binder_mmap_size;
+    tasks[slot].binder_mmap_offset = parent->binder_mmap_offset;
+    tasks[slot].binder_mmap_kptr = parent->binder_mmap_kptr;
     tasks[slot].mmap_base = parent->mmap_base;
     tasks[slot].wait_status = 0;
     tasks[slot].wait_code = 0;
@@ -1441,7 +1495,7 @@ int task_clone(uint64_t clone_flags, uint64_t stack_top, uint32_t* parent_tid, u
 
     if (slot >= task_count) task_count = slot + 1;
 
-    enqueue_ready(&tasks[slot]);
+    tasks[slot].state = TASK_READY; enqueue_ready(&tasks[slot]);
     spin_unlock(&sched_lock);
     task_irq_restore(irq_flags);
 

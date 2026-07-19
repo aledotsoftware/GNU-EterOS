@@ -2,7 +2,7 @@
 
 ## Introducción
 
-La documentación del proyecto éterOS presenta múltiples deficiencias que dificultan la comprensión, uso y contribución al sistema operativo. El README.md principal contiene información desactualizada (referencias a copyright 2026, versión v0.2.0), mientras que áreas críticas del proyecto carecen completamente de documentación. Los subdirectorios principales (kernel/, drivers/, fs/, net/, gfx/) no tienen READMEs explicativos, las APIs públicas carecen de guías de uso, y no existen documentos para desarrolladores que deseen contribuir o portar éterOS a nuevas arquitecturas.
+La documentación del proyecto éterOS presenta múltiples deficiencias que dificultan la comprensión, uso y contribución al sistema operativo. El README.md principal contiene información desactualizada (referencias a copyright 2025, versión v0.2.0), mientras que áreas críticas del proyecto carecen completamente de documentación. Los subdirectorios principales (kernel/, drivers/, fs/, net/, gfx/) no tienen READMEs explicativos, las APIs públicas carecen de guías de uso, y no existen documentos para desarrolladores que deseen contribuir o portar éterOS a nuevas arquitecturas.
 
 Este bugfix aborda sistemáticamente estas deficiencias para garantizar que la documentación refleje con precisión el estado actual del proyecto y proporcione la información necesaria para usuarios y desarrolladores.
 
@@ -10,7 +10,7 @@ Este bugfix aborda sistemáticamente estas deficiencias para garantizar que la d
 
 ### Comportamiento Actual (Defecto)
 
-1.1 CUANDO un usuario lee el README.md principal ENTONCES el sistema muestra información desactualizada incluyendo copyright "2026" y referencias a versiones antiguas
+1.1 CUANDO un usuario lee el README.md principal ENTONCES el sistema muestra información desactualizada incluyendo copyright "2025" y referencias a versiones antiguas
 
 1.2 CUANDO un desarrollador navega a directorios críticos (kernel/drivers/, kernel/fs/, kernel/net/, kernel/gfx/, kernel/crypto/, kernel/mm/) ENTONCES el sistema no proporciona ningún README explicativo sobre el propósito o estructura del módulo
 
@@ -103,9 +103,9 @@ Esto asegura que la documentación que ya es correcta y precisa (como las seccio
 ## Ejemplos Concretos
 
 ### Ejemplo 1: Información Desactualizada
-- **Input**: README.md línea "© 2026 **Tudex Networks**"
+- **Input**: README.md línea "© 2025 **Tudex Networks**"
 - **Condición de Bug**: `isOutdated = true` (año futuro incorrecto)
-- **Comportamiento Actual**: Muestra copyright 2026
+- **Comportamiento Actual**: Muestra copyright 2025
 - **Comportamiento Esperado**: Muestra copyright del año actual
 
 ### Ejemplo 2: Documentación Faltante

@@ -22,8 +22,8 @@ enter_user_mode:
     mov ax, 0x1B    ; User Data Segment (Index 3, RPL 3)
     mov ds, ax
     mov es, ax
-    mov fs, ax
-    mov gs, ax      ; Update GS selector (Base becomes 0, which matches current GS_BASE)
+    ; Do NOT load fs and gs here, as doing so clears their MSR bases on many CPUs!
+    ; Even loading a NULL selector clears the base.
 
     ; Construct IRETQ Frame
     ; Stack order (pushes): SS, RSP, RFLAGS, CS, RIP

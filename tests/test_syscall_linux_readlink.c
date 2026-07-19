@@ -1,9 +1,10 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-void my_assert(int condition) {
+void assert(int condition) {
     if (!condition) {
-        printf("Assertion failed!\n");
+        printf("Assertion failed at line %d!\n", __LINE__);
         exit(1);
     }
 }
@@ -62,6 +63,7 @@ ssize_t mock_read(fs_node_t* node, uint64_t offset, uint64_t size, uint8_t* buff
 
 // Function to test
 static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
+    if ((ssize_t)bufsiz <= 0) return -EINVAL;
     if (!vmm_verify_user_access(buf, bufsiz, 1)) return -EFAULT;
 
     char kpath[256];
@@ -108,32 +110,32 @@ int main() {
 
     // Test valid readlinkat
     res = sys_readlinkat(AT_FDCWD, "/valid_symlink", buf, sizeof(buf));
-    my_assert(res > 0);
-    my_assert(strncmp(buf, "/target_path", res) == 0);
+    assert(res > 0);
+    assert(strncmp(buf, "/target_path", res) == 0);
 
     // Test valid readlink
     res = sys_readlink("/valid_symlink", buf, sizeof(buf));
-    my_assert(res > 0);
-    my_assert(strncmp(buf, "/target_path", res) == 0);
+    assert(res > 0);
+    assert(strncmp(buf, "/target_path", res) == 0);
 
     // Test invalid pointer
     res = sys_readlinkat(AT_FDCWD, "/valid_symlink", NULL, 0);
-    my_assert(res == -EFAULT);
+    assert(res == -EINVAL);
 
     // Test not found
     res = sys_readlinkat(AT_FDCWD, "/missing", buf, sizeof(buf));
-    my_assert(res == -ENOENT);
+    assert(res == -ENOENT);
 
     // Test not a symlink
     res = sys_readlinkat(AT_FDCWD, "/invalid_symlink", buf, sizeof(buf));
-    my_assert(res == -EINVAL);
+    assert(res == -EINVAL);
 
     // Test rename and symlink (stubbed)
     res = sys_rename("/old", "/new");
-    my_assert(res == 0);
+    assert(res == 0);
 
     res = sys_symlink("/target", "/link");
-    my_assert(res == 0);
+    assert(res == 0);
 
     printf("test_syscall_linux_readlink passed!\n");
     free(mock_node);

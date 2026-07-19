@@ -6,6 +6,10 @@
 #define RUSAGE_SELF 0
 #define RUSAGE_CHILDREN -1
 
+#define PRIO_PROCESS 0
+#define PRIO_PGRP    1
+#define PRIO_USER    2
+
 struct rusage {
     struct timeval ru_utime;
     struct timeval ru_stime;
@@ -26,5 +30,7 @@ struct rusage {
 };
 
 int getrusage(int who, struct rusage *usage);
+int getpriority(int which, int who);
+int setpriority(int which, int who, int niceval);
 
 #endif

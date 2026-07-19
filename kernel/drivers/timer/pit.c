@@ -1,6 +1,6 @@
 /**
  * éterOS - PIT Timer Driver
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Programa el PIT 8254 Channel 0 en Rate Generator mode
  * para generar ~100 interrupciones por segundo (IRQ0).

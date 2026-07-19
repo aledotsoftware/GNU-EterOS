@@ -173,6 +173,7 @@ long syscall(long nr, ...);
 #define SYS_fstatfs              138
 #define SYS_sysfs                139
 #define SYS_getpriority          140
+#define SYS_setpriority          141
 #define SYS_sched_setparam       142
 #define SYS_sched_getparam       143
 #define SYS_sched_setscheduler   144

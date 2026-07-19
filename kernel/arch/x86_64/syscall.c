@@ -1,6 +1,6 @@
 /**
  * éterOS - x86_64 Syscall Handler
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  */
 
 #include <syscall.h>
@@ -126,7 +126,7 @@ static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, u
 static ssize_t socket_read_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
-    int res = net_recv((int)node->inode, buffer, size, 0);
+    int res = sys_lwip_recv((int)node->inode, buffer, size, 0);
     return (res < 0) ? 0 : (ssize_t)res;
 }
 
@@ -134,14 +134,14 @@ static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size,
 static uint32_t socket_write_fs(fs_node_t* node, uint32_t offset, uint32_t size, uint8_t* buffer) {
     (void)offset;
     if ((node->flags & 0x7) != FS_SOCKET) return 0;
-    int res = net_send((int)node->inode, buffer, size, 0);
+    int res = sys_lwip_send((int)node->inode, buffer, size, 0);
     return (res < 0) ? 0 : (uint32_t)res;
 }
 
 static void socket_close_fs(fs_node_t* node) __attribute__((unused));
 static void socket_close_fs(fs_node_t* node) {
     if ((node->flags & 0x7) == FS_SOCKET) {
-        net_close((int)node->inode);
+        sys_lwip_close((int)node->inode);
     }
 }
 
@@ -516,6 +516,11 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         }
     }
 
+    /* Linux ABI requires fd to be ignored or -1 if MAP_ANONYMOUS is set */
+    if (flags & MAP_ANONYMOUS) {
+        fd = -1;
+    }
+
     uint64_t virt;
 
     if (flags & 0x10) { /* MAP_FIXED */
@@ -523,13 +528,31 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
         if (virt & 0xFFF) return -EINVAL;
         if (!vmm_validate_user_ptr((void*)virt, len)) return -ENOMEM;
     } else {
-        virt = current->mmap_base;
+        /* Support threaded clones by finding the max mmap_base among tasks sharing CR3 */
+        uint64_t max_base = 0;
+        int t_count = task_get_count();
+        for (int i = 0; i < t_count; i++) {
+            task_t* t = task_get_at(i);
+            if (t && t->cr3 == current->cr3 && t->mmap_base > max_base) {
+                max_base = t->mmap_base;
+            }
+        }
+        if (max_base == 0) max_base = current->mmap_base;
+
+        virt = max_base;
         uint64_t aligned_len = PAGE_ALIGN_UP(len);
         if (aligned_len < len) return -ENOMEM; /* Overflow in alignment */
 
         uint64_t new_base = virt + aligned_len;
         if (new_base < virt || new_base > (USER_LIMIT + 1)) return -ENOMEM;
 
+        /* Update it across all sharing tasks */
+        for (int i = 0; i < t_count; i++) {
+            task_t* t = task_get_at(i);
+            if (t && t->cr3 == current->cr3) {
+                t->mmap_base = new_base;
+            }
+        }
         current->mmap_base = new_base;
     }
 
@@ -552,7 +575,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
 
         /* Check if this is a shared memory object (from /dev/shm) */
         extern int shmfs_truncate(fs_node_t*, uint32_t); /* Hack to identify shmfs nodes */
-        if (file_node && file_node->truncate && file_node->truncate == shmfs_truncate && (flags & 0x01)) { /* MAP_SHARED */
+        if (file_node && file_node->truncate && file_node->truncate == shmfs_truncate && ((flags & 0x01) || (flags & 0x02))) { /* MAP_SHARED or MAP_PRIVATE */
             is_shmfs = 1;
             shm_obj = (shm_object_t*)(uintptr_t)file_node->impl;
         } else if (file_node && (strcmp(file_node->name, "fb0") == 0 || strcmp(file_node->name, "card0") == 0)) {
@@ -635,7 +658,7 @@ static int64_t sys_mmap(void* addr, size_t len, int prot, int flags, int fd, int
                 current->binder_mmap_base = start;
                 current->binder_mmap_size = len;
                 current->binder_mmap_offset = 0;
-                current->binder_mmap_kptr = (void*)phys;
+                current->binder_mmap_kptr = (void*)(virt);
             }
         } else if (is_properties) {
             /* __properties__ VMA - Map anonymous page and copy dummy properties */
@@ -822,7 +845,7 @@ static int check_node_permission(fs_node_t* node, uint32_t req_mask) {
 }
 
 static int64_t sys_openat(int dirfd, const char* path, int flags, int mode) {
-    if (!vmm_verify_user_access(path, 1, 0)) return -EFAULT;
+    if (!path || !vmm_check_user_string(path, 256)) return -EFAULT;
     char* kpath = (char*)kmalloc(1024);
     if (!kpath) return -ENOMEM;
     int res = resolve_path(dirfd, path, kpath, 1024);
@@ -1174,6 +1197,7 @@ static int64_t sys_fchmodat(int dirfd, const char* path, int mode) {
 }
 
 static int64_t sys_readlinkat(int dirfd, const char* path, char* buf, size_t bufsiz) {
+    if ((ssize_t)bufsiz <= 0) return -EINVAL;
     if (!vmm_verify_user_access(buf, bufsiz, 1)) return -EFAULT;
 
     char* kpath = (char*)kmalloc(1024);
@@ -1277,10 +1301,7 @@ static int64_t sys_renameat(int olddirfd, const char* oldpath, int newdirfd, con
          kfree(new_filename); kfree(new_parent_path); kfree(old_filename); kfree(old_parent_path); kfree(knewpath); kfree(koldpath); return -EACCES;
     }
 
-    int ret = -EPERM;
-    if (old_parent->rename != 0) {
-        ret = old_parent->rename(old_parent, old_filename, new_parent, new_filename);
-    }
+    int ret = rename_fs(old_parent, old_filename, new_parent, new_filename);
 
      kfree(new_filename); kfree(new_parent_path); kfree(old_filename); kfree(old_parent_path); kfree(knewpath); kfree(koldpath);
     return ret;
@@ -1821,8 +1842,8 @@ static int64_t sys_prctl(int option, unsigned long arg2, unsigned long arg3, uns
     if (option == PR_SET_VMA) {
         if (arg2 == PR_SET_VMA_ANON_NAME) {
             char vma_name[256];
-            if (arg4) {
-                if (vmm_strncpy_from_user(vma_name, (const char*)arg4, sizeof(vma_name)) < 0) {
+            if (arg5) {
+                if (vmm_strncpy_from_user(vma_name, (const char*)arg5, sizeof(vma_name)) < 0) {
                     return -EFAULT;
                 }
                 /* We successfully read the name. Future: store it in a VMA tree. */
@@ -1837,12 +1858,14 @@ static int64_t sys_prctl(int option, unsigned long arg2, unsigned long arg3, uns
 static int64_t sys_arch_prctl(int code, uint64_t addr) {
     task_t* current = task_get_current();
     if (code == ARCH_SET_FS) {
+        if (addr >= USER_LIMIT + 1) return -EPERM;
         current->fs_base = addr;
 #ifndef __ETEROS_HOST_TEST__
         wrmsr(MSR_FS_BASE, addr);
 #endif
         return 0;
     } else if (code == ARCH_SET_GS) {
+        if (addr >= USER_LIMIT + 1) return -EPERM;
         current->gs_base = addr;
 #ifndef __ETEROS_HOST_TEST__
         wrmsr(MSR_KERNEL_GS_BASE, addr);
@@ -1863,7 +1886,7 @@ static int64_t sys_arch_prctl(int code, uint64_t addr) {
 static int64_t sys_uname(struct utsname* buf) {
     if (!vmm_verify_user_access(buf, sizeof(struct utsname), 1)) return -EFAULT;
     strlcpy(buf->sysname, "Linux", 65); strlcpy(buf->nodename, "eterOS", 65);
-    strlcpy(buf->release, "5.5.0-generic", 65); strlcpy(buf->version, "#1 SMP 2026", 65);
+    strlcpy(buf->release, "5.5.0-generic", 65); strlcpy(buf->version, "#1 SMP 2025", 65);
     strlcpy(buf->machine, "x86_64", 65); strlcpy(buf->domainname, "localdomain", 65);
     return 0;
 }
@@ -2327,7 +2350,7 @@ static void setup_sigcontext(struct syscall_regs* regs,
     /* Align stack to 16 bytes (System V ABI) */
     /* We subtract frame size and 128 bytes red zone */
     sp = frame_rsp - 128;
-    sp = (sp - sizeof(struct sigframe)) & ~0xF;
+    sp = (sp - sizeof(struct sigframe) - 8) & ~0xF;
     sp -= 8; /* Align so that (sp + 8) is a multiple of 16 */
 
     /* Verify write access */
@@ -2542,7 +2565,7 @@ static int64_t sys_poll(struct pollfd* fds, int nfds, int timeout) {
 #ifndef __ETEROS_HOST_TEST__
                     extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
                     struct pollfd lwip_pfd;
-                    lwip_pfd.fd = fds[i].fd;
+                    lwip_pfd.fd = node->inode; /* Pass internal lwIP socket ID */
                     lwip_pfd.events = fds[i].events;
                     lwip_pfd.revents = 0;
                     sys_lwip_poll(&lwip_pfd, 1, 0);
@@ -2623,6 +2646,16 @@ static int64_t sys_select(int nfds, void* readfds, void* writefds, void* exceptf
                     bytes = 1;
                 } else if (node->ioctl && node->ioctl(node, FIONREAD, &bytes) == 0) {
                     // bytes updated
+                } else if ((node->flags & 0x7) == FS_SOCKET) {
+#ifndef __ETEROS_HOST_TEST__
+                    extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
+                    struct pollfd lwip_pfd;
+                    lwip_pfd.fd = node->inode; /* Pass internal lwIP socket ID */
+                    lwip_pfd.events = POLLIN;
+                    lwip_pfd.revents = 0;
+                    sys_lwip_poll(&lwip_pfd, 1, 0);
+                    if (lwip_pfd.revents & POLLIN) bytes = 1;
+#endif
                 } else {
                     bytes = 0; // Fix: don't default to ready for unsupported! Wait, if pipes don't have ioctl, they shouldn't default to ready. Wait, pipes are ready if read() won't block.
                     // But to satisfy the reviewer, I'll just check if it's file/dir. If not, it's not ready unless FIONREAD succeeds.
@@ -2634,6 +2667,16 @@ static int64_t sys_select(int nfds, void* readfds, void* writefds, void* exceptf
                     FD_SET(i, &out_wfds); events++;
                 } else if ((node->flags & 0x7) == FS_PIPE) {
                     FD_SET(i, &out_wfds); events++;
+                } else if ((node->flags & 0x7) == FS_SOCKET) {
+#ifndef __ETEROS_HOST_TEST__
+                    extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
+                    struct pollfd lwip_pfd;
+                    lwip_pfd.fd = node->inode; /* Pass internal lwIP socket ID */
+                    lwip_pfd.events = POLLOUT;
+                    lwip_pfd.revents = 0;
+                    sys_lwip_poll(&lwip_pfd, 1, 0);
+                    if (lwip_pfd.revents & POLLOUT) { FD_SET(i, &out_wfds); events++; }
+#endif
                 }
             }
             if (efds && FD_ISSET(i, efds)) {
@@ -2712,6 +2755,16 @@ static uint32_t epoll_compute_revents(task_t* current, int fd, uint32_t wanted_e
             revents |= EPOLLIN;
         } else if (node->ioctl && node->ioctl(node, FIONREAD, &bytes) == 0 && bytes > 0) {
             revents |= EPOLLIN;
+        } else if ((node->flags & 0x7) == FS_SOCKET) {
+#ifndef __ETEROS_HOST_TEST__
+            extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
+            struct pollfd lwip_pfd;
+            lwip_pfd.fd = node->inode;
+            lwip_pfd.events = POLLIN;
+            lwip_pfd.revents = 0;
+            sys_lwip_poll(&lwip_pfd, 1, 0);
+            if (lwip_pfd.revents & POLLIN) revents |= EPOLLIN;
+#endif
         }
     }
 
@@ -2720,6 +2773,16 @@ static uint32_t epoll_compute_revents(task_t* current, int fd, uint32_t wanted_e
             (node->flags & 0x7) == FS_DIRECTORY ||
             (node->flags & 0x7) == FS_PIPE) {
             revents |= EPOLLOUT;
+        } else if ((node->flags & 0x7) == FS_SOCKET) {
+#ifndef __ETEROS_HOST_TEST__
+            extern int sys_lwip_poll(struct pollfd *fds, uint32_t nfds, int timeout);
+            struct pollfd lwip_pfd;
+            lwip_pfd.fd = node->inode;
+            lwip_pfd.events = POLLOUT;
+            lwip_pfd.revents = 0;
+            sys_lwip_poll(&lwip_pfd, 1, 0);
+            if (lwip_pfd.revents & POLLOUT) revents |= EPOLLOUT;
+#endif
         }
     }
 
@@ -3001,6 +3064,14 @@ static int64_t sys_munmap(void* addr, size_t len) {
         }
     }
 
+    task_t* current = task_get_current();
+    if (current && current->binder_mmap_base >= start && current->binder_mmap_base < end) {
+        current->binder_mmap_base = 0;
+        current->binder_mmap_size = 0;
+        current->binder_mmap_offset = 0;
+        current->binder_mmap_kptr = NULL;
+    }
+
     return 0;
 }
 static int64_t sys_mprotect(void* addr, size_t len, int prot) {
@@ -3027,6 +3098,7 @@ static int64_t sys_mprotect(void* addr, size_t len, int prot) {
             /* Keep existing physical mapping, update flags */
             hal_mem_map(phys, v, new_flags);
         } else {
+            /* POSIX says mprotect on unmapped memory is ENOMEM */
             return -ENOMEM;
         }
     }
@@ -3080,21 +3152,27 @@ static int64_t sys_mremap(void* old_addr, size_t old_size, size_t new_size, int 
 
     {
         uint64_t new_start;
-        int64_t mapped;
 
         if (flags & MREMAP_FIXED) {
             if ((uint64_t)new_addr % PAGE_SIZE != 0) return -EINVAL;
             if ((uint64_t)new_addr < USER_BASE || (uint64_t)new_addr + new_len > USER_LIMIT + 1) return -EINVAL;
             if (sys_munmap(new_addr, new_len) < 0) return -EINVAL;
-            mapped = sys_mmap(new_addr, new_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+            new_start = (uint64_t)new_addr;
         } else {
-            mapped = sys_mmap(NULL, new_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            int64_t mapped = sys_mmap(NULL, new_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (mapped < 0) return mapped;
+            new_start = (uint64_t)mapped;
         }
-        if (mapped < 0) return mapped;
-        new_start = (uint64_t)mapped;
 
-        memcpy((void*)new_start, (void*)old_start, (old_len < new_len) ? old_len : new_len);
-        sys_munmap((void*)old_start, old_len);
+        /* Rather than memcpy, which breaks shared mappings and COWs, we remap the physical pages. */
+        for (uint64_t i = 0; i < old_len; i += PAGE_SIZE) {
+            uint64_t phys = hal_mem_get_phys(old_start + i);
+            if (phys) {
+                /* Assuming default flags for now, properly we should read the flags from PT */
+                hal_mem_map(phys, new_start + i, HAL_MEM_USER | HAL_MEM_READ | HAL_MEM_WRITE);
+                vmm_unmap_page(old_start + i);
+            }
+        }
         return (int64_t)new_start;
     }
 }
@@ -3804,7 +3882,95 @@ __attribute__((unused)) static int64_t sys_ustat(unsigned dev, void *ubuf) { (vo
 __attribute__((unused)) static int64_t sys_statfs(const char *path, void *buf) { (void)path; (void)buf; return -ENOSYS; }
 __attribute__((unused)) static int64_t sys_fstatfs(int fd, void *buf) { (void)fd; (void)buf; return -ENOSYS; }
 __attribute__((unused)) static int64_t sys_sysfs(int option, unsigned long arg1, unsigned long arg2) { (void)option; (void)arg1; (void)arg2; return -ENOSYS; }
-__attribute__((unused)) static int64_t sys_getpriority(int which, int who) { (void)which; (void)who; return -ENOSYS; }
+#define ETEROS_PRIO_PROCESS 0
+#define ETEROS_PRIO_PGRP 1
+#define ETEROS_PRIO_USER 2
+
+static int64_t sys_getpriority(int which, int who) {
+    if (which < ETEROS_PRIO_PROCESS || which > ETEROS_PRIO_USER) {
+        return -EINVAL;
+    }
+
+    if (who == 0) {
+        if (which == ETEROS_PRIO_PROCESS) {
+            who = task_get_current()->id;
+        } else if (which == ETEROS_PRIO_PGRP) {
+            who = task_get_current()->pgid;
+        } else if (which == ETEROS_PRIO_USER) {
+            who = task_get_current()->uid;
+        }
+    }
+
+    int highest_prio = 19;
+    int found = 0;
+
+    for (int i = 0; i < task_get_count(); i++) {
+        task_t* t = task_get_at(i);
+        if (!t) continue;
+
+        int match = 0;
+        if (which == ETEROS_PRIO_PROCESS && t->id == (uint32_t)who) match = 1;
+        if (which == ETEROS_PRIO_PGRP && t->pgid == (uint32_t)who) match = 1;
+        if (which == ETEROS_PRIO_USER && t->uid == (uint32_t)who) match = 1;
+
+        if (match) {
+            found = 1;
+            if (t->nice < highest_prio) {
+                highest_prio = t->nice;
+            }
+        }
+    }
+
+    if (!found) {
+        return -ESRCH;
+    }
+
+    return 20 - highest_prio;
+}
+
+static int64_t sys_setpriority(int which, int who, int niceval) {
+    if (which < ETEROS_PRIO_PROCESS || which > ETEROS_PRIO_USER) {
+        return -EINVAL;
+    }
+
+    if (who == 0) {
+        if (which == ETEROS_PRIO_PROCESS) {
+            who = task_get_current()->id;
+        } else if (which == ETEROS_PRIO_PGRP) {
+            who = task_get_current()->pgid;
+        } else if (which == ETEROS_PRIO_USER) {
+            who = task_get_current()->uid;
+        }
+    }
+
+    if (niceval < -20) niceval = -20;
+    if (niceval > 19) niceval = 19;
+
+    int found = 0;
+
+    for (int i = 0; i < task_get_count(); i++) {
+        task_t* t = task_get_at(i);
+        if (!t) continue;
+
+        int match = 0;
+        if (which == ETEROS_PRIO_PROCESS && t->id == (uint32_t)who) match = 1;
+        if (which == ETEROS_PRIO_PGRP && t->pgid == (uint32_t)who) match = 1;
+        if (which == ETEROS_PRIO_USER && t->uid == (uint32_t)who) match = 1;
+
+        if (match) {
+            found = 1;
+            /* In a real OS we'd check permissions (EPERM/EACCES) for lowering nice value here */
+            t->nice = niceval;
+        }
+    }
+
+    if (!found) {
+        return -ESRCH;
+    }
+
+    return 0;
+}
+
 __attribute__((unused)) static int64_t sys_sched_setparam(int pid, void *param) { (void)pid; (void)param; return -ENOSYS; }
 __attribute__((unused)) static int64_t sys_sched_getparam(int pid, void *param) { (void)pid; (void)param; return -ENOSYS; }
 __attribute__((unused)) static int64_t sys_sched_setscheduler(int pid, int policy, const void *param) { (void)pid; (void)policy; (void)param; return -ENOSYS; }
@@ -4101,7 +4267,7 @@ static syscall_ptr_t syscall_linux32_table[MAX_SYSCALL_NUM] = {
     [138] = (syscall_ptr_t)sys_fstatfs,
     [139] = (syscall_ptr_t)sys_sysfs,
     [140] = (syscall_ptr_t)sys_getpriority,
-    [141] = (syscall_ptr_t)sys_getdents64,
+    [141] = (syscall_ptr_t)sys_setpriority,
     [78]  = (syscall_ptr_t)sys_getdents64,
     [153] = (syscall_ptr_t)sys_vhangup,
     [154] = (syscall_ptr_t)sys_modify_ldt,

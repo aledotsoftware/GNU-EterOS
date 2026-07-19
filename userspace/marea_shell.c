@@ -1,6 +1,6 @@
 /**
  * eterOS — Marea Shell (Wayland-inspired Desktop Environment)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Proceso userspace que actúa como compositor y window manager.
  * Se conecta al framebuffer via /dev/fb0 mmap y lee input de
@@ -687,7 +687,7 @@ static void draw_menu(void) {
 /* Check if click is on a window's minimize button */
 static int hit_minimize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + win->w - 14 - btn_spacing;
+    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -696,7 +696,7 @@ static int hit_minimize_button(marea_window_t* win, int mx, int my) {
 /* Check if click is on a window's maximize button */
 static int hit_maximize_button(marea_window_t* win, int mx, int my) {
     int btn_spacing = 20;
-    int btn_cx = win->x + win->w - 14 - btn_spacing * 2;
+    int btn_cx = win->x + win->w - 14 - btn_spacing;
     int btn_cy = win->y + TITLEBAR_HEIGHT / 2;
     int dx = mx - btn_cx, dy = my - btn_cy;
     return (dx * dx + dy * dy <= 8 * 8);
@@ -1013,7 +1013,7 @@ static void term_execute(marea_window_t* win) {
 
         if (strcmp(argv[0], "help") == 0) {
             term_print(win, "\n", COL_TERM_FG);
-            term_print(win, "Marea Shell Terminal v0.2.0 Genesis SMP\n", COL_ACCENT);
+            term_print(win, "eterOS Marea UI v0.2.0 Genesis SMP\n", COL_ACCENT);
             term_print(win, "Comandos internos: help, clear, echo, uname, cd, pwd, exit\n", COL_TERM_FG);
             term_print(win, "Comandos externos: se resuelven en /gnu/bin, /bin y /\n", COL_TERM_FG);
         } else if (strcmp(argv[0], "clear") == 0) {
@@ -1695,17 +1695,17 @@ static void draw_tooltips(void) {
     int hover_min = hit_minimize_button(win, mouse_x, mouse_y);
 
     if (hover_close) {
-        fill_rounded_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 6, 0xE60F172A);
-        stroke_rect(btn_base_x - 12, btn_base_y - btn_r - 28, 64, 20, 0x1AFFFFFF);
-        draw_text(btn_base_x - 6, btn_base_y - btn_r - 26, "Cerrar", COL_TEXT_PRIMARY, 0);
+        fill_rounded_rect(btn_base_x - 24, btn_base_y - btn_r - 28, 64, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - 24, btn_base_y - btn_r - 28, 64, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - 18, btn_base_y - btn_r - 26, "Cerrar", COL_TEXT_PRIMARY, 0);
     } else if (hover_max) {
-        fill_rounded_rect(btn_base_x - btn_spacing - 24, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
-        stroke_rect(btn_base_x - btn_spacing - 24, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
-        draw_text(btn_base_x - btn_spacing - 18, btn_base_y - btn_r - 26, "Maximizar", COL_TEXT_PRIMARY, 0);
+        fill_rounded_rect(btn_base_x - btn_spacing - 32, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - btn_spacing - 32, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - btn_spacing - 26, btn_base_y - btn_r - 26, "Maximizar", COL_TEXT_PRIMARY, 0);
     } else if (hover_min) {
-        fill_rounded_rect(btn_base_x - btn_spacing * 2 - 24, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
-        stroke_rect(btn_base_x - btn_spacing * 2 - 24, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
-        draw_text(btn_base_x - btn_spacing * 2 - 18, btn_base_y - btn_r - 26, "Minimizar", COL_TEXT_PRIMARY, 0);
+        fill_rounded_rect(btn_base_x - btn_spacing * 2 - 32, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - btn_spacing * 2 - 32, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - btn_spacing * 2 - 26, btn_base_y - btn_r - 26, "Minimizar", COL_TEXT_PRIMARY, 0);
     }
 }
 

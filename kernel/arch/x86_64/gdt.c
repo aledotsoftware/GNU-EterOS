@@ -1,6 +1,6 @@
 /**
  * éterOS - GDT & TSS Implementation (x86_64)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Configura la Global Descriptor Table y el Task State Segment.
  * Es crítico en Long Mode tener un TSS válido para el manejo de interrupciones

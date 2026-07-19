@@ -34,9 +34,16 @@ int main(int argc, char *argv[]) {
             const char* root_entry = "root:x:0:0:root:/root:/bin/sh\n";
             write(passwd_fd, root_entry, strlen(root_entry));
             close(passwd_fd);
+        } else {
+            printf("Error: Could not create /etc/passwd\n");
+            return 1;
         }
     } else {
         close(passwd_fd);
+    }
+    if (chmod("/etc/passwd", 0644) < 0) {
+        printf("Error: Failed to set permissions on /etc/passwd\n");
+        return 1;
     }
 
     /* Initialize /etc/shadow if missing */
@@ -47,12 +54,18 @@ int main(int argc, char *argv[]) {
             const char* root_entry = "root::19000:0:99999:7:::\n";
             write(shadow_fd, root_entry, strlen(root_entry));
             close(shadow_fd);
+        } else {
+            printf("Error: Could not create /etc/shadow\n");
+            return 1;
         }
     } else {
         close(shadow_fd);
     }
     /* Always enforce shadow file permissions to 0600 */
-    chmod("/etc/shadow", 0600);
+    if (chmod("/etc/shadow", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow\n");
+        return 1;
+    }
 
     /* Check for preferred shell from argv */
     const char* preferred_shell = "sh.elf";

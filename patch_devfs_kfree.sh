@@ -1,1 +1,0 @@
-sed -i 's/buffer_to_free < current->binder_mmap_base || buffer_to_free >= current->binder_mmap_base + current->binder_mmap_size/(uintptr_t)buffer_to_free < current->binder_mmap_base || (uintptr_t)buffer_to_free >= current->binder_mmap_base + current->binder_mmap_size/g' kernel/fs/devfs.c

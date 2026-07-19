@@ -292,7 +292,13 @@ fs_node_t *initrd_finddir(fs_node_t *node, char *name) {
              fnode->name[name_len] = '\0';
 
              fnode->inode = i;
-             fnode->mask = 0755; /* Files typically rwxr-xr-x (executable for elf) */
+             if (strcmp(safe_name, "etc/shadow") == 0) {
+                 fnode->mask = 0600;
+             } else if (strcmp(safe_name, "etc/passwd") == 0) {
+                 fnode->mask = 0644;
+             } else {
+                 fnode->mask = 0755; /* Files typically rwxr-xr-x (executable for elf) */
+             }
              fnode->flags = FS_FILE;
              fnode->read = &initrd_read;
              fnode->write = 0;

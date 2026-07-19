@@ -5,6 +5,7 @@
 #include "../../include/string.h"
 #include <gfx/window.h>
 #include <hal.h>
+#include <timer.h>
 
 void cmd_echo(const char* args) {
     terminal_write_string(args);
@@ -109,8 +110,22 @@ void cmd_test_compositor(const char* args) {
 
     compositor_add_window(w3);
 
-    terminal_write_string("Rendering...\n");
-    compositor_render();
+    terminal_write_string("Rendering Animation...\n");
+    for (int frame = 0; frame < 60; frame++) {
+        window_invalidate(w1);
+        window_invalidate(w2);
+        window_invalidate(w3);
 
-    terminal_write_string("Check screen. Windows should be visible.\n");
+        w2->x += 2;
+        w3->y += 1;
+
+        window_invalidate(w1);
+        window_invalidate(w2);
+        window_invalidate(w3);
+
+        compositor_render();
+        timer_sleep(16);
+    }
+
+    terminal_write_string("Animation complete. Check screen.\n");
 }

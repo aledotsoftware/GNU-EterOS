@@ -210,16 +210,16 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                                 }
                             } else {
                                 /* Fallback to legacy kmalloc if no mmap or full */
-                            temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
-                            if (temp_payload) {
-                                if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
-                                    kfree(temp_payload);
-                                    temp_payload = NULL;
+                                temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
+                                if (temp_payload) {
+                                    if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
+                                        kfree(temp_payload);
+                                        temp_payload = NULL;
+                                        tr.data_size = 0;
+                                    }
+                                } else {
                                     tr.data_size = 0;
                                 }
-                            } else {
-                            }
-                                tr.data_size = 0;
                             }
                         } else {
                             tr.data_size = 0; /* Deny oversized requests */
@@ -299,6 +299,14 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                      }
                      spin_unlock(&binder_lock);
 
+                } else if (cmd == BC_INCREFS || cmd == BC_ACQUIRE || cmd == BC_RELEASE || cmd == BC_DECREFS) {
+                    if (consumed + sizeof(uint32_t) > bwr.write_size) break;
+                    uint32_t desc;
+                    if (safe_copy_from_user(&desc, wbuf + consumed, sizeof(uint32_t)) != 0) break;
+                    consumed += sizeof(uint32_t);
+                    /* Dummy reference tracking, NO-OP for now */
+                } else if (cmd == BC_ENTER_LOOPER || cmd == BC_REGISTER_LOOPER || cmd == BC_EXIT_LOOPER) {
+                    /* NO-OP for thread state tracking for now */
                 } else {
                     /* Unknown or unimplemented command, break */
                     break;

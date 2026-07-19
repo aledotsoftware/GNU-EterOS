@@ -120,6 +120,7 @@ int create_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {}
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int unlink_fs(fs_node_t *parent, char *name) { return 0; }
+int rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) { return 0; }
 int ioctl_fs(fs_node_t *node, int request, void *arg) { return 0; }
 
 /* Stub MSR functions */

@@ -216,3 +216,4 @@ __attribute__((weak)) uint64_t pmm_get_free_ram(void) { return 512 * 1024 * 1024
 __attribute__((weak)) uint64_t pmm_get_used_ram(void) { return 512 * 1024 * 1024; }
 #endif
 void task_stop_signal(int sig) {}
+int rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) { return 0; }

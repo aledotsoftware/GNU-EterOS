@@ -1,6 +1,6 @@
 /**
  * éterOS - Driver de Mouse PS/2 (Versión de Máxima Compatibilidad)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  */
 
 #include <mouse.h>

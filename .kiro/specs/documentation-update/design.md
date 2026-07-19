@@ -2,7 +2,7 @@
 
 ## Overview
 
-Este bugfix aborda las deficiencias sistemáticas en la documentación del proyecto éterOS. El problema se manifiesta en tres categorías: información desactualizada (copyright 2026, versiones antiguas), documentación faltante en áreas críticas (READMEs de módulos, guías de APIs, CONTRIBUTING.md), y documentación incompleta (guías de porting, especificaciones de Eterland y filesystem).
+Este bugfix aborda las deficiencias sistemáticas en la documentación del proyecto éterOS. El problema se manifiesta en tres categorías: información desactualizada (copyright 2025, versiones antiguas), documentación faltante en áreas críticas (READMEs de módulos, guías de APIs, CONTRIBUTING.md), y documentación incompleta (guías de porting, especificaciones de Eterland y filesystem).
 
 La estrategia de corrección es incremental y preservativa: actualizar información obsoleta, crear documentación faltante para módulos críticos, y expandir documentación incompleta, mientras se preserva todo el contenido técnico correcto existente (descripciones de arquitectura, memoria, planificador).
 
@@ -36,7 +36,7 @@ END FUNCTION
 
 ### Examples
 
-- **Ejemplo 1 - Información Desactualizada**: README.md contiene "© 2026 **Tudex Networks**" (año futuro incorrecto) y referencias a "v0.2.0" cuando la versión actual puede ser diferente. Comportamiento esperado: copyright del año actual y versión correcta.
+- **Ejemplo 1 - Información Desactualizada**: README.md contiene "© 2025 **Tudex Networks**" (año futuro incorrecto) y referencias a "v0.2.0" cuando la versión actual puede ser diferente. Comportamiento esperado: copyright del año actual y versión correcta.
 
 - **Ejemplo 2 - Documentación Faltante**: El directorio `kernel/drivers/` no tiene README.md explicando los drivers disponibles (e1000, serial, keyboard, mouse, rtc, pci). Comportamiento esperado: README.md con descripción de cada driver y su propósito.
 
@@ -63,7 +63,7 @@ Todos los documentos que NO contienen información desactualizada, que ya existe
 
 Basado en el análisis del bug, las causas más probables son:
 
-1. **Falta de Mantenimiento Continuo**: La documentación no se actualizó conforme el proyecto evolucionó, resultando en información obsoleta (copyright 2026 probablemente fue un placeholder, versiones antiguas no actualizadas)
+1. **Falta de Mantenimiento Continuo**: La documentación no se actualizó conforme el proyecto evolucionó, resultando en información obsoleta (copyright 2025 probablemente fue un placeholder, versiones antiguas no actualizadas)
 
 2. **Desarrollo Rápido Sin Documentación Paralela**: Los módulos críticos (drivers, fs, net, gfx, crypto, mm) se desarrollaron sin crear READMEs correspondientes, priorizando funcionalidad sobre documentación
 
@@ -96,7 +96,7 @@ Asumiendo que nuestro análisis de causa raíz es correcto:
 **Archivos a Modificar:**
 
 1. **README.md (raíz del proyecto)**
-   - Actualizar copyright de "2026" al año actual
+   - Actualizar copyright de "2025" al año actual
    - Verificar y actualizar versión de "v0.2.0" a la versión actual
    - Revisar comandos de compilación para asegurar que están actualizados
    - Preservar secciones técnicas correctas (arquitectura, memoria, planificador)
@@ -184,7 +184,7 @@ Asumiendo que nuestro análisis de causa raíz es correcto:
 ### Specific Changes
 
 **1. Actualización de Información Desactualizada**:
-   - Buscar y reemplazar "2026" con año actual en README.md
+   - Buscar y reemplazar "2025" con año actual en README.md
    - Verificar versión actual del proyecto y actualizar referencias a "v0.2.0"
    - Revisar comandos de compilación contra scripts actuales en build/
 
@@ -240,13 +240,13 @@ La estrategia de testing para documentación sigue un enfoque de dos fases: prim
 **Test Plan**: Revisar manualmente la documentación existente y buscar información desactualizada, documentación faltante, y guías incompletas. Documentar cada instancia encontrada como contraejemplo.
 
 **Test Cases**:
-1. **Test de Información Desactualizada**: Buscar "2026" en README.md (fallará en código sin corregir - encontrará copyright incorrecto)
+1. **Test de Información Desactualizada**: Buscar "2025" en README.md (fallará en código sin corregir - encontrará copyright incorrecto)
 2. **Test de Documentación Faltante**: Verificar existencia de kernel/drivers/README.md (fallará en código sin corregir - archivo no existe)
 3. **Test de API Sin Documentar**: Buscar docs/api/vfs.md (fallará en código sin corregir - archivo no existe)
 4. **Test de Guía Incompleta**: Buscar docs/porting-guide.md con checklist de HAL (fallará en código sin corregir - archivo no existe o está incompleto)
 
 **Expected Counterexamples**:
-- README.md contiene "© 2026 **Tudex Networks**" (año futuro incorrecto)
+- README.md contiene "© 2025 **Tudex Networks**" (año futuro incorrecto)
 - Directorios kernel/drivers/, kernel/fs/, kernel/net/, kernel/gfx/, kernel/crypto/, kernel/mm/ no tienen README.md
 - Directorio docs/api/ no existe o está vacío
 - CONTRIBUTING.md no existe
@@ -293,7 +293,7 @@ END FOR
 ### Unit Tests
 
 - Verificar que cada archivo de documentación creado existe en la ubicación correcta
-- Verificar que información desactualizada (copyright 2026, versión v0.2.0) se corrige
+- Verificar que información desactualizada (copyright 2025, versión v0.2.0) se corrige
 - Verificar que cada README de módulo contiene las secciones requeridas (propósito, estructura, componentes)
 - Verificar que cada guía de API contiene ejemplos de código
 - Verificar que CONTRIBUTING.md contiene estándares de código y proceso de PR
