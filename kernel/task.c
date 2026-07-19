@@ -723,9 +723,7 @@ void schedule(void) {
     current->gs_base = rdmsr(MSR_KERNEL_GS_BASE); /* User GS is in KERNEL_GS_BASE while in kernel */
     
     /* Remove next task from ready queue */
-    if (next_task != current) {
-        dequeue_ready(next_task);
-    }
+    dequeue_ready(next_task);
 
     next_task->state = TASK_RUNNING;
     /* Clear any pending timeout when task is scheduled */
