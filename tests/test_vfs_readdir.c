@@ -66,6 +66,7 @@ typedef struct fs_node {
     create_type_t create;
     mkdir_type_t mkdir;
     unlink_type_t unlink;
+    int (*rename)(struct fs_node*, char*, struct fs_node*, char*);
     link_type_t link;
     struct fs_node *ptr;
     uint32_t ref_count;

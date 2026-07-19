@@ -1,5 +1,5 @@
 #ifndef HALT_MACRO
-#define HALT_MACRO() __asm__ volatile("hlt")
+#define HALT_MACRO() hal_cpu_halt()
 #endif
 /*
  * ACPI Parser para éterOS
@@ -8,6 +8,7 @@
  * Escanea memoria en busca de RSDP -> RSDT -> MADT.
  */
 #include <acpi.h>
+#include <hal.h>
 #include <string.h>
 #include <serial.h>
 #include <mm.h>

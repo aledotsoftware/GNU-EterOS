@@ -52,3 +52,5 @@
 #endif /* __LWIP_OPTS_H__ */
 
 #define LWIP_PROVIDE_ERRNO 1
+#define TCPIP_MBOX_SIZE 32
+#define LWIP_TCPIP_CORE_LOCKING 1

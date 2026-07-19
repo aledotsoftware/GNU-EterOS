@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <termios.h>
 #include "sha256.h"
 
 #define MAX_LINE 256
@@ -33,9 +34,16 @@ int main(int argc, char *argv[]) {
             const char* root_entry = "root:x:0:0:root:/root:/bin/sh\n";
             write(passwd_fd, root_entry, strlen(root_entry));
             close(passwd_fd);
+        } else {
+            printf("Error: Could not create /etc/passwd\n");
+            return 1;
         }
     } else {
         close(passwd_fd);
+    }
+    if (chmod("/etc/passwd", 0644) < 0) {
+        printf("Error: Failed to set permissions on /etc/passwd\n");
+        return 1;
     }
 
     /* Initialize /etc/shadow if missing */
@@ -46,12 +54,18 @@ int main(int argc, char *argv[]) {
             const char* root_entry = "root::19000:0:99999:7:::\n";
             write(shadow_fd, root_entry, strlen(root_entry));
             close(shadow_fd);
+        } else {
+            printf("Error: Could not create /etc/shadow\n");
+            return 1;
         }
     } else {
         close(shadow_fd);
     }
     /* Always enforce shadow file permissions to 0600 */
-    chmod("/etc/shadow", 0600);
+    if (chmod("/etc/shadow", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow\n");
+        return 1;
+    }
 
     /* Check for preferred shell from argv */
     const char* preferred_shell = "sh.elf";
@@ -75,7 +89,14 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             char *args[] = {(char*)preferred_shell, NULL};
-            execve(preferred_shell, args, NULL);
+            char *envp[] = {
+                "USER=root",
+                "HOME=/root",
+                "PATH=/bin:/usr/bin",
+                "TERM=xterm",
+                NULL
+            };
+            execve(preferred_shell, args, envp);
             return 1;
         }
     }
@@ -92,9 +113,18 @@ int main(int argc, char *argv[]) {
         if (username[len-1] == '\n') username[len-1] = '\0';
         if (strlen(username) == 0) continue;
 
+        struct termios term, term_orig;
+        tcgetattr(0, &term_orig);
+        term = term_orig;
+        term.c_lflag &= ~ECHO;
+        tcsetattr(0, TCSANOW, &term);
+
         printf("Password: ");
         fflush(stdout);
         len = read(0, password, sizeof(password) - 1);
+
+        tcsetattr(0, TCSANOW, &term_orig);
+        printf("\n");
         if (len < 0) {
             break; /* Cleanly exit on error */
         } else if (len == 0) {
@@ -222,7 +252,24 @@ int main(int argc, char *argv[]) {
                         exit(1);
                     }
                     char *args[] = {(char*)preferred_shell, NULL};
-                    execve(preferred_shell, args, NULL);
+
+                    char env_user[64];
+                    snprintf(env_user, sizeof(env_user), "USER=%s", username);
+                    char env_home[64];
+                    if (target_uid == 0) {
+                        snprintf(env_home, sizeof(env_home), "HOME=/root");
+                    } else {
+                        snprintf(env_home, sizeof(env_home), "HOME=/home/%s", username);
+                    }
+
+                    char *envp[] = {
+                        env_user,
+                        env_home,
+                        "PATH=/bin:/usr/bin",
+                        "TERM=xterm",
+                        NULL
+                    };
+                    execve(preferred_shell, args, envp);
 
                     /* Should not return */
                     printf("Failed to execute shell.\n");

@@ -21,6 +21,7 @@
 #include "../lwip_port/ethernetif.h"
 #include <task.h>
 #include <mm.h>
+#include <sem.h>
 
 /* Global network state for legacy compatibility */
 volatile int network_ready = 0;
@@ -30,9 +31,12 @@ uint32_t dns_ip = 0;
 uint8_t gateway_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static struct netif main_netif;
 
+sem_t net_sem;
+
 void net_init(void) {
     serial_write_string("[NET] Initializing lwIP...\n");
     tcpip_init(NULL, NULL);
+    sem_init(&net_sem, 0);
 
     ip_addr_t ipaddr, netmask, gw;
     IP4_ADDR(&ipaddr, 0,0,0,0);
@@ -62,14 +66,11 @@ void net_init(void) {
     serial_write_string("[NET] Init done.\n");
 }
 
-void net_poll(void) {
-    /* Poll the driver */
-    ethernetif_poll(&main_netif);
+uint8_t* net_get_mac(void) {
+    return main_netif.hwaddr;
+}
 
-    /* Handle lwIP timeouts */
-    sys_check_timeouts();
-
-    /* Update global status */
+void net_update_status(void) {
     if (netif_is_up(&main_netif) && !ip4_addr_isany_val(*netif_ip4_addr(&main_netif))) {
         my_ip = ip4_addr_get_u32(netif_ip4_addr(&main_netif));
         gateway_ip = ip4_addr_get_u32(netif_ip4_gw(&main_netif));
@@ -82,6 +83,18 @@ void net_poll(void) {
         network_ready = 0;
     }
 }
+
+void net_poll(void) {
+    /* Poll the driver */
+    ethernetif_poll(&main_netif);
+
+    /* Timeouts are handled by tcpip_thread */
+
+
+    /* Update global status */
+    net_update_status();
+}
+
 
 /* State for blocking operations */
 typedef struct {

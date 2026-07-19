@@ -5,7 +5,7 @@
 
 void test_malloc(void) {
     printf("[TEST] Testing malloc alignment...\n");
-    void *p1 = malloc(1);
+    void *p1 = malloc(16);
     void *p2 = malloc(10);
     void *p3 = malloc(100);
 

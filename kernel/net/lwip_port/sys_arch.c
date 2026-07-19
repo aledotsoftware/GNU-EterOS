@@ -3,6 +3,7 @@
 #include <task.h>
 #include <sem.h>
 #include <mm.h>
+#include <lwip/timeouts.h>
 #include <string.h>
 
 u32_t sys_now(void) {
@@ -80,6 +81,7 @@ u32_t sys_arch_sem_wait(sys_sem_t *sem, u32_t timeout) {
             hal_interrupts_enable();
 
             if(sys_now() - start_time >= timeout) return SYS_ARCH_TIMEOUT;
+            sys_check_timeouts();
             task_sleep(10);
         }
     }
@@ -179,6 +181,7 @@ u32_t sys_arch_mbox_fetch(sys_mbox_t *mbox, void **msg, u32_t timeout) {
             hal_interrupts_enable();
 
             if(sys_now() - start_time >= timeout) return SYS_ARCH_TIMEOUT;
+            sys_check_timeouts();
             task_sleep(10);
         }
     }
@@ -285,13 +288,16 @@ sys_thread_t sys_thread_new(const char *name, lwip_thread_fn thread, void *arg, 
     thread_data[idx].arg = arg;
     thread_data[idx].active = 1;
 
+    hal_interrupts_disable();
     int tid = task_create(name, sys_thread_trampoline);
     if(tid < 0) {
+        hal_interrupts_enable();
         thread_data[idx].active = 0;
         sem_signal(&thread_data_mutex);
         return 0;
     }
     thread_data[idx].task_id = (uint32_t)tid;
+    hal_interrupts_enable();
     sem_signal(&thread_data_mutex);
 
     return tid;

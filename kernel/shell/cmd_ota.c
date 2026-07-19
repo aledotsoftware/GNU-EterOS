@@ -44,7 +44,7 @@ static uint16_t parse_url(const char* url, char* host, size_t host_size, char* p
 
 void cmd_ota(const char* args) {
     if (!args || !*args) {
-        terminal_write_string("Uso: ota [info | seturl <url> | update | confirm | rollback]\n");
+        terminal_write_string("Uso: ota [info | seturl <url> | checksig | update | confirm | rollback]\n");
         return;
     }
 
@@ -74,9 +74,13 @@ void cmd_ota(const char* args) {
 
         terminal_write_string("\n\n  [Slots de Arranque]:\n");
 
+        uint8_t current_update_state = nvram_get_update_state();
+        uint8_t current_booted = 0xFF;
+
         fs_node_t *active_node = partition_get_active_root();
         terminal_write_string("    Slot Activo: ");
         if (active_node) {
+            current_booted = active_node->impl;
             terminal_write_string(active_node->impl == 0 ? "A (0)" : (active_node->impl == 1 ? "B (1)" : "Desconocido"));
             terminal_write_string(" [particion ");
             terminal_write_string(active_node->name);
@@ -92,8 +96,16 @@ void cmd_ota(const char* args) {
             terminal_write_string("Desconocido (No disponible)");
         }
 
+        if (current_update_state == UPDATE_STATE_PENDING && current_booted == nvram_get_boot_partition()) {
+            terminal_write_string("  <-- [! ATENCION: Ejecutando actualizacion NO CONFIRMADA !]");
+        }
+
         fs_node_t *passive_node = partition_get_passive_root();
-        terminal_write_string("\n    Slot Pendiente: ");
+        if (current_update_state == UPDATE_STATE_PENDING && current_booted != nvram_get_boot_partition()) {
+            terminal_write_string("\n    Slot Pendiente (Proximo arranque): ");
+        } else {
+            terminal_write_string("\n    Slot Pasivo (Disponible para OTA): ");
+        }
         if (passive_node) {
             terminal_write_string(passive_node->impl == 0 ? "A (0)" : (passive_node->impl == 1 ? "B (1)" : "Desconocido"));
             terminal_write_string(" [particion ");
@@ -108,11 +120,16 @@ void cmd_ota(const char* args) {
             terminal_write_string("Desconocido (No disponible)");
         }
 
-        uint8_t update_state = nvram_get_update_state();
         terminal_write_string("\n\n  [Estado de Actualizacion]: ");
-        if (update_state == UPDATE_STATE_PENDING) terminal_write_string("Pendiente (Reinicio requerido)");
-        else if (update_state == UPDATE_STATE_SUCCESS) terminal_write_string("Exitoso (Arranque confirmado)");
-        else if (update_state == UPDATE_STATE_FAILED) terminal_write_string("Fallido (Rollback)");
+        if (current_update_state == UPDATE_STATE_PENDING) {
+            if (current_booted == nvram_get_boot_partition()) {
+                terminal_write_string("Pendiente (Se requiere 'ota confirm' o hara rollback en prox reinicio)");
+            } else {
+                terminal_write_string("Pendiente (Reinicio requerido para aplicar)");
+            }
+        }
+        else if (current_update_state == UPDATE_STATE_SUCCESS) terminal_write_string("Exitoso (Arranque confirmado)");
+        else if (current_update_state == UPDATE_STATE_FAILED) terminal_write_string("Fallido (Rollback)");
         else terminal_write_string("Ninguno/Limpio");
 
         terminal_write_string("\n\n");
@@ -125,6 +142,224 @@ void cmd_ota(const char* args) {
         terminal_write_string("URL del repositorio actualizada a: ");
         terminal_write_string(ota_repo_url);
         terminal_write_string("\n");
+    } else if (strcmp(subcmd, "checksig") == 0) {
+        if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
+             terminal_write_string("  [OTA] ERROR: Hay una actualizacion pendiente. Confirme o haga rollback.\n");
+             return;
+        }
+
+        fs_node_t *passive_part = partition_get_passive_root();
+        if (!passive_part) {
+            terminal_write_string("\n  [OTA] ERROR: No se encontro una particion pasiva (Slot B) disponible para actualizar.\n");
+            terminal_write_string("  [OTA] Asegurese de que el disco tenga al menos 2 particiones configuradas.\n");
+            return;
+        }
+
+        terminal_write_string("\n  [OTA] Buscando actualizaciones en ");
+        terminal_write_string(ota_repo_url);
+        terminal_write_string("...\n");
+
+        char host[256];
+        char path[256];
+        uint16_t port = parse_url(ota_repo_url, host, sizeof(host), path, sizeof(path));
+
+        if (port == 443) {
+            terminal_write_string("  [OTA] Error: TLS (HTTPS) no implementado. Conexión rechazada por seguridad.\n");
+            kfree(passive_part);
+            return;
+        }
+
+        uint32_t ip = ip_aton(host);
+        if (ip == 0) {
+            uint32_t resolved_ip = 0;
+            if (net_gethostbyname(host, &resolved_ip) == 0) {
+                ip = resolved_ip;
+            } else {
+                terminal_write_string("  [OTA] Error: Resolucion DNS fallo para el host.\n");
+                kfree(passive_part);
+                return;
+            }
+        }
+
+        int sock = sys_lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (sock < 0) {
+            terminal_write_string("  [OTA] Failed to create socket.\n");
+            kfree(passive_part);
+            return;
+        }
+
+        struct sockaddr_in_old addr;
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        addr.sin_addr = ip;
+
+        terminal_write_string("  [OTA] Conectando a ");
+        terminal_write_string(host);
+        terminal_write_string(" (");
+
+        uint8_t *ip_bytes = (uint8_t*)&ip;
+        for (int i = 0; i < 4; i++) {
+            char ip_buf[4];
+            itoa_s(ip_bytes[i], ip_buf, sizeof(ip_buf), 10);
+            terminal_write_string(ip_buf);
+            if (i < 3) terminal_write_string(".");
+        }
+        terminal_write_string(")...\n");
+
+        if (sys_lwip_connect(sock, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
+            terminal_write_string("  [OTA] Error: Conexion TCP fallida. El repositorio podria estar caido o inaccesible.\n");
+            sys_lwip_close(sock);
+            kfree(passive_part);
+            return;
+        }
+
+        char request[1024];
+        size_t req_size = sizeof(request);
+
+        if (strlcpy(request, "GET ", req_size) >= req_size) goto trunc_checksig;
+        if (strlcat(request, path, req_size) >= req_size) goto trunc_checksig;
+        if (strlcat(request, " HTTP/1.0\r\nHost: ", req_size) >= req_size) goto trunc_checksig;
+        if (strlcat(request, host, req_size) >= req_size) goto trunc_checksig;
+        if (strlcat(request, "\r\nUser-Agent: eterOS-OTA/0.1\r\nConnection: close\r\n\r\n", req_size) >= req_size) goto trunc_checksig;
+
+        sys_lwip_send(sock, request, strlen(request), 0);
+        goto receive_checksig;
+
+trunc_checksig:
+        terminal_write_string("  [OTA] Error: Request buffer overflow.\n");
+        sys_lwip_close(sock);
+        kfree(passive_part);
+        return;
+
+receive_checksig:
+        terminal_write_string("  [OTA] Descargando payload HTTP...\n");
+
+        // Escribiremos temporalmente a un buffer en memoria para validación
+        // Asumimos un tamaño máximo de kernel de 5 MB
+        uint32_t max_payload = 5 * 1024 * 1024;
+        uint8_t *payload_data = kmalloc(max_payload);
+        if (!payload_data) {
+            terminal_write_string("  [OTA] Error: Sin memoria para alojar la actualizacion.\n");
+            sys_lwip_close(sock);
+            kfree(passive_part);
+            return;
+        }
+
+        uint32_t total_received = 0;
+        int headers_done = 0;
+        uint32_t body_start_idx = 0;
+        int len;
+
+        // Leer y procesar cabeceras HTTP hasta encontrar \r\n\r\n
+        while (total_received < max_payload && (len = sys_lwip_recv(sock, payload_data + total_received, max_payload - total_received, 0)) > 0) {
+            total_received += len;
+
+            if (!headers_done && total_received >= 4) {
+                for (uint32_t j = 0; j <= total_received - 4; j++) {
+                    if (payload_data[j] == '\r' && payload_data[j+1] == '\n' && payload_data[j+2] == '\r' && payload_data[j+3] == '\n') {
+                        headers_done = 1;
+                        body_start_idx = j + 4;
+
+                        // Validate HTTP 200 OK
+                        if (total_received >= 12 && (payload_data[0] == 'H' && payload_data[1] == 'T' && payload_data[2] == 'T' && payload_data[3] == 'P')) {
+                            uint32_t space_idx = 0;
+                            for (uint32_t k = 0; k < j; k++) {
+                                if (payload_data[k] == ' ') {
+                                    space_idx = k;
+                                    break;
+                                }
+                            }
+                            if (space_idx > 0 && space_idx + 3 < j) {
+                                if (payload_data[space_idx + 1] != '2' || payload_data[space_idx + 2] != '0' || payload_data[space_idx + 3] != '0') {
+                                    terminal_write_string("  [OTA] Error: Respuesta HTTP no es 200 OK. Recibido: ");
+                                    char http_code_buf[4];
+                                    http_code_buf[0] = payload_data[space_idx + 1];
+                                    http_code_buf[1] = payload_data[space_idx + 2];
+                                    http_code_buf[2] = payload_data[space_idx + 3];
+                                    http_code_buf[3] = '\0';
+                                    terminal_write_string(http_code_buf);
+                                    terminal_write_string("\n");
+                                    kfree(payload_data);
+                                    sys_lwip_close(sock);
+                                    if (passive_part) kfree(passive_part);
+                                    return;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (total_received >= max_payload) {
+                // Peek to see if there is more data
+                char check_buf[1];
+                if (sys_lwip_recv(sock, check_buf, 1, 0) > 0) {
+                    terminal_write_string("  [OTA] Error: Archivo de actualizacion demasiado grande.\n");
+                    kfree(payload_data);
+                    sys_lwip_close(sock);
+                    if (passive_part) kfree(passive_part);
+                    return;
+                }
+            }
+            task_yield();
+        }
+
+        sys_lwip_close(sock);
+
+        if (!headers_done) {
+            terminal_write_string("  [OTA] Error: Cabeceras HTTP no encontradas.\n");
+            kfree(payload_data);
+            if (passive_part) kfree(passive_part);
+            return;
+        }
+
+        uint32_t payload_size = total_received - body_start_idx;
+        if (payload_size > 0) {
+            memmove(payload_data, payload_data + body_start_idx, payload_size);
+        }
+
+
+
+        terminal_write_string("  [OTA] Payload descargado (");
+        char size_buf[16];
+        itoa_s((int)payload_size, size_buf, sizeof(size_buf), 10);
+        terminal_write_string(size_buf);
+        terminal_write_string(" bytes).\n");
+
+        terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
+
+        // Assume the first 64 bytes of payload are the signature, rest is actual image.
+        if (payload_size < 64) {
+            terminal_write_string("  [OTA] ERROR: Payload demasiado pequeno para contener firma.\n");
+            kfree(payload_data);
+            kfree(passive_part);
+            return;
+        }
+
+        unsigned char sig[64];
+        memcpy(sig, payload_data, 64);
+
+        // Definir una clave publica real (hardcodeada para este build) en lugar de una de ceros.
+        // Esto es una semilla/clave valida en formato binario para propósitos de update signing
+        unsigned char pk[32] = {
+            0x20, 0x7A, 0x06, 0x78, 0x92, 0x82, 0x1E, 0x25,
+            0xD7, 0x70, 0xF1, 0xFB, 0xA0, 0xC4, 0x7C, 0x11,
+            0xFF, 0x4B, 0x81, 0x3E, 0x54, 0x16, 0x2E, 0xCE,
+            0x9E, 0xB8, 0x39, 0xE0, 0x76, 0x23, 0x1A, 0xB6
+        };
+
+        if (!ed25519_verify(sig, payload_data + 64, payload_size - 64, pk)) {
+            terminal_write_string("  [OTA] ERROR: Fallo la validacion de la firma Ed25519.\n");
+            kfree(payload_data);
+            kfree(passive_part);
+            return;
+        }
+        terminal_write_string("  [OTA] Firma verificada correctamente.\n");
+
+        terminal_write_string("  [OTA] Verificacion de firma exitosa. No se aplicaron cambios.\n");
+        kfree(payload_data);
+        kfree(passive_part);
     } else if (strcmp(subcmd, "update") == 0) {
         if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
              terminal_write_string("  [OTA] ERROR: Hay una actualizacion pendiente. Confirme o haga rollback antes de actualizar.\n");
@@ -176,9 +411,21 @@ void cmd_ota(const char* args) {
         addr.sin_port = htons(port);
         addr.sin_addr = ip;
 
-        terminal_write_string("  [OTA] Conectando a repositorio...\n");
+        terminal_write_string("  [OTA] Conectando a ");
+        terminal_write_string(host);
+        terminal_write_string(" (");
+
+        uint8_t *ip_bytes = (uint8_t*)&ip;
+        for (int i = 0; i < 4; i++) {
+            char ip_buf[4];
+            itoa_s(ip_bytes[i], ip_buf, sizeof(ip_buf), 10);
+            terminal_write_string(ip_buf);
+            if (i < 3) terminal_write_string(".");
+        }
+        terminal_write_string(")...\n");
+
         if (sys_lwip_connect(sock, (const struct sockaddr *)&addr, sizeof(addr)) != 0) {
-            terminal_write_string("  [OTA] Conexion fallida.\n");
+            terminal_write_string("  [OTA] Error: Conexion TCP fallida. El repositorio podria estar caido o inaccesible.\n");
             sys_lwip_close(sock);
             kfree(passive_part);
             return;
@@ -242,7 +489,14 @@ receive:
                             }
                             if (space_idx > 0 && space_idx + 3 < j) {
                                 if (payload_data[space_idx + 1] != '2' || payload_data[space_idx + 2] != '0' || payload_data[space_idx + 3] != '0') {
-                                    terminal_write_string("  [OTA] Error: Respuesta HTTP no es 200 OK.\n");
+                                    terminal_write_string("  [OTA] Error: Respuesta HTTP no es 200 OK. Recibido: ");
+                                    char http_code_buf[4];
+                                    http_code_buf[0] = payload_data[space_idx + 1];
+                                    http_code_buf[1] = payload_data[space_idx + 2];
+                                    http_code_buf[2] = payload_data[space_idx + 3];
+                                    http_code_buf[3] = '\0';
+                                    terminal_write_string(http_code_buf);
+                                    terminal_write_string("\n");
                                     kfree(payload_data);
                                     sys_lwip_close(sock);
                                     if (passive_part) kfree(passive_part);
@@ -283,12 +537,7 @@ receive:
             memmove(payload_data, payload_data + body_start_idx, payload_size);
         }
 
-        if (payload_size < 1024) {
-             terminal_write_string("  [OTA] Error: El archivo descargado esta incompleto o es muy pequeno.\n");
-             kfree(payload_data);
-             if (passive_part) kfree(passive_part);
-             return;
-        }
+
 
         terminal_write_string("  [OTA] Payload descargado (");
         char size_buf[16];
@@ -299,7 +548,7 @@ receive:
         terminal_write_string("  [OTA] Verificando firma Ed25519...\n");
 
         // Assume the first 64 bytes of payload are the signature, rest is actual image.
-        if (payload_size <= 64) {
+        if (payload_size < 64) {
             terminal_write_string("  [OTA] ERROR: Payload demasiado pequeno para contener firma.\n");
             kfree(payload_data);
             kfree(passive_part);
@@ -312,10 +561,10 @@ receive:
         // Definir una clave publica real (hardcodeada para este build) en lugar de una de ceros.
         // Esto es una semilla/clave valida en formato binario para propósitos de update signing
         unsigned char pk[32] = {
-            0x7A, 0x1B, 0x2C, 0x3D, 0x4E, 0x5F, 0x6A, 0x7B,
-            0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3,
-            0x04, 0x15, 0x26, 0x37, 0x48, 0x59, 0x6A, 0x7B,
-            0x8C, 0x9D, 0xAE, 0xBF, 0xC0, 0xD1, 0xE2, 0xF3
+            0x20, 0x7A, 0x06, 0x78, 0x92, 0x82, 0x1E, 0x25,
+            0xD7, 0x70, 0xF1, 0xFB, 0xA0, 0xC4, 0x7C, 0x11,
+            0xFF, 0x4B, 0x81, 0x3E, 0x54, 0x16, 0x2E, 0xCE,
+            0x9E, 0xB8, 0x39, 0xE0, 0x76, 0x23, 0x1A, 0xB6
         };
 
         if (!ed25519_verify(sig, payload_data + 64, payload_size - 64, pk)) {
@@ -365,7 +614,9 @@ receive:
         }
 
         terminal_write_string("  [OTA] Verificando escritura...\n");
-        uint8_t *verify_buf = kmalloc(write_size);
+
+        uint32_t chunk_size = 64 * 1024;
+        uint8_t *verify_buf = kmalloc(chunk_size);
         if (!verify_buf) {
             terminal_write_string("  [OTA] ERROR: Sin memoria para verificar escritura.\n");
             kfree(passive_part);
@@ -373,14 +624,24 @@ receive:
             return;
         }
 
-        uint32_t verified_read = read_fs(passive_part, write_offset, write_size, verify_buf);
-        if (verified_read != write_size || memcmp(payload_data + data_offset, verify_buf, write_size) != 0) {
-            terminal_write_string("  [OTA] ERROR: Fallo la verificacion de escritura (corrupcion o fallo en lectura).\n");
-            kfree(verify_buf);
-            kfree(passive_part);
-            kfree(payload_data);
-            return;
+        uint32_t bytes_verified = 0;
+        while (bytes_verified < write_size) {
+            uint32_t read_size = write_size - bytes_verified;
+            if (read_size > chunk_size) {
+                read_size = chunk_size;
+            }
+
+            uint32_t verified_read = read_fs(passive_part, write_offset + bytes_verified, read_size, verify_buf);
+            if (verified_read != read_size || memcmp(payload_data + data_offset + bytes_verified, verify_buf, read_size) != 0) {
+                terminal_write_string("  [OTA] ERROR: Fallo la verificacion de escritura (corrupcion o fallo en lectura).\n");
+                kfree(verify_buf);
+                kfree(passive_part);
+                kfree(payload_data);
+                return;
+            }
+            bytes_verified += read_size;
         }
+
         kfree(verify_buf);
         kfree(passive_part);
         terminal_write_string("  [OTA] Verificacion de escritura exitosa.\n");
@@ -425,11 +686,23 @@ receive:
         if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
             fs_node_t *active_node = partition_get_active_root();
             if (active_node) {
-                uint8_t current_part = active_node->impl;
-                uint8_t next_part = (current_part == 0) ? 1 : 0;
-                nvram_set_boot_partition(next_part);
-                nvram_set_update_state(UPDATE_STATE_FAILED);
-                terminal_write_string("  [OTA] Rollback solicitado. El sistema regresara al slot anterior en el proximo reinicio.\n");
+                uint8_t current_booted = active_node->impl;
+                uint8_t nvram_target = nvram_get_boot_partition();
+
+                if (current_booted == nvram_target) {
+                    // We have already rebooted into the new slot. Rollback to the OTHER slot.
+                    uint8_t rollback_part = (current_booted == 0) ? 1 : 0;
+                    nvram_set_boot_partition(rollback_part);
+                    nvram_set_update_state(UPDATE_STATE_FAILED);
+                    terminal_write_string("  [OTA] Rollback post-reinicio ejecutado. El sistema regresara al slot original en el proximo reinicio.\n");
+                } else {
+                    // We haven't rebooted yet. The active node is our original slot.
+                    // Rollback simply means setting the boot partition back to our current slot.
+                    nvram_set_boot_partition(current_booted);
+                    nvram_set_update_state(UPDATE_STATE_FAILED);
+                    terminal_write_string("  [OTA] Rollback pre-reinicio ejecutado. La actualizacion pendiente ha sido cancelada.\n");
+                }
+
                 kfree(active_node);
             } else {
                 terminal_write_string("  [OTA] ERROR: No se pudo determinar el slot activo para hacer rollback.\n");
@@ -438,6 +711,6 @@ receive:
             terminal_write_string("  [OTA] No hay ninguna actualizacion pendiente de la cual hacer rollback.\n");
         }
     } else {
-        terminal_write_string("Comando OTA desconocido. Uso: ota [info | seturl <url> | update | confirm | rollback]\n");
+        terminal_write_string("Comando OTA desconocido. Uso: ota [info | seturl <url> | checksig | update | confirm | rollback]\n");
     }
 }

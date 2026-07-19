@@ -1,0 +1,2 @@
+Fix missing fields in /proc/meminfo and permissions for /etc/shadow, /etc/passwd.
+Align FAT32 driver error codes with POSIX standards.

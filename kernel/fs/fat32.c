@@ -96,7 +96,7 @@ int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_s
     if (bpb->boot_sector_signature != FAT32_BOOT_SIGNATURE) {
         hal_console_write("[FAT32] Invalid Boot Sector Signature\n");
         kfree(buffer);
-        return -4;
+        return -EIO;
     }
 
     // Load geometry
@@ -107,7 +107,7 @@ int fat32_init(fat32_volume_t* vol, fat32_read_sector_t read_func, fat32_write_s
     // Check minimal sector size (usually 512)
     if (vol->bytes_per_sector == 0) {
         kfree(buffer);
-        return -5;
+        return -EIO;
     }
 
     // Calculate offsets
@@ -179,7 +179,7 @@ static int fat32_fat_set(fat32_volume_t* vol, uint32_t cluster, uint32_t value) 
     // Write back
     if (fat32_write_sector_cached(vol, fat_sector, buffer) != 0) {
         kfree(buffer);
-        return -4;
+        return -EIO;
     }
 
     kfree(buffer);
@@ -189,7 +189,7 @@ static int fat32_fat_set(fat32_volume_t* vol, uint32_t cluster, uint32_t value) 
 /* Helper: Allocate a free cluster */
 static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -EIO;
+    if (!buffer) return -ENOMEM;
 
     uint32_t current_fat_sector = vol->fat_start_lba;
     uint32_t entries_per_sector = vol->bytes_per_sector / 4;
@@ -199,7 +199,7 @@ static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
     for (uint32_t i = 0; i < vol->fat_size; i++) {
         if (fat32_read_sector_cached(vol, current_fat_sector + i, buffer) != 0) {
             kfree(buffer);
-            return -ENOMEM;
+            return -EIO;
         }
 
         uint32_t* entries = (uint32_t*)buffer;
@@ -240,7 +240,7 @@ static int fat32_alloc_cluster(fat32_volume_t* vol, uint32_t* out_cluster) {
     }
 
     kfree(buffer);
-    return -4; // No free space found
+    return -ENOSPC; // No free space found
 }
 
 /* Helper: Free cluster chain */
@@ -256,11 +256,11 @@ static void fat32_free_cluster_chain(fat32_volume_t* vol, uint32_t start_cluster
 /* Helper: Update or Create Directory Entry */
 static int fat32_update_dirent(fat32_volume_t* vol, uint32_t sector, uint32_t offset, fat32_dir_entry_t* value) {
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -EIO;
+    if (!buffer) return -ENOMEM;
 
     if (fat32_read_sector_cached(vol, sector, buffer) != 0) {
         kfree(buffer);
-        return -ENOMEM;
+        return -EIO;
     }
 
     memcpy(buffer + offset, value, sizeof(fat32_dir_entry_t));
@@ -281,7 +281,7 @@ typedef int (*fat32_dir_cb_t)(fat32_volume_t* vol, fat32_dir_entry_t* entry, uin
 static int fat32_iterate_dir(fat32_volume_t* vol, uint32_t start_cluster, fat32_dir_cb_t callback, void* ctx, uint32_t* last_cluster_out) {
     uint32_t current_cluster = start_cluster;
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -EIO;
+    if (!buffer) return -ENOMEM;
 
     while (current_cluster < FAT32_EOC) {
         if (last_cluster_out) *last_cluster_out = current_cluster;
@@ -291,7 +291,7 @@ static int fat32_iterate_dir(fat32_volume_t* vol, uint32_t start_cluster, fat32_
         for (uint32_t i = 0; i < vol->sectors_per_cluster; i++) {
             if (fat32_read_sector_cached(vol, lba + i, buffer) != 0) {
                 kfree(buffer);
-                return -ENOMEM;
+                return -EIO;
             }
 
             fat32_dir_entry_t* entry = (fat32_dir_entry_t*)buffer;
@@ -364,7 +364,7 @@ static int fat32_find_entry_cb(fat32_volume_t* vol, fat32_dir_entry_t* entry, ui
     (void)vol;
     struct find_entry_ctx* c = (struct find_entry_ctx*)ctx;
 
-    if (entry->name[0] == DIRENT_END) return -ENOSPC; /* Not Found, stop iteration */
+    if (entry->name[0] == DIRENT_END) return -ENOENT; /* Not Found, stop iteration */
     if (entry->name[0] == DIRENT_DELETED) return 0;
     if (entry->attr & ATTR_VOLUME_ID) return 0;
     if (entry->attr & ATTR_LONG_NAME) return 0;
@@ -387,8 +387,8 @@ static int fat32_find_dirent_in_chain(fat32_volume_t* vol, uint32_t start_cluste
     int res = fat32_iterate_dir(vol, start_cluster, fat32_find_entry_cb, &ctx, NULL);
 
     if (res == 1) return 0; // Success
-    if (res == -3) return -ENOSPC; // Explicit Not Found
-    if (res == 0) return -ENOSPC; // End of Chain, Not Found
+    if (res == -3) return -ENOENT; // Explicit Not Found
+    if (res == 0) return -ENOENT; // End of Chain, Not Found
     return res; // Error
 }
 
@@ -407,6 +407,7 @@ fs_node_t *fat32_finddir_fs(fs_node_t *node, char *name);
 int fat32_create_fs(fs_node_t *parent, char *name, uint16_t permission);
 int fat32_mkdir_fs(fs_node_t *parent, char *name, uint16_t permission);
 int fat32_unlink_fs(fs_node_t *parent, char *name);
+int fat32_rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name);
 
 static uint32_t fat32_seek_cluster(fat32_volume_t* vol, uint32_t first_cluster, uint32_t offset, uint32_t* offset_within_cluster) {
     uint32_t cluster_size = vol->bytes_per_sector * vol->sectors_per_cluster;
@@ -646,7 +647,7 @@ static int fat32_readdir_fs_impl(fs_node_t *node, uint32_t index, struct dirent 
     if (res == 2) return 0; /* Success */
     if (res == 1) return 1; /* EOF */
     if (res == 0) return 1; /* EOF (end of chain) */
-    return -EIO; /* Error */
+    return -ENOENT; /* Error */
 }
 
 int fat32_readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) {
@@ -690,6 +691,7 @@ static fs_node_t *fat32_finddir_fs_impl(fs_node_t *node, char *name) {
         child->create = fat32_create_fs;
         child->mkdir = fat32_mkdir_fs;
         child->unlink = fat32_unlink_fs;
+        child->rename = fat32_rename_fs;
     } else {
         child->flags = FS_FILE;
         child->mask = 0666;
@@ -716,10 +718,10 @@ static int fat32_create_fs_impl(fs_node_t *parent, char *name, uint16_t permissi
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EIO;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EEXIST;
 
     uint32_t sector, offset;
-    if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOMEM;
+    if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOSPC;
 
     fat32_dir_entry_t entry;
     memset(&entry, 0, sizeof(entry));
@@ -744,10 +746,10 @@ static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permissio
     (void)permission;
     fat32_volume_t* vol = (fat32_volume_t*)parent->ptr;
 
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EIO;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, NULL, NULL, NULL) == 0) return -EEXIST;
 
     uint32_t sector, offset;
-    if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOMEM;
+    if (fat32_find_free_dirent_in_chain(vol, parent->inode, &sector, &offset) != 0) return -ENOSPC;
 
     uint32_t cluster;
     if (fat32_alloc_cluster(vol, &cluster) != 0) return -ENOSPC;
@@ -759,7 +761,7 @@ static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permissio
     entry.fst_clus_hi = (cluster >> 16) & 0xFFFF;
     entry.fst_clus_lo = cluster & 0xFFFF;
 
-    if (fat32_update_dirent(vol, sector, offset, &entry) != 0) return -4;
+    if (fat32_update_dirent(vol, sector, offset, &entry) != 0) return -EIO;
 
     uint32_t parent_clus = parent->inode;
     if (parent_clus == vol->root_cluster) parent_clus = 0;
@@ -782,7 +784,7 @@ static int fat32_mkdir_fs_impl(fs_node_t *parent, char *name, uint16_t permissio
 
     uint32_t lba = fat32_cluster_to_lba(vol, cluster);
     uint8_t* buffer = kmalloc(vol->bytes_per_sector);
-    if (!buffer) return -5;
+    if (!buffer) return -EIO;
     memset(buffer, 0, vol->bytes_per_sector);
     memcpy(buffer, dot, sizeof(dot));
     fat32_write_sector_cached(vol, lba, buffer);
@@ -804,13 +806,51 @@ static int fat32_unlink_fs_impl(fs_node_t *parent, char *name) {
 
     fat32_dir_entry_t entry;
     uint32_t sector, offset;
-    if (fat32_find_dirent_in_chain(vol, parent->inode, name, &sector, &offset, &entry) != 0) return -EIO;
+    if (fat32_find_dirent_in_chain(vol, parent->inode, name, &sector, &offset, &entry) != 0) return -ENOENT;
 
     uint32_t cluster = (entry.fst_clus_hi << 16) | entry.fst_clus_lo;
     if (cluster != 0) fat32_free_cluster_chain(vol, cluster);
 
     entry.name[0] = DIRENT_DELETED;
     return fat32_update_dirent(vol, sector, offset, &entry);
+}
+
+
+static int fat32_rename_fs_impl(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    fat32_volume_t* vol = (fat32_volume_t*)old_parent->ptr;
+
+    fat32_dir_entry_t entry;
+    uint32_t old_sector, old_offset;
+    if (fat32_find_dirent_in_chain(vol, old_parent->inode, old_name, &old_sector, &old_offset, &entry) != 0) return -ENOENT;
+
+    /* If new exists, remove it */
+    fat32_dir_entry_t new_entry;
+    uint32_t exist_sector, exist_offset;
+    if (fat32_find_dirent_in_chain(vol, new_parent->inode, new_name, &exist_sector, &exist_offset, &new_entry) == 0) {
+        new_entry.name[0] = DIRENT_DELETED;
+        fat32_update_dirent(vol, exist_sector, exist_offset, &new_entry);
+    }
+
+    uint32_t new_sector, new_offset;
+    if (fat32_find_free_dirent_in_chain(vol, new_parent->inode, &new_sector, &new_offset) != 0) return -ENOSPC;
+
+    fat32_to_dos_name(new_name, (char*)entry.name);
+
+    if (fat32_update_dirent(vol, new_sector, new_offset, &entry) != 0) return -EIO;
+
+    /* Delete old */
+    entry.name[0] = DIRENT_DELETED;
+    fat32_update_dirent(vol, old_sector, old_offset, &entry);
+
+    return 0;
+}
+
+int fat32_rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    fat32_volume_t* vol = (fat32_volume_t*)old_parent->ptr;
+    spin_lock(&vol->lock);
+    int res = fat32_rename_fs_impl(old_parent, old_name, new_parent, new_name);
+    spin_unlock(&vol->lock);
+    return res;
 }
 
 int fat32_unlink_fs(fs_node_t *parent, char *name) {
@@ -844,6 +884,7 @@ fs_node_t* fat32_mount(fat32_volume_t* vol) {
     root->create = fat32_create_fs;
     root->mkdir = fat32_mkdir_fs;
     root->unlink = fat32_unlink_fs;
+    root->rename = fat32_rename_fs;
 
     return root;
 }

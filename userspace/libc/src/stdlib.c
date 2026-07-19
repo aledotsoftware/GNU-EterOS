@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #define ATEXIT_MAX 32
@@ -473,4 +476,59 @@ long atol(const char *nptr) {
         nptr++;
     }
     return res * sign;
+}
+
+int mkstemp(char *template) {
+    if (!template) {
+        errno = EINVAL;
+        return -1;
+    }
+    size_t len = strlen(template);
+    if (len < 6 || strcmp(&template[len - 6], "XXXXXX") != 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    const char *charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    for (int i = 0; i < 1000; i++) {
+        for (int j = 0; j < 6; j++) {
+            template[len - 6 + j] = charset[rand() % 62];
+        }
+        int fd = open(template, O_RDWR | O_CREAT | O_EXCL, 0600);
+        if (fd >= 0) {
+            return fd;
+        }
+        if (errno != EEXIST) {
+            return -1;
+        }
+    }
+    errno = EEXIST;
+    return -1;
+}
+
+char *mkdtemp(char *template) {
+    if (!template) {
+        errno = EINVAL;
+        return NULL;
+    }
+    size_t len = strlen(template);
+    if (len < 6 || strcmp(&template[len - 6], "XXXXXX") != 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    const char *charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    for (int i = 0; i < 1000; i++) {
+        for (int j = 0; j < 6; j++) {
+            template[len - 6 + j] = charset[rand() % 62];
+        }
+        if (mkdir(template, 0700) == 0) {
+            return template;
+        }
+        if (errno != EEXIST) {
+            return NULL;
+        }
+    }
+    errno = EEXIST;
+    return NULL;
 }

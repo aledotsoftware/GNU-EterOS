@@ -1,6 +1,6 @@
 /**
  * éterOS - Task Scheduler (Round-Robin Preemptive)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Multitarea preemptiva con Round-Robin.
  * Cada tarea tiene su propio stack de kernel (4 KB).
@@ -96,6 +96,11 @@ typedef struct task {
     struct semaphore* waiting_sem;          /* Semaphore waiting on (if blocked) */
     char           name[32];                /* Nombre descriptivo */
     char           executable_path[256];    /* Absolute path to the loaded ELF */
+    /* TLS Tracking */
+    uint64_t       tls_vaddr;               /* Original TLS virtual address */
+    uint64_t       tls_memsz;               /* TLS segment memory size */
+    uint64_t       tls_filesz;              /* TLS segment file size */
+    uint64_t       tls_align;               /* TLS segment alignment */
 
     struct task*   next_ready;              /* Next task in ready queue */
     struct task*   prev_ready;              /* Previous task in ready queue */
@@ -108,6 +113,7 @@ typedef struct task {
     file_descriptor_t fd_table_internal[MAX_FD]; /* Internal FD table for processes */
     char           cwd[256];                /* Current Working Directory */
     struct fs_node* cwd_node;               /* Current Working Directory Node */
+    int            nice;                    /* Base nice value (-20 to 19) */
     uint32_t       signal_mask;             /* Mask of blocked signals */
     uint32_t       uid;                     /* User ID */
     uint32_t       gid;                     /* Group ID */
@@ -140,6 +146,10 @@ typedef struct task {
     uint8_t        is_linux;                /* Linux Compatibility Flag */                  /* ABI (0=SysV/Native, 3=Linux) */
     uint64_t       user_rsp;                /* User Stack Pointer (saved during syscall) */
     uint64_t       mmap_base;               /* Base address for mmap allocator */
+    uint64_t       binder_mmap_base;
+    uint64_t       binder_mmap_size;
+    uint64_t       binder_mmap_offset;
+    void*          binder_mmap_kptr;
 
     /* FPU Context (512 bytes, aligned to 16 bytes for FXSAVE/FXRSTOR) */
     uint8_t        fpu_state[512] __attribute__((aligned(16)));
@@ -214,6 +224,7 @@ void task_wakeup(task_t* t);
  */
 void task_exit(int status);
 void task_exit_signal(int sig);
+void task_stop_signal(int sig);
 
 /**
  * Obtiene la tarea actual.

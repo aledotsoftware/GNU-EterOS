@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - Xtensa HAL Implementation (ESP32)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  *
  * Implementación de la HAL para la arquitectura Xtensa LX6/LX7 (ESP32/S2/S3).
@@ -79,6 +79,11 @@ void hal_cpu_halt(void) {
 #ifndef __ETEROS_HOST_TEST__
     __asm__ volatile ("waiti 0");
 #endif
+}
+
+void hal_cpu_enable_interrupts_and_halt(void) {
+    hal_interrupts_enable();
+    hal_cpu_halt();
 }
 
 void hal_cpu_reset(void) {

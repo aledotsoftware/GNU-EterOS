@@ -98,31 +98,39 @@ static ssize_t proc_uptime_read(fs_node_t *node, uint32_t offset, uint32_t size,
 /* ========================================================================= */
 static ssize_t proc_meminfo_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
     (void)node;
-    char meminfo_str[256];
+    char meminfo_str[512];
     char num_buf[32];
 
     uint64_t total = pmm_get_total_ram();
     uint64_t free = pmm_get_free_ram();
     uint64_t used = pmm_get_used_ram();
 
-    /* Format similar to Linux /proc/meminfo but simplified */
-    /* TotalRam: X kB */
+    /* Format similar to Linux /proc/meminfo */
     strlcpy(meminfo_str, "MemTotal:       ", sizeof(meminfo_str));
     itoa_s((int64_t)(total / 1024), num_buf, sizeof(num_buf), 10);
     strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
     strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
 
-    /* MemFree: Y kB */
     strlcat(meminfo_str, "MemFree:        ", sizeof(meminfo_str));
     itoa_s((int64_t)(free / 1024), num_buf, sizeof(num_buf), 10);
     strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
     strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
 
-    /* MemUsed: Z kB */
-    strlcat(meminfo_str, "MemUsed:        ", sizeof(meminfo_str));
+    strlcat(meminfo_str, "MemAvailable:   ", sizeof(meminfo_str));
+    itoa_s((int64_t)(free / 1024), num_buf, sizeof(num_buf), 10);
+    strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
+    strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
+
+    strlcat(meminfo_str, "Buffers:        0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "Cached:         0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "SwapCached:     0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "Active:         ", sizeof(meminfo_str));
     itoa_s((int64_t)(used / 1024), num_buf, sizeof(num_buf), 10);
     strlcat(meminfo_str, num_buf, sizeof(meminfo_str));
     strlcat(meminfo_str, " kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "Inactive:       0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "SwapTotal:      0 kB\n", sizeof(meminfo_str));
+    strlcat(meminfo_str, "SwapFree:       0 kB\n", sizeof(meminfo_str));
 
     size_t len = strlen(meminfo_str);
     if (offset >= len) return 0;
@@ -486,6 +494,47 @@ static ssize_t proc_self_symlink_read(fs_node_t *node, uint32_t offset, uint32_t
 }
 
 /* ========================================================================= */
+/* /proc/cpuinfo implementation                                              */
+/* ========================================================================= */
+static ssize_t proc_cpuinfo_read(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) {
+    (void)node;
+    const char *cpuinfo =
+        "processor\t: 0\n"
+        "vendor_id\t: GenuineIntel\n"
+        "cpu family\t: 6\n"
+        "model\t\t: 158\n"
+        "model name\t: EterOS Virtual CPU\n"
+        "stepping\t: 9\n"
+        "microcode\t: 0x1\n"
+        "cpu MHz\t\t: 2000.000\n"
+        "cache size\t: 16384 KB\n"
+        "physical id\t: 0\n"
+        "siblings\t: 1\n"
+        "core id\t\t: 0\n"
+        "cpu cores\t: 1\n"
+        "apicid\t\t: 0\n"
+        "initial apicid\t: 0\n"
+        "fpu\t\t: yes\n"
+        "fpu_exception\t: yes\n"
+        "cpuid level\t: 22\n"
+        "wp\t\t: yes\n"
+        "flags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 cx16 pcid sse4_1 sse4_2 x2apic popcnt aes xsave avx rdrand hypervisor lahf_lm 3dnowprefetch fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 xsaves\n"
+        "bugs\t\t: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs taa itlb_multihit\n"
+        "bogomips\t: 4000.00\n"
+        "clflush size\t: 64\n"
+        "cache_alignment\t: 64\n"
+        "address sizes\t: 39 bits physical, 48 bits virtual\n"
+        "power management:\n\n";
+
+    uint32_t len = strlen(cpuinfo);
+    if (offset >= len) return 0;
+    if (offset + size > len) size = len - offset;
+
+    memcpy(buffer, cpuinfo + offset, size);
+    return size;
+}
+
+/* ========================================================================= */
 /* ProcFS Directory Operations                                               */
 /* ========================================================================= */
 static int procfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry) {
@@ -510,8 +559,13 @@ static int procfs_readdir(fs_node_t *node, uint32_t index, struct dirent *entry)
         entry->inode = 3;
         return 0;
     }
+    if (index == 4) {
+        strlcpy(entry->name, "cpuinfo", sizeof(entry->name));
+        entry->inode = 4;
+        return 0;
+    }
 
-    index -= 4; /* Shift index for task entries */
+    index -= 6; /* Shift index for task entries */
 
     uint32_t seen = 0;
     int max = task_get_max();
@@ -564,6 +618,11 @@ static fs_node_t *procfs_finddir(fs_node_t *node, char *name) {
         fnode->read = proc_self_symlink_read;
         fnode->mask = 0777;
         fnode->inode = 3;
+    } else if (strcmp(name, "cpuinfo") == 0) {
+        strlcpy(fnode->name, "cpuinfo", sizeof(fnode->name));
+        fnode->read = proc_cpuinfo_read;
+        fnode->mask = 0444;
+        fnode->inode = 4;
     } else {
         // Attempt to parse name as PID
         int pid = 0;
@@ -604,6 +663,16 @@ static int procfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     return -EROFS;
 }
 
+static int procfs_unlink(fs_node_t *parent, char *name) {
+    (void)parent; (void)name;
+    return -EROFS;
+}
+
+static int procfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    (void)old_parent; (void)old_name; (void)new_parent; (void)new_name;
+    return -EROFS;
+}
+
 static int procfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
     (void)parent; (void)name; (void)permission;
     return -EROFS;
@@ -622,6 +691,8 @@ fs_node_t* procfs_init(void) {
     procfs_root->finddir = procfs_finddir;
     procfs_root->create = procfs_create;
     procfs_root->mkdir = procfs_mkdir;
+    procfs_root->unlink = procfs_unlink;
+    procfs_root->rename = procfs_rename;
 
     return procfs_root;
 }

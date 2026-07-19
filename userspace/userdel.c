@@ -28,13 +28,29 @@ static int remove_user_from_file(const char* filepath, const char* username) {
     char temp_filepath[256];
     snprintf(temp_filepath, sizeof(temp_filepath), "%s.tmp", filepath);
 
-    int temp_fd = open(temp_filepath, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    int mask = 0644;
+    if (strstr(filepath, "shadow")) mask = 0600;
+
+    int temp_fd = open(temp_filepath, O_WRONLY | O_CREAT | O_TRUNC, mask);
     if (temp_fd < 0) {
         close(fd);
         return -1;
     }
-    if (strstr(filepath, "shadow")) chmod(temp_filepath, 0600);
-    else chmod(temp_filepath, 0644);
+    if (strstr(filepath, "shadow")) {
+        if (chmod(temp_filepath, 0600) < 0) {
+            close(temp_fd);
+            close(fd);
+            unlink(temp_filepath);
+            return -1;
+        }
+    } else {
+        if (chmod(temp_filepath, 0644) < 0) {
+            close(temp_fd);
+            close(fd);
+            unlink(temp_filepath);
+            return -1;
+        }
+    }
 
     int found = 0;
     char line[MAX_LINE];
@@ -66,8 +82,9 @@ static int remove_user_from_file(const char* filepath, const char* username) {
         return 0; // Not found, but no error during reading
     }
 
-    unlink(filepath);
-    rename(temp_filepath, filepath);
+    if (rename(temp_filepath, filepath) < 0) {
+        return -1;
+    }
 
     return 1; // Found and removed
 }
@@ -76,6 +93,11 @@ static int remove_user_from_file(const char* filepath, const char* username) {
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("Usage: %s <username>\n", argv[0]);
+        return 1;
+    }
+
+    if (getuid() != 0) {
+        printf("Error: Only root can delete users.\n");
         return 1;
     }
 
@@ -93,7 +115,10 @@ int main(int argc, char *argv[]) {
     }
 
     /* Enforce shadow file permissions */
-    chmod("/etc/shadow", 0600);
+    if (chmod("/etc/shadow", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow\n");
+        return 1;
+    }
 
     int passwd_res = remove_user_from_file("/etc/passwd", username);
     if (passwd_res < 0) {
@@ -101,7 +126,10 @@ int main(int argc, char *argv[]) {
          return 1;
     }
     /* Enforce passwd permissions */
-    chmod("/etc/passwd", 0644);
+    if (chmod("/etc/passwd", 0644) < 0) {
+        printf("Error: Failed to set permissions on /etc/passwd\n");
+        return 1;
+    }
 
     if (shadow_res == 0 && passwd_res == 0) {
         printf("Error: User '%s' not found.\n", username);

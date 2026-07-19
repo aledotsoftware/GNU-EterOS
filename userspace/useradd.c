@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <termios.h>
+#include <fcntl.h>
 #include "sha256.h"
 
 #define MAX_LINE 256
@@ -21,21 +23,50 @@ static int read_line(int fd, char *buf, int max_len) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        printf("Usage: %s <username> <password>\n", argv[0]);
+    if (argc != 2) {
+        printf("Usage: %s <username>\n", argv[0]);
+        return 1;
+    }
+
+    if (getuid() != 0) {
+        printf("Error: Only root can add users.\n");
         return 1;
     }
 
     const char* username = argv[1];
-    const char* password = argv[2];
 
-    /* Calculate SHA256 */
-    uint8_t hash[SHA256_BLOCK_SIZE];
-    sha256((const uint8_t*)password, strlen(password), hash);
+    struct termios term, term_orig;
+    tcgetattr(0, &term_orig);
+    term = term_orig;
+    term.c_lflag &= ~ECHO;
+    tcsetattr(0, TCSANOW, &term);
+
+    printf("Password: ");
+    fflush(stdout);
+    char password[32];
+    int len = read(0, password, sizeof(password) - 1);
+
+    tcsetattr(0, TCSANOW, &term_orig);
+    printf("\n");
+
+    if (len < 0) return 1;
+    if (len > 0) {
+        password[len] = '\0';
+        if (password[len-1] == '\n') password[len-1] = '\0';
+    } else {
+        password[0] = '\0';
+    }
 
     char hash_str[SHA256_BLOCK_SIZE * 2 + 1];
-    for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-        snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
+    if (strlen(password) > 0) {
+        /* Calculate SHA256 */
+        uint8_t hash[SHA256_BLOCK_SIZE];
+        sha256((const uint8_t*)password, strlen(password), hash);
+        for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+            snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
+        }
+    } else {
+        hash_str[0] = '\0';
     }
 
     /* Assign next UID/GID from /etc/passwd */
@@ -87,19 +118,44 @@ int main(int argc, char *argv[]) {
             const char* root_entry = "root:x:0:0:root:/root:/bin/sh\n";
             write(fd, root_entry, strlen(root_entry));
             close(fd);
+        } else {
+            printf("Error: Could not create /etc/passwd\n");
+            return 1;
         }
     }
 
-    /* Append to /etc/passwd */
-    fd = open("/etc/passwd", O_WRONLY | O_APPEND | O_CREAT, 0644);
-    if (fd < 0) {
-        printf("Error: Could not open /etc/passwd for writing\n");
+    /* Rewrite /etc/passwd with atomic rename */
+    fd = open("/etc/passwd", O_RDONLY);
+    int temp_fd = open("/etc/passwd.tmp", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (temp_fd < 0) {
+        printf("Error: Could not open /etc/passwd.tmp for writing\n");
+        if (fd >= 0) close(fd);
         return 1;
     }
+    if (chmod("/etc/passwd.tmp", 0644) < 0) {
+        printf("Error: Failed to set permissions on /etc/passwd.tmp\n");
+        close(temp_fd);
+        if (fd >= 0) close(fd);
+        unlink("/etc/passwd.tmp");
+        return 1;
+    }
+
+    if (fd >= 0) {
+        char line[MAX_LINE];
+        while (read_line(fd, line, sizeof(line)) > 0) {
+            write(temp_fd, line, strlen(line));
+        }
+        close(fd);
+    }
+
     char passwd_entry[MAX_LINE];
     snprintf(passwd_entry, sizeof(passwd_entry), "%s:x:%d:%d::/home/%s:/bin/sh\n", username, next_uid, next_uid, username);
-    write(fd, passwd_entry, strlen(passwd_entry));
-    close(fd);
+    write(temp_fd, passwd_entry, strlen(passwd_entry));
+    close(temp_fd);
+    if (rename("/etc/passwd.tmp", "/etc/passwd") < 0) {
+        printf("Error: Failed to rename /etc/passwd.tmp\n");
+        return 1;
+    }
 
     /* Check if shadow exists */
     int fd_shadow = open("/etc/shadow", O_RDONLY);
@@ -109,26 +165,56 @@ int main(int argc, char *argv[]) {
             const char* root_entry = "root::19000:0:99999:7:::\n";
             write(fd_shadow, root_entry, strlen(root_entry));
             close(fd_shadow);
+        } else {
+            printf("Error: Could not create /etc/shadow\n");
+            return 1;
         }
     } else {
         close(fd_shadow);
     }
 
-
-    /* Append to /etc/shadow */
-    fd = open("/etc/shadow", O_WRONLY | O_APPEND | O_CREAT, 0600);
-    if (fd < 0) {
-        printf("Error: Could not open /etc/shadow for writing\n");
+    /* Rewrite /etc/shadow with atomic rename */
+    fd_shadow = open("/etc/shadow", O_RDONLY);
+    int temp_shadow_fd = open("/etc/shadow.tmp", O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (temp_shadow_fd < 0) {
+        printf("Error: Could not open /etc/shadow.tmp for writing\n");
+        if (fd_shadow >= 0) close(fd_shadow);
         return 1;
     }
+    if (chmod("/etc/shadow.tmp", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow.tmp\n");
+        close(temp_shadow_fd);
+        if (fd_shadow >= 0) close(fd_shadow);
+        unlink("/etc/shadow.tmp");
+        return 1;
+    }
+
+    if (fd_shadow >= 0) {
+        char line[MAX_LINE];
+        while (read_line(fd_shadow, line, sizeof(line)) > 0) {
+            write(temp_shadow_fd, line, strlen(line));
+        }
+        close(fd_shadow);
+    }
+
     char shadow_entry[MAX_LINE];
     snprintf(shadow_entry, sizeof(shadow_entry), "%s:%s:19000:0:99999:7:::\n", username, hash_str);
-    write(fd, shadow_entry, strlen(shadow_entry));
-    close(fd);
+    write(temp_shadow_fd, shadow_entry, strlen(shadow_entry));
+    close(temp_shadow_fd);
+    if (rename("/etc/shadow.tmp", "/etc/shadow") < 0) {
+        printf("Error: Failed to rename /etc/shadow.tmp\n");
+        return 1;
+    }
 
     /* Enforce file permissions */
-    chmod("/etc/shadow", 0600);
-    chmod("/etc/passwd", 0644);
+    if (chmod("/etc/shadow", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow\n");
+        return 1;
+    }
+    if (chmod("/etc/passwd", 0644) < 0) {
+        printf("Error: Failed to set permissions on /etc/passwd\n");
+        return 1;
+    }
 
     printf("User '%s' created successfully.\n", username);
     return 0;

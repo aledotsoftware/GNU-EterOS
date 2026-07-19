@@ -9,6 +9,7 @@ static void shell_print_prompt(void) {
     terminal_write_colored("> ", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 }
 
+#include <hal.h>
 static void shell_replace_line(char* input, size_t* pos, const char* new_text) {
     /* Borrar línea actual en pantalla */
     while (*pos > 0) {
@@ -64,11 +65,11 @@ void shell_run(void) {
             }
 
             /* Dormir hasta la próxima interrupción */
-            __asm__ volatile("cli");
+            hal_interrupts_disable();
             if (!keyboard_has_input() && !serial_received()) {
-                __asm__ volatile("sti; hlt");
+                hal_cpu_enable_interrupts_and_halt();
             } else {
-                __asm__ volatile("sti");
+                hal_interrupts_enable();
             }
         }
 

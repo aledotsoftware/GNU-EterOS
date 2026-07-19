@@ -1,6 +1,6 @@
 /**
  * éterOS - IDT Implementation (i386 / 32-bit Protected Mode)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Configura la Interrupt Descriptor Table para modo de 32 bits.
  * Usa __attribute__((interrupt)) de GCC para generar los ISR stubs.
@@ -90,8 +90,8 @@ static void handle_exception(uint8_t vector) {
     serial_write_string(vector < NUM_EXCEPTION_NAMES ? exception_names[vector] : "Unknown");
     serial_write_string("\n");
 
-    __asm__ volatile ("cli");
-    for (;;) { __asm__ volatile ("hlt"); }
+    hal_interrupts_disable();
+    for (;;) { hal_cpu_halt(); }
 }
 
 /* ========================================================================= */

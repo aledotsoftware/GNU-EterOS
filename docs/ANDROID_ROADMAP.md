@@ -14,16 +14,16 @@ While EterOS currently maps a growing subset of x86_64 Linux syscalls, Android (
 ## 3. Implementation Strategy
 
 ### 3.1. Phase 1: IPC Base & Stubs (Current Focus)
-- **Action:** Move basic Binder definitions into standard compatibility headers (`include/linux_compat.h`).
-- **Action:** Route `/dev/ashmem` to `shmfs_create_memfd` and `/dev/__properties__` to `devfs` with anonymous mappings for Android properties compatibility.
-- **Action:** Implement `sys_prctl` with support for `PR_SET_NAME` and `PR_SET_VMA` to satisfy Bionic's linker and memory allocation routines.
-- **Action:** Implement basic memory mapping support for `/dev/binder`, `/dev/ashmem`, and `/dev/__properties__` in `sys_mmap`.
+- **Action (Completed):** Move basic Binder definitions into standard compatibility headers (`include/linux_compat.h`).
+- **Action (Completed):** Route `/dev/ashmem` to `shmfs_create_memfd` and `/dev/__properties__` to `devfs` with anonymous mappings for Android properties compatibility. Additional IOCTLs added (`ASHMEM_SET_PROT_MASK`, `BINDER_SET_MAX_THREADS`).
+- **Action (Completed):** Implement `sys_prctl` with support for `PR_SET_NAME` and `PR_SET_VMA` to satisfy Bionic's linker and memory allocation routines.
+- **Action (Completed):** Implement basic memory mapping support for `/dev/binder`, `/dev/ashmem`, and `/dev/__properties__` in `sys_mmap`.
 
 ### 3.2. Phase 2: Memory & Threading
-- **Action:** Map the Bionic Thread Local Storage (TLS) expectations to EterOS's `sys_arch_prctl`.
-- **Action:** Expand `sys_clone` and `futex` implementations to strictly handle Bionic's synchronization and thread ID lifecycle.
-- **Action:** Emulate Android properties mapping in memory to allow Bionic to read `ro.*` properties safely.
-- **Action:** Upgrade the Binder routing mechanism from the basic static payload-copy shim to proper memory mapping for transaction data transfer.
+- **Action (Completed):** Map the Bionic Thread Local Storage (TLS) expectations to EterOS's `sys_arch_prctl` and support `PT_TLS` segment.
+- **Action (Completed):** Expand `sys_clone` and `futex` implementations to strictly handle Bionic's synchronization and thread ID lifecycle.
+- **Action (Completed):** Emulate Android properties mapping in memory to allow Bionic to read `ro.*` properties safely.
+- **Action (Completed):** Upgrade the Binder routing mechanism from the basic static payload-copy shim to proper memory mapping for transaction data transfer.
 
 ### 3.3. Phase 3: Binder Routing & Native Binaries
 - **Action:** Transition the `/dev/binder` stub into a functional message router inside the kernel, allowing `servicemanager` to start and register services.

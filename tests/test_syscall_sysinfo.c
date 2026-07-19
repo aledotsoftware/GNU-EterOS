@@ -33,6 +33,18 @@ fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*
 
 #include "../kernel/arch/x86_64/syscall.c"
 
+#undef memcpy
+#undef memset
+#undef strcmp
+#undef strncpy
+#undef strlcpy
+#undef strlen
+
+#undef malloc
+#undef free
+#undef printf
+#undef exit
+
 #undef assert
 #define assert(x) do { if (!(x)) { printf("Assertion failed: %s\n", #x); return 1; } } while (0)
 
@@ -124,3 +136,5 @@ int main() {
     printf("sys_sysinfo test passed!\n");
     return 0;
 }
+void task_stop_signal(int sig) {}
+int rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) { return 0; }

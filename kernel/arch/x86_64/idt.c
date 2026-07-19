@@ -1,6 +1,6 @@
 /**
  * éterOS - IDT Implementation (x86_64)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Configura la Interrupt Descriptor Table con handlers para:
  *   - Excepciones de CPU (0-31): Division by zero, Page fault, etc.
@@ -24,6 +24,8 @@
 #include "../../../include/task.h"
 #include "../../../include/vmm.h"
 #include "../../../include/apic.h"
+#include "../../../include/syscall.h"
+#include "../../../include/hal.h"
 
 /* ========================================================================= */
 /* Tabla IDT (256 entradas × 16 bytes = 4 KB)                               */
@@ -130,7 +132,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
         /* it means copy_from_user/validate failed (e.g. unmapped page). */
         /* We should kill the task instead of panicking. */
         if ((frame->cs & 3) == 0 && cr2 >= USER_BASE && cr2 <= USER_LIMIT) {
-            serial_write_string("\n[EXCEPTION] Kernel Page Fault on User Address. Bad pointer?\n");
+            serial_write_string("\n[EXCEPTION] [HYBRID BOUNDARY] Kernel Page Fault on User Address. Bad pointer?\n");
 
             task_t* current = task_get_current();
             if (current) {
@@ -151,7 +153,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
 
     /* Check if exception happened in User Mode (CS & 3 == 3) */
     if ((frame->cs & 3) == 3) {
-        serial_write_string("\n[EXCEPTION] User Mode Fault detected. Terminating task.\n");
+        serial_write_string("\n[EXCEPTION] [USERLAND BOUNDARY] User Mode Fault detected. Terminating task.\n");
 
         char buf[32];
         if (vector < NUM_EXCEPTION_NAMES) {
@@ -188,7 +190,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
 
         /* Just in case we return (e.g. error killing task), loop forever or schedule */
         schedule();
-        for(;;) __asm__ volatile("hlt");
+        for(;;) hal_cpu_halt();
         return;
     }
 
@@ -280,9 +282,7 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
         serial_write_string("\nNMI detected. Hardware error.\n");
     }
 
-    if (vector == 14 || vector == 13 || vector == 8) {
-        serial_write_string("\nCRITICAL EXCEPTION 8/13/14 HANDLED: Full Registers, Stack Trace, and PID printed above.\n");
-    }
+    serial_write_string("\n[KERNEL CORE BOUNDARY] CRITICAL EXCEPTION HANDLED: Full Registers, Stack Trace, and PID printed above.\n");
     serial_write_string("\nTask: ");
     extern task_t* task_get_current(void);
     task_t* panic_task = task_get_current();
@@ -293,17 +293,35 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
         serial_write_string(buf);
         serial_write_string(")");
     }
+    /* Print CR0, CR3, CR4 for deep memory context before trace */
+    char cr_buf[32];
+    uint64_t cr0_val, cr3_val, cr4_val;
+    __asm__ volatile("mov %%cr0, %0" : "=r"(cr0_val));
+    __asm__ volatile("mov %%cr3, %0" : "=r"(cr3_val));
+    __asm__ volatile("mov %%cr4, %0" : "=r"(cr4_val));
+    serial_write_string("\nControl Registers:\n");
+    serial_write_string("  CR0: 0x"); utoa_hex_s(cr0_val, cr_buf, sizeof(cr_buf)); serial_write_string(cr_buf);
+    serial_write_string("\n  CR3: 0x"); utoa_hex_s(cr3_val, cr_buf, sizeof(cr_buf)); serial_write_string(cr_buf);
+    serial_write_string("\n  CR4: 0x"); utoa_hex_s(cr4_val, cr_buf, sizeof(cr_buf)); serial_write_string(cr_buf);
+    serial_write_string("\n");
+
     serial_write_string("\nStack Trace (RBP chain):\n");
     uint64_t* rbp;
     __asm__ volatile("mov %%rbp, %0" : "=r"(rbp));
     for (int i=0; i<15 && rbp != NULL; i++) {
         /* Instead check if it maps to physical memory. Verify rbp and rbp+1 */
-        if (!vmm_virt_to_phys((uint64_t)rbp)) {
-            serial_write_string("  <Invalid RBP pointer>\n");
+        if ((uint64_t)rbp == 0 || ((uint64_t)rbp % 8 != 0)) {
+            serial_write_string("  <Invalid RBP pointer alignment or null>\n");
+            break;
+        }
+    /* Prevent stack tracing from dipping into invalid regions during nested faults.
+       A valid RBP must be either in Kernel Space (>= 0xFFFF800000000000) or User Space. */
+    if (!vmm_virt_to_phys((uint64_t)rbp)) {
+        serial_write_string("  <Invalid RBP pointer: not mapped to phys>\n");
             break;
         }
         if (!vmm_virt_to_phys((uint64_t)rbp + 8)) {
-            serial_write_string("  <Invalid return address pointer>\n");
+        serial_write_string("  <Invalid return address pointer: not mapped to phys>\n");
             break;
         }
         uint64_t rip_caller = rbp[1];
@@ -315,11 +333,12 @@ static void handle_exception(uint8_t vector, struct interrupt_frame* frame, uint
     serial_write_string("\n");
 
     /* Halt forever */
-    __asm__ volatile ("cli");
-    for (;;) { __asm__ volatile ("hlt"); }
+    hal_interrupts_disable();
+    for (;;) { hal_cpu_halt(); }
 }
 
 extern void syscall_int80_handler(struct syscall_regs* regs);
+extern void handle_signal_if_needed(struct syscall_regs* regs);
 
 void exception_handler_c(struct int_regs *regs) {
     if (regs->int_no == 128) {
@@ -335,6 +354,42 @@ void exception_handler_c(struct int_regs *regs) {
         .ss = regs->ss
     };
     handle_exception(regs->int_no, &frame, regs->err_code, regs);
+
+    if ((regs->cs & 3) != 0) {
+        struct syscall_regs sregs;
+        sregs.r15 = regs->r15;
+        sregs.r14 = regs->r14;
+        sregs.r13 = regs->r13;
+        sregs.r12 = regs->r12;
+        sregs.r11 = regs->rflags;
+        sregs.r10 = regs->r10;
+        sregs.r9  = regs->r9;
+        sregs.r8  = regs->r8;
+        sregs.rbp = regs->rbp;
+        sregs.rdi = regs->rdi;
+        sregs.rsi = regs->rsi;
+        sregs.rdx = regs->rdx;
+        sregs.rcx = regs->rip;
+        sregs.rbx = regs->rbx;
+        sregs.rax = regs->rax;
+        handle_signal_if_needed(&sregs);
+
+        regs->r15 = sregs.r15;
+        regs->r14 = sregs.r14;
+        regs->r13 = sregs.r13;
+        regs->r12 = sregs.r12;
+        regs->rflags = sregs.r11;
+        regs->r10 = sregs.r10;
+        regs->r9  = sregs.r9;
+        regs->r8  = sregs.r8;
+        regs->rbp = sregs.rbp;
+        regs->rdi = sregs.rdi;
+        regs->rsi = sregs.rsi;
+        regs->rdx = sregs.rdx;
+        regs->rip = sregs.rcx;
+        regs->rbx = sregs.rbx;
+        regs->rax = sregs.rax;
+    }
 }
 
 /* Stubs definidos en exceptions.asm */

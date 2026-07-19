@@ -120,6 +120,7 @@ int create_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {}
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int unlink_fs(fs_node_t *parent, char *name) { return 0; }
+int rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) { return 0; }
 int ioctl_fs(fs_node_t *node, int request, void *arg) { return 0; }
 
 /* Stub MSR functions */
@@ -295,3 +296,4 @@ __attribute__((weak)) uint64_t pmm_get_total_ram(void) { return 1024 * 1024 * 10
 __attribute__((weak)) uint64_t pmm_get_free_ram(void) { return 512 * 1024 * 1024; }
 __attribute__((weak)) uint64_t pmm_get_used_ram(void) { return 512 * 1024 * 1024; }
 #endif
+void task_stop_signal(int sig) {}

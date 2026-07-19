@@ -159,6 +159,10 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
         spin_unlock(&binder_lock);
         return 0;
     }
+    if (request == BINDER_SET_MAX_THREADS) {
+        /* Stub: accept max threads setting */
+        return 0;
+    }
     if (request == BINDER_WRITE_READ) {
         if (!arg) return -EINVAL;
         struct binder_write_read bwr;
@@ -180,19 +184,42 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                     if (safe_copy_from_user(&tr, wbuf + consumed, sizeof(tr)) != 0) break;
                     consumed += sizeof(struct binder_transaction_data);
 
+                    int target_dead = 0;
+                    task_t *target_task = NULL;
+                    if (tr.target.handle == 0 && cmd != BC_REPLY) {
+                        target_task = task_get_by_id((uint32_t)binder_context_mgr_pid);
+                    } else if (cmd == BC_REPLY) {
+                        target_task = task_get_by_id(tr.target.handle);
+                    }
+                    if (!target_task) target_dead = 1;
+
                     uint8_t *temp_payload = NULL;
                     if (tr.data.ptr.buffer && tr.data_size > 0) {
                         /* Real allocation instead of a static buffer, capped at 1MB to prevent OOM */
                         if (tr.data_size <= 1024 * 1024) {
-                            temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
-                            if (temp_payload) {
-                                if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
-                                    kfree(temp_payload);
-                                    temp_payload = NULL;
+                            if (!target_dead && target_task->binder_mmap_kptr && (target_task->binder_mmap_offset + tr.data_size <= target_task->binder_mmap_size)) {
+                                /* Copy directly into receivers mapped memory area */
+                                uint64_t target_vaddr = target_task->binder_mmap_base + target_task->binder_mmap_offset;
+                                uint8_t *kptr = (uint8_t*)target_task->binder_mmap_kptr + target_task->binder_mmap_offset;
+
+                                if (safe_copy_from_user(kptr, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) == 0) {
+                                    temp_payload = (uint8_t*)(uintptr_t)target_vaddr; /* Store the offset within the binder VMA so receiver knows where it is */
+                                    target_task->binder_mmap_offset += (((tr.data_size) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1));
+                                } else {
                                     tr.data_size = 0;
                                 }
                             } else {
-                                tr.data_size = 0;
+                                /* Fallback to legacy kmalloc if no mmap or full */
+                                temp_payload = (uint8_t*)kmalloc((size_t)tr.data_size);
+                                if (temp_payload) {
+                                    if (safe_copy_from_user(temp_payload, (void*)(uintptr_t)tr.data.ptr.buffer, (size_t)tr.data_size) != 0) {
+                                        kfree(temp_payload);
+                                        temp_payload = NULL;
+                                        tr.data_size = 0;
+                                    }
+                                } else {
+                                    tr.data_size = 0;
+                                }
                             }
                         } else {
                             tr.data_size = 0; /* Deny oversized requests */
@@ -200,7 +227,18 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                     }
 
                     spin_lock(&binder_lock);
-                    if (tr.target.handle == 0 && cmd != BC_REPLY) {
+                    if (target_dead) {
+                        for (int i = 0; i < BINDER_MAX_QUEUED; i++) {
+                            if (!cl_queues[i].used) {
+                                cl_queues[i].pid = current->id;
+                                memset(&cl_queues[i].tr, 0, sizeof(struct binder_transaction_data));
+                                cl_queues[i].tr.code = BR_DEAD_REPLY;
+                                cl_queues[i].payload = NULL;
+                                cl_queues[i].used = 1;
+                                break;
+                            }
+                        }
+                    } else if (tr.target.handle == 0 && cmd != BC_REPLY) {
                         /* Route to context manager */
                         int next_head = (cm_q_head + 1) % BINDER_MAX_QUEUED;
                         if (next_head != cm_q_tail) {
@@ -245,18 +283,30 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                      spin_lock(&binder_lock);
                      for (int i = 0; i < BINDER_MAX_QUEUED; i++) {
                          if (payload_buffers[i] == (uint8_t*)buffer_to_free && buffer_to_free != 0) {
+                             if ((uintptr_t)buffer_to_free < current->binder_mmap_base || (uintptr_t)buffer_to_free >= current->binder_mmap_base + current->binder_mmap_size) {
                              kfree((void*)buffer_to_free);
+                             }
                              payload_buffers[i] = NULL;
                              break;
                          }
                          if (cl_queues[i].payload == (uint8_t*)buffer_to_free && buffer_to_free != 0) {
+                             if ((uintptr_t)buffer_to_free < current->binder_mmap_base || (uintptr_t)buffer_to_free >= current->binder_mmap_base + current->binder_mmap_size) {
                              kfree((void*)buffer_to_free);
+                             }
                              cl_queues[i].payload = NULL;
                              break;
                          }
                      }
                      spin_unlock(&binder_lock);
 
+                } else if (cmd == BC_INCREFS || cmd == BC_ACQUIRE || cmd == BC_RELEASE || cmd == BC_DECREFS) {
+                    if (consumed + sizeof(uint32_t) > bwr.write_size) break;
+                    uint32_t desc;
+                    if (safe_copy_from_user(&desc, wbuf + consumed, sizeof(uint32_t)) != 0) break;
+                    consumed += sizeof(uint32_t);
+                    /* Dummy reference tracking, NO-OP for now */
+                } else if (cmd == BC_ENTER_LOOPER || cmd == BC_REGISTER_LOOPER || cmd == BC_EXIT_LOOPER) {
+                    /* NO-OP for thread state tracking for now */
                 } else {
                     /* Unknown or unimplemented command, break */
                     break;
@@ -290,7 +340,11 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
                         payload_ptr = cl_queues[i].payload;
                         cl_queues[i].used = 0;
                         has_tr = 1;
-                        out_cmd = BR_REPLY;
+                        if (tr_copy.code == BR_DEAD_REPLY) {
+                            out_cmd = BR_DEAD_REPLY;
+                        } else {
+                            out_cmd = BR_REPLY;
+                        }
                         break;
                     }
                 }
@@ -298,13 +352,25 @@ static int dev_binder_ioctl(fs_node_t *node, int request, void *arg) {
             spin_unlock(&binder_lock);
 
             if (has_tr) {
-                if (bwr.read_size >= sizeof(uint32_t) + sizeof(struct binder_transaction_data)) {
+                if (out_cmd == BR_DEAD_REPLY) {
+                    if (bwr.read_size >= sizeof(uint32_t)) {
+                        if (safe_copy_to_user(rbuf + read_out, &out_cmd, sizeof(out_cmd)) == 0) {
+                            read_out += sizeof(uint32_t);
+                        }
+                    }
+                } else if (bwr.read_size >= sizeof(uint32_t) + sizeof(struct binder_transaction_data)) {
                     /* Basic shim copies data to the user provided buffer instead of mmaps, to avoid passing kernel pointers */
                     if (payload_ptr && tr_copy.data.ptr.buffer) {
                         /* In this shim, we assume the reader provided a valid buffer in tr_copy.data.ptr.buffer
                            to copy the payload into. This is not strictly Android compliant but safe for our baremetal shim. */
+                        if ((uintptr_t)payload_ptr >= current->binder_mmap_base && (uintptr_t)payload_ptr < current->binder_mmap_base + current->binder_mmap_size) {
+                            /* It is already in their mapped memory, just give them the pointer */
+                            tr_copy.data.ptr.buffer = (uint64_t)(uintptr_t)payload_ptr;
+                        } else {
+                            /* Legacy copy */
                         if (safe_copy_to_user((void*)(uintptr_t)tr_copy.data.ptr.buffer, payload_ptr, tr_copy.data_size) != 0) {
                            /* Copy failed */
+                        }
                         }
                         /* We don't free payload_ptr here, BC_FREE_BUFFER must handle it based on the tracking logic */
                     } else {
@@ -1265,6 +1331,16 @@ static int devfs_create(fs_node_t *parent, char *name, uint16_t permission) {
     return -EROFS;
 }
 
+static int devfs_unlink(fs_node_t *parent, char *name) {
+    (void)parent; (void)name;
+    return -EROFS;
+}
+
+static int devfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    (void)old_parent; (void)old_name; (void)new_parent; (void)new_name;
+    return -EROFS;
+}
+
 static int devfs_mkdir(fs_node_t *parent, char *name, uint16_t permission) {
     (void)parent; (void)name; (void)permission;
     return -EROFS;
@@ -1283,6 +1359,8 @@ fs_node_t* devfs_init(void) {
     devfs_root->finddir = devfs_finddir;
     devfs_root->create = devfs_create;
     devfs_root->mkdir = devfs_mkdir;
+    devfs_root->unlink = devfs_unlink;
+    devfs_root->rename = devfs_rename;
     dev_tty_termios.c_lflag = ECHO | ICANON | ISIG;
 
     return devfs_root;

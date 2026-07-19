@@ -1,6 +1,6 @@
 /**
  * éterOS — x86_64 HAL Implementation
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Target: x86_64 (Intel/AMD)
  */
@@ -82,6 +82,10 @@ void hal_irq_install(uint8_t vector, irq_handler_t handler) {
 
 void hal_cpu_halt(void) {
     __asm__ volatile ("hlt");
+}
+
+void hal_cpu_enable_interrupts_and_halt(void) {
+    __asm__ volatile ("sti; hlt");
 }
 
 void hal_cpu_reset(void) {

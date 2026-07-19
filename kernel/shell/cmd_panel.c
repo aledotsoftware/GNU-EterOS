@@ -1,4 +1,5 @@
 #include "shell_internal.h"
+#include "../../include/stdio.h"
 #include "../../include/keyboard.h"
 #include "../../include/net/defs.h"
 #include "../../include/mouse.h"
@@ -8,6 +9,7 @@
 #include "../../include/net/nic.h"
 #include "../../include/fs/initrd.h"
 #include "../../include/vga.h"
+#include <hal.h>
 
 static volatile bool panel_running = false;
 static volatile int panel_mouse_x = 40;
@@ -53,20 +55,29 @@ static void panel_mouse_callback(int8_t dx, int8_t dy, uint8_t buttons) {
 
 static void draw_panel_menu(void) {
     cmd_clear("");
-    terminal_write_string("\n");
-    terminal_write_colored("  +----------------------------------------------+\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    terminal_write_colored("  | Panel de Control - eterOS v0.2.0 Genesis SMP |\n", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
-    terminal_write_colored("  +----------------------------------------------+\n", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_set_cursor(2, 1);
+    terminal_write_colored("+----------------------------------------------+", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    terminal_set_cursor(2, 2);
+    terminal_write_colored("| eterOS Control Panel v0.2.0 Genesis SMP      |", VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    terminal_set_cursor(2, 3);
+    terminal_write_colored("+----------------------------------------------+", VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
-    // Items are roughly at lines 4, 5, 6, 7, 8, 9, 10
-    terminal_write_string("    [1] Configurar Teclado (Layout & Typematic)\n"); // Y=4
-    terminal_write_string("    [2] Configurar Mouse (Sensibilidad & Botones)\n"); // Y=5
-    terminal_write_string("    [3] Estado de Almacenamiento (Slots & Initrd)\n"); // Y=6
-    terminal_write_string("    [4] Configurar Tiempo (Zona Horaria & NTP)\n"); // Y=7
-    terminal_write_string("    [5] Usuarios y Seguridad (Auto-login & Permisos)\n"); // Y=8
-    terminal_write_string("    [6] Estado de Red (IP & DNS)\n"); // Y=9
-    terminal_write_string("    [7] Salir del Panel de Control\n"); // Y=10
-    terminal_write_string("\n  Use teclas [1-7] o haga click para seleccionar.\n");
+    terminal_set_cursor(4, 4);
+    terminal_write_string("[1] Configurar Teclado (Layout & Typematic)");
+    terminal_set_cursor(4, 5);
+    terminal_write_string("[2] Configurar Mouse (Sensibilidad & Botones)");
+    terminal_set_cursor(4, 6);
+    terminal_write_string("[3] Estado de Almacenamiento (Slots & Initrd)");
+    terminal_set_cursor(4, 7);
+    terminal_write_string("[4] Configurar Tiempo (Zona Horaria & NTP)");
+    terminal_set_cursor(4, 8);
+    terminal_write_string("[5] Usuarios y Seguridad (Auto-login & Permisos)");
+    terminal_set_cursor(4, 9);
+    terminal_write_string("[6] Estado de Red (IP & DNS)");
+    terminal_set_cursor(4, 10);
+    terminal_write_string("[7] Salir del Panel de Control");
+    terminal_set_cursor(2, 12);
+    terminal_write_string("Use teclas [1-7] o haga click para seleccionar.");
 
     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
 }
@@ -84,22 +95,27 @@ static void wait_for_enter(void) {
             panel_mouse_clicked = false;
             break;
         }
-        __asm__ volatile("cli");
-        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
-            __asm__ volatile("sti; hlt");
+        hal_interrupts_disable();
+        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
+            hal_cpu_enable_interrupts_and_halt();
         } else {
-            __asm__ volatile("sti");
+            hal_interrupts_enable();
         }
     }
 }
 
 static void panel_keyboard(void) {
     cmd_clear("");
-    terminal_write_string("\n  -- Teclado --\n");
-    terminal_write_string("  1. Layout: Espanol (es)\n"); // Y=2
-    terminal_write_string("  2. Layout: Ingles (en)\n"); // Y=3
-    terminal_write_string("  3. Ajustar Typematic Rate\n"); // Y=4
-    terminal_write_string("  Elija [1-3] o presione ESC para volver.\n");
+    terminal_set_cursor(2, 1);
+    terminal_write_string("-- Teclado --");
+    terminal_set_cursor(2, 2);
+    terminal_write_string("1. Layout: Espanol (es)");
+    terminal_set_cursor(2, 3);
+    terminal_write_string("2. Layout: Ingles (en)");
+    terminal_set_cursor(2, 4);
+    terminal_write_string("3. Ajustar Typematic Rate");
+    terminal_set_cursor(2, 6);
+    terminal_write_string("Elija [1-3] o presione ESC para volver.");
 
     char c = 0;
     while (1) {
@@ -122,11 +138,11 @@ static void panel_keyboard(void) {
             }
             if (c) break;
         }
-        __asm__ volatile("cli");
-        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
-            __asm__ volatile("sti; hlt");
+        hal_interrupts_disable();
+        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
+            hal_cpu_enable_interrupts_and_halt();
         } else {
-            __asm__ volatile("sti");
+            hal_interrupts_enable();
         }
     }
 
@@ -148,13 +164,20 @@ static void panel_keyboard(void) {
 
 static void panel_mouse_cfg(void) {
     cmd_clear("");
-    terminal_write_string("\n  -- Mouse --\n");
-    terminal_write_string("  1. Sensibilidad: Baja (Multiplicador 1)\n"); // Y=2
-    terminal_write_string("  2. Sensibilidad: Media (Multiplicador 5)\n"); // Y=3
-    terminal_write_string("  3. Sensibilidad: Alta (Multiplicador 10)\n"); // Y=4
-    terminal_write_string("  4. Modo Diestro (Normal)\n"); // Y=5
-    terminal_write_string("  5. Modo Zurdo (Invertido)\n"); // Y=6
-    terminal_write_string("  Elija [1-5] o haga click para seleccionar, o ESC para volver.\n");
+    terminal_set_cursor(2, 1);
+    terminal_write_string("-- Mouse --");
+    terminal_set_cursor(2, 2);
+    terminal_write_string("1. Sensibilidad: Baja (Multiplicador 1)");
+    terminal_set_cursor(2, 3);
+    terminal_write_string("2. Sensibilidad: Media (Multiplicador 5)");
+    terminal_set_cursor(2, 4);
+    terminal_write_string("3. Sensibilidad: Alta (Multiplicador 10)");
+    terminal_set_cursor(2, 5);
+    terminal_write_string("4. Modo Diestro (Normal)");
+    terminal_set_cursor(2, 6);
+    terminal_write_string("5. Modo Zurdo (Invertido)");
+    terminal_set_cursor(2, 8);
+    terminal_write_string("Elija [1-5] o haga click para seleccionar, o ESC para volver.");
 
     char c = 0;
     while (1) {
@@ -181,11 +204,11 @@ static void panel_mouse_cfg(void) {
                 break;
             }
         }
-        __asm__ volatile("cli");
-        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
-            __asm__ volatile("sti; hlt");
+        hal_interrupts_disable();
+        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
+            hal_cpu_enable_interrupts_and_halt();
         } else {
-            __asm__ volatile("sti");
+            hal_interrupts_enable();
         }
     }
 
@@ -212,44 +235,97 @@ static void panel_mouse_cfg(void) {
 
 static void panel_storage(void) {
     cmd_clear("");
-    terminal_write_string("\n  -- Almacenamiento --\n");
+    terminal_set_cursor(2, 1);
+    terminal_write_string("-- Almacenamiento --");
 
     uint8_t active_id = nvram_get_boot_partition();
     uint8_t passive_id = (active_id == 0) ? 1 : 0;
 
-    terminal_write_string("\n  [A/B Slots - NVRAM]\n");
-    terminal_write_string("  Slot Activo:  ");
+    terminal_set_cursor(2, 3);
+    terminal_write_string("[A/B Slots - NVRAM]");
+    terminal_set_cursor(2, 4);
+    terminal_write_string("Slot Activo:  ");
     terminal_write_string(active_id == 0 ? "A (part0)" : "B (part1)");
-    terminal_write_string("\n  Slot Pasivo:  ");
+    terminal_set_cursor(2, 5);
+    terminal_write_string("Slot Pasivo:  ");
     terminal_write_string(passive_id == 0 ? "A (part0)" : "B (part1)");
-    terminal_write_string("\n\n");
 
-    terminal_write_string("  [Estado de Discos y VFS]\n");
-    terminal_write_string("  Sistema de Archivos Principal: Initrd (RAM Disk)\n");
-    terminal_write_string("  Estado de Salud: OK (Solo-Lectura)\n");
+    terminal_set_cursor(2, 7);
+    terminal_write_string("[Estado de Discos y VFS]");
+    terminal_set_cursor(2, 8);
+    terminal_write_string("Sistema de Archivos Principal: Initrd (RAM Disk)");
+    terminal_set_cursor(2, 9);
+    terminal_write_string("Estado de Salud: OK (Solo-Lectura)");
 
     char size_buf[32];
     itoa_s(initrd_get_size(), size_buf, sizeof(size_buf), 10);
-    terminal_write_string("  Tamano Total Initrd: ");
+    terminal_set_cursor(2, 11);
+    terminal_write_string("Tamano Total Initrd: ");
     terminal_write_string(size_buf);
-    terminal_write_string(" bytes\n");
+    terminal_write_string(" bytes");
 
-    terminal_write_string("  Espacio Libre: 0 bytes\n");
-    terminal_write_string("\n");
+    terminal_set_cursor(2, 12);
+    terminal_write_string("Espacio Libre: 0 bytes");
 
     wait_for_enter();
 }
 
 static void panel_time(void) {
     cmd_clear("");
-    terminal_write_string("\n  -- Tiempo --\n");
-    cmd_time("");
-    terminal_write_string("  1. Sincronizar via red (NTP / Resolucion DNS)\n"); // Y = varies based on cmd_time output length, usually 5-6 lines
-    // Let's print fixed options and read keyboard for simplicity to not hardcode dynamic Y positions here
-    terminal_write_string("  2. Zona Horaria: Argentina (UTC-3)\n");
-    terminal_write_string("  3. Zona Horaria: UTC (0)\n");
-    terminal_write_string("  4. Sincronizacion Manual Avanzada (HH:MM:SS)\n");
-    terminal_write_string("  Elija [1-4] usando el teclado numerico (o ESC para cancelar y volver).\n");
+    terminal_set_cursor(2, 1);
+    terminal_write_string("-- Tiempo --");
+
+    rtc_time_t utc, local;
+    rtc_get_time(&utc);
+    rtc_get_local_time(&utc, &local);
+
+    char buf[16];
+
+    terminal_set_cursor(2, 3);
+    terminal_write_string("Hora Local:  ");
+    itoa_s(local.hours, buf, sizeof(buf), 10);
+    if(local.hours < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+    terminal_write_string(":");
+    itoa_s(local.minutes, buf, sizeof(buf), 10);
+    if(local.minutes < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+    terminal_write_string(":");
+    itoa_s(local.seconds, buf, sizeof(buf), 10);
+    if(local.seconds < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+
+    terminal_write_string("  (Offset: ");
+    int8_t tz = rtc_get_timezone();
+    itoa_s(tz, buf, sizeof(buf), 10);
+    if (tz > 0) terminal_write_string("+");
+    terminal_write_string(buf);
+    terminal_write_string(")");
+
+    terminal_set_cursor(2, 4);
+    terminal_write_string("Hora UTC:    ");
+    itoa_s(utc.hours, buf, sizeof(buf), 10);
+    if(utc.hours < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+    terminal_write_string(":");
+    itoa_s(utc.minutes, buf, sizeof(buf), 10);
+    if(utc.minutes < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+    terminal_write_string(":");
+    itoa_s(utc.seconds, buf, sizeof(buf), 10);
+    if(utc.seconds < 10) terminal_write_string("0");
+    terminal_write_string(buf);
+
+    terminal_set_cursor(2, 9);
+    terminal_write_string("1. Sincronizar via red (NTP / Resolucion DNS)");
+    terminal_set_cursor(2, 10);
+    terminal_write_string("2. Zona Horaria: Argentina (UTC-3)");
+    terminal_set_cursor(2, 11);
+    terminal_write_string("3. Zona Horaria: UTC (0)");
+    terminal_set_cursor(2, 12);
+    terminal_write_string("4. Sincronizacion Manual Avanzada (HH:MM:SS)");
+    terminal_set_cursor(2, 14);
+    terminal_write_string("Elija [1-4] usando el teclado numerico (o ESC para cancelar y volver).");
 
     char c = 0;
     while (1) {
@@ -263,16 +339,9 @@ static void panel_time(void) {
 
         if (panel_mouse_clicked) {
             panel_mouse_clicked = false;
-            // The output of cmd_time is about 6 lines long.
-            // Menu starts at roughly y=10.
-            // "1. Sincronizar via red"
-            // "2. Zona Horaria"
-            // "3. Zona Horaria UTC"
-            // "4. Sincronizacion Manual"
             if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                // Approximate mapping based on typical cmd_time length
-                if (panel_mouse_y >= 6 && panel_mouse_y <= 9) {
-                    c = '1' + (panel_mouse_y - 6);
+                if (panel_mouse_y >= 9 && panel_mouse_y <= 12) {
+                    c = '1' + (panel_mouse_y - 9);
                     if (c > '4') c = '4'; // Clamping
                     break;
                 } else {
@@ -284,11 +353,11 @@ static void panel_time(void) {
                 break;
             }
         }
-        __asm__ volatile("cli");
-        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
-            __asm__ volatile("sti; hlt");
+        hal_interrupts_disable();
+        if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
+            hal_cpu_enable_interrupts_and_halt();
         } else {
-            __asm__ volatile("sti");
+            hal_interrupts_enable();
         }
     }
 
@@ -326,11 +395,11 @@ static void panel_time(void) {
                     terminal_putchar(k);
                 }
             }
-            __asm__ volatile("cli");
-            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
-                __asm__ volatile("sti; hlt");
+            hal_interrupts_disable();
+            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
+                hal_cpu_enable_interrupts_and_halt();
             } else {
-                __asm__ volatile("sti");
+                hal_interrupts_enable();
             }
         }
         terminal_write_string("\n");
@@ -357,11 +426,11 @@ static void panel_time(void) {
                     terminal_putchar(k);
                 }
             }
-            __asm__ volatile("cli");
-            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
-                __asm__ volatile("sti; hlt");
+            hal_interrupts_disable();
+            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
+                hal_cpu_enable_interrupts_and_halt();
             } else {
-                __asm__ volatile("sti");
+                hal_interrupts_enable();
             }
         }
         terminal_write_string("\n");
@@ -387,11 +456,11 @@ static void panel_time(void) {
                     terminal_putchar(k);
                 }
             }
-            __asm__ volatile("cli");
-            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
-                __asm__ volatile("sti; hlt");
+            hal_interrupts_disable();
+            if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
+                hal_cpu_enable_interrupts_and_halt();
             } else {
-                __asm__ volatile("sti");
+                hal_interrupts_enable();
             }
         }
         terminal_write_string("\n");
@@ -460,13 +529,20 @@ void cmd_panel(const char* args) {
                 draw_panel_menu();
             } else if (opt == '5') {
                 cmd_clear("");
-                terminal_write_string("\n  -- Usuarios y Seguridad --\n");
-                terminal_write_string("  1. Habilitar Auto-login (autologin on)\n"); // y=2
-                terminal_write_string("  2. Deshabilitar Auto-login (autologin off)\n"); // y=3
-                terminal_write_string("  3. Crear Usuario (add)\n"); // y=4
-                terminal_write_string("  4. Eliminar Usuario (del)\n"); // y=5
-                terminal_write_string("  5. Cambiar Contrasena (passwd)\n"); // y=6
-                terminal_write_string("\n  Elija [1-5] o ESC para volver.\n");
+                terminal_set_cursor(2, 1);
+                terminal_write_string("-- Usuarios y Seguridad --");
+                terminal_set_cursor(2, 2);
+                terminal_write_string("1. Habilitar Auto-login (autologin on)");
+                terminal_set_cursor(2, 3);
+                terminal_write_string("2. Deshabilitar Auto-login (autologin off)");
+                terminal_set_cursor(2, 4);
+                terminal_write_string("3. Crear Usuario (add)");
+                terminal_set_cursor(2, 5);
+                terminal_write_string("4. Eliminar Usuario (del)");
+                terminal_set_cursor(2, 6);
+                terminal_write_string("5. Cambiar Contrasena (passwd)");
+                terminal_set_cursor(2, 8);
+                terminal_write_string("Elija [1-5] o ESC para volver.");
                 char c = 0;
                 while (1) {
                     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
@@ -489,9 +565,9 @@ void cmd_panel(const char* args) {
                             break;
                         }
                     }
-                    __asm__ volatile("cli");
-                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) __asm__ volatile("sti; hlt");
-                    else __asm__ volatile("sti");
+                    hal_interrupts_disable();
+                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) { hal_cpu_enable_interrupts_and_halt(); }
+                    else { hal_interrupts_enable(); }
                 }
                 terminal_write_string("\n");
                 if (c == '1') cmd_user("autologin on");
@@ -508,22 +584,53 @@ void cmd_panel(const char* args) {
                 if (c != KB_KEY_ESCAPE) wait_for_enter();
                 draw_panel_menu();
             } else if (opt == '6') {
-                if (!current_nic) {
-                    cmd_clear("");
-                    terminal_write_string("\n  -- Red y Conectividad --\n");
-                    terminal_write_string("  Error: Adaptador de red no activo o no detectado.\n");
-                    wait_for_enter();
-                    draw_panel_menu();
-                    continue;
-                }
                 cmd_clear("");
-                terminal_write_string("\n  -- Red y Conectividad --\n");
-                cmd_net("");
-                // cmd_net outputs ~4-5 lines, so options start roughly at y=7 or y=8
-                terminal_write_string("\n  1. Renovar DHCP\n");
-                terminal_write_string("  2. Probar conexion (wget tudexgames.com)\n");
-                terminal_write_string("\n  Elija [1-2] o ESC para volver.\n");
+                terminal_set_cursor(2, 1);
+                terminal_write_string("-- Red y Conectividad --");
+
+                uint8_t* net_get_mac(void);
+                uint8_t* mac = net_get_mac();
+                char buf[64];
+
+                terminal_set_cursor(2, 3);
+                if (!mac) {
+                    terminal_write_string("MAC Address: Error (not found)");
+                } else {
+                    snprintf(buf, sizeof(buf), "MAC Address: %02x:%02x:%02x:%02x:%02x:%02x",
+                        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+                    terminal_write_string(buf);
+                }
+
+                terminal_set_cursor(2, 5);
+                if (network_ready) {
+                    terminal_write_string("State: UP");
+
+                    terminal_set_cursor(2, 6);
+                    snprintf(buf, sizeof(buf), "IP Address: %d.%d.%d.%d",
+                        (my_ip >> 24) & 0xFF, (my_ip >> 16) & 0xFF, (my_ip >> 8) & 0xFF, my_ip & 0xFF);
+                    terminal_write_string(buf);
+
+                    terminal_set_cursor(2, 7);
+                    snprintf(buf, sizeof(buf), "Gateway: %d.%d.%d.%d",
+                        (gateway_ip >> 24) & 0xFF, (gateway_ip >> 16) & 0xFF, (gateway_ip >> 8) & 0xFF, gateway_ip & 0xFF);
+                    terminal_write_string(buf);
+
+                    terminal_set_cursor(2, 8);
+                    snprintf(buf, sizeof(buf), "DNS: %d.%d.%d.%d",
+                        (dns_ip >> 24) & 0xFF, (dns_ip >> 16) & 0xFF, (dns_ip >> 8) & 0xFF, dns_ip & 0xFF);
+                    terminal_write_string(buf);
+                } else {
+                    terminal_write_string("State: DOWN (Link or DHCP pending)");
+                }
+
+                terminal_set_cursor(2, 11);
+                terminal_write_string("1. Renovar DHCP");
+                terminal_set_cursor(2, 12);
+                terminal_write_string("2. Probar conexion (wget tudexgames.com)");
+                terminal_set_cursor(2, 14);
+                terminal_write_string("Elija [1-2] o ESC para volver.");
                 char c = 0;
+
                 while (1) {
                     terminal_set_cursor(panel_mouse_x, panel_mouse_y);
                     if (keyboard_has_input()) {
@@ -533,8 +640,8 @@ void cmd_panel(const char* args) {
                     if (panel_mouse_clicked) {
                         panel_mouse_clicked = false;
                         if (panel_mouse_x >= 2 && panel_mouse_x <= 50) {
-                            if (panel_mouse_y >= 9 && panel_mouse_y <= 10) { // rough estimate
-                                c = '1' + (panel_mouse_y - 9);
+                            if (panel_mouse_y >= 11 && panel_mouse_y <= 12) {
+                                c = '1' + (panel_mouse_y - 11);
                                 if (c > '2') c = '2';
                                 break;
                             } else {
@@ -546,11 +653,11 @@ void cmd_panel(const char* args) {
                             break;
                         }
                     }
-                    __asm__ volatile("cli");
-                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved) {
-                        __asm__ volatile("sti; hlt");
+                    hal_interrupts_disable();
+                    if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
+                        hal_cpu_enable_interrupts_and_halt();
                     } else {
-                        __asm__ volatile("sti");
+                        hal_interrupts_enable();
                     }
                 }
                 terminal_write_string("\n");
@@ -572,11 +679,11 @@ void cmd_panel(const char* args) {
             }
         }
 
-        __asm__ volatile("cli");
+        hal_interrupts_disable();
         if (!keyboard_has_input() && !panel_mouse_clicked && !panel_mouse_moved && panel_running) {
-            __asm__ volatile("sti; hlt");
+            hal_cpu_enable_interrupts_and_halt();
         } else {
-            __asm__ volatile("sti");
+            hal_interrupts_enable();
         }
     }
 

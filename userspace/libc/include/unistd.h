@@ -48,8 +48,8 @@ int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgrp(void);
 int tcgetpgrp(int fd);
 int tcsetpgrp(int fd, pid_t pgrp);
-int setuid(int uid);
-int setgid(int gid);
+int setuid(uid_t uid);
+int setgid(gid_t gid);
 int kill(int pid, int sig);
 int fork(void);
 int execve(const char *pathname, char *const argv[], char *const envp[]);
@@ -91,5 +91,7 @@ extern int optind;
 extern int opterr;
 extern int optopt;
 int getopt(int argc, char * const argv[], const char *optstring);
+
+int execveat(int dirfd, const char *pathname, char *const argv[], char *const envp[], int flags);
 
 #endif /* _UNISTD_H */

@@ -70,11 +70,26 @@ context_switch:
 ;   La tarea hija "despierta" aquí con RSP apuntando a los registros guardados.
 ; -----------------------------------------------------------------------------
 extern sched_lock
+extern handle_signal_if_needed
+extern hal_interrupts_enable
 
 global fork_return
 fork_return:
+    ; Align stack to 16 bytes for System V AMD64 ABI before calling C functions
+    mov r12, rsp
+    and rsp, ~0xF
+
     ; Release sched_lock held by the scheduler before returning to userspace
     mov dword [sched_lock], 0
+
+    call hal_interrupts_enable
+
+    ; `rsp` currently points exactly to the 15 pushed registers from `struct syscall_regs`
+    ; since sysret is used, we know it will return to user space.
+    mov rdi, r12 ; The original unaligned stack pointer contains the registers
+    call handle_signal_if_needed
+
+    mov rsp, r12 ; Restore original stack pointer to pop registers
 
     pop r15
     pop r14

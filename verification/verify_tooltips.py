@@ -55,7 +55,7 @@ def verify_tooltips():
 
         output_path = f"{os.path.dirname(__file__)}/verify_tooltip.png"
         print(f"Taking screenshot to {output_path}")
-        window_el.screenshot(path=output_path)
+        page.screenshot(path=output_path)
 
         browser.close()
 

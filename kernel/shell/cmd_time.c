@@ -69,8 +69,8 @@ void cmd_ntp(const char* args) {
         server = args;
     }
 
-    if (!current_nic || !network_ready) {
-        terminal_write_string("  [NTP] Error: Adaptador de red no activo o DHCP no asignado.\n");
+    if (!network_ready) {
+        terminal_write_string("  [NTP] Error: Red no lista o DHCP no asignado.\n");
         return;
     }
 
@@ -145,10 +145,10 @@ void cmd_ntp(const char* args) {
     time_t unix_time;
     if ((ntp_secs & 0x80000000) == 0) {
         // MSB is 0, NTP timestamp has rolled over to era 1 (starts in 2036)
-        unix_time = (time_t)ntp_secs + 0x100000000ull - NTP_TIMESTAMP_DELTA;
+        unix_time = (time_t)((uint64_t)ntp_secs + 0x100000000ull - NTP_TIMESTAMP_DELTA);
     } else {
         // Era 0
-        unix_time = (time_t)ntp_secs - NTP_TIMESTAMP_DELTA;
+        unix_time = (time_t)((uint64_t)ntp_secs - NTP_TIMESTAMP_DELTA);
     }
 
     rtc_time_t new_time;

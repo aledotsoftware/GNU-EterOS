@@ -33,10 +33,10 @@ void sem_wait(sem_t* sem) {
         task_block();
 
         spin_unlock(&sem->lock);
-        task_irq_restore(irq_flags);
 
         /* Yield CPU */
         schedule();
+        task_irq_restore(irq_flags);
 
         /* When we wake up, interrupts are enabled. Loop again to try acquire. */
     }

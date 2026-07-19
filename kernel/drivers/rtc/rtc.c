@@ -1,6 +1,6 @@
 /**
  * éterOS - RTC Driver (Real Time Clock)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  */
 
 #include "rtc.h"
@@ -13,42 +13,39 @@ static int8_t current_timezone = -3; // Default UTC-3 (Argentina)
 
 static int rtc_is_updating() {
 #ifndef __ETEROS_HOST_TEST__
-    uint64_t flags;
-    __asm__ volatile("pushfq; pop %0; cli" : "=r"(flags));
+    uint64_t flags = irq_save();
 #endif
     outb(CMOS_ADDRESS, 0x0A | 0x80); // Disable NMI
     int ret = (inb(CMOS_DATA) & 0x80);
     outb(CMOS_ADDRESS, 0x0A);        // Re-enable NMI
 #ifndef __ETEROS_HOST_TEST__
-    __asm__ volatile("push %0; popfq" :: "r"(flags));
+    irq_restore(flags);
 #endif
     return ret;
 }
 
 static unsigned char rtc_read_register(int reg) {
 #ifndef __ETEROS_HOST_TEST__
-    uint64_t flags;
-    __asm__ volatile("pushfq; pop %0; cli" : "=r"(flags));
+    uint64_t flags = irq_save();
 #endif
     outb(CMOS_ADDRESS, reg | 0x80); // Disable NMI
     unsigned char ret = inb(CMOS_DATA);
     outb(CMOS_ADDRESS, reg);        // Re-enable NMI
 #ifndef __ETEROS_HOST_TEST__
-    __asm__ volatile("push %0; popfq" :: "r"(flags));
+    irq_restore(flags);
 #endif
     return ret;
 }
 
 static void rtc_write_register(int reg, unsigned char val) {
 #ifndef __ETEROS_HOST_TEST__
-    uint64_t flags;
-    __asm__ volatile("pushfq; pop %0; cli" : "=r"(flags));
+    uint64_t flags = irq_save();
 #endif
     outb(CMOS_ADDRESS, reg | 0x80); // Disable NMI
     outb(CMOS_DATA, val);
     outb(CMOS_ADDRESS, reg);        // Re-enable NMI
 #ifndef __ETEROS_HOST_TEST__
-    __asm__ volatile("push %0; popfq" :: "r"(flags));
+    irq_restore(flags);
 #endif
 }
 
@@ -213,10 +210,6 @@ static uint8_t get_days_in_month(uint8_t month, uint16_t year) {
         return days[month];
     }
     return 30; // Fallback
-}
-
-void rtc_to_argentina(const rtc_time_t* utc, rtc_time_t* local) {
-    rtc_get_local_time(utc, local);
 }
 
 void rtc_get_local_time(const rtc_time_t* utc, rtc_time_t* local) {

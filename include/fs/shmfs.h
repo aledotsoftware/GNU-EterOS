@@ -11,6 +11,8 @@ typedef struct shm_object {
     uint32_t page_count;      /* Number of allocated physical pages */
     uint64_t* pages;          /* Array of physical page addresses */
     uint32_t ref_count;       /* Number of open file descriptors to this object */
+    uint32_t prot_mask;
+    int is_pinned;
     spinlock_t lock;
     struct shm_object* next;
 } shm_object_t;

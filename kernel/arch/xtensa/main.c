@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - Kernel Main (Xtensa)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  *
  * Punto de entrada del kernel para la arquitectura Xtensa (ESP32).
@@ -41,7 +41,7 @@ void kmain(void) {
     hal_console_clear();
     hal_console_write("\n");
     hal_console_write("  eterOS (Xtensa Edition)\n");
-    hal_console_write("  (c) 2026 Tudex Networks\n");
+    hal_console_write("  (c) 2025 Tudex Networks\n");
     hal_console_write("  -----------------------\n");
 
     /* 4. Habilitar interrupciones */

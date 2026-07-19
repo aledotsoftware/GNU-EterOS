@@ -1,6 +1,6 @@
 /**
  * éterOS - NVRAM / CMOS Driver
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  */
 
 #include "nvram.h"

@@ -35,6 +35,7 @@ static int jfs_create(fs_node_t *parent, char *name, uint16_t permission);
 static int jfs_mkdir(fs_node_t *parent, char *name, uint16_t permission);
 static int jfs_link(fs_node_t *parent, fs_node_t *target, char *name);
 static int jfs_unlink(fs_node_t *parent, char *name);
+static int jfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name);
 
 static void jfs_set_inode_metadata(uint32_t inode_idx, uint16_t mode, uint32_t uid, uint32_t gid) {
     if (inode_idx >= JFS_MAX_INODES) return;
@@ -202,6 +203,7 @@ static fs_node_t* jfs_make_node(uint32_t inode_idx, const char *name) {
         fnode->mkdir = jfs_mkdir;
         fnode->link = jfs_link;
         fnode->unlink = jfs_unlink;
+        fnode->rename = jfs_rename;
     } else {
         fnode->read = jfs_read;
         fnode->write = jfs_write;
@@ -468,6 +470,43 @@ static int jfs_link(fs_node_t *parent, fs_node_t *target, char *name) {
     return ret;
 }
 
+
+
+
+static int jfs_rename(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) {
+    if (!old_parent || !new_parent || !old_name || !new_name || !*old_name || !*new_name) return -EINVAL;
+    if (!jfs_is_directory(old_parent->inode) || !jfs_is_directory(new_parent->inode)) return -ENOTDIR;
+
+    jfs_dirent_t found;
+    if (jfs_find_entry(old_parent->inode, old_name, &found, NULL, NULL) != 0) return -ENOENT;
+
+    uint32_t target_inode = found.inode;
+
+    uint32_t existing_inode = 0;
+    if (jfs_remove_entry(new_parent->inode, new_name, &existing_inode) == 0) {
+        jfs_inode_t *inode = get_inode(existing_inode);
+        if (inode) {
+            if (inode->nlink > 0) inode->nlink--;
+            if (inode->nlink == 0) {
+                for(int i=0; i<12; i++) {
+                    if (inode->blocks[i]) inode->blocks[i] = 0;
+                }
+                inode->flags = 0;
+                inode->size = 0;
+            }
+            put_inode(inode, existing_inode);
+            kfree(inode);
+        }
+    }
+
+    int ret = jfs_add_entry(new_parent->inode, new_name, target_inode);
+    if (ret != 0) return ret;
+
+    uint32_t dummy = 0;
+    jfs_remove_entry(old_parent->inode, old_name, &dummy);
+
+    return 0;
+}
 static int jfs_unlink(fs_node_t *parent, char *name) {
     if (!parent || !name || !*name) return -EINVAL;
     if (!jfs_is_directory(parent->inode)) return -ENOTDIR;
@@ -561,6 +600,7 @@ fs_node_t* jfs_init(void) {
     fs->mkdir = jfs_mkdir;
     fs->link = jfs_link;
     fs->unlink = jfs_unlink;
+    fs->rename = jfs_rename;
 
     hal_console_write("[JFS] Initialized with disk backend. Journaling Enabled.\n");
     return fs;

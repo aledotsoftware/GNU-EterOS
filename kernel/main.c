@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - Kernel Main
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  * 
  * Punto de entrada principal del kernel de éterOS.
@@ -64,22 +64,22 @@ extern uint32_t my_ip;
 static bool desktop_autostart = false;
 
 static void network_task(void) {
-    /* Ejecutar DHCP Discover ahora que las interrupciones y el scheduler están activos */
-    // dhcp_discover();
-
     /* Process any pending packets before entering loop */
     net_poll();
 
     while(1) {
-        net_poll();
+        sem_wait(&net_sem);
+
+        /* Drain queue */
+        for(int i = 0; i < 5; i++) {
+            net_poll();
+        }
 
         /* Update status */
         if (!network_ready && my_ip != 0) {
             network_ready = 1;
             hal_console_write("  [NET]  DHCP Bound! IP assigned.\n");
         }
-
-        task_yield();
     }
 }
 
@@ -331,7 +331,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
     /* ---- Log de depuración ---- */
     klog(KLOG_INFO, "Kernel loaded.\n");
-    klog(KLOG_INFO, "(c) 2026 Tudex Networks\n");
+    klog(KLOG_INFO, "(c) 2025 Tudex Networks\n");
 
     /* ---- 6. Información del sistema ---- */
     kernel_print_sysinfo();
@@ -385,7 +385,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
         terminal_set_silent(true);
         serial_write_string("[ETER] Desktop autostart detected. Kernel framebuffer terminal disabled.\n");
         while(1) {
-            hal_cpu_halt();
+            hal_cpu_enable_interrupts_and_halt();
             task_yield();
         }
     }
@@ -404,7 +404,7 @@ void __attribute__((section(".text.boot"))) kmain(void) {
 
     /* Main kernel task becomes Idle loop (reached if shell exits) */
     while(1) {
-        hal_cpu_halt();
+        hal_cpu_enable_interrupts_and_halt();
         task_yield();
     }
 }
@@ -436,7 +436,7 @@ static void kernel_print_banner(void) {
             ETEROS_VERSION_MAJOR, ETEROS_VERSION_MINOR, ETEROS_VERSION_PATCH, ETEROS_CODENAME);
 
     /* Copyright */
-    hal_console_write("       \033[38;2;120;120;120m(c) 2026 Tudex Networks \033[38;2;80;80;80m| Premium Edition\033[0m\n");
+    hal_console_write("       \033[38;2;120;120;120m(c) 2025 Tudex Networks \033[38;2;80;80;80m| Premium Edition\033[0m\n");
     
     hal_console_write("\033[38;2;0;200;255m  ====================================================================\033[0m\n");
     hal_console_write("\n");
@@ -517,6 +517,6 @@ static void show_splash(void) {
     /* Wait ~2 seconds (busy wait on timer ticks to keep scheduler running) */
     uint64_t end_ticks = timer_get_ticks() + (2 * TIMER_HZ);
     while (timer_get_ticks() < end_ticks) {
-        __asm__ volatile("hlt");
+        hal_cpu_enable_interrupts_and_halt();
     }
 }

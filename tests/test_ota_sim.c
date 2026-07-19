@@ -58,13 +58,36 @@ typedef struct {
     uint8_t impl;
 } fs_node_t;
 
+static int cached_boot_part = -1;
+
+void simulate_reboot() {
+    cached_boot_part = -1;
+}
+
 fs_node_t* partition_get_active_root() {
+    if (cached_boot_part != -1) {
+        fs_node_t *node = malloc(sizeof(fs_node_t));
+        node->impl = cached_boot_part;
+        return node;
+    }
+
     fs_node_t *node = malloc(sizeof(fs_node_t));
     uint8_t nvram_part = nvram_get_boot_partition();
+    uint8_t update_state = nvram_get_update_state();
+
     if (nvram_part != 0xFF) {
         node->impl = nvram_part;
     } else {
         node->impl = 0; // Default active
+    }
+
+    if (node->impl == 0 || node->impl == 1) {
+        cached_boot_part = node->impl;
+    }
+
+    if (node->impl != 0 && node->impl != 1) {
+        free(node);
+        return NULL;
     }
     return node;
 }
@@ -72,11 +95,22 @@ fs_node_t* partition_get_active_root() {
 void simulate_rollback() {
     if (nvram_get_update_state() == UPDATE_STATE_PENDING) {
         fs_node_t *active = partition_get_active_root();
-        uint8_t current = active->impl;
-        uint8_t next = (current == 0) ? 1 : 0;
-        nvram_set_boot_partition(next);
-        nvram_set_update_state(UPDATE_STATE_FAILED);
-        free(active);
+        if (active) {
+            uint8_t current_booted = active->impl;
+            uint8_t nvram_target = nvram_get_boot_partition();
+
+            if (current_booted == nvram_target) {
+                // Post-reboot rollback
+                uint8_t rollback_part = (current_booted == 0) ? 1 : 0;
+                nvram_set_boot_partition(rollback_part);
+                nvram_set_update_state(UPDATE_STATE_FAILED);
+            } else {
+                // Pre-reboot rollback
+                nvram_set_boot_partition(current_booted);
+                nvram_set_update_state(UPDATE_STATE_FAILED);
+            }
+            free(active);
+        }
     }
 }
 
@@ -103,10 +137,19 @@ int main() {
     assert(nvram_get_boot_partition() == 0);
     assert(nvram_get_update_state() == UPDATE_STATE_PENDING);
 
-    // Test 5: Rollback
+    // Test 5: Pre-reboot Rollback
     simulate_rollback();
-    assert(nvram_get_boot_partition() == 1);
+    assert(nvram_get_boot_partition() == 1); // Because it reverts to active boot (1)
     assert(nvram_get_update_state() == UPDATE_STATE_FAILED);
+
+    // Test 5b: Post-reboot Rollback
+    simulate_update();
+    assert(nvram_get_boot_partition() == 0); // target is 0
+    simulate_reboot(); // Reboots into slot 0
+    simulate_rollback();
+    assert(nvram_get_boot_partition() == 1); // Reverts back to 1
+    assert(nvram_get_update_state() == UPDATE_STATE_FAILED);
+    simulate_reboot(); // Return to steady state 1
 
     // Test 6: Try to apply update while pending (should fail)
     nvram_set_update_state(UPDATE_STATE_PENDING);
@@ -130,9 +173,10 @@ int main() {
 
     // Rollback with uninitialized boot partition
     nvram_set_update_state(UPDATE_STATE_PENDING);
+    simulate_reboot(); // clear cache
     simulate_rollback();
-    // Default active root impl is 0, so next should be 1
-    assert(nvram_get_boot_partition() == 1);
+    // Default active root impl is 0, so rollback should revert to 0
+    assert(nvram_get_boot_partition() == 0);
     assert(nvram_get_update_state() == UPDATE_STATE_FAILED);
 
     printf("All OTA state machine tests passed!\n");

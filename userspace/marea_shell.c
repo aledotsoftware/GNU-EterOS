@@ -1,6 +1,6 @@
 /**
  * eterOS — Marea Shell (Wayland-inspired Desktop Environment)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Proceso userspace que actúa como compositor y window manager.
  * Se conecta al framebuffer via /dev/fb0 mmap y lee input de
@@ -241,6 +241,21 @@ static void redraw_all(void);
 /* ========================================================================= */
 /* Menu State                                                                */
 /* ========================================================================= */
+
+
+static void bring_to_front(int idx) {
+    if (idx < 0 || idx >= window_count) return;
+    if (idx == window_count - 1) {
+        focused_window = idx;
+        return;
+    }
+    marea_window_t temp = windows[idx];
+    for (int i = idx; i < window_count - 1; i++) {
+        windows[i] = windows[i + 1];
+    }
+    windows[window_count - 1] = temp;
+    focused_window = window_count - 1;
+}
 
 static int menu_open = 0;
 static int menu_x, menu_y;
@@ -723,10 +738,13 @@ static void draw_window_chrome(marea_window_t* win) {
     int btn_base_x = x + w - 14;
     int btn_base_y = y + TITLEBAR_HEIGHT / 2;
 
-    /* Check hover states */
-    int hover_close = hit_close_button(win, mouse_x, mouse_y);
-    int hover_min = hit_minimize_button(win, mouse_x, mouse_y);
-    int hover_max = hit_maximize_button(win, mouse_x, mouse_y);
+    /* Check hover states only if this window is currently topmost at mouse pos */
+    int hover_close = 0, hover_min = 0, hover_max = 0;
+    if (find_window_at(mouse_x, mouse_y) == (win - windows)) {
+        hover_close = hit_close_button(win, mouse_x, mouse_y);
+        hover_max = hit_maximize_button(win, mouse_x, mouse_y);
+        hover_min = hit_minimize_button(win, mouse_x, mouse_y);
+    }
 
     /* Close (red) - Rightmost */
     for (int dy = -btn_r; dy <= btn_r; dy++) {
@@ -995,7 +1013,7 @@ static void term_execute(marea_window_t* win) {
 
         if (strcmp(argv[0], "help") == 0) {
             term_print(win, "\n", COL_TERM_FG);
-            term_print(win, "Marea Shell Terminal v0.2.0 Genesis SMP\n", COL_ACCENT);
+            term_print(win, "eterOS Marea UI v0.2.0 Genesis SMP\n", COL_ACCENT);
             term_print(win, "Comandos internos: help, clear, echo, uname, cd, pwd, exit\n", COL_TERM_FG);
             term_print(win, "Comandos externos: se resuelven en /gnu/bin, /bin y /\n", COL_TERM_FG);
         } else if (strcmp(argv[0], "clear") == 0) {
@@ -1005,7 +1023,7 @@ static void term_execute(marea_window_t* win) {
             return;
         } else if (strcmp(argv[0], "uname") == 0) {
             term_print(win, "\n", COL_TERM_FG);
-            term_print(win, "eterOS Marea Shell v0.2.0 Genesis SMP\n", COL_ACCENT);
+            term_print(win, "eterOS Marea UI v0.2.0 Genesis SMP\n", COL_ACCENT);
             term_print(win, "Compositor: Wayland-like (SHM)\n", COL_TERM_FG);
             term_print(win, "Arch: x86_64 Long Mode\n", COL_TERM_FG);
         } else if (strcmp(argv[0], "echo") == 0) {
@@ -1321,6 +1339,18 @@ static void cursor_draw(int cx, int cy) {
     }
 }
 
+
+static int get_hovered_button(int mx, int my) {
+    int win_idx = find_window_at(mx, my);
+    if (win_idx >= 0) {
+        marea_window_t* win = &windows[win_idx];
+        if (hit_close_button(win, mx, my)) return 1;
+        if (hit_minimize_button(win, mx, my)) return 2;
+        if (hit_maximize_button(win, mx, my)) return 3;
+    }
+    return 0;
+}
+
 static void handle_mouse_event(const input_event_t* ev) {
     if (ev->type == EV_REL) {
         int delta = ev->value * MOUSE_SENSITIVITY;
@@ -1338,6 +1368,9 @@ static void handle_mouse_event(const input_event_t* ev) {
         if (mouse_x >= (int)fb_info.width - CURSOR_W) mouse_x = fb_info.width - CURSOR_W;
         if (mouse_y >= (int)fb_info.height - CURSOR_H) mouse_y = fb_info.height - CURSOR_H;
 
+        int old_hover = get_hovered_button(old_x, old_y);
+        int new_hover = get_hovered_button(mouse_x, mouse_y);
+
         if (dragging && drag_win >= 0) {
             windows[drag_win].x = mouse_x - drag_offset_x;
             windows[drag_win].y = mouse_y - drag_offset_y;
@@ -1347,6 +1380,8 @@ static void handle_mouse_event(const input_event_t* ev) {
                 windows[drag_win].y = fb_info.height - TASKBAR_HEIGHT - windows[drag_win].h;
             }
 
+            redraw_all();
+        } else if (old_hover != new_hover) {
             redraw_all();
         }
 
@@ -1392,7 +1427,8 @@ static void handle_mouse_event(const input_event_t* ev) {
                 if (windows[tb_idx].minimized) {
                     windows[tb_idx].minimized = 0;
                     if (focused_window >= 0) windows[focused_window].focused = 0;
-                    focused_window = tb_idx;
+                    bring_to_front(tb_idx);
+                    tb_idx = window_count - 1;
                     windows[tb_idx].focused = 1;
                 } else if (focused_window == tb_idx) {
                     windows[tb_idx].minimized = 1;
@@ -1400,7 +1436,8 @@ static void handle_mouse_event(const input_event_t* ev) {
                     focused_window = -1;
                 } else {
                     if (focused_window >= 0) windows[focused_window].focused = 0;
-                    focused_window = tb_idx;
+                    bring_to_front(tb_idx);
+                    tb_idx = window_count - 1;
                     windows[tb_idx].focused = 1;
                 }
                 menu_open = 0;
@@ -1426,7 +1463,9 @@ static void handle_mouse_event(const input_event_t* ev) {
                 if (focused_window != win_idx) {
                     if (focused_window >= 0) windows[focused_window].focused = 0;
                     win->focused = 1;
-                    focused_window = win_idx;
+                    bring_to_front(win_idx);
+                    win_idx = window_count - 1;
+                    win = &windows[win_idx];
                     redraw_all();
                     cursor_save_bg(mouse_x, mouse_y);
                     cursor_draw(mouse_x, mouse_y);
@@ -1489,7 +1528,7 @@ static void handle_mouse_event(const input_event_t* ev) {
 
                 if (hit_titlebar(win, mouse_x, mouse_y)) {
                     dragging = 1;
-                    drag_win = win_idx;
+                    drag_win = window_count - 1; /* because it was just brought to front */
                     drag_offset_x = mouse_x - win->x;
                     drag_offset_y = mouse_y - win->y;
                 }
@@ -1641,6 +1680,35 @@ static int hit_menu_item(int mx, int my) {
 /* Full Screen Redraw                                                        */
 /* ========================================================================= */
 
+static void draw_tooltips(void) {
+    int win_idx = find_window_at(mouse_x, mouse_y);
+    if (win_idx < 0) return;
+
+    marea_window_t* win = &windows[win_idx];
+    int btn_r = 6;
+    int btn_spacing = 20;
+    int btn_base_x = win->x + win->w - 14;
+    int btn_base_y = win->y + TITLEBAR_HEIGHT / 2;
+
+    int hover_close = hit_close_button(win, mouse_x, mouse_y);
+    int hover_max = hit_maximize_button(win, mouse_x, mouse_y);
+    int hover_min = hit_minimize_button(win, mouse_x, mouse_y);
+
+    if (hover_close) {
+        fill_rounded_rect(btn_base_x - 24, btn_base_y - btn_r - 28, 64, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - 24, btn_base_y - btn_r - 28, 64, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - 18, btn_base_y - btn_r - 26, "Cerrar", COL_TEXT_PRIMARY, 0);
+    } else if (hover_max) {
+        fill_rounded_rect(btn_base_x - btn_spacing - 32, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - btn_spacing - 32, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - btn_spacing - 26, btn_base_y - btn_r - 26, "Maximizar", COL_TEXT_PRIMARY, 0);
+    } else if (hover_min) {
+        fill_rounded_rect(btn_base_x - btn_spacing * 2 - 32, btn_base_y - btn_r - 28, 88, 20, 6, 0xE60F172A);
+        stroke_rect(btn_base_x - btn_spacing * 2 - 32, btn_base_y - btn_r - 28, 88, 20, 0x1AFFFFFF);
+        draw_text(btn_base_x - btn_spacing * 2 - 26, btn_base_y - btn_r - 26, "Minimizar", COL_TEXT_PRIMARY, 0);
+    }
+}
+
 static void redraw_all(void) {
     draw_desktop_gradient();
 
@@ -1655,7 +1723,7 @@ static void redraw_all(void) {
                       windows[i].w - 2, windows[i].h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
             windows[i].term_cx = 0;
             windows[i].term_cy = 0;
-            term_print(&windows[i], "eterOS Marea Shell v0.2.0 Genesis SMP\n", COL_ACCENT);
+            term_print(&windows[i], "eterOS Marea UI v0.2.0 Genesis SMP\n", COL_ACCENT);
             term_print(&windows[i], "Compositor: Wayland-like (SHM zero-copy)\n", COL_TEXT_SECONDARY);
             term_print(&windows[i], "Escribe 'help' para lista de comandos.\n\n", COL_TEXT_SECONDARY);
             term_draw_prompt(&windows[i]);
@@ -1664,6 +1732,7 @@ static void redraw_all(void) {
 
     draw_taskbar();
     draw_menu();
+    draw_tooltips();
     mark_dirty_rect(0, 0, (int)fb_info.width, (int)fb_info.height);
 }
 
@@ -1721,7 +1790,7 @@ int main(int argc, char* argv[]) {
         draw_window_chrome(win);
         fill_rect(win->x + 1, win->y + TITLEBAR_HEIGHT + 1,
                   win->w - 2, win->h - TITLEBAR_HEIGHT - 2, COL_TERM_BG);
-        term_print(win, "eterOS Marea Shell v0.2.0 Genesis SMP\n", COL_ACCENT);
+        term_print(win, "eterOS Marea UI v0.2.0 Genesis SMP\n", COL_ACCENT);
         term_print(win, "Compositor: Wayland-like (SHM zero-copy)\n", COL_TEXT_SECONDARY);
         term_print(win, "Escribe 'help' para lista de comandos.\n\n", COL_TEXT_SECONDARY);
         term_draw_prompt(win);

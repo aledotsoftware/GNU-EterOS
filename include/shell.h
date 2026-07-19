@@ -1,6 +1,6 @@
 /**
  * éterOS - Shell Interactivo
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Terminal de comandos integrada en el kernel.
  * Provee una interfaz básica de línea de comandos.

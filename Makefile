@@ -167,6 +167,7 @@ KERNEL_SRCS = $(KERNEL_DIR)/main.c              \
               $(KERNEL_DIR)/crypto/sha256.c        \
               $(KERNEL_DIR)/crypto/sha512.c        \
               $(KERNEL_DIR)/crypto/ed25519.c       \
+              $(KERNEL_DIR)/crypto/tweetnacl.c     \
               $(KERNEL_DIR)/task.c                 \
               $(KERNEL_DIR)/drivers/video/framebuffer.c \
               $(KERNEL_DIR)/drivers/video/font.c   \
@@ -245,7 +246,7 @@ LDFLAGS_UEFI = -nostdlib -shared -Bsymbolic -T $(UEFI_DIR)/linker.ld
 # Targets
 # =============================================================================
 
-.PHONY: all boot kernel image uefi run run-nographic debug clean dirs info userspace
+.PHONY: all boot kernel image uefi run run-nographic debug clean dirs info userspace test test-integration test-web test-verification test-all
 
 # NOTA WINDOWS:
 # Si estás en Windows, tienes dos opciones:
@@ -469,3 +470,26 @@ endif
 	@echo "Kernel BIN:   $(KERNEL_BIN)"
 	@echo "Disk image:   $(OS_IMAGE)"
 	@echo ""
+# ---- Tests ----
+test:
+	@echo "[TEST] Ejecutando tests..."
+	@bash tests/run_tests.sh
+
+# ---- Integrations Tests ----
+test-integration: all
+	@echo "[TEST] Ejecutando integration tests..."
+	@bash tests/run_integration.sh
+
+# ---- Web UI Tests ----
+test-web:
+	@echo "[TEST] Ejecutando Web UI tests..."
+	@cd web_ui && npm ci && npm test
+
+# ---- UI Verification Scripts ----
+test-verification:
+	@echo "[TEST] Ejecutando UI Verification Scripts..."
+	@if [ ! -d "venv" ]; then python3 -m venv venv && . venv/bin/activate && pip install playwright pytest && playwright install; fi
+	@. venv/bin/activate && set -e; for test in verification/verify_*.py; do echo "Running $$test"; if ! python3 "$$test"; then exit 1; fi; done
+
+test-all: test test-integration test-web test-verification
+	@echo "All tests passed successfully!"

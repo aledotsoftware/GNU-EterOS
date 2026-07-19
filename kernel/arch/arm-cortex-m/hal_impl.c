@@ -1,6 +1,6 @@
 /**
  * éterOS — ARM Cortex-M HAL Implementation
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Target: STM32F103 (Cortex-M3)
  * Reference: CMSIS & STM32F10x Reference Manual
@@ -106,6 +106,11 @@ void hal_irq_install(uint8_t vector, irq_handler_t handler) {
 
 void hal_cpu_halt(void) {
     __asm__ volatile ("wfi");
+}
+
+void hal_cpu_enable_interrupts_and_halt(void) {
+    hal_interrupts_enable();
+    hal_cpu_halt();
 }
 
 void hal_cpu_reset(void) {

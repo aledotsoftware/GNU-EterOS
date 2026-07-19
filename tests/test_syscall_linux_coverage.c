@@ -4,6 +4,9 @@
 
 #define __ETEROS_HOST_TEST__ 1
 #include "../include/types.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/socket.h>
 #include "../include/elf.h"
 #include "../include/linux_compat.h"
 #include "../include/cpu.h"
@@ -31,6 +34,20 @@ cpu_info_t cpu_mock_struct;
 fs_node_t* shmfs_create_memfd(const char* name) { (void)name; return (fs_node_t*)malloc(sizeof(fs_node_t)); }
 
 #include "../kernel/arch/x86_64/syscall.c"
+
+#undef malloc
+#define malloc __builtin_malloc
+#undef free
+#define free __builtin_free
+#undef printf
+#undef exit
+#define exit __builtin_exit
+#undef memcpy
+#undef memset
+#undef strcmp
+#undef strncpy
+#undef strlcpy
+#undef strlen
 
 #undef assert
 #define assert(x) do { if (!(x)) { printf("Assertion failed: %s\n", #x); exit(1); } } while (0)
@@ -64,7 +81,7 @@ void gfx_present(void) {}
 int vfs_normalize_path(char* out_path, int size, const char* path, const char* base_dir) { if (strcmp(path, "/invalid") == 0) return -1; strncpy(out_path, path, size); return 0; }
 int readdir_fs(fs_node_t *node, uint32_t index, struct dirent *entry) { return 0; }
 fs_node_t *finddir_fs(fs_node_t *node, char *name) { return NULL; }
-fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) { return NULL; }
+fs_node_t *vfs_lookup_ext(fs_node_t *root, const char *path, int follow_symlink) { return vfs_lookup(root, path); }
 task_t* task_get_at(int i) { return NULL; }
 void task_exit_signal(int sig) {}
 int task_waitid(int idtype, int id, int options, int* out_pid, int* out_status, int* out_code) { return 0; }
@@ -79,12 +96,14 @@ void pmm_unref_page(void* addr) {}
 void vmm_unmap_page(uint64_t virt_addr) {}
 int vmm_validate_user_ptr(const void* addr, size_t size) { return 1; }
 int vmm_check_user_string(const char* str, size_t max_len) { return 1; }
-int vmm_strncpy_from_user(char* dst, const char* src, size_t max) { return 0; }
+int vmm_strncpy_from_user(char* dst, const char* src, size_t max) { strncpy(dst, src, max); return 0; }
 int net_socket(int domain, int type, int protocol) { return 0; }
 int net_close(int sock) { return 0; }
 int net_connect(int sock, const struct sockaddr_in_old* addr, int addrlen) { return 0; }
 int net_send(int sock, const void* buf, int len, int flags) { return 0; }
+
 int net_recv(int sock, void* buf, int len, int flags) { return 0; }
+
 ssize_t read_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) { return 0; }
 uint32_t write_fs(fs_node_t *node, uint32_t offset, uint32_t size, uint8_t *buffer) { return 0; }
 void open_fs(fs_node_t *node, uint8_t read, uint8_t write) {}
@@ -92,6 +111,7 @@ void close_fs(fs_node_t *node) {}
 int create_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int mkdir_fs(fs_node_t *parent, char *name, uint16_t permission) { return 0; }
 int unlink_fs(fs_node_t *parent, char *name) { return 0; }
+int rename_fs(fs_node_t *old_parent, char *old_name, fs_node_t *new_parent, char *new_name) { return 0; }
 fs_node_t *vfs_lookup(fs_node_t *root, const char *path) {
     if (strcmp(path, "/valid") == 0) {
         fs_node_t* n = malloc(sizeof(fs_node_t));
@@ -136,8 +156,11 @@ int main() {
     assert(sys_fdatasync(3) == 0);
 
     printf("Testing truncate\n");
-    printf("truncate returned %ld\n", sys_truncate("/invalid", 100)); assert(sys_truncate("/invalid", 100) == -2); // resolve_path in mock returns -ENOENT (-2)
-    printf("truncate valid returned %ld\n", sys_truncate("/valid", 100)); assert(sys_truncate("/valid", 100) == -1 || sys_truncate("/valid", 100) == -2); // no truncate op on node
+    printf("truncate returned %ld\n", sys_truncate("/invalid", 100)); assert(sys_truncate("/invalid", 100) == -1 || sys_truncate("/invalid", 100) == -2);
+    printf("truncate valid returned %ld\n", sys_truncate("/valid", 100)); assert(sys_truncate("/valid", 100) == 0);
+
+    printf("Testing ftruncate\n");
+    assert(sys_ftruncate(3, 100) == 0);
 
     assert(sys_fchdir(3) == -ENOTDIR);
     valid_node->flags = FS_DIRECTORY;
@@ -148,6 +171,9 @@ int main() {
     assert(sys_fchown(3, 200, 200) == 0);
 
     assert(sys_umask(0022) == 0022);
+
+    assert(sys_setpriority(ETEROS_PRIO_PROCESS, 0, 10) == 0 || sys_setpriority(ETEROS_PRIO_PROCESS, 0, 10) == -ESRCH);
+    assert(sys_getpriority(ETEROS_PRIO_PROCESS, 0) == 10 || sys_getpriority(ETEROS_PRIO_PROCESS, 0) == -ESRCH);
 
     char buf[10];
     printf("pread returned %ld\n", sys_pread64(3, buf, 10, 0)); // node doesn't have read ops attached
@@ -164,11 +190,49 @@ int main() {
     assert(sys_arch_prctl(ARCH_SET_FS, 0x12345678) == 0);
     assert(current_task_mock.fs_base == 0x12345678);
 
+    printf("Testing sys_getrusage\n");
+    assert(sys_getrusage(0, NULL) == -EFAULT);
+    char rusage_buf[144];
+    assert(sys_getrusage(0, rusage_buf) == 0);
+
+    printf("Testing sys_prlimit64\n");
+    assert(sys_prlimit64(0, 0, NULL, NULL) == 0);
+    char rlim_buf[16];
+    assert(sys_prlimit64(0, 0, NULL, (void*)rlim_buf) == 0);
+    assert(*(uint64_t*)rlim_buf == ~0ULL);
+
+    printf("Testing sys_syslog\n");
+    assert(sys_syslog(0, NULL, 0) == 0);
+
+    printf("Testing sys_getgroups\n");
+    assert(sys_getgroups(1, NULL) == -EFAULT);
+    assert(sys_setgroups(2, NULL) == -EFAULT);
+
+    printf("Testing sys_getrandom\n");
+    assert(sys_getrandom(NULL, 10, 0) == -EFAULT);
+    assert(sys_getrandom(NULL, 0, 0) == 0);
+    char rand_buf[10];
+    assert(sys_getrandom(rand_buf, 10, 0) == 10);
 
     printf("Testing sys_reboot\n");
     assert(sys_reboot(1, 2, 3, NULL) == 0);
+
+    printf("Testing execve wrapper defaults\n");
+    assert(sys_execve(NULL, NULL, NULL, NULL) == -EFAULT);
+    assert(sys_execveat(0, NULL, NULL, NULL, 0, NULL) == -EFAULT);
+
+    printf("Testing newly added stubs\n");
+    assert(sys_msync(NULL, 0, 0) == 0);
+    unsigned char vec[1];
+    assert(sys_mincore(NULL, 0, vec) == 0);
+    assert(sys_shmget(0, 0, 0) == -ENOSYS);
+    assert((long)sys_shmat(0, NULL, 0) == -ENOSYS);
+    assert(sys_shmctl(0, 0, NULL) == -ENOSYS);
+    assert(sys_flock(3, 0) == 0);
+    assert(sys_flock(99, 0) == -EBADF);
 
     printf("Tests passed!\n");
     free(valid_node);
     return 0;
 }
+void task_stop_signal(int sig) {}

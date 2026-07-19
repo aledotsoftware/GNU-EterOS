@@ -1,6 +1,6 @@
 /**
  * éterOS — RISC-V 64-bit HAL
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Implementación de la HAL para RISC-V 64-bit (S-mode).
  * Target: QEMU virt (SiFive U/HiFive compatible layout).
@@ -235,6 +235,11 @@ void hal_init(void) {
 
 void hal_cpu_halt(void) {
     __asm__ volatile ("wfi");
+}
+
+void hal_cpu_enable_interrupts_and_halt(void) {
+    hal_interrupts_enable();
+    hal_cpu_halt();
 }
 
 void hal_cpu_reset(void) {

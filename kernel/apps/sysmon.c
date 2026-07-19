@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - EterMon v1.0 (System Monitor)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  *
  * Monitor del sistema en tiempo real para éterOS.

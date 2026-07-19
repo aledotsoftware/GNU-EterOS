@@ -1,7 +1,7 @@
 /**
  * =============================================================================
  * éterOS - Hardware Abstraction Layer (HAL)
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  * =============================================================================
  *
  * La HAL es la capa que hace a éterOS universal.
@@ -148,6 +148,11 @@ void hal_irq_install(uint8_t vector, irq_handler_t handler);
  * x86: HLT | ARM: WFI | RISC-V: WFI
  */
 void hal_cpu_halt(void);
+
+/**
+ * Habilita interrupciones y detiene la CPU de forma atómica.
+ */
+void hal_cpu_enable_interrupts_and_halt(void);
 
 /**
  * Reinicia el sistema.

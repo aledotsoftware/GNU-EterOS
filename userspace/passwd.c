@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <termios.h>
+#include <fcntl.h>
 #include "sha256.h"
 
 #define MAX_LINE 256
@@ -21,21 +23,50 @@ static int read_line(int fd, char *buf, int max_len) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        printf("Usage: %s <username> <new_password>\n", argv[0]);
+    if (argc != 2) {
+        printf("Usage: %s <username>\n", argv[0]);
+        return 1;
+    }
+
+    if (getuid() != 0) {
+        printf("Error: Only root can change passwords.\n");
         return 1;
     }
 
     const char* username = argv[1];
-    const char* password = argv[2];
 
-    /* Calculate SHA256 */
-    uint8_t hash[SHA256_BLOCK_SIZE];
-    sha256((const uint8_t*)password, strlen(password), hash);
+    struct termios term, term_orig;
+    tcgetattr(0, &term_orig);
+    term = term_orig;
+    term.c_lflag &= ~ECHO;
+    tcsetattr(0, TCSANOW, &term);
+
+    printf("New password: ");
+    fflush(stdout);
+    char password[32];
+    int len = read(0, password, sizeof(password) - 1);
+
+    tcsetattr(0, TCSANOW, &term_orig);
+    printf("\n");
+
+    if (len < 0) return 1;
+    if (len > 0) {
+        password[len] = '\0';
+        if (password[len-1] == '\n') password[len-1] = '\0';
+    } else {
+        password[0] = '\0';
+    }
 
     char hash_str[SHA256_BLOCK_SIZE * 2 + 1];
-    for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
-        snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
+    if (strlen(password) > 0) {
+        /* Calculate SHA256 */
+        uint8_t hash[SHA256_BLOCK_SIZE];
+        sha256((const uint8_t*)password, strlen(password), hash);
+        for (int i = 0; i < SHA256_BLOCK_SIZE; i++) {
+            snprintf(&hash_str[i*2], sizeof(hash_str) - (i * 2), "%02x", hash[i]);
+        }
+    } else {
+        hash_str[0] = '\0';
     }
 
     int fd = open("/etc/shadow", O_RDONLY);
@@ -50,7 +81,13 @@ int main(int argc, char *argv[]) {
         close(fd);
         return 1;
     }
-    chmod("/etc/shadow.tmp", 0600);
+    if (chmod("/etc/shadow.tmp", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow.tmp\n");
+        close(temp_fd);
+        close(fd);
+        unlink("/etc/shadow.tmp");
+        return 1;
+    }
 
     int found = 0;
     char line[MAX_LINE];
@@ -109,11 +146,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    unlink("/etc/shadow");
-    rename("/etc/shadow.tmp", "/etc/shadow");
+    if (rename("/etc/shadow.tmp", "/etc/shadow") < 0) {
+        printf("Error: Failed to rename /etc/shadow.tmp\n");
+        return 1;
+    }
 
     /* Enforce shadow file permissions */
-    chmod("/etc/shadow", 0600);
+    if (chmod("/etc/shadow", 0600) < 0) {
+        printf("Error: Failed to set permissions on /etc/shadow\n");
+        return 1;
+    }
 
     printf("Password for user '%s' changed successfully.\n", username);
     return 0;

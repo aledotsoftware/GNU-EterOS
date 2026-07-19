@@ -1,6 +1,6 @@
 /**
  * éterOS - Driver de Mouse PS/2
- * Copyright (c) 2026 Tudex Networks. All rights reserved.
+ * Copyright (c) 2025 Tudex Networks. All rights reserved.
  *
  * Driver básico para mouse PS/2 (IRQ 12).
  * Soporta protocolo estándar de 3 bytes (X, Y, Botones).

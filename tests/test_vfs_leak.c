@@ -62,6 +62,7 @@ typedef struct fs_node {
     create_type_t create;
     mkdir_type_t mkdir;
     unlink_type_t unlink;
+    int (*rename)(struct fs_node*, char*, struct fs_node*, char*);
     link_type_t link;
     struct fs_node *ptr;
     uint32_t ref_count;
@@ -128,8 +129,8 @@ int main() {
     if (node) {
         printf("Result: Found node '%s'\n", node->name);
         printf("Stats: Alloc=%d, Free=%d\n", kmalloc_count, kfree_count);
-        if (kmalloc_count != 2 || kfree_count != 1) {
-            printf("FAIL: Expected 2 allocs, 1 free.\n");
+        if (kmalloc_count != 3 || kfree_count != 2) {
+            printf("FAIL: Expected 3 allocs, 2 frees.\n");
             return 1;
         }
         kfree(node);
@@ -149,12 +150,12 @@ int main() {
         printf("Result: Found node '%s'\n", node->name);
         printf("Stats: Alloc=%d, Free=%d\n", kmalloc_count, kfree_count);
 
-        if (kmalloc_count != 4) {
-             printf("FAIL: Expected 4 allocs. Got %d.\n", kmalloc_count);
+        if (kmalloc_count != 5) {
+             printf("FAIL: Expected 5 allocs. Got %d.\n", kmalloc_count);
              return 1;
         }
-        if (kfree_count != 3) {
-             printf("FAIL: Expected 3 frees. Got %d.\n", kfree_count);
+        if (kfree_count != 4) {
+             printf("FAIL: Expected 4 frees. Got %d.\n", kfree_count);
              return 1;
         }
 
