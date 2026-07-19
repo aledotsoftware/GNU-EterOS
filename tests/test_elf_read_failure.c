@@ -269,7 +269,7 @@ int main() {
     printf("Setting up ELF Read Failure Test...\n");
 
     /* Map memory at 4GB to simulate the target load address */
-    void* mapping = mmap((void*)0x100000000ULL, 4096 * 4, PROT_READ | PROT_WRITE,
+    void* mapping = mmap((void*)0x200000000ULL, 4096 * 4, PROT_READ | PROT_WRITE,
                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
 
     if (mapping == MAP_FAILED) {
@@ -295,7 +295,7 @@ int main() {
     prog_header.p_type = PT_LOAD;
     prog_header.p_flags = PF_R | PF_X;
     prog_header.p_offset = 4096;
-    prog_header.p_vaddr = 0x100000000;
+    prog_header.p_vaddr = 0x200000000;
     prog_header.p_paddr = 0;
     prog_header.p_memsz = 4096;
     prog_header.p_filesz = 4096;
