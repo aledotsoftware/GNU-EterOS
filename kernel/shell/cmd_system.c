@@ -46,6 +46,12 @@ static void shell_run_user_task(void) {
         current->fd_table[2].offset = 0;
     }
 
+    if (task_setup_private_pml4() == 0) {
+        serial_write_string("[RUN] Error: Failed to setup private PML4 for UserRun task.\n");
+        kfree(path);
+        return;
+    }
+
     uint64_t entry_point = elf_load_file(path, 0x200000000);
     if (entry_point == 0) {
         serial_write_string("[RUN] Error: No se pudo cargar el ELF en la tarea de usuario.\n");

@@ -47,7 +47,7 @@
 /* ========================================================================= */
 #define ETEROS_VERSION_MAJOR    0
 #define ETEROS_VERSION_MINOR    2  /* Bump for SMP support */
-#define ETEROS_VERSION_PATCH    19
+#define ETEROS_VERSION_PATCH    48
 #define ETEROS_CODENAME         "Genesis SMP"
 
 /* ========================================================================= */

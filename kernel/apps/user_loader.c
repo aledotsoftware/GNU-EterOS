@@ -104,6 +104,11 @@ static void enter_loaded_user_program(uint64_t entry_point, const char* arg0) {
 void user_loader_entry(void) {
     serial_write_string("[USER] Starting User Mode Loader...\n");
 
+    if (task_setup_private_pml4() == 0) {
+        serial_write_string("[USER] Error: Failed to setup private PML4 for User Mode.\n");
+        while(1) { task_yield(); hal_cpu_halt(); }
+    }
+
     setup_user_stdio();
 
     uint64_t entry_point = 0;

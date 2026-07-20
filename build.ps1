@@ -111,7 +111,7 @@ if ($Arch -eq "x86_64") {
     $LD = Find-Tool "x86_64-elf-ld" $crossSearchPaths
     $OBJCOPY = Find-Tool "x86_64-elf-objcopy" $crossSearchPaths
     $BOOT_DIR = "boot\x86_64"
-    $CARCHFLAGS = @("-m64", "-mcmodel=large", "-mno-red-zone", "-mno-sse", "-mno-sse2", "-mno-mmx", "-D__x86_64__", "-DARCH_X86_64")
+    $CARCHFLAGS = @("-m64", "-mno-red-zone", "-mno-sse", "-mno-sse2", "-mno-mmx", "-D__x86_64__", "-DARCH_X86_64")
     $LDFLAGS_ARCH = @("-m", "elf_x86_64")
     $VBOX_OSTYPE = "Other_64"
 }
@@ -208,7 +208,10 @@ $CFLAGS = @(
     "-Wall",
     "-Wextra",
     "-O2",
-    "-I$INCLUDE_DIR"
+    "-fno-cprop-registers",
+    "-I$INCLUDE_DIR",
+    "-I$KERNEL_DIR\net\lwip\src\include",
+    "-I$KERNEL_DIR\net\lwip_port"
 ) + $CARCHFLAGS
 
 # Archivos fuente comunes
@@ -237,14 +240,61 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\drivers\rtc\rtc.c",
     "$KERNEL_DIR\drivers\pci\pci.c",
     "$KERNEL_DIR\drivers\net\e1000.c",
+    
+    # Net core & lwIP sources
     "$KERNEL_DIR\net\core\nic.c",
-    "$KERNEL_DIR\net\core\dhcp.c",
-    "$KERNEL_DIR\net\core\dhcp_parser.c",
-    "$KERNEL_DIR\net\core\stack.c",
-    "$KERNEL_DIR\net\core\raw_tcp.c",
-    "$KERNEL_DIR\net\core\tcp.c",
     "$KERNEL_DIR\net\core\ip_utils.c",
-    "$KERNEL_DIR\net\core\lwip_stubs.c",
+    "$KERNEL_DIR\net\socket.c",
+    "$KERNEL_DIR\net\compat.c",
+    
+    # lwIP core sources
+    "$KERNEL_DIR\net\lwip\src\core\init.c",
+    "$KERNEL_DIR\net\lwip\src\core\def.c",
+    "$KERNEL_DIR\net\lwip\src\core\dns.c",
+    "$KERNEL_DIR\net\lwip\src\core\inet_chksum.c",
+    "$KERNEL_DIR\net\lwip\src\core\ip.c",
+    "$KERNEL_DIR\net\lwip\src\core\mem.c",
+    "$KERNEL_DIR\net\lwip\src\core\memp.c",
+    "$KERNEL_DIR\net\lwip\src\core\netif.c",
+    "$KERNEL_DIR\net\lwip\src\core\pbuf.c",
+    "$KERNEL_DIR\net\lwip\src\core\raw.c",
+    "$KERNEL_DIR\net\lwip\src\core\stats.c",
+    "$KERNEL_DIR\net\lwip\src\core\sys.c",
+    "$KERNEL_DIR\net\lwip\src\core\tcp.c",
+    "$KERNEL_DIR\net\lwip\src\core\tcp_in.c",
+    "$KERNEL_DIR\net\lwip\src\core\tcp_out.c",
+    "$KERNEL_DIR\net\lwip\src\core\timeouts.c",
+    "$KERNEL_DIR\net\lwip\src\core\udp.c",
+    
+    # lwIP IPv4 sources
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\acd.c",
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\autoip.c",
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\etharp.c",
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\icmp.c",
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\igmp.c",
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\ip4_frag.c",
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\ip4.c",
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\ip4_addr.c",
+    "$KERNEL_DIR\net\lwip\src\core\ipv4\dhcp.c",
+    
+    # lwIP netif
+    "$KERNEL_DIR\net\lwip\src\netif\ethernet.c",
+    
+    # lwIP port
+    "$KERNEL_DIR\net\lwip_port\ethernetif.c",
+    "$KERNEL_DIR\net\lwip_port\sys_arch.c",
+    
+    # lwIP API sources
+    "$KERNEL_DIR\net\lwip\src\api\api_lib.c",
+    "$KERNEL_DIR\net\lwip\src\api\api_msg.c",
+    "$KERNEL_DIR\net\lwip\src\api\err.c",
+    "$KERNEL_DIR\net\lwip\src\api\if_api.c",
+    "$KERNEL_DIR\net\lwip\src\api\netbuf.c",
+    "$KERNEL_DIR\net\lwip\src\api\netdb.c",
+    "$KERNEL_DIR\net\lwip\src\api\netifapi.c",
+    "$KERNEL_DIR\net\lwip\src\api\sockets.c",
+    "$KERNEL_DIR\net\lwip\src\api\tcpip.c",
+
     "$KERNEL_DIR\mm\heap.c",
     "$KERNEL_DIR\mm\pmm.c",
     "$KERNEL_DIR\mm\vmm.c",
@@ -271,11 +321,14 @@ $KERNEL_SRCS = @(
     "$KERNEL_DIR\drivers\input\input.c",
     "$KERNEL_DIR\drivers\tty.c",
     "$KERNEL_DIR\gfx\gfx.c",
+    "$KERNEL_DIR\gfx\drm.c",
     "$KERNEL_DIR\gfx\window.c",
+    "$KERNEL_DIR\gfx\png.c",
     "$KERNEL_DIR\fs\elf.c",
     "$KERNEL_DIR\crypto\sha256.c",
     "$KERNEL_DIR\crypto\sha512.c",
-    "$KERNEL_DIR\crypto\ed25519.c"
+    "$KERNEL_DIR\crypto\ed25519.c",
+    "$KERNEL_DIR\crypto\tweetnacl.c"
 )
 
 # Archivos específicos de arquitectura
@@ -332,6 +385,13 @@ function Initialize-BuildDirs {
         "$BUILD_DIR\$KERNEL_DIR\drivers\disk",
         "$BUILD_DIR\$KERNEL_DIR\net",
         "$BUILD_DIR\$KERNEL_DIR\net\core",
+        "$BUILD_DIR\$KERNEL_DIR\net\lwip",
+        "$BUILD_DIR\$KERNEL_DIR\net\lwip\src",
+        "$BUILD_DIR\$KERNEL_DIR\net\lwip\src\core",
+        "$BUILD_DIR\$KERNEL_DIR\net\lwip\src\core\ipv4",
+        "$BUILD_DIR\$KERNEL_DIR\net\lwip\src\netif",
+        "$BUILD_DIR\$KERNEL_DIR\net\lwip\src\api",
+        "$BUILD_DIR\$KERNEL_DIR\net\lwip_port",
         "$BUILD_DIR\$KERNEL_DIR\mm",
         "$BUILD_DIR\$KERNEL_DIR\apps",
         "$BUILD_DIR\$KERNEL_DIR\fs",
@@ -560,6 +620,19 @@ function Invoke-UserspaceBuild {
     }
     if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar crt0.asm"; exit 1 }
     $libcObjs += $crt0Obj
+
+    # restore_rt
+    $restoreRtSrc = "$libcSrc\restore_rt.asm"
+    $restoreRtObj = "$libcObjDir\restore_rt.o"
+    if (Test-Path $restoreRtSrc) {
+        if ($Arch -eq "x86_64") {
+            & $AS -f elf64 $restoreRtSrc -o $restoreRtObj
+        } else {
+            & $AS -f elf32 $restoreRtSrc -o $restoreRtObj
+        }
+        if ($LASTEXITCODE -ne 0) { Write-Step "ERR" "Fallo al compilar restore_rt.asm"; exit 1 }
+        $libcObjs += $restoreRtObj
+    }
     $libcSources = Get-ChildItem "$libcSrc\*.c"
     foreach ($src in $libcSources) {
         $obj = "$libcObjDir\$($src.Name -replace '\.c$', '.o')"

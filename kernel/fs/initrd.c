@@ -105,6 +105,18 @@ static fs_node_t* initrd_make_dir_node(const char* name, const char* full_path) 
     fnode->create = &initrd_create;
     fnode->unlink = &initrd_unlink;
     fnode->rename = &initrd_rename;
+
+    /* Generate a unique inode for the directory based on its path */
+    uint32_t hash = 5381;
+    if (full_path) {
+        const char* str = full_path;
+        int c;
+        while ((c = (int)*str++)) {
+            hash = ((hash << 5) + hash) + (uint32_t)c;
+        }
+    }
+    fnode->inode = file_count + 1 + (hash & 0x7FFFFFFF);
+
     if (full_path && full_path[0]) {
         size_t n = strlen(full_path) + 1;
         char* p = (char*)kmalloc(n);

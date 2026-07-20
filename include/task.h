@@ -178,6 +178,7 @@ void scheduler_init(void);
  * @return ID de la tarea, o -1 si no hay espacio.
  */
 int task_create(const char* name, void (*entry)(void));
+uint64_t task_setup_private_pml4(void);
 
 /**
  * Llamada desde el timer ISR. Incrementa el tick counter del scheduler

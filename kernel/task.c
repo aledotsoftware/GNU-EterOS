@@ -2346,3 +2346,45 @@ cleanup_error:
     for (int i=0; i<envc; i++) kfree(kenvp[i]);
     return res;
 }
+
+uint64_t task_setup_private_pml4(void) {
+    uint64_t new_cr3_phys = (uint64_t)pmm_alloc_page();
+    if (!new_cr3_phys) return 0;
+    uint64_t* new_pml4 = (uint64_t*)new_cr3_phys;
+    memset(new_pml4, 0, PAGE_SIZE);
+
+    /* Copy Kernel Mappings (Higher Half) */
+    uint64_t* kernel_pml4 = (uint64_t*)tasks[0].cr3;
+    for (int i = 256; i < 512; i++) {
+        new_pml4[i] = kernel_pml4[i];
+    }
+
+    /* Copy Identity Map (Index 0) - Need deep copy of PDPT to separate User Space */
+    uint64_t new_pdpt_phys = (uint64_t)pmm_alloc_page();
+    if (!new_pdpt_phys) {
+        pmm_free_page((void*)new_cr3_phys);
+        return 0;
+    }
+    uint64_t* new_pdpt = (uint64_t*)new_pdpt_phys;
+    memset(new_pdpt, 0, PAGE_SIZE);
+
+    uint64_t kernel_pdpt_phys = kernel_pml4[0] & PAGE_ADDR_MASK;
+    uint64_t* kernel_pdpt = (uint64_t*)kernel_pdpt_phys;
+
+    /* Copy first 8 entries (Identity Map 0-8GB) */
+    for (int i = 0; i < 8; i++) {
+        new_pdpt[i] = kernel_pdpt[i];
+    }
+
+    /* Link PDPT to PML4[0] */
+    new_pml4[0] = new_pdpt_phys | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+
+    /* Switch CR3 */
+    __asm__ volatile("mov %0, %%cr3" : : "r"(new_cr3_phys) : "memory");
+    
+    task_t* current = task_get_current();
+    if (current) {
+        current->cr3 = new_cr3_phys;
+    }
+    return new_cr3_phys;
+}
