@@ -28,7 +28,7 @@ Este documento es el manifiesto técnico y la única fuente de verdad sobre la a
 eterOS no es un clon de UNIX; es una reinvención. Se construye sobre tres pilares:
 *   **Ether-Core (Arquitectura Híbrida):** Combina la estabilidad de un microkernel (aislando drivers en espacio de usuario) con el rendimiento de un núcleo monolítico para operaciones críticas.
 *   **Fluidez Nativa:** Ignoramos el lastre de los 90. Diseñado para hardware moderno: **UEFI/GOP**, **NVMe**, **Multicore (SMP)** y renderizado acelerado.
-*   **Aero-Minimalismo:** Una experiencia visual basada en vectores, transparencias (**Glassmorphism**) y una interfaz fluida denominada **Flux UI**.
+*   **GNU FIRST** Compatibilidad completa con GNU
 
 ### Sistema de Tiers (Portabilidad)
 La HAL permite que eterOS escale según el hardware:
