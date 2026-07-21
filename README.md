@@ -1,4 +1,4 @@
-# 🌌 eterOS: El Sistema Operativo Universal (v0.2.0 "Genesis SMP")
+# 🌌 eterOS: El Sistema Operativo Universal
 
 eterOS es un sistema operativo de **Nueva Era**, desarrollado desde el **"cero absoluto" (Bare-Metal)** en C y ensamblador. Diseñado con una arquitectura de **Kernel Híbrido** y una **HAL (Hardware Abstraction Layer)** universal, su objetivo es ser el tejido conectivo entre microcontroladores IoT, dispositivos móviles ARM64 y potentes servidores x86_64.
 
